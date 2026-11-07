@@ -63,11 +63,12 @@ struct HomeView: View {
         }
     }
 
-    /// About 82% of a phone's width, so the next card peeks (DESIGN §4.1); on a wide screen (landscape,
-    /// iPad) about 42%, so a card stays shorter than the screen and two and a bit show.
+    /// About 82% of a phone's width, so the next card peeks (DESIGN §4.1); on a wide screen (landscape)
+    /// about a third, so a card and its caption stay above the floating tab bar (402 pt of height on its
+    /// side) and nearly three show.
     private static func cardWidth(for width: CGFloat) -> CGFloat {
         let shown = max(width, 320)
-        return (shown * (shown < 600 ? 0.82 : 0.42)).rounded()
+        return (shown * (shown < 600 ? 0.82 : 0.33)).rounded()
     }
 
     private func load() async {
