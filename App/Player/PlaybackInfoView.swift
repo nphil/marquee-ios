@@ -74,8 +74,13 @@ struct PlaybackInfoView: View {
                         copied = true
                     }
                 } label: {
-                    Label(copied ? "Copied" : "Copy Diagnostics", systemImage: copied ? "checkmark" : "doc.on.doc")
-                        .foregroundStyle(theme.accentText)
+                    // A Label in this row drew its title cut off mid-word at accessibility text sizes.
+                    HStack(spacing: Space.s3) {
+                        Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                            .accessibilityHidden(true)
+                        Text(copied ? "Copied" : "Copy Diagnostics")
+                    }
+                    .foregroundStyle(theme.accentText)
                 }
                 .textRole(.body)
                 .accessibilityIdentifier("playbackInfo.copy")
