@@ -33,10 +33,10 @@ final class AppSession {
     private(set) var linkCode: String?
     /// Counts network changes, so a visible server list knows to check its servers again.
     private(set) var networkChanges = 0
-    /// The item whose Play was pressed; RootView explains that playback is not built yet.
-    var playbackNotice: PlexMetadata?
     /// Settings, in a sheet opened from Home's profile button.
     var showsSettings = false
+    /// The full-screen player and whatever keeps playing in Picture in Picture.
+    let player = PlayerCenter()
     /// The profile switcher sheet, opened from the Settings Account row.
     var showsProfileSwitcher = false
     /// The active profile's playback, audio and subtitle settings; every change is saved at once.
@@ -185,6 +185,7 @@ final class AppSession {
     func switchUser(_ profile: PlexHomeUser, pin: String?) async throws {
         guard let tv = plexTV else { return }
         let token = try await tv.switchHomeUser(profile, pin: pin)
+        player.stopAll()
         let profileTV = makePlexTV(token: token)
         let found = try await profileTV.servers().filter(\.isOwnOrHome)
         storage.accountToken = token
@@ -208,6 +209,7 @@ final class AppSession {
         for task in [signInTask, refreshTask, addressTask] { task?.cancel() }
         showsProfileSwitcher = false
         showsSettings = false
+        player.stopAll()
         storage.clearSignIn()
         plexTV = nil
         library = nil
@@ -219,9 +221,21 @@ final class AppSession {
         state = .signedOut
     }
 
-    /// Play and Resume land here until the player exists.
-    func play(item: PlexMetadata) {
-        playbackNotice = item
+    func play(item: PlexMetadata, mediaIndex: Int = 0, fromStart: Bool = false) {
+        player.play(PlaybackRequest(item: item, mediaIndex: mediaIndex, fromStart: fromStart), session: self)
+    }
+
+    /// The audio and subtitle picks remembered for the item's show (or the movie) on this server and profile.
+    func trackMemory(for item: PlexMetadata) -> TrackMemory? {
+        storage.trackMemory(forKey: trackKey(for: item))
+    }
+
+    func remember(_ memory: TrackMemory, for item: PlexMetadata) {
+        storage.setTrackMemory(memory, forKey: trackKey(for: item))
+    }
+
+    private func trackKey(for item: PlexMetadata) -> String {
+        TrackMemory.storageKey(server: server?.id ?? "", profile: user?.uuid ?? "", item: item)
     }
 
     // MARK: Private
@@ -399,7 +413,25 @@ final class AppSession {
         state = .ready
         addressTask?.cancel()
         addressTask = Task { await keepAddress(of: library.connection, reprobe: false) }
+        #if DEBUG
+        playForUITest(library)
+        #endif
     }
+
+    #if DEBUG
+    /// UI tests open the player straight on an item, paused where they want it, against the fake server.
+    private func playForUITest(_ library: PlexLibrary) {
+        let defaults = UserDefaults.standard
+        guard FakePlex.isActive, let key = defaults.string(forKey: "marquee.uitest.play") else { return }
+        Task {
+            guard let item = try? await library.metadata(key) else { return }
+            let time = defaults.double(forKey: "marquee.uitest.playerTime")
+            let request = PlaybackRequest(item: item, startAt: time > 0 ? time : nil, startsPaused: defaults.bool(forKey: "marquee.uitest.paused"))
+            player.play(request, session: self)
+            player.active?.showsStats = defaults.bool(forKey: "marquee.uitest.stats")
+        }
+    }
+    #endif
 
     /// Finds the server's address now, so the first screen does not wait for it, and keeps the one
     /// that answered for the next launch.

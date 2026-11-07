@@ -1,6 +1,5 @@
 import AVFoundation
 import CoreMedia
-import LoopbackHLS
 import MarqueeCore
 import os
 import SwiftUI
@@ -24,6 +23,24 @@ enum EngineLog {
     }()
 }
 
+/// Fetches a file from the server with the authorization headers, so the token stays out of the URL.
+enum PlexFetch {
+    struct Status: LocalizedError {
+        let code: Int
+        var errorDescription: String? { "The server answered \(code)." }
+    }
+
+    static func data(_ path: String, library: PlexLibrary, session: URLSession) async throws -> Data {
+        let base = try await library.connection.connection().uri
+        guard let url = PlexURL.make(base: base, path: path) else { throw URLError(.badURL) }
+        var request = URLRequest(url: url)
+        for (name, value) in library.authorizationHeaders() { request.setValue(value, forHTTPHeaderField: name) }
+        let (data, response) = try await session.data(for: request)
+        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { throw Status(code: http.statusCode) }
+        return data
+    }
+}
+
 /// One subtitle cue for the overlay, its WebVTT markup turned into italic, bold and underlined runs.
 struct TextCue: Sendable, Equatable {
     var start: TimeInterval
@@ -31,38 +48,26 @@ struct TextCue: Sendable, Equatable {
     var text: AttributedString
 }
 
-/// What a downloaded subtitle file holds, ready to draw.
+/// A downloaded subtitle file, ready to draw or to hand to the remux.
 struct SidecarContents: Sendable {
     var cues: [TextCue]
     var bitmaps: SubtitleOverlayTrack?
-    /// The engine's own cues, for a remux that carries them as a rendition.
-    var engineCues: [SubtitleCue]
+    /// The text as a remux rendition.
+    var sidecar: SidecarSubtitles
 }
 
 enum SidecarLoader {
-    enum Failure: LocalizedError {
-        case unsupported(String)
-        case status(Int)
-
-        var errorDescription: String? {
-            switch self {
-            case .unsupported(let format): "\(format.uppercased()) subtitle files can't be shown."
-            case .status(let code): "The server answered \(code) for the subtitle file."
-            }
-        }
+    struct Unsupported: LocalizedError {
+        let format: String
+        var errorDescription: String? { "\(format.uppercased()) subtitle files can't be shown." }
     }
 
-    /// Downloads an external subtitle stream (`/library/streams/<id>`) with the server's headers and
-    /// reads it. The file is deleted once read.
-    static func load(_ track: MarqueeCore.SubtitleTrack, key: String, library: PlexLibrary, session: URLSession) async throws -> SidecarContents {
+    /// Downloads an external subtitle stream (`/library/streams/<id>`) and reads it. The temporary
+    /// file is deleted once read.
+    static func load(_ track: SubtitleTrack, key: String, library: PlexLibrary, session: URLSession) async throws -> SidecarContents {
         let format = track.codec.lowercased()
-        guard let ext = fileExtension(format) else { throw Failure.unsupported(format.isEmpty ? "unknown" : format) }
-        let base = try await library.connection.connection().uri
-        guard let url = PlexURL.make(base: base, path: key) else { throw URLError(.badURL) }
-        var request = URLRequest(url: url)
-        for (name, value) in library.authorizationHeaders() { request.setValue(value, forHTTPHeaderField: name) }
-        let (data, response) = try await session.data(for: request)
-        if let http = response as? HTTPURLResponse, !(200..<300).contains(http.statusCode) { throw Failure.status(http.statusCode) }
+        guard let ext = fileExtension(format) else { throw Unsupported(format: format.isEmpty ? "unknown" : format) }
+        let data = try await PlexFetch.data(key, library: library, session: session)
         let file = FileManager.default.temporaryDirectory.appending(path: "marquee-subtitle-\(UUID().uuidString).\(ext)")
         try data.write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
@@ -70,8 +75,19 @@ enum SidecarLoader {
         return SidecarContents(
             cues: contents.cues.map { TextCue(start: $0.start, end: $0.end, text: CueText.attributed($0.text)) },
             bitmaps: contents.bitmaps.isEmpty ? nil : SubtitleOverlayTrack(contents.bitmaps),
-            engineCues: contents.cues
+            sidecar: SidecarSubtitles(
+                name: name(track),
+                language: track.language.code ?? "und",
+                isForced: track.kind == .onScreenText,
+                isHearingImpaired: track.kind == .captions,
+                cues: contents.cues
+            )
         )
+    }
+
+    /// The rendition name the remux lists a downloaded track under; unique per stream id.
+    static func name(_ track: SubtitleTrack) -> String {
+        "\(track.label) [\(track.id)]"
     }
 
     /// Plex names a sidecar's format by codec. VobSub needs its .idx and .sub pair, which one stream
@@ -87,21 +103,6 @@ enum SidecarLoader {
         default: nil
         }
     }
-
-    static func sidecar(_ contents: SidecarContents, for track: MarqueeCore.SubtitleTrack) -> SidecarSubtitles {
-        SidecarSubtitles(
-            name: sidecarName(track),
-            language: track.language.code ?? "und",
-            isForced: track.kind == .onScreenText,
-            isHearingImpaired: track.kind == .captions,
-            cues: contents.engineCues
-        )
-    }
-
-    /// The rendition name the remux lists a downloaded track under; unique per stream id.
-    static func sidecarName(_ track: MarqueeCore.SubtitleTrack) -> String {
-        "\(track.label) [\(track.id)]"
-    }
 }
 
 /// WebVTT cue text as the engine writes it: `<i>`, `<b>` and `<u>` tags, with `&`, `<` and `>` escaped.
@@ -112,8 +113,7 @@ enum CueText {
         var rest = Substring(markup)
         while !rest.isEmpty {
             if rest.first == "<", let close = rest.firstIndex(of: ">") {
-                let tag = rest[rest.index(after: rest.startIndex)..<close].lowercased()
-                switch tag {
+                switch rest[rest.index(after: rest.startIndex)..<close].lowercased() {
                 case "i": italic += 1
                 case "/i": italic = max(0, italic - 1)
                 case "b": bold += 1
@@ -194,23 +194,26 @@ enum MediaSelection {
 }
 
 /// The subtitle style for text AVPlayer draws. Left to the system's caption settings until the profile
-/// changes the style.
+/// changes the style; `lifted` raises the line above the bottom chrome.
 @MainActor
 enum CaptionStyle {
-    static func rules(for style: SubtitleStyle) -> [AVTextStyleRule]? {
-        guard style != SubtitleStyle() else { return nil }
-        var attributes: [String: Any] = [
-            kCMTextMarkupAttribute_ForegroundColorARGB as String: argb(PictureColours.subtitle(style.colour)),
-            kCMTextMarkupAttribute_BaseFontSizePercentageRelativeToVideoHeight as String: style.size.heightFraction * 100,
-            kCMTextMarkupAttribute_CharacterEdgeStyle as String: edge(style.edge),
-        ]
-        if style.isBold { attributes[kCMTextMarkupAttribute_BoldStyle as String] = true }
-        if style.hasBackground {
-            attributes[kCMTextMarkupAttribute_CharacterBackgroundColorARGB as String] = argb(PictureColours.subtitleBox)
+    static func rules(for style: SubtitleStyle, lifted: Bool) -> [AVTextStyleRule]? {
+        var attributes: [String: Any] = [:]
+        if style != SubtitleStyle() {
+            attributes[kCMTextMarkupAttribute_ForegroundColorARGB as String] = argb(PictureColours.subtitle(style.colour))
+            attributes[kCMTextMarkupAttribute_BaseFontSizePercentageRelativeToVideoHeight as String] = style.size.heightFraction * 100
+            attributes[kCMTextMarkupAttribute_CharacterEdgeStyle as String] = edge(style.edge)
+            if style.isBold { attributes[kCMTextMarkupAttribute_BoldStyle as String] = true }
+            if style.hasBackground {
+                attributes[kCMTextMarkupAttribute_CharacterBackgroundColorARGB as String] = argb(PictureColours.subtitleBox)
+            }
         }
         if style.position == .top {
             attributes[kCMTextMarkupAttribute_OrthogonalLinePositionPercentageRelativeToWritingDirection as String] = 10
+        } else if lifted {
+            attributes[kCMTextMarkupAttribute_OrthogonalLinePositionPercentageRelativeToWritingDirection as String] = 62
         }
+        guard !attributes.isEmpty else { return nil }
         return AVTextStyleRule(textMarkupAttributes: attributes).map { [$0] }
     }
 
@@ -237,9 +240,9 @@ extension PlexMetadata {
     }
 }
 
-/// "1:02:03" or "4:05".
-func clockText(_ seconds: TimeInterval) -> String {
+/// "1:02:03" or "4:05"; "0:04:05" with `hours` set, so the two times beside a long film's scrubber match.
+func clockText(_ seconds: TimeInterval, hours: Bool = false) -> String {
     let total = Int(max(0, seconds.isFinite ? seconds : 0))
-    let hours = total / 3600, minutes = (total / 60) % 60, secs = total % 60
-    return hours > 0 ? String(format: "%d:%02d:%02d", hours, minutes, secs) : String(format: "%d:%02d", minutes, secs)
+    let h = total / 3600, minutes = (total / 60) % 60, secs = total % 60
+    return h > 0 || hours ? String(format: "%d:%02d:%02d", h, minutes, secs) : String(format: "%d:%02d", minutes, secs)
 }

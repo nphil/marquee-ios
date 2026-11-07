@@ -21,6 +21,7 @@ final class SessionStorage {
         static let settingsPrefix = "marquee.settings."
         static let speechDockEnabled = "marquee.speechDock.enabled"
         static let speechDockAddress = "marquee.speechDock.address"
+        static let tracksPrefix = "marquee."
     }
 
     private init(defaults: UserDefaults, keychain: KeychainStore?) {
@@ -78,6 +79,15 @@ final class SessionStorage {
 
     func setSettings(_ settings: ProfileSettings, for profile: String?) {
         defaults.set(try? JSONEncoder().encode(settings), forKey: Key.settingsPrefix + (profile ?? ""))
+    }
+
+    /// The audio and subtitle picks remembered for a show or movie, under `TrackMemory.storageKey`.
+    func trackMemory(forKey key: String) -> TrackMemory? {
+        defaults.data(forKey: Key.tracksPrefix + key).flatMap { try? JSONDecoder().decode(TrackMemory.self, from: $0) }
+    }
+
+    func setTrackMemory(_ memory: TrackMemory, forKey key: String) {
+        defaults.set(try? JSONEncoder().encode(memory), forKey: Key.tracksPrefix + key)
     }
 
     var speechDockEnabled: Bool {

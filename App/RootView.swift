@@ -18,6 +18,7 @@ struct RootView: View {
 
     var body: some View {
         @Bindable var session = session
+        @Bindable var player = session.player
         let theme = store.theme(for: colorScheme)
             .adjusted(increaseContrast: contrast == .increased, reduceTransparency: reduceTransparency)
         let scheme = store.presentationScheme(for: theme)
@@ -34,9 +35,8 @@ struct RootView: View {
         // Sign-in, the server list and the tabs fade into each other rather than cut (DESIGN §9 layer;
         // Reduce Motion keeps a short fade).
         .animation(reduceMotion ? .linear(duration: 0.12) : .easeOut(duration: 0.22), value: stage)
-        .sheet(item: $session.playbackNotice) { item in
-            PlaybackNoticeView(item: item)
-                .preferredColorScheme(scheme)
+        .fullScreenCover(item: $player.presented, onDismiss: { session.player.dismissed() }) { model in
+            PlayerView(model: model, outerTheme: theme, outerScheme: scheme ?? colorScheme)
         }
         .sheet(isPresented: $session.showsSettings) {
             NavigationStack {

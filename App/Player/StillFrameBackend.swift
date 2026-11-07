@@ -26,9 +26,13 @@ final class StillFrameBackend: VideoBackend {
         }
     }
 
-    func play() {}
+    func play() {
+        onEvent?(.state(isPlaying: true, isBuffering: false))
+    }
 
-    func pause() {}
+    func pause() {
+        onEvent?(.state(isPlaying: false, isBuffering: false))
+    }
 
     func seek(to itemTime: TimeInterval, precise: Bool) async -> Bool {
         self.itemTime = itemTime
