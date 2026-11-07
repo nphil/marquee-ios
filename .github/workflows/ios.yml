@@ -108,7 +108,8 @@ jobs:
   app:
     name: App
     runs-on: xcode-27
-    timeout-minutes: 60
+    # The UI and accessibility passes took 48 min on 2026-11-07, the whole job 57.
+    timeout-minutes: 80
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
