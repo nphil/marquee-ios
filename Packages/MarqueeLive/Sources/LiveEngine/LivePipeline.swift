@@ -17,8 +17,9 @@ public final class LivePipeline: @unchecked Sendable {
         /// The tuner answered 200; the stream this one replaces has stopped.
         case connected
         case refused(TunerRefusal)
-        /// Nothing arrived for `firstPictureTimeout` before the first picture, the picture cannot be decoded, or the
-        /// connection broke.
+        /// Nothing arrived for `firstPictureTimeout` before the first picture.
+        case noPicture
+        /// The picture cannot be decoded, or the connection broke.
         case failed(String)
         /// The tuner closed the stream.
         case ended
@@ -178,10 +179,10 @@ public final class LivePipeline: @unchecked Sendable {
         while true {
             wake.lock()
             if !stopped, !pending { _ = wake.wait(until: Date(timeIntervalSinceNow: wait)) }
-            let stop = stopped
+            let ended = stopped
             pending = false
             wake.unlock()
-            if stop { return }
+            if ended { return }
             let now = monotonicNow()
             let total = ring.counts.written
             if total != written {
@@ -189,7 +190,8 @@ public final class LivePipeline: @unchecked Sendable {
                 dataAt = now
             }
             if core.currentPhase == .opening, now - dataAt >= Self.firstPictureTimeout {
-                fail("No picture from the tuner in \(Int(Self.firstPictureTimeout)) s.")
+                onEvent(.noPicture)
+                stop()
                 return
             }
             wait = core.step(now: now)
