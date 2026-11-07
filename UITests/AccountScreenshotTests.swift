@@ -53,9 +53,10 @@ final class AccountAccessibilityScreenshots: XCTestCase {
     }
 }
 
-/// The same screens in landscape, in Rosé Pine. In landscape the swipes that scroll a list did not bring
-/// lower Settings rows in, so Settings is walked upright and each page turned for its shot. Every test
-/// ends upright, so the classes that follow are not affected.
+/// The same screens in landscape, in Rosé Pine. Landscape swipes did not scroll the Settings list and
+/// UI queries over the landscape switcher timed out on a loaded runner, so Settings and the profiles
+/// are walked upright and each page turned for its shot. Every test ends upright, so the classes that
+/// follow are not affected.
 final class AccountLandscapeScreenshots: XCTestCase {
     @MainActor
     func testSignIn() throws {
@@ -71,9 +72,7 @@ final class AccountLandscapeScreenshots: XCTestCase {
 
     @MainActor
     func testProfiles() throws {
-        XCUIDevice.shared.orientation = .landscapeLeft
-        defer { XCUIDevice.shared.orientation = .portrait }
-        try profileFlow(mode: "dark", suffix: "land-rose-pine")
+        try profileFlow(mode: "dark", suffix: "land-rose-pine", turned: true)
     }
 }
 
@@ -163,27 +162,27 @@ extension XCTestCase {
     }
 
     /// The switcher from Settings, Alex's PIN pad, a wrong PIN, then the right one (1234 in the
-    /// fixtures), after which Settings shows Alex.
+    /// fixtures), after which Settings shows Alex; `turned` takes each shot in landscape.
     @MainActor
-    func profileFlow(mode: String, suffix: String) throws {
+    func profileFlow(mode: String, suffix: String, turned: Bool = false) throws {
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine")
         openSettings(in: app)
         tap("settings.profile", in: app)
         waitForBar("Profiles", in: app)
-        try snap("acct-13-profiles-\(suffix)")
+        try snap("acct-13-profiles-\(suffix)", turned: turned)
 
         tap("profile.fake-alex", in: app)
         waitForBar("Alex", in: app)
-        try snap("acct-14-pin-\(suffix)")
+        try snap("acct-14-pin-\(suffix)", turned: turned)
         for digit in [1, 1, 1, 1] { tap("pin.\(digit)", in: app) }
         waitFor("pin.message", in: app)
-        try snap("acct-15-pin-wrong-\(suffix)")
+        try snap("acct-15-pin-wrong-\(suffix)", turned: turned)
 
         for digit in [1, 2, 3, 4] { tap("pin.\(digit)", in: app) }
         let row = element("settings.profile", in: app)
         let switched = expectation(for: NSPredicate(format: "label CONTAINS %@", "Alex"), evaluatedWith: row)
         wait(for: [switched], timeout: 10)
-        try snap("acct-16-settings-alex-\(suffix)")
+        try snap("acct-16-settings-alex-\(suffix)", turned: turned)
     }
 
     /// Waits until a server row has finished checking its addresses.

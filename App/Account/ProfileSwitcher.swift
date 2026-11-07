@@ -24,6 +24,7 @@ struct ProfileSwitcher: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var path: [PlexHomeUser] = []
     @State private var detent = PresentationDetent.medium
     @State private var switching: PlexHomeUser?
@@ -61,8 +62,8 @@ struct ProfileSwitcher: View {
                 }
             }
             // A partial sheet keeps the system glass; at full height iOS makes the sheet opaque and the
-            // list takes the canvas (DESIGN §6).
-            .themedList(theme, onCanvas: detent == .large)
+            // list takes the canvas (DESIGN §6). A landscape phone always shows the sheet at full height.
+            .themedList(theme, onCanvas: detent == .large || verticalSizeClass == .compact)
             .navigationTitle("Profiles")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
