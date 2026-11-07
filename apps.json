@@ -1,0 +1,40 @@
+{
+  "name": "Marquee",
+  "subtitle": "Plex for iPhone",
+  "description": "Feather and AltStore source for Marquee, a native Plex client for iPhone.",
+  "iconURL": "https://raw.githubusercontent.com/nphil/marquee-ios/main/Resources/AppIcon-1024.png",
+  "website": "https://github.com/nphil/marquee-ios",
+  "tintColor": "#A79BF5",
+  "apps": [
+    {
+      "name": "Marquee",
+      "bundleIdentifier": "com.nphil.marquee",
+      "developerName": "Nitin",
+      "subtitle": "Plex for iPhone",
+      "localizedDescription": "A native Plex client for iPhone, in 40 colour themes.",
+      "iconURL": "https://raw.githubusercontent.com/nphil/marquee-ios/main/Resources/AppIcon-1024.png",
+      "tintColor": "#A79BF5",
+      "category": "entertainment",
+      "deviceFamilies": [
+        1
+      ],
+      "appPermissions": {
+        "entitlements": [],
+        "privacy": {
+          "NSLocalNetworkUsageDescription": "Marquee looks for Plex servers on the local network and plays from them."
+        }
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "buildVersion": "0.1.0",
+          "date": "2026-11-07T02:11:12Z",
+          "localizedDescription": "Unsigned IPA, built from 6e8aa7a.",
+          "downloadURL": "https://github.com/nphil/marquee-ios/releases/download/v0.1.0/Marquee.ipa",
+          "size": 687427,
+          "minOSVersion": "27.0"
+        }
+      ]
+    }
+  ]
+}

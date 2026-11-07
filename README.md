@@ -21,7 +21,7 @@ Video remux and transcode use [stashy-videoengine](https://github.com/nphil/stas
 Add this source in Feather or AltStore:
 
 ```
-https://github.com/nphil/marquee-ios/releases/download/feed/apps.json
+https://raw.githubusercontent.com/nphil/marquee-ios/main/apps.json
 ```
 
 Each release also carries `Marquee.ipa` for a manual install. Marquee needs iOS 27.
@@ -32,6 +32,6 @@ There is no local Mac. GitHub Actions builds on the `xcode-27` runner image (`.g
 
 - **Core:** the theme checker and the MarqueeCore tests.
 - **App:** an unsigned Release build for iPhone, then UI tests on the iPhone 18 Pro simulator (iOS 27.0) that save a screenshot of each screen in several themes as the `screens` artifact.
-- **Release** (`main` only): the IPA goes out as a GitHub release `vX.Y.Z`, one patch above the newest tag, and the source `apps.json` on the `feed` release gains that version. Nothing is committed back to `main`.
+- **Release** (`main` only): the IPA goes out as a GitHub release `vX.Y.Z`, one patch above the newest tag, and CI commits the new version to `apps.json` on `main` (`[skip ci]`). `apps.json` is CI-owned; never edit it by hand.
 
 The Xcode project is generated from `project.yml` with XcodeGen and is not stored in git.
