@@ -22,6 +22,7 @@ struct AppearanceView: View {
                 Text(store.matchSystem
                      ? "Marquee follows the iPhone's light or dark appearance, with a theme for each."
                      : "One theme, whatever the iPhone's appearance.")
+                    .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)
 
@@ -68,6 +69,8 @@ private struct SlotRow: View {
     let mode: ThemeMode
     let theme: Theme
 
+    @Environment(\.theme) private var active
+
     var body: some View {
         HStack(spacing: Space.s4) {
             ThemePreview(theme: theme, cornerRadius: Radius.control)
@@ -76,7 +79,7 @@ private struct SlotRow: View {
             VStack(alignment: .leading, spacing: Space.s1) {
                 Text(mode.title)
                 Text(theme.name)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(active.ink2)
             }
         }
     }

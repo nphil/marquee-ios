@@ -70,6 +70,21 @@ final class ScreenshotTests: XCTestCase {
         try snap("18-grid-light-dawn")
     }
 
+    /// CI runs this on its own in a second pass, with Increase Contrast on and the text size at
+    /// accessibility 2, where the theme grid drops to two columns.
+    @MainActor
+    func testAccessibilitySettings() throws {
+        let app = launch(matchSystem: false, fixedMode: "light", dark: "rose-pine")
+        try snap("19-ax-home-dawn")
+        open(tab: "Settings", title: "Settings", in: app)
+        try snap("20-ax-settings-dawn")
+        tap("settings.theme", in: app)
+        waitForBar("Appearance", in: app)
+        try snap("21-ax-appearance-dawn")
+        app.swipeUp()
+        try snap("22-ax-grid-dawn")
+    }
+
     // MARK: - Steps
 
     /// Launches with the theme settings given as launch arguments, which override the saved ones.

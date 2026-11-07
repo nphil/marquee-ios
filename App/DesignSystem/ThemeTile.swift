@@ -87,6 +87,10 @@ struct ThemeTile: View {
                                 .foregroundStyle(active.focusInk)
                                 .frame(width: badge, height: badge)
                                 .background(active.focus, in: Circle())
+                                // A page-coloured rim keeps the badge apart from a tile of its own tone
+                                // (a dark tile on a light page, where focus is near-black).
+                                .padding(2)
+                                .background(active.canvas, in: Circle())
                                 .offset(x: -Space.s2, y: Space.s2)
                                 .accessibilityHidden(true)
                         }

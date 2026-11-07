@@ -155,6 +155,7 @@ jobs:
             -destination "id=$UDID" \
             -derivedDataPath build/DD-sim \
             -resultBundlePath build/UITests.xcresult \
+            -skip-testing:MarqueeUITests/ScreenshotTests/testAccessibilitySettings \
             2>&1 | tee xcodebuild-test.log | xcbeautify
           STATUS=${PIPESTATUS[0]}
           set -e
@@ -165,6 +166,22 @@ jobs:
               | sed -E 's#^(.+):([0-9]+):([0-9]+): error: (.*)$#::error file=\1,line=\2,col=\3::\4#'
           fi
           exit "$STATUS"
+
+      - name: Screenshots with Increase Contrast and accessibility text size
+        env:
+          UDID: ${{ steps.simulator.outputs.udid }}
+        run: |
+          set -o pipefail
+          xcrun simctl ui "$UDID" increase_contrast enabled
+          xcrun simctl ui "$UDID" content_size accessibility-large
+          TEST_RUNNER_SCREENS_DIR="$PWD/screens" xcodebuild test-without-building \
+            -project Marquee.xcodeproj \
+            -scheme Marquee \
+            -destination "id=$UDID" \
+            -derivedDataPath build/DD-sim \
+            -resultBundlePath build/UITests-accessibility.xcresult \
+            -only-testing:MarqueeUITests/ScreenshotTests/testAccessibilitySettings \
+            2>&1 | xcbeautify
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -177,7 +194,7 @@ jobs:
         if: failure()
         with:
           name: UITests-xcresult
-          path: build/UITests.xcresult
+          path: build/UITests*.xcresult
           if-no-files-found: ignore
 
   release:

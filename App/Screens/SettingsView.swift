@@ -14,14 +14,22 @@ struct SettingsView: View {
                 NavigationLink {
                     AppearanceView()
                 } label: {
-                    LabeledContent("Theme", value: theme.name)
+                    LabeledContent {
+                        Text(theme.name).foregroundStyle(theme.ink2)
+                    } label: {
+                        Text("Theme")
+                    }
                 }
                 .accessibilityIdentifier("settings.theme")
             }
             .listRowBackground(theme.sheet)
 
             Section("About") {
-                LabeledContent("Version", value: version)
+                LabeledContent {
+                    Text(version).foregroundStyle(theme.ink2)
+                } label: {
+                    Text("Version")
+                }
                 NavigationLink("Open-Source Notices") {
                     NoticesView()
                 }
