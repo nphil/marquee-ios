@@ -70,6 +70,7 @@ struct PlayerChrome: View {
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)
+            .accessibilityIdentifier("player.title")
             .accessibilityAction(named: model.showsStats ? "Hide stats for nerds" : "Show stats for nerds") {
                 model.showsStats.toggle()
             }

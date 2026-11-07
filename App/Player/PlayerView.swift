@@ -106,6 +106,7 @@ struct PlayerView: View {
         }
         .onAppear { rotate(to: .landscape) }
         .onDisappear { rotate(to: .portrait) }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("player")
     }
 
