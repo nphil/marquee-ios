@@ -108,8 +108,8 @@ jobs:
   app:
     name: App
     runs-on: xcode-27
-    # The UI and accessibility passes took 48 min on 2026-11-07, the whole job 57.
-    timeout-minutes: 80
+    # The whole job ran 79 min on 2026-11-07 once the player, Live TV and Home Rows UI tests were all in.
+    timeout-minutes: 110
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
