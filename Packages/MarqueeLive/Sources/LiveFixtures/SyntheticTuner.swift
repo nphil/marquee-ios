@@ -5,7 +5,7 @@ import LiveEngine
 /// written into a ring at the pace a tuner sends them until the ring's reader cancels it.
 public enum SyntheticTuner {
     public static func feed(_ ring: ByteRing, slateSeconds: Double = 1) {
-        Thread.detachNewThread {
+        let thread = Thread {
             defer { ring.finish() }
             guard let stream = try? SyntheticTS([.slate(seconds: slateSeconds), .station(seconds: 2)]) else { return }
             let started = ContinuousClock.now
@@ -29,5 +29,8 @@ public enum SyntheticTuner {
                 }
             }
         }
+        // As TunerConnection's queue: the pipeline's reader and the main thread wait on the ring's lock.
+        thread.qualityOfService = .userInteractive
+        thread.start()
     }
 }

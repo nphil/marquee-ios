@@ -97,7 +97,9 @@ public final class TunerConnection: NSObject, URLSessionDataDelegate, @unchecked
         configuration.timeoutIntervalForResource = .greatestFiniteMagnitude
         let queue = OperationQueue()
         queue.maxConcurrentOperationCount = 1
-        queue.qualityOfService = .userInitiated
+        // The pipeline's reader and the main thread wait on the ring's lock this queue writes under; any lower and
+        // they would wait on a lower-priority thread.
+        queue.qualityOfService = .userInteractive
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
         var request = URLRequest(url: url)
         #if !canImport(FoundationNetworking)
