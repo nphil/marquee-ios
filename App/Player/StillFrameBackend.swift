@@ -2,8 +2,8 @@
 import AVFoundation
 import UIKit
 
-/// The UI tests' frame source. The simulator decodes no video, so a fixture picture
-/// (`frames/player.jpg` in the fake Plex folder) stands in for it. Its clock reports time the way
+/// The UI tests' frame source. The simulator decodes no video, so a fixture picture (the path in the
+/// fake Plex folder given as `-marquee.uitest.frame`) stands in for it. Its clock reports time the way
 /// AVPlayer's periodic observer does: every 0.1 s while playing, and once after a seek or a stop.
 @MainActor
 final class StillFrameBackend: VideoBackend {
@@ -15,7 +15,8 @@ final class StillFrameBackend: VideoBackend {
     private var clock: Task<Void, Never>?
 
     init(root: URL) {
-        image = UIImage(contentsOfFile: root.appending(path: "frames/player.jpg").path(percentEncoded: false))
+        let frame = UserDefaults.standard.string(forKey: "marquee.uitest.frame") ?? ""
+        image = frame.isEmpty ? nil : UIImage(contentsOfFile: root.appending(path: frame).path(percentEncoded: false))
     }
 
     func load(_ item: AVPlayerItem?) {
