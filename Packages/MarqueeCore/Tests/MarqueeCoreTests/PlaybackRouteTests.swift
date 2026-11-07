@@ -235,13 +235,27 @@ struct PlaybackRouteTests {
 
     // MARK: Limits
 
-    @Test func qualityLimitAndFailedPlaybackGoToTheServer() throws {
+    @Test func qualityLimitAndServerReasonsGoToTheServer() throws {
         let file = try Self.file("mp4", bitrate: 20_000)
 
         let limited = Self.route(file, limits: RouteLimits(maxBitrateKbps: 8_000))
-        let failed = Self.route(file, limits: RouteLimits(serverOnly: true))
 
         #expect(limited.kind == .serverTranscode && limited.reencodesVideo && limited.reasons == [.bitrateLimit(kbps: 8_000)])
-        #expect(failed.kind == .serverTranscode && !failed.reencodesVideo && failed.reasons == [.onDeviceFailed])
+        for reason in [RouteReason.onDeviceFailed, .directPlayOff, .airPlay] {
+            let route = Self.route(file, limits: RouteLimits(serverReason: reason))
+            #expect(route.kind == .serverTranscode && !route.reencodesVideo && route.reasons == [reason])
+        }
+    }
+
+    @Test func forcedDirectPlayNeverUsesTheServer() throws {
+        let mkv = try Self.file("mkv", video: Fixture.video("vc1"), streams: [Fixture.audio(2, "eng"), Fixture.subtitle(3, "eng", codec: "pgs")])
+        let mp4 = try Self.file("mp4", video: Fixture.video("vc1"))
+
+        let remuxed = Self.route(mkv, subtitle: Self.subtitle(3, in: mkv, .handPick), limits: RouteLimits(phoneOnly: true))
+        let direct = Self.route(mp4, limits: RouteLimits(phoneOnly: true))
+
+        #expect(remuxed.kind == .remux && !remuxed.reencodesVideo && remuxed.reasons == [.container("mkv")])
+        #expect(remuxed.subtitle == .notShown(mkv.tracks.subtitles[0]))
+        #expect(direct.kind == .directPlay && direct.reasons.isEmpty)
     }
 }

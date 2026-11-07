@@ -13,7 +13,7 @@
 - `PlexHTTPClient` (actor): adds identity and token headers. `send` retries a read once after a dropped connection, never a write or a timeout; `decode` parses JSON off the actor; `setToken` after a profile switch.
 - `PlexError`: `unauthorized` (401), `unreachable(NetworkFailure)`, `server(status:message:)`, `decoding`, `pinExpired`, `profilePINRejected`, `noConnections`. Carries no token or URL, so it is safe to log.
 - `PlexMediaContainer`, `PlexMetadata`, `PlexMedia`, `PlexPart`, `PlexStream`, `PlexMarker`, `PlexChapter`, `PlexRole`, `PlexHub`, `PlexDirectory`, `PlexLibrarySection`, `PlexMediaType`: Plex JSON. Every field is optional and read whether Plex sends `"1"`, `1` or `true`; a bad field never drops its item.
-- `PlexMetadata.markers(_:)`: intro, credits or commercial markers in playback order. `onDeck`: the episode to play next on a show's details.
+- `PlexMetadata.markers(_:)`: intro, credits or commercial markers in playback order. `onDeck`: the episode to play next on a show's details. `PlexPart.hasSceneThumbnails`: the server has scrubber thumbnails at `/library/parts/<id>/indexes/sd`.
 - `KeychainStore`, `KeychainError`: the account token and server list, readable after first unlock.
 - `PlexTV`: the plex.tv account API.
   - `createPIN(strong:)`, `authURL(for:forwardURL:)`, `checkPIN(_:)`, `waitForToken(_:every:now:sleep:)`: PIN sign-in. A strong PIN is for the browser; a 4-character one is typed at plex.tv/link.
@@ -78,7 +78,7 @@ Tracks titled Signs or Songs count as on-screen text, as the spec's forced-word 
   - Server re-encode for video the phone cannot decode, Dolby Vision it cannot show, HDR on an SDR screen, HLS level or frame-rate limits, a quality limit, or a hand-picked subtitle to burn in.
   - Unplayable audio is first swapped for a playable track in the same language. Automatic subtitle picks never burn; a remembered one burns only when the video is re-encoded anyway.
 - `PlaybackRoute`: kind, `RouteReason`s, played audio and whether it stands in, audio conversion, video re-encode, `SubtitleDelivery` (sidecar, in stream, burned in, not shown).
-- `RouteReason`: plain-English reasons. `RouteLimits`: server only after an on-device failure, bitrate cap.
+- `RouteReason`: plain-English reasons. `RouteLimits`: a server reason (on-device failure, direct play off, AirPlay), phone only (Direct play forced: never the server, unshowable subtitles not shown), bitrate cap.
 - `TranscodeRequest`: start offset, quality, video copy and burn-in for `PlexLibrary.transcodeURL(_:)`. The server takes audio and subtitle from the streams set with `selectStreams`. `init(live:)` streams a tuned channel; the server copies H.264 and HEVC and converts MPEG-2.
 
 ## Live TV (`Live/`)

@@ -292,9 +292,11 @@ public struct PlexPart: Sendable, Hashable, Identifiable, Decodable {
     public var size: Int?
     public var container: String?
     public var streams: [PlexStream]
+    /// The server made scene thumbnails for the scrubber (`indexes` lists `sd`).
+    public var hasSceneThumbnails: Bool
 
     enum CodingKeys: String, CodingKey {
-        case id, key, duration, file, size, container
+        case id, key, duration, file, size, container, indexes
         case streams = "Stream"
     }
 
@@ -307,6 +309,7 @@ public struct PlexPart: Sendable, Hashable, Identifiable, Decodable {
         size = c.int(.size)
         container = c.string(.container)
         streams = c.list(.streams)
+        hasSceneThumbnails = c.string(.indexes)?.split(separator: ",").contains("sd") ?? false
     }
 
     public var videoStream: PlexStream? { streams.first { $0.kind == .video } }

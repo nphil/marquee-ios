@@ -18,7 +18,7 @@ struct PlexModelsTests {
             "Media": [[
                 "id": 1, "container": "mkv", "videoCodec": "hevc", "bitrate": "18000",
                 "Part": [[
-                    "id": 77, "key": "/library/parts/77/file.mkv", "duration": 1_450_000,
+                    "id": 77, "key": "/library/parts/77/file.mkv", "duration": 1_450_000, "indexes": "sd",
                     "Stream": [
                         ["id": 1, "streamType": 1, "codec": "HEVC", "bitDepth": 10, "DOVIPresent": "1",
                          "DOVIProfile": 8, "DOVIBLCompatID": 1, "colorTrc": "SMPTE2084"],
@@ -47,7 +47,9 @@ struct PlexModelsTests {
         #expect(credits[1].isFinal && credits[1].contains(1_460_000))
         #expect(!credits[0].contains(1_320_000))
 
-        let streams = try #require(item.media.first?.parts.first?.streams)
+        let part = try #require(item.media.first?.parts.first)
+        #expect(part.hasSceneThumbnails)
+        let streams = part.streams
         #expect(streams[0].codec == "hevc" && streams[0].colorTrc == "smpte2084")
         #expect(streams[0].dolbyVision?.profile == 8 && streams[0].dolbyVision?.baseLayerCompatibility == 1)
         #expect(streams[1].kind == .audio && streams[1].isDefault)

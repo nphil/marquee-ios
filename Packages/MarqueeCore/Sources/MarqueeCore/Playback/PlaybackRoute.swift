@@ -64,13 +64,17 @@ public enum RouteReason: Sendable, Hashable, CustomStringConvertible {
     case burnsSubtitle
     /// Playing on the phone failed, so the server takes over.
     case onDeviceFailed
+    /// Direct play is turned off in Settings.
+    case directPlayOff
+    /// AirPlay is showing the video, and the receiver cannot reach a stream made on the phone.
+    case airPlay
 
     /// The server has to re-encode the video for this reason.
     var needsReencode: Bool {
         switch self {
         case .videoCodec, .videoFormat, .dolbyVision, .hdrOnSDRScreen, .levelOrFrameRate, .bitrateLimit, .burnsSubtitle:
             true
-        case .container, .hevcTag, .dolbyVisionBaseLayer, .audio, .onDeviceFailed:
+        case .container, .hevcTag, .dolbyVisionBaseLayer, .audio, .onDeviceFailed, .directPlayOff, .airPlay:
             false
         }
     }
@@ -89,19 +93,25 @@ public enum RouteReason: Sendable, Hashable, CustomStringConvertible {
         case .bitrateLimit(let kbps): "Quality limit \(kbps / 1000) Mbps"
         case .burnsSubtitle: "Subtitles burned in"
         case .onDeviceFailed: "Playing on the phone failed"
+        case .directPlayOff: "Direct play turned off"
+        case .airPlay: "AirPlay needs a server stream"
         }
     }
 }
 
-/// Limits set in the player.
+/// Limits set in the player and in Settings.
 public struct RouteLimits: Sendable, Hashable {
-    /// Use the server: the on-device route failed for this item.
-    public var serverOnly: Bool
+    /// Why the server streams even what the phone could play: `.onDeviceFailed`, `.directPlayOff` or
+    /// `.airPlay`.
+    public var serverReason: RouteReason?
+    /// Settings force direct play: every file plays on the phone as it is, never through the server.
+    public var phoneOnly: Bool
     /// The picked quality in kbit/s; a source above it is transcoded down.
     public var maxBitrateKbps: Int?
 
-    public init(serverOnly: Bool = false, maxBitrateKbps: Int? = nil) {
-        self.serverOnly = serverOnly
+    public init(serverReason: RouteReason? = nil, phoneOnly: Bool = false, maxBitrateKbps: Int? = nil) {
+        self.serverReason = serverReason
+        self.phoneOnly = phoneOnly
         self.maxBitrateKbps = maxBitrateKbps
     }
 }
@@ -118,6 +128,9 @@ public enum PlaybackRouteDecider {
     /// Audio the phone cannot play is first swapped for a playable track in the same language (not
     /// commentary, same dub-ness and audio description). Subtitle defaults never burn; a remembered pick
     /// burns only when the video is re-encoded anyway.
+    ///
+    /// With `limits.phoneOnly` the server is never used: the file plays directly, or through the remux when
+    /// it needs one, and a subtitle only the server could show is not shown.
     ///
     /// - Parameter hevcSampleEntry: `hvc1` or `hev1` when the app has read the MP4's sample entry; HEVC in
     ///   an MP4 without it is remuxed to be safe.
@@ -137,7 +150,7 @@ public enum PlaybackRouteDecider {
         var serverReasons: [RouteReason] = []
         var remuxReasons: [RouteReason] = []
 
-        if limits.serverOnly { serverReasons.append(.onDeviceFailed) }
+        if let reason = limits.serverReason { serverReasons.append(reason) }
         if let video, let reason = undecodable(video, codec: codec, capabilities) { serverReasons.append(reason) }
         if let cap = limits.maxBitrateKbps, let bitrate = media.bitrate, bitrate > cap { serverReasons.append(.bitrateLimit(kbps: cap)) }
 
@@ -172,7 +185,11 @@ public enum PlaybackRouteDecider {
 
         var kind: PlaybackRoute.Kind
         var reencodes = serverReasons.contains(where: \.needsReencode)
-        if !serverReasons.isEmpty {
+        if limits.phoneOnly {
+            serverReasons = []
+            reencodes = false
+            kind = remuxReasons.isEmpty || !capabilities.canRemux ? .directPlay : .remux
+        } else if !serverReasons.isEmpty {
             kind = .serverTranscode
         } else if remuxReasons.isEmpty {
             kind = .directPlay
@@ -181,7 +198,7 @@ public enum PlaybackRouteDecider {
         } else {
             kind = .serverTranscode
         }
-        if kind != .directPlay, !reencodes, let video, let reason = hlsLimit(video, codec: codec, capabilities) {
+        if !limits.phoneOnly, kind != .directPlay, !reencodes, let video, let reason = hlsLimit(video, codec: codec, capabilities) {
             serverReasons.append(reason)
             kind = .serverTranscode
             reencodes = true
@@ -191,6 +208,8 @@ public enum PlaybackRouteDecider {
         if let track = subtitle.track {
             if let onPhone = onDevice(track, kind: kind, reencodes: reencodes, capabilities) {
                 delivery = onPhone
+            } else if limits.phoneOnly {
+                delivery = .notShown(track)
             } else {
                 switch subtitle.source {
                 case .handPick:
