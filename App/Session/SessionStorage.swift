@@ -23,6 +23,8 @@ final class SessionStorage {
         static let settingsPrefix = "marquee.settings."
         static let speechDockEnabled = "marquee.speechDock.enabled"
         static let speechDockAddress = "marquee.speechDock.address"
+        static let bazarrAddress = "marquee.bazarr.address"
+        static let bazarrKey = "marquee.bazarr.key"
         static let tracksPrefix = "marquee."
     }
 
@@ -101,6 +103,18 @@ final class SessionStorage {
     var speechDockAddress: String {
         get { defaults.string(forKey: Key.speechDockAddress) ?? "" }
         set { defaults.set(newValue, forKey: Key.speechDockAddress) }
+    }
+
+    /// Bazarr's address and API key; the key is a secret like the Plex sign-in. Kept through sign-out.
+    var bazarr: BazarrConfig? {
+        get {
+            guard let address = defaults.url(forKey: Key.bazarrAddress), let key = secret(Key.bazarrKey) else { return nil }
+            return BazarrConfig(address: address, apiKey: String(decoding: key, as: UTF8.self))
+        }
+        set {
+            defaults.set(newValue?.address, forKey: Key.bazarrAddress)
+            setSecret(newValue.map { Data($0.apiKey.utf8) }, for: Key.bazarrKey)
+        }
     }
 
     /// Sign-out: the token and servers leave the Keychain; settings and themes stay.

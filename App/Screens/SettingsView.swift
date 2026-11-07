@@ -128,6 +128,15 @@ struct SettingsView: View {
                     }
                 }
                 .accessibilityIdentifier("settings.speechDock")
+                NavigationLink {
+                    BazarrView()
+                } label: {
+                    LabeledContent("Bazarr") {
+                        Text(session.bazarr.config == nil ? "Off" : "On")
+                            .foregroundStyle(theme.ink2)
+                    }
+                }
+                .accessibilityIdentifier("settings.bazarr")
             }
             .listRowBackground(theme.sheet)
 

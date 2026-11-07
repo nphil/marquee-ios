@@ -68,6 +68,8 @@ final class AppSession {
     private var profileSettings = ProfileSettings()
     private var speechDockOn = false
     private var speechDockText = ""
+    /// Bazarr (DESIGN §8.7 Integrations), kept per iPhone like SpeechDock.
+    let bazarr: BazarrSettings
 
     /// Made again by Delete All Local Data, which removes the stored client identifier.
     private(set) var identity: PlexClientIdentity
@@ -92,6 +94,7 @@ final class AppSession {
         let configuration = URLSessionConfiguration.default
         FakePlex.install(into: configuration)
         transport = URLSessionTransport(session: URLSession(configuration: configuration))
+        bazarr = BazarrSettings(storage: storage, transport: transport)
         speechDockOn = storage.speechDockEnabled
         speechDockText = storage.speechDockAddress
         restore()
