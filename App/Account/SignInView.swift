@@ -9,19 +9,26 @@ struct SignInView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
     @Environment(\.webAuthenticationSession) private var browser
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var confirmingSignOut = false
 
     var body: some View {
+        // A landscape phone is too short for the code panel under the mark, so they sit side by side.
+        let layout = verticalSizeClass == .compact
+            ? AnyLayout(HStackLayout(spacing: Space.s8))
+            : AnyLayout(VStackLayout(spacing: Space.s7))
         GeometryReader { proxy in
             ScrollView {
-                VStack(spacing: Space.s7) {
-                    MarqueeMark()
-                        .frame(maxWidth: 240)
-                        .accessibilityHidden(true)
-                    Text("Marquee")
-                        .textRole(.display)
-                        .foregroundStyle(theme.ink)
-                        .accessibilityAddTraits(.isHeader)
+                layout {
+                    VStack(spacing: Space.s7) {
+                        MarqueeMark()
+                            .frame(maxWidth: 240)
+                            .accessibilityHidden(true)
+                        Text("Marquee")
+                            .textRole(.display)
+                            .foregroundStyle(theme.ink)
+                            .accessibilityAddTraits(.isHeader)
+                    }
                     content
                         .frame(maxWidth: 420)
                 }
