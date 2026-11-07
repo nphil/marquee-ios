@@ -27,13 +27,17 @@ public final class LiveStreamPlayer {
         case refused(TunerRefusal)
         /// Nothing came for 5 s before the first picture.
         case noPicture
-        /// The connection broke, or the picture cannot be decoded.
-        case broken(String)
+        /// The connection broke.
+        case lost(String)
+        /// The stream cannot be read or its pictures decoded.
+        case unreadable(String)
         /// The tuner closed the stream.
         case ended
     }
 
     public private(set) var state = State.idle
+    /// Called after every change of `state`.
+    @ObservationIgnored public var onStateChange: ((State) -> Void)?
     /// The tuner's slate stands in for the station after a dropout.
     public private(set) var slateOnScreen = false
     public private(set) var audioTracks: [LiveAudioTrack] = []
@@ -90,7 +94,7 @@ public final class LiveStreamPlayer {
     /// Ends the stream and frees the tuner; the last picture stays. `resume()` opens the same URL again.
     public func close() {
         if let pipeline { end(pipeline) }
-        state = .idle
+        move(to: .idle)
         slateOnScreen = false
     }
 
@@ -114,7 +118,7 @@ public final class LiveStreamPlayer {
         }
         self.pipeline = pipeline
         pipeline.setVideoEnabled(showsVideo)
-        state = .opening
+        move(to: .opening)
         slateOnScreen = false
         audioTracks = []
         diagnostics = LiveDiagnostics()
@@ -142,8 +146,14 @@ public final class LiveStreamPlayer {
 
     private func fail(_ failure: Failure) {
         if let pipeline { end(pipeline) }
-        state = .failed(failure)
+        move(to: .failed(failure))
         slateOnScreen = false
+    }
+
+    private func move(to new: State) {
+        guard new != state else { return }
+        state = new
+        onStateChange?(new)
     }
 
     /// The events of the stream on screen; a replaced or closed stream's are dropped.
@@ -161,9 +171,12 @@ public final class LiveStreamPlayer {
         case .noPicture:
             LiveLog.line("failed", ["reason": "no picture in \(Int(LivePipeline.firstPictureTimeout)) s"])
             fail(.noPicture)
+        case .lost(let message):
+            LiveLog.line("lost", ["reason": message])
+            fail(.lost(message))
         case .failed(let message):
             LiveLog.line("failed", ["reason": message])
-            fail(.broken(message))
+            fail(.unreadable(message))
         case .ended:
             LiveLog.line("ended")
             fail(.ended)
@@ -177,7 +190,7 @@ public final class LiveStreamPlayer {
         switch event {
         case .phase(let phase):
             let resumed = state == .stalled && phase == .playing
-            state = State(phase)
+            move(to: State(phase))
             signposts?.reached(phase)
             switch phase {
             case .opening: break

@@ -19,7 +19,9 @@ public final class LivePipeline: @unchecked Sendable {
         case refused(TunerRefusal)
         /// Nothing arrived for `firstPictureTimeout` before the first picture.
         case noPicture
-        /// The picture cannot be decoded, or the connection broke.
+        /// The connection broke.
+        case lost(String)
+        /// The stream cannot be read or its pictures decoded.
         case failed(String)
         /// The tuner closed the stream.
         case ended
@@ -108,7 +110,7 @@ public final class LivePipeline: @unchecked Sendable {
             onEvent(.refused(refusal))
             stop()
         case .ended(let error):
-            onEvent(error.map { .failed($0) } ?? .ended)
+            onEvent(error.map { .lost($0) } ?? .ended)
         }
     }
 
