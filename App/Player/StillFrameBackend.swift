@@ -3,7 +3,8 @@ import AVFoundation
 import UIKit
 
 /// The UI tests' frame source. The simulator decodes no video, so a fixture picture
-/// (`frames/player.jpg` in the fake Plex folder) stands in for it, paused where the test put it.
+/// (`frames/player.jpg` in the fake Plex folder) stands in for it. Its clock reports time the way
+/// AVPlayer's periodic observer does: every 0.1 s while playing, and once after a seek or a stop.
 @MainActor
 final class StillFrameBackend: VideoBackend {
     let image: UIImage?
@@ -11,12 +12,15 @@ final class StillFrameBackend: VideoBackend {
     var onEvent: ((BackendEvent) -> Void)?
     private(set) var itemTime: TimeInterval = 0
     var itemDuration: TimeInterval? { nil }
+    private var clock: Task<Void, Never>?
 
     init(root: URL) {
         image = UIImage(contentsOfFile: root.appending(path: "frames/player.jpg").path(percentEncoded: false))
     }
 
     func load(_ item: AVPlayerItem?) {
+        stopClock()
+        itemTime = 0
         guard item != nil else { return }
         // Answered on the next turn, as AVPlayer would.
         Task { @MainActor [weak self] in
@@ -27,21 +31,42 @@ final class StillFrameBackend: VideoBackend {
     }
 
     func play() {
+        guard clock == nil else { return }
         onEvent?(.state(isPlaying: true, isBuffering: false))
+        clock = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(100))
+                guard let self, !Task.isCancelled else { return }
+                itemTime += 0.1
+                onEvent?(.time(itemTime))
+            }
+        }
     }
 
     func pause() {
+        stopClock()
         onEvent?(.state(isPlaying: false, isBuffering: false))
+        onEvent?(.time(itemTime))
     }
 
     func seek(to itemTime: TimeInterval, precise: Bool) async -> Bool {
         self.itemTime = itemTime
-        onEvent?(.time(itemTime))
+        // The observer reports the jump on a later turn, after the seek's caller has moved on.
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            onEvent?(.time(self.itemTime))
+        }
         return true
     }
 
     func tearDown() {
+        stopClock()
         onEvent = nil
+    }
+
+    private func stopClock() {
+        clock?.cancel()
+        clock = nil
     }
 }
 #endif
