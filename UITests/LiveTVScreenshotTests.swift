@@ -178,7 +178,13 @@ extension XCTestCase {
         // The player turns the screen on its side; turning the phone with it keeps the shots upright.
         XCUIDevice.shared.orientation = .landscapeLeft
         let stop = element("liveplayer.stop", in: app)
-        XCTAssertTrue(stop.waitForExistence(timeout: 10), "Channel 2.1 did not play")
+        // Stop shows once the channel plays and fades with the controls 3 s later. At accessibility sizes
+        // turning the screen took most of that window (Stop on screen 16.8-19.0 s, first check at 19.4 s),
+        // so a missed Stop is raised again with a tap on the picture.
+        if !stop.waitForExistence(timeout: 10) {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        }
+        XCTAssertTrue(stop.waitForExistence(timeout: 5), "Channel 2.1 did not play")
         try snap("livetv-13-player-\(suffix)")
 
         raiseLiveControls(in: app)
