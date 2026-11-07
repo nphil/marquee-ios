@@ -31,16 +31,18 @@ final class AudioSession {
         ]
     }
 
+    /// Activation is asynchronous: the blocking `setActive` stalls the main thread while the system
+    /// settles audio with other apps, and iOS 27 warns about calling it there.
     func activate() {
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, mode: .moviePlayback)
-        try? session.setActive(true)
+        session.activate { _, _ in }
     }
 
     /// Lets the music another app paused resume.
     func deactivate() {
         for token in tokens { NotificationCenter.default.removeObserver(token) }
         tokens = []
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        AVAudioSession.sharedInstance().deactivate(options: .notifyOthersOnDeactivation) { _, _ in }
     }
 }
