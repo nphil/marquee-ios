@@ -90,7 +90,7 @@ Marquee's own path on 2.1 (720p60 MPEG-2, AC-3 stereo; 2026-11-07, O): tune 0.77
 
 `LiveRouteDecider` runs before every tune. First match wins:
 
-1. Settings › Video & Playback › Read the Tuner Directly (on by default) is off → Plex.
+1. Settings › Video & Playback › Live TV › Direct from Tuner (on by default) is off → Plex.
 2. The phone is not on the home network (`NetworkPath`), or `GET <uri>/discover.json` fails within 0.5 s (cached 60 s) → Plex.
 3. The device's grabber is not HDHomeRun (`Device.uuid` does not start with `device://tv.plex.grabbers.hdhomerun/`) → Plex. Real HDHomeRuns, LumaTuner and the HDHomeRun-emulating IPTV proxies (xTeVe, Threadfin and similar) all pass.
 4. AirPlay video is the chosen output → Plex.

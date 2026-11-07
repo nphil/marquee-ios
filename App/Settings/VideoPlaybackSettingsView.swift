@@ -63,10 +63,12 @@ struct VideoPlaybackSettingsView: View {
             .listRowBackground(theme.sheet)
 
             Section {
-                Toggle("Read the Tuner Directly", isOn: $session.settings.readsTunerDirectly)
+                Toggle("Direct from Tuner", isOn: $session.settings.readsTunerDirectly)
                     .accessibilityIdentifier("video.readsTunerDirectly")
+            } header: {
+                Text("Live TV")
             } footer: {
-                Text("Live TV plays the home network's HDHomeRun straight from the tuner, and through Plex when away or when that fails.")
+                Text("At home, channels play straight from the HDHomeRun; away from home, or if that fails, they play through Plex.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)

@@ -17,7 +17,7 @@ import UIKit
 final class LiveRouter: LiveVideoSource {
     let direct = DirectLiveSource()
     let plex: PlexLiveSource
-    /// Settings › Video & Playback › Read the Tuner Directly is off.
+    /// Settings › Video & Playback › Live TV › Direct from Tuner is off.
     var prefersPlex = false
     /// The route of the current tune.
     private(set) var route: LiveRoute?
