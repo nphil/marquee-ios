@@ -201,8 +201,9 @@ jobs:
           zip -qry Marquee.ipa Payload
           BYTES=$(wc -c < Marquee.ipa | tr -d ' ')
           echo "Executable: $(wc -c < "$APP/$EXE" | tr -d ' ') bytes. IPA: $BYTES bytes."
-          # Sized for the shell (291 KB, no FFmpeg yet); raise it when the video engine links.
-          if [ "$BYTES" -lt 200000 ]; then
+          # The engine's FFmpeg is most of the IPA (12.5 MB in v0.1.7, executable 31.4 MB); one under
+          # 6 MB has lost it.
+          if [ "$BYTES" -lt 6000000 ]; then
             echo "::error::Marquee.ipa is only $BYTES bytes."
             exit 1
           fi
