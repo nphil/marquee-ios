@@ -87,6 +87,8 @@ public struct RecordingRule: Identifiable, Hashable, Sendable {
     /// "New Airings Only" and the like.
     public var airingsType: String?
     public var librarySectionTitle: String?
+    /// The library the recordings go into; the Recorded list reads it.
+    public var targetLibrarySectionID: Int?
     public var thumb: String?
     public var settings: [RecordSetting]
     /// The airings this rule has scheduled or is recording.
@@ -98,6 +100,7 @@ public struct RecordingRule: Identifiable, Hashable, Sendable {
         title: String,
         airingsType: String? = nil,
         librarySectionTitle: String? = nil,
+        targetLibrarySectionID: Int? = nil,
         thumb: String? = nil,
         settings: [RecordSetting] = [],
         recordings: [ScheduledRecording] = []
@@ -107,6 +110,7 @@ public struct RecordingRule: Identifiable, Hashable, Sendable {
         self.title = title
         self.airingsType = airingsType
         self.librarySectionTitle = librarySectionTitle
+        self.targetLibrarySectionID = targetLibrarySectionID
         self.thumb = thumb
         self.settings = settings
         self.recordings = recordings
