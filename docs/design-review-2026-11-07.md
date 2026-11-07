@@ -6,12 +6,13 @@ A second pass over the iPhone build against DESIGN.md and the reference apps, fr
 2. **Medium: format chips looked like controls.** "4K", "Dolby Vision" and "Atmos" used the capsule, outline and near-same type as the Version and Season menus under them, so they read as tappable. `App/DesignSystem/Chips.swift`, `Chip`. Fixed: small Caption Semibold badges in ink2.
 3. **Medium: cast without photos was a row of identical silhouettes.** `CastShelf` in `DetailView.swift`. Fixed: the person's initials on the placeholder fill.
 4. **Medium: in landscape the tab bar covered Continue Watching.** The cards were 42% of the width, so each title and its time left sat under the floating bar at rest. `App/Screens/HomeView.swift`, `cardWidth`. Fixed: a third of the width.
-5. **Low: a rating with no format chips stood alone on its own line** (every show). Fixed: the rating ends the meta line.
-6. **Low: in landscape the tab bar covers the top of the Version menu on a movie.** It is the first row below the fold, and the bar tucks away on scroll in Home and Library. Unchanged.
-7. **Low: the Library's Jump To menu shows `textformat.abc`,** which reads as the word "Abc" beside the View menu. It is the accessible twin of the A–Z rail. Unchanged.
-8. **Low: episode synopses are Caption (12 pt),** small for the only prose in the row. Unchanged.
+5. **Medium: art could stay a grey tile.** When a load of the same art finished between a view's first frame and its load task (a prefetch, or the backdrop under the hero's mirror), the view kept the fill it drew on that frame until it was rebuilt; the Caminandes poster in Search stayed grey in most CI runs, and the mirror sometimes showed a grey band. `App/Images/PlexArtView.swift`. Fixed: the load task takes the image from memory when it is already there.
+6. **Low: a rating with no format chips stood alone on its own line** (every show). Fixed: the rating ends the meta line.
+7. **Low: in landscape the tab bar covers the top of the Version menu on a movie.** It is the first row below the fold, and the bar tucks away on scroll in Home and Library. Unchanged.
+8. **Low: the Library's Jump To menu shows `textformat.abc`,** which reads as the word "Abc" beside the View menu. It is the accessible twin of the A–Z rail. Unchanged.
+9. **Low: episode synopses are Caption (12 pt),** small for the only prose in the row. Unchanged.
 
-Grey art tiles in the screenshots are the trackOff fill of art still loading when the shot was taken (§11), not missing art. Sign-in, the PIN pad, server and profile lists, Settings and its pages, empty Search and the Watchlist title that is not on the server hold up against §8 and the reference apps.
+Sign-in, the PIN pad, server and profile lists, Settings and its pages, empty Search and the Watchlist title that is not on the server hold up against §8 and the reference apps.
 
 Findings in the player and Live TV went to their owners, whose branches (`player`, `player-stats`, `live-preview`) carry commits for each; those were not on main at the time of writing:
 
