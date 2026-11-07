@@ -169,13 +169,13 @@ private struct DetailPage: View {
             }
             .padding(.bottom, Space.s7)
         }
-        // Read inside the edge the page ignores, so the top inset is the bars' height.
+        .ignoresSafeArea(.container, edges: isLandscape ? [] : .top)
+        // Read outside the edge the page ignores: inside it, the top inset is zero.
         .onGeometryChange(for: CGFloat.self) { proxy in
             proxy.safeAreaInsets.top
         } action: { top in
             barInset = top.isFinite ? max(top, 0) : 0
         }
-        .ignoresSafeArea(.container, edges: isLandscape ? [] : .top)
         .scrollEdgeEffectStyle(.soft, for: .top)
         .swipeActionsContainer()
         .onScrollGeometryChange(for: Bool.self) { geometry in
@@ -982,15 +982,16 @@ private struct DetailSkeleton: View {
                 .padding(.top, Space.s3)
             } else {
                 VStack(alignment: .leading, spacing: Space.s4) {
-                    theme.trackOff
+                    // Below the bars like the backdrop, and filled on up under them like its mirror.
+                    Color.clear
                         .frame(height: (max(width, 1) * 9 / 16).rounded())
+                        .background(theme.trackOff, ignoresSafeAreaEdges: .top)
                     lines
                         .padding(.horizontal, Space.inset)
                 }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .ignoresSafeArea(.container, edges: landscape ? [] : .top)
         .accessibilityHidden(true)
     }
 
