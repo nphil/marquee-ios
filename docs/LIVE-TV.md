@@ -1,6 +1,6 @@
 # Live TV design
 
-Status: decided. Built: L1, L2, L3 and L6, and of L5 the player gestures, channel card, Quick Guide and last channel (no PiP, Now Playing or AirPlay switch yet). The player plays through Plex; the direct path is not routed yet (L4b). The Plex path is timed against the home server (§1.3); the §7.1 test sheet and the L2 scroll trace have not been run on a phone. Scope: the Live TV tab of Marquee for iPhone (iOS 27): guide, channel surfing, live playback and DVR. It works with any source Plex Live TV supports and is tuned first for LumaTuner, the LumaTV plugin that shares the LG TV's antenna tuner as a one-tuner HDHomeRun on port 5004.
+Status: decided. Built: L1, L2, L3, L4a, L4b and L6, and of L5 the player gestures, channel card, Quick Guide and last channel (no PiP, Now Playing or AirPlay switch yet). At home the player reads the tuner directly and carries on through Plex when that fails (§2.2). The Plex path is timed against the home server (§1.3) and the direct path on BeastNAS (§4.1); L0, the direct path's phone receipt (L4b), the §7.1 test sheet and the L2 scroll trace have not been run on a phone. Scope: the Live TV tab of Marquee for iPhone (iOS 27): guide, channel surfing, live playback and DVR. It works with any source Plex Live TV supports and is tuned first for LumaTuner, the LumaTV plugin that shares the LG TV's antenna tuner as a one-tuner HDHomeRun on port 5004.
 
 Source key used in citations:
 

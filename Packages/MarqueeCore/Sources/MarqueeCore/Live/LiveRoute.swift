@@ -10,7 +10,7 @@ public enum LiveRoute: Sendable, Hashable {
 
 /// Why a channel goes through Plex, in the order the rules are checked.
 public enum PlexRouteReason: Sendable, Hashable {
-    /// Settings › Live TV › Playback is "Through Plex".
+    /// Settings › Video & Playback › Live TV › Direct from Tuner is off.
     case setting
     case awayFromHome
     /// The tuner did not answer `discover.json` in time.
