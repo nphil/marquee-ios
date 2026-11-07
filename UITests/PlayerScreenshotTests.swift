@@ -142,6 +142,9 @@ private extension XCTestCase {
         let app = launchPlayer(at: 132, paused: false, mode: "dark")
         let next = element("player.playNext", in: app)
         XCTAssertTrue(next.waitForExistence(timeout: 10), "No Up Next card")
+        if element("player.close", in: app).exists {
+            XCTAssertFalse(element("player.playPause", in: app).exists, "The transport shows under the Up Next card")
+        }
         try snap("player-11-up-next-\(suffix)")
         XCTAssertTrue(next.waitForNonExistence(timeout: 8), "Up Next did not move on")
 
@@ -173,8 +176,10 @@ private extension XCTestCase {
         ]
         if let introSkipDelay { arguments += ["-marquee.uitest.introSkipDelay", String(introSkipDelay)] }
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", light: "paper", arguments: arguments, waitingFor: nil)
-        let landed = element("player.playPause", in: app).waitForExistence(timeout: 20)
-            || element("player.skipIntro", in: app).exists || element("player.playNext", in: app).exists
+        // Up Next hides the transport, so whichever control shows first means the player is up.
+        let landed = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier IN %@", ["player.playPause", "player.skipIntro", "player.playNext"]))
+            .firstMatch.waitForExistence(timeout: 20)
         let failure = element("player.failed", in: app)
         XCTAssertTrue(landed, failure.exists ? "Playback failed: \(failure.label)" : "The player did not open")
         return app

@@ -119,8 +119,20 @@ struct PlayerChrome: View {
         case .finished:
             FinishedCard(model: model, close: close)
         case .playing:
-            transport
+            // The Up Next card covers the middle of a phone on its side and carries its own play, so the
+            // transport steps aside while it shows; Watch Credits brings it back. It leaves the tree: at
+            // zero opacity its buttons stayed in the accessibility tree. The spacers keep the top and
+            // bottom rows in place.
+            if !upNextShowing {
+                transport
+                    .transition(.opacity)
+            }
         }
+    }
+
+    private var upNextShowing: Bool {
+        guard case .upNext? = model.offer else { return false }
+        return true
     }
 
     private var transport: some View {
@@ -412,16 +424,24 @@ struct TracksMenu: View {
         }
     }
 
+    /// A language with one track goes without a header: its row already starts with the language.
+    @ViewBuilder
     private func subtitleSection(_ group: SubtitleGroup) -> some View {
-        Section(group.name) {
-            ForEach(group.tracks) { track in
-                choice(
-                    track.label,
-                    detail: detail(track.badges, imageFormat: track.imageFormat),
-                    value: SubtitleChoice.track(track.id),
-                    selection: $model.subtitlePick
-                )
-            }
+        if group.tracks.count == 1 {
+            Section { subtitleRows(group) }
+        } else {
+            Section(group.name) { subtitleRows(group) }
+        }
+    }
+
+    private func subtitleRows(_ group: SubtitleGroup) -> some View {
+        ForEach(group.tracks) { track in
+            choice(
+                track.label,
+                detail: detail(track.badges, imageFormat: track.imageFormat),
+                value: SubtitleChoice.track(track.id),
+                selection: $model.subtitlePick
+            )
         }
     }
 
