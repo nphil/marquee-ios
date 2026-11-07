@@ -1,7 +1,5 @@
-import AuthenticationServices
 import MarqueeCore
 import Observation
-// WebAuthenticationSession comes from the AuthenticationServices–SwiftUI overlay.
 import SwiftUI
 import UIKit
 
@@ -71,6 +69,9 @@ final class AppSession {
     let transport: URLSessionTransport
     private let storage: SessionStorage
     @ObservationIgnored private var signInTask: Task<Void, Never>?
+    @ObservationIgnored private let signInBrowser = PlexSignInBrowser()
+    /// plex.tv's approval page while a browser sign-in waits, so it can be opened again.
+    private(set) var signInPage: URL?
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var addressTask: Task<Void, Never>?
     @ObservationIgnored private var networkTask: Task<Void, Never>?
@@ -92,28 +93,30 @@ final class AppSession {
 
     // MARK: Sign-in
 
-    /// Opens plex.tv in the browser sheet. plex.tv forwards back to the app once the code is approved.
-    func signIn(with browser: WebAuthenticationSession) {
+    /// Opens plex.tv's approval page and waits for the code to be approved there. The page closes
+    /// itself once it is, whether or not plex.tv forwards back to the app.
+    func signIn() {
         let tv = beginSignIn()
         signInTask = Task {
             await finishSignIn(tv) {
                 let pin = try await tv.createPIN(strong: true)
                 // The UI tests' fake plex.tv approves every code, and no browser can run there.
                 if FakePlex.isActive { return try await tv.waitForToken(pin) }
-                let forwarded: Bool
-                do {
-                    _ = try await browser.authenticate(
-                        using: tv.authURL(for: pin, forwardURL: Self.forwardURL),
-                        callback: .customScheme("marquee"),
-                        additionalHeaderFields: [:]
-                    )
-                    forwarded = true
-                } catch {
-                    forwarded = false
+                let url = tv.authURL(for: pin, forwardURL: Self.forwardURL)
+                self.signInPage = url
+                self.signInBrowser.open(url)
+                defer {
+                    self.signInBrowser.close()
+                    self.signInPage = nil
                 }
-                return try await Self.approvedToken(pin, tv: tv, forwarded: forwarded)
+                return try await tv.waitForToken(pin)
             }
         }
+    }
+
+    /// Opens plex.tv's approval page again, for someone who closed it before approving.
+    func reopenSignInPage() {
+        if let signInPage { signInBrowser.open(signInPage) }
     }
 
     /// The fallback: a 4-character code typed at plex.tv/link on any device.
@@ -325,16 +328,6 @@ final class AppSession {
             linkCode = nil
             state = .failed(error as? PlexError ?? .unreachable(.other))
         }
-    }
-
-    /// plex.tv approves the code before it forwards, and a person may close the page right after
-    /// approving, so the code is read again: a few times after a forward, once after a close.
-    private static func approvedToken(_ pin: PlexPIN, tv: PlexTV, forwarded: Bool) async throws -> String? {
-        for attempt in 0..<(forwarded ? 5 : 1) {
-            if attempt > 0 { try await Task.sleep(for: .seconds(1)) }
-            if let token = try await tv.checkPIN(pin).authToken { return token }
-        }
-        return nil
     }
 
     private func completeSignIn(token: String, tv: PlexTV, pick: ServerPick) async {

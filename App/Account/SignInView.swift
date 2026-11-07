@@ -1,4 +1,3 @@
-import AuthenticationServices
 import MarqueeCore
 import SwiftUI
 
@@ -8,7 +7,6 @@ import SwiftUI
 struct SignInView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
-    @Environment(\.webAuthenticationSession) private var browser
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var confirmingSignOut = false
 
@@ -59,7 +57,7 @@ struct SignInView: View {
     private var signInButtons: some View {
         VStack(spacing: Space.s4) {
             Button {
-                session.signIn(with: browser)
+                session.signIn()
             } label: {
                 Text("Sign in").frame(maxWidth: .infinity)
             }
@@ -75,14 +73,33 @@ struct SignInView: View {
         }
     }
 
+    /// While plex.tv's page is open, or after it was closed before approving: one line on what to do,
+    /// a way back to the page, and a way out. Approval anywhere moves on by itself.
     private var waiting: some View {
         VStack(spacing: Space.s4) {
             ProgressView()
                 .controlSize(.large)
                 .tint(theme.ink2)
-            Text("Signing in")
+            Text(session.signInPage == nil ? "Signing in" : "Approve Marquee on the Plex page. Marquee carries on by itself.")
                 .textRole(.body)
                 .foregroundStyle(theme.ink2)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            if session.signInPage != nil {
+                Button {
+                    session.reopenSignInPage()
+                } label: {
+                    Text("Open the Plex page").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.pill)
+                .accessibilityIdentifier("signin.reopen")
+                Button("Use a code instead") {
+                    session.signInWithCode()
+                }
+                .textRole(.body)
+                .foregroundStyle(theme.accentText)
+                .frame(minHeight: Size.target)
+            }
             cancelButton
         }
     }
@@ -146,7 +163,7 @@ struct SignInView: View {
                 .buttonStyle(.pill)
             case .unauthorized:
                 Button {
-                    session.signIn(with: browser)
+                    session.signIn()
                 } label: {
                     Text("Sign in again").frame(maxWidth: .infinity)
                 }
@@ -156,7 +173,7 @@ struct SignInView: View {
                     if session.canRetry {
                         session.retry()
                     } else {
-                        session.signIn(with: browser)
+                        session.signIn()
                     }
                 } label: {
                     Text("Try again").frame(maxWidth: .infinity)
