@@ -21,7 +21,7 @@ packages:
     path: Packages/MarqueeLive
   VideoEngine:
     url: https://github.com/nphil/stashy-videoengine.git
-    exactVersion: 2.0.0
+    exactVersion: 2.0.1
 
 targets:
   Marquee:

@@ -60,6 +60,10 @@ private struct ServerRow: View {
     @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var reach: Reach = .checking
+    /// The address the app uses, for the current server.
+    @State private var address: String?
+    /// The latest probe round's lines, for the current server.
+    @State private var probeLines: [String] = []
 
     var body: some View {
         let layout = typeSize.isAccessibilitySize
@@ -73,6 +77,17 @@ private struct ServerRow: View {
                 Text(owner)
                     .textRole(.label)
                     .foregroundStyle(theme.ink2)
+                if let address {
+                    Text("In use: \(address)")
+                        .textRole(.label)
+                        .foregroundStyle(theme.ink2)
+                        .accessibilityIdentifier("server.\(server.id).address")
+                }
+                ForEach(probeLines, id: \.self) { line in
+                    Text(line)
+                        .textRole(.caption)
+                        .foregroundStyle(theme.ink3)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             ReachLabel(reach: reach)
@@ -87,12 +102,18 @@ private struct ServerRow: View {
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(isCurrent ? .isSelected : [])
-        // Checks again when the phone changes networks.
+        // Checks again when the phone changes networks. The current server reports the address the
+        // app actually uses and how its last probe went, rather than a fresh probe of its own.
         .task(id: session.networkChanges) {
             reach = .checking
             do {
-                let connection = try await session.probe(server).connection()
+                let probing = isCurrent ? session.library?.connection ?? session.probe(server) : session.probe(server)
+                let connection = try await probing.connection()
                 reach = Reach(connection)
+                if isCurrent {
+                    address = "\(connection.kindWord) \(connection.displayAddress)"
+                    probeLines = await probing.probeRounds.last?.lines ?? []
+                }
             } catch is CancellationError {
             } catch {
                 reach = .offline

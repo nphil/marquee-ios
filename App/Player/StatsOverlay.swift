@@ -119,12 +119,15 @@ enum PlayerStats {
     struct Server: Sendable {
         var connection: PlexConnection?
         var transcode: PlexTranscodeSession?
+        /// The latest connection probe rounds, oldest first.
+        var probes: [ProbeRound] = []
 
         @MainActor static func read(_ model: PlayerModel) async -> Server {
             let library = model.library
-            let connection = try? await library.connection.connection()
-            guard let session = model.transcodeSession else { return Server(connection: connection) }
-            return Server(connection: connection, transcode: try? await library.transcodeSession(session))
+            let connection = await library.connection.currentConnection
+            let probes = await library.connection.probeRounds
+            guard let session = model.transcodeSession else { return Server(connection: connection, probes: probes) }
+            return Server(connection: connection, transcode: try? await library.transcodeSession(session), probes: probes)
         }
     }
 
@@ -142,9 +145,14 @@ enum PlayerStats {
         if let fallback = model.fallback {
             lines.append(Line("Fallback", fallback))
         }
-        if let connection = server?.connection {
-            let kind = connection.isRelay ? "Relay" : connection.isLocal ? "Local" : "Remote"
-            lines.append(Line("Server", "\(kind) · \(connection.displayAddress)"))
+        if let detail = model.failureDetail {
+            lines.append(Line("Error", detail))
+        }
+        if let connection = model.streamConnection ?? server?.connection {
+            lines.append(Line("Server", "\(connection.kindWord) · \(connection.displayAddress)"))
+        }
+        for (i, line) in (server?.probes.last?.lines ?? []).enumerated() {
+            lines.append(Line("Probe \(i + 1)", line))
         }
         let file = [
             (model.part?.container ?? model.media?.container)?.uppercased(),
@@ -183,9 +191,16 @@ enum PlayerStats {
         }
         if let item = model.player?.currentItem {
             if let event = item.accessLog()?.events.last {
-                var network = event.observedBitrate > 0 ? mbps(event.observedBitrate) : "–"
-                if event.indicatedBitrate > 0 { network += " · stream \(mbps(event.indicatedBitrate))" }
-                lines.append(Line("Network", network))
+                // A remux plays from the phone's own loopback server; the link that matters is the read
+                // from the media server.
+                if let remux = model.remux {
+                    let rate = remux.progress.sourceBytesPerSecond
+                    lines.append(Line("Network", rate.map { "\(mbps($0 * 8)) from the server" } ?? "–"))
+                } else {
+                    var network = event.observedBitrate > 0 ? mbps(event.observedBitrate) : "–"
+                    if event.indicatedBitrate > 0 { network += " · stream \(mbps(event.indicatedBitrate))" }
+                    lines.append(Line("Network", network))
+                }
                 lines.append(Line("Frames", "\(max(0, event.numberOfDroppedVideoFrames)) dropped · \(max(0, event.numberOfStalls)) stalls"))
             }
             lines.append(Line("Buffer", "\(bufferAhead(item).formatted(.number.precision(.fractionLength(1)))) s ahead"))
@@ -226,6 +241,14 @@ enum PlayerStats {
         text += (stream(model, server: server) + health(model, server: server)).map { "\($0.label): \($0.value)" }
         let engine = EngineDiagnostics.report()
         if !engine.isEmpty { text += ["", "Engine:", engine] }
+        if let rounds = server?.probes, !rounds.isEmpty {
+            text += ["", "Connection probes:"]
+            for round in rounds {
+                let picked = round.picked.map { "\($0.kindWord) \($0.displayAddress)" } ?? "none"
+                text.append("\(round.started.formatted(date: .omitted, time: .standard)) · picked \(picked)")
+                text += round.lines.map { "  \($0)" }
+            }
+        }
         if let hardware = model.capabilities.hardware { text += ["", "Hardware:"] + hardware.reportLines() }
         return text.joined(separator: "\n")
     }
