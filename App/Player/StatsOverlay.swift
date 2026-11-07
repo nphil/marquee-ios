@@ -6,7 +6,9 @@ import VideoEngine
 import os
 
 /// Stats for nerds: what is playing and how the player keeps up, refreshed twice a second. Two columns
-/// in landscape. Only the Copy button takes touches; the rest passes through to the picture.
+/// in landscape. Only the Copy button takes touches; the rest passes through to the picture. Copy sits
+/// beside the lines at the top: at large text sizes the panel runs down under the scrubber and bottom
+/// row, which would otherwise cover it while the controls show.
 struct StatsOverlay: View {
     let model: PlayerModel
     @Environment(\.theme) private var theme
@@ -15,7 +17,7 @@ struct StatsOverlay: View {
     @State private var copied = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
+        HStack(alignment: .top, spacing: Space.s3) {
             TimelineView(.periodic(from: .now, by: 0.5)) { _ in
                 columns(stream: PlayerStats.stream(model, server: server), health: PlayerStats.health(model, server: server))
                     // One layer redrawn twice a second, rather than dozens of text layers composited over
@@ -30,8 +32,7 @@ struct StatsOverlay: View {
         }
         .textRole(.caption)
         .monospaced()
-        .padding(.horizontal, Space.s3)
-        .padding(.top, Space.s3)
+        .padding(Space.s3)
         .background {
             ZStack {
                 RoundedRectangle(cornerRadius: Radius.row).fill(theme.glassRaised)
@@ -87,8 +88,9 @@ struct StatsOverlay: View {
             }
         } label: {
             Label(copied ? "Copied" : "Copy", systemImage: copied ? "checkmark" : "doc.on.doc")
+                .fixedSize()
                 .foregroundStyle(theme.ink)
-                .frame(minHeight: Size.target)
+                .frame(minWidth: Size.target, minHeight: Size.target, alignment: .topLeading)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

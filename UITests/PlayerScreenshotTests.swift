@@ -84,7 +84,11 @@ private extension XCTestCase {
         XCTAssertTrue(stats.waitForExistence(timeout: 5), "No Stats for Nerds item")
         stats.tap()
         waitFor("player.stats", in: app)
-        XCTAssertTrue(app.buttons["player.stats.copy"].exists, "No Copy button on the stats overlay")
+        let copy = app.buttons["player.stats.copy"]
+        XCTAssertTrue(copy.exists, "No Copy button on the stats overlay")
+        for control in ["player.scrubber", "player.previous", "player.playPause"] {
+            XCTAssertFalse(copy.frame.intersects(element(control, in: app).frame), "\(control) covers the stats Copy button")
+        }
         try snap("player-06-stats-\(suffix)")
     }
 
@@ -104,11 +108,12 @@ private extension XCTestCase {
         waitFor("player.info", in: app)
         try snap("player-04-playback-info-\(suffix)")
         // app.swipeUp() left this landscape sheet unscrolled, so the drag runs between two points of
-        // the list. At accessibility sizes the section is several screens down.
+        // the list. At accessibility sizes the section is several screens down, and the row is
+        // hittable while only its top shows, so the drags go on until it is whole on screen.
         let list = app.collectionViews["player.info"]
         let copy = app.buttons["Copy Diagnostics"]
         var drags = 0
-        while !(copy.exists && copy.isHittable), drags < 15 {
+        while !(copy.exists && copy.isHittable && list.frame.contains(copy.frame)), drags < 15 {
             list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
                 .press(forDuration: 0.1, thenDragTo: list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)))
             drags += 1
