@@ -34,10 +34,11 @@ final class LivePlaybackModel: Identifiable {
     /// A tune waits this long after the last channel passed, so surfing across five channels tunes once.
     static let surfCommitDelay: Duration = .milliseconds(300)
 
-    init(store: LiveTVStore, channel: LiveChannel) {
+    init(store: LiveTVStore, channel: LiveChannel, readsTunerDirectly: Bool) {
         self.store = store
         self.channel = channel
         source = LiveRouter(live: store.live, plex: PlexLiveSource(live: store.live))
+        source.prefersPlex = !readsTunerDirectly
     }
 
     var state: LiveState { source.state }

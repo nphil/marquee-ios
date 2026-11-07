@@ -17,9 +17,10 @@ final class DirectLiveSource: LiveVideoSource {
     let player = LiveStreamPlayer()
     private(set) var channel: LiveChannel?
 
-    /// A tune failed before anything of it was on screen, with a network error, no data, or a stream the phone
-    /// cannot decode; the router tries it through Plex (§2.2 rule 8).
-    @ObservationIgnored var onFailedBeforePicture: ((LiveChannel, LiveError) -> Void)?
+    /// A tune failed with a network error, no data, an end, or a stream the phone cannot decode, before its first
+    /// picture or while it played; the router carries on through Plex (§2.2 rule 8). A tuner's refusal is not passed
+    /// on, since Plex would be refused the same way.
+    @ObservationIgnored var onFailed: ((LiveChannel, LiveError) -> Void)?
 
     init() {
         player.onStateChange = { [weak self] state in self?.stateChanged(state) }
@@ -54,12 +55,9 @@ final class DirectLiveSource: LiveVideoSource {
 
     private func stateChanged(_ state: LiveStreamPlayer.State) {
         guard case .failed(let failure) = state, let channel else { return }
-        // Slate and picture times are the failed stream's own: the player keeps its last diagnostics.
-        let timings = player.diagnostics.timings
-        guard timings.slate == nil, timings.picture == nil else { return }
         switch failure {
         case .noPicture, .lost, .unreadable, .ended:
-            onFailedBeforePicture?(channel, Self.error(failure))
+            onFailed?(channel, Self.error(failure))
         case .refused:
             break
         }

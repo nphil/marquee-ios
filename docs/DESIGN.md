@@ -399,7 +399,7 @@ Settings opens from Home's profile button in a sheet with Done (§7). It is a sy
 
 1. **Account:** profile name and server name; opens the profile switcher.
 2. **Appearance:** the theme picker (below).
-3. **Video & playback** (`B:§1`): skip interval, intro skip (manual or auto, countdown), credits and auto-next delay, direct play mode (Auto, Disabled, Force; Force asks for confirmation with Cancel first), default aspect (`B:§4`).
+3. **Video & playback** (`B:§1`): skip interval, intro skip (manual or auto, countdown), credits and auto-next delay, direct play mode (Auto, Disabled, Force; Force asks for confirmation with Cancel first), default aspect (`B:§4`), **Read the Tuner Directly** (on by default; off, Live TV plays every channel through Plex, docs/LIVE-TV.md §2.2).
 4. **Audio & subtitles** (`B:§1`): preferred audio language, subtitle mode, follow-dub rule, remember choices, **Subtitle style** with a live preview (`B:§3`).
 5. **Integrations:** each is off until enabled and has its own page; plugins supply data, never styling (`/data/home/lgtv/CLAUDE.md`). First entry: the optional SpeechDock address (`B:§1`).
 6. **About:** version, open-source notices. **Sign out** is destructive: a confirmation dialog that names what is removed.

@@ -6,9 +6,9 @@ import os
 import UIKit
 
 /// The live player's source. Before every tune it picks the phone's own path to the tuner or a Plex tune
-/// (docs/LIVE-TV.md §2.2) and plays through that one. A direct tune that fails before anything of it is on screen,
-/// with a network error, no data or a stream the phone cannot decode, is tried once through Plex; a tuner's refusal
-/// is not, since Plex would be refused the same way (§2.3).
+/// (docs/LIVE-TV.md §2.2) and plays through that one. A direct tune that fails, before its first picture or while it
+/// plays, with a network error, no data or a stream the phone cannot decode, carries on once through Plex; a tuner's
+/// refusal does not, since Plex would be refused the same way (§2.3).
 ///
 /// While the phone holds a one-tuner device, a Plex recording on it would be refused, so the router reads the
 /// schedule every 60 s, says so a minute ahead, and lets go of the tuner 5 s before the recording starts,
@@ -17,7 +17,7 @@ import UIKit
 final class LiveRouter: LiveVideoSource {
     let direct = DirectLiveSource()
     let plex: PlexLiveSource
-    /// Settings › Live TV › Playback is "Through Plex".
+    /// Settings › Video & Playback › Read the Tuner Directly is off.
     var prefersPlex = false
     /// The route of the current tune.
     private(set) var route: LiveRoute?
@@ -54,7 +54,7 @@ final class LiveRouter: LiveVideoSource {
     init(live: PlexLiveTV, plex: PlexLiveSource) {
         self.live = live
         self.plex = plex
-        direct.onFailedBeforePicture = { [weak self] channel, error in self?.fallBack(channel, after: error) }
+        direct.onFailed = { [weak self] channel, error in self?.fallBack(channel, after: error) }
     }
 
     // MARK: LiveSource

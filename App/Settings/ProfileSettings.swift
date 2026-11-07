@@ -12,6 +12,8 @@ struct ProfileSettings: Equatable, Sendable {
     var nextEpisodeDelay = 5
     var directPlay = DirectPlayMode.auto
     var aspect = VideoAspect.fit
+    /// Live TV reads an HDHomeRun tuner on the home network itself; off, every channel plays through Plex.
+    var readsTunerDirectly = true
     /// Nil plays the file's default audio track.
     var audioLanguage: TrackLanguage?
     var subtitles = SubtitleSettings()
@@ -25,7 +27,7 @@ struct ProfileSettings: Equatable, Sendable {
 
 extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
-        case skipInterval, introSkipDelay, nextEpisodeDelay, directPlay, aspect
+        case skipInterval, introSkipDelay, nextEpisodeDelay, directPlay, aspect, readsTunerDirectly
         case audioLanguage, subtitles, remembersTracks, subtitleStyle
     }
 
@@ -38,6 +40,7 @@ extension ProfileSettings: Codable {
         nextEpisodeDelay = value(.nextEpisodeDelay) ?? nextEpisodeDelay
         directPlay = value(.directPlay) ?? directPlay
         aspect = value(.aspect) ?? aspect
+        readsTunerDirectly = value(.readsTunerDirectly) ?? readsTunerDirectly
         audioLanguage = value(.audioLanguage)
         subtitles = value(.subtitles) ?? subtitles
         remembersTracks = value(.remembersTracks) ?? remembersTracks
