@@ -1,0 +1,219 @@
+import Foundation
+
+/// The library API of one server, reached through its chosen address with this user's server token.
+public struct PlexLibrary: Sendable {
+    public let connection: PlexServerConnection
+    let http: PlexHTTPClient
+
+    public var server: PlexServer { connection.server }
+
+    public init(
+        server: PlexServer,
+        identity: PlexClientIdentity,
+        transport: any PlexTransport = URLSessionTransport(),
+        rememberedURI: URL? = nil
+    ) {
+        connection = PlexServerConnection(server: server, identity: identity, transport: transport, remembered: rememberedURI)
+        http = PlexHTTPClient(identity: identity, token: server.accessToken, transport: transport)
+    }
+
+    // MARK: Browsing
+
+    /// Home rows: Continue Watching (style `hero`), On Deck, Recently Added.
+    public func promotedHubs(count: Int = 12) async throws -> [PlexHub] {
+        try await container("/hubs/promoted", ["count": String(count)]).hubs
+    }
+
+    public func sections() async throws -> [PlexLibrarySection] {
+        try await container("/library/sections").directories.map(PlexLibrarySection.init)
+    }
+
+    /// One page of a library grid, `size` items from `start`.
+    public func items(in sectionKey: String, query: SectionQuery, start: Int, size: Int = 60) async throws -> PlexPage<PlexMetadata> {
+        let paging = [PlexHeader.containerStart: String(start), PlexHeader.containerSize: String(size)]
+        let result = try await container("/library/sections/\(sectionKey)/all", query.queryItems, headers: paging)
+        return PlexPage(items: result.metadata, totalSize: result.totalSize ?? start + result.metadata.count)
+    }
+
+    /// The A–Z jump bar for a grid with the same query.
+    public func alphabetIndex(in sectionKey: String, query: SectionQuery) async throws -> [AlphabetIndexEntry] {
+        let result = try await container("/library/sections/\(sectionKey)/firstCharacter", query.queryItems)
+        return AlphabetIndexEntry.entries(from: result.directories)
+    }
+
+    /// Full details of an item, with its streams, markers and chapters.
+    public func metadata(_ ratingKey: String) async throws -> PlexMetadata {
+        let query = ["includeMarkers": "1", "includeChapters": "1"]
+        guard let item = try await container("/library/metadata/\(ratingKey)", query).metadata.first else {
+            throw PlexError.server(status: 404, message: nil)
+        }
+        return item
+    }
+
+    /// Seasons of a show or episodes of a season.
+    public func children(of ratingKey: String) async throws -> [PlexMetadata] {
+        try await container("/library/metadata/\(ratingKey)/children").metadata
+    }
+
+    /// Search results grouped by kind: movies, shows, episodes, people.
+    public func search(_ text: String, limit: Int = 10) async throws -> [PlexHub] {
+        try await container("/hubs/search", ["query": text, "limit": String(limit)]).hubs
+    }
+
+    // MARK: Watch state
+
+    public func markWatched(_ ratingKey: String) async throws {
+        try await perform(.get, "/:/scrobble", ["identifier": "com.plexapp.plugins.library", "key": ratingKey])
+    }
+
+    public func markUnwatched(_ ratingKey: String) async throws {
+        try await perform(.get, "/:/unscrobble", ["identifier": "com.plexapp.plugins.library", "key": ratingKey])
+    }
+
+    public func reportTimeline(_ update: TimelineUpdate) async throws {
+        var headers: [String: String] = [:]
+        if let session = update.sessionIdentifier { headers[PlexHeader.sessionIdentifier] = session }
+        try await perform(.get, "/:/timeline", update.queryItems, headers: headers)
+    }
+
+    // MARK: Playback
+
+    /// A play queue starting at `item`. Episodes queue the rest of their show (`continuous=1`).
+    public func createPlayQueue(for item: PlexMetadata) async throws -> PlexPlayQueue {
+        let continuous = [.episode, .season, .show].contains(item.type)
+        let uri = "server://\(server.clientIdentifier)/com.plexapp.plugins.library/library/metadata/\(item.ratingKey)"
+        let query = [
+            "type": "video",
+            "uri": uri,
+            "continuous": continuous ? "1" : "0",
+            "shuffle": "0",
+            "repeat": "0",
+            "own": "1",
+            "includeChapters": "1",
+            "includeMarkers": "1",
+        ]
+        let result = try await container("/playQueues", query, method: .post)
+        guard let queue = PlexPlayQueue(result) else { throw PlexError.decoding("play queue without an id") }
+        return queue
+    }
+
+    public func playQueue(_ id: Int) async throws -> PlexPlayQueue {
+        let result = try await container("/playQueues/\(id)", ["includeChapters": "1", "includeMarkers": "1"])
+        guard let queue = PlexPlayQueue(result) else { throw PlexError.decoding("play queue without an id") }
+        return queue
+    }
+
+    /// Saves the audio and subtitle choice for a part on the server (`subtitleStreamID` nil turns subtitles
+    /// off), which a server transcode then uses.
+    public func selectStreams(partID: Int, audioStreamID: Int?, subtitleStreamID: Int?) async throws {
+        var query = ["allParts": "1", "subtitleStreamID": String(subtitleStreamID ?? 0)]
+        if let audioStreamID { query["audioStreamID"] = String(audioStreamID) }
+        try await perform(.put, "/library/parts/\(partID)", query)
+    }
+
+    /// The address and token for a URL the player fetches itself. The token is in the URL because
+    /// AVPlayer cannot add headers; never log or cache these URLs.
+    public func playbackURL(path: String, query: [URLQueryItem] = []) async throws -> URL {
+        let base = try await connection.connection().uri
+        var query = query
+        if let token = server.accessToken { query.append(URLQueryItem(name: PlexHeader.token, value: token)) }
+        guard let url = PlexURL.make(base: base, path: path, query: query) else { throw PlexError.decoding("bad path") }
+        return url
+    }
+
+    /// The HLS URL of a server transcode. It carries the client identity too, since the server picks the
+    /// output formats by platform and the player cannot send headers.
+    public func transcodeURL(_ request: TranscodeRequest) async throws -> URL {
+        let location = try await connection.connection().isLocal ? "lan" : "wan"
+        let identity = http.identity.headers(token: nil)
+            .filter { $0.key.hasPrefix("X-Plex-") }
+            .sorted { $0.key < $1.key }
+            .map { URLQueryItem(name: $0.key, value: $0.value) }
+        let path = "/video/:/transcode/universal/start.m3u8"
+        return try await playbackURL(path: path, query: request.queryItems(location: location) + identity)
+    }
+
+    /// Ends a server transcode session.
+    public func stopTranscode(session: String) async throws {
+        try await perform(.get, "/video/:/transcode/universal/stop", ["session": session])
+    }
+
+    /// A server-resized image URL for the current address. See `PlexImageURL`.
+    public func imageURL(_ path: String, width: Double, height: Double, scale: Double) async throws -> URL? {
+        let base = try await connection.connection().uri
+        return PlexImageURL.transcoded(path, base: base, width: width, height: height, scale: scale)
+    }
+
+    /// The headers that authorize a request to this server, for loaders outside this client (images, the
+    /// on-device remux).
+    public func authorizationHeaders() -> [String: String] {
+        http.identity.headers(token: server.accessToken)
+    }
+
+    // MARK: Transport
+
+    private func container(
+        _ path: String,
+        _ query: [String: String] = [:],
+        headers: [String: String] = [:],
+        method: HTTPMethod = .get
+    ) async throws -> PlexMediaContainer {
+        try await container(path, Self.items(query), headers: headers, method: method)
+    }
+
+    private func container(
+        _ path: String,
+        _ query: [URLQueryItem],
+        headers: [String: String] = [:],
+        method: HTTPMethod = .get
+    ) async throws -> PlexMediaContainer {
+        let response = try await send(method, path, query, headers: headers)
+        return try PlexJSON.decode(PlexEnvelope.self, from: response.body).container
+    }
+
+    private func perform(_ method: HTTPMethod, _ path: String, _ query: [String: String], headers: [String: String] = [:]) async throws {
+        _ = try await send(method, path, Self.items(query), headers: headers, idempotent: false)
+    }
+
+    private func perform(_ method: HTTPMethod, _ path: String, _ query: [URLQueryItem], headers: [String: String]) async throws {
+        _ = try await send(method, path, query, headers: headers, idempotent: false)
+    }
+
+    /// Sends through the chosen address. When it gives no answer, the address is dropped; a read is
+    /// repeated once if probing finds a different one.
+    private func send(
+        _ method: HTTPMethod,
+        _ path: String,
+        _ query: [URLQueryItem],
+        headers: [String: String],
+        idempotent: Bool? = nil
+    ) async throws -> PlexHTTPResponse {
+        let first = try await connection.connection()
+        do {
+            return try await http.send(request(method, path, query, headers, idempotent, base: first.uri))
+        } catch PlexError.unreachable(let failure) {
+            await connection.reportFailure(of: first)
+            let isRead = idempotent ?? (method == .get)
+            guard isRead, let next = try? await connection.connection(), next != first else {
+                throw PlexError.unreachable(failure)
+            }
+            return try await http.send(request(method, path, query, headers, idempotent, base: next.uri))
+        }
+    }
+
+    private func request(
+        _ method: HTTPMethod,
+        _ path: String,
+        _ query: [URLQueryItem],
+        _ headers: [String: String],
+        _ idempotent: Bool?,
+        base: URL
+    ) throws -> PlexRequest {
+        guard let url = PlexURL.make(base: base, path: path, query: query) else { throw PlexError.decoding("bad path") }
+        return PlexRequest(method: method, url: url, headers: headers, isIdempotent: idempotent)
+    }
+
+    private static func items(_ query: [String: String]) -> [URLQueryItem] {
+        query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
+    }
+}

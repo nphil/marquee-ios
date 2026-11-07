@@ -65,4 +65,43 @@ struct ConnectionTests {
 
         #expect(try await connection.connection() == Self.local)
     }
+
+    @Test func readMovesToAnotherAddressWhenTheChosenOneStopsAnswering() async throws {
+        let localHost = Self.local.uri.host
+        let transport = FakeTransport { request, earlier in
+            let localUsed = earlier.contains { $0.url.host == localHost && $0.url.path != "/identity" }
+            switch (request.url.host == localHost, request.url.path) {
+            case (true, "/identity"):
+                if localUsed { throw NetworkFailure.cannotConnect }
+                return Self.identity()
+            case (true, _):
+                throw NetworkFailure.timedOut
+            case (false, "/identity"):
+                return Self.identity()
+            default:
+                return container(["Directory": [["key": "1", "title": "Films", "type": "movie"]]])
+            }
+        }
+        let library = PlexLibrary(server: Self.server([Self.local, Self.remote]), identity: testIdentity, transport: transport)
+
+        let sections = try await library.sections()
+
+        #expect(sections.map(\.title) == ["Films"])
+        #expect(await library.connection.currentConnection == Self.remote)
+        let reads = await transport.requests(to: "/library/sections")
+        #expect(reads.map(\.url.host) == [localHost, Self.remote.uri.host])
+    }
+
+    @Test func writeIsNotRepeatedAfterTheAddressFails() async throws {
+        let transport = FakeTransport { request, _ in
+            if request.url.path == "/identity" { return Self.identity() }
+            throw NetworkFailure.timedOut
+        }
+        let library = PlexLibrary(server: Self.server([Self.local, Self.remote]), identity: testIdentity, transport: transport)
+
+        await #expect(throws: PlexError.unreachable(.timedOut)) {
+            try await library.markWatched("12")
+        }
+        #expect(await transport.requests(to: "/:/scrobble").count == 1)
+    }
 }
