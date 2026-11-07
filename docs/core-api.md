@@ -25,7 +25,7 @@
 
 ## Server address (`Connection/`)
 
-- `PlexServer`, `PlexConnection`: a server with this user's token and its addresses. Codable, for the Keychain only.
+- `PlexServer`, `PlexConnection`: a server with this user's token and its addresses. Codable, for the Keychain only. `PlexConnection.displayAddress` is the address as a person reads it: the IP a plex.direct name spells, and the port when it is not 32400.
 - `ConnectionRanking.ordered(_:httpsRequired:)`: local, then remote, then relay; https before http, IPv4 before IPv6; duplicates dropped.
 - `ConnectionRanking.pick(_:graceExpired:)`: `use`, `wait` or `noneReachable` from probe outcomes so far.
 - `PlexServerConnection` (actor): probes every address at once with `/identity` (no token; an answer from another machine counts as a failure). A remembered address is tried alone first; better-ranked addresses get 750 ms after the first answer. `connection()`, `currentConnection`, `reportFailure(of:)`, `refresh()` (after a network change).

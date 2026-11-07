@@ -143,7 +143,8 @@ enum PlayerStats {
             lines.append(Line("Fallback", fallback))
         }
         if let connection = server?.connection {
-            lines.append(Line("Server", connection.isRelay ? "Relay" : connection.isLocal ? "Local" : "Remote"))
+            let kind = connection.isRelay ? "Relay" : connection.isLocal ? "Local" : "Remote"
+            lines.append(Line("Server", "\(kind) · \(connection.displayAddress)"))
         }
         let file = [
             (model.part?.container ?? model.media?.container)?.uppercased(),

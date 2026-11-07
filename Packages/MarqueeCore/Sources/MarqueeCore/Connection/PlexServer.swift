@@ -65,6 +65,18 @@ public struct PlexConnection: Sendable, Hashable, Codable {
     }
 
     public var isHTTPS: Bool { uri.scheme?.lowercased() == "https" }
+
+    /// The address as a person reads it. A plex.direct name spells its IP in the first label
+    /// ("81-2-3-4.<id>.plex.direct"), far shorter than the name; the port follows when it is not
+    /// Plex's 32400.
+    public var displayAddress: String {
+        var host = (uri.host() ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        if host.hasSuffix(".plex.direct"), let label = host.split(separator: ".").first {
+            host = label.replacingOccurrences(of: "-", with: isIPv6 ? ":" : ".")
+        }
+        guard let port = uri.port, port != 32400 else { return host }
+        return host.contains(":") ? "[\(host)]:\(port)" : "\(host):\(port)"
+    }
 }
 
 /// One entry of `GET https://plex.tv/api/v2/resources`.

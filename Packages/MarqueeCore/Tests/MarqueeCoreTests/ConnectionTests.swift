@@ -34,6 +34,14 @@ struct ConnectionTests {
         #expect(ConnectionRanking.pick([.failed, .failed]) == .noneReachable)
     }
 
+    @Test func displayAddressReadsTheIPOutOfAPlexDirectName() {
+        #expect(Self.remote.displayAddress == "81.2.3.4")
+        #expect(Self.remoteV6.displayAddress == "2a00::1")
+        #expect(Self.relay.displayAddress == "5.6.7.8:8443")
+        #expect(Self.localHTTP.displayAddress == "192.168.1.5")
+        #expect(PlexConnection(uri: URL(string: "http://[fe80::1]:8080")!, isLocal: true, isIPv6: true).displayAddress == "[fe80::1]:8080")
+    }
+
     @Test func probeSkipsAnAddressAnsweringAsAnotherServer() async throws {
         let transport = FakeTransport { request, _ in
             request.url.host == Self.local.uri.host ? Self.identity("other-machine") : Self.identity()
