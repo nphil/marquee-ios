@@ -83,7 +83,7 @@ Tracks titled Signs or Songs count as on-screen text, as the spec's forced-word 
 
 ## Not yet checked against a live server
 
-- The shape of `/api/v2/home/users` and the status codes for a wrong profile PIN.
+- The status codes for a wrong profile PIN (the live Plex Home has no protected profile). `/api/v2/resources`, `/api/v2/user` and `/api/v2/home/users` were decoded from a live account on 2026-11-06 with no mismatch.
 - The watchlist add and remove calls and `removeFromContinueWatching`, which have not been sent to a live account.
 - The universal transcode parameters, including identity sent as query items and the offset format.
 - The Keychain store, which has no tests.
