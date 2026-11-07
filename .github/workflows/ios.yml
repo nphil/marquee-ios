@@ -4,10 +4,14 @@ on:
   push:
   workflow_dispatch:
 
-# One queue per ref: a second push waits for the first run instead of racing it.
+# One queue per ref: a second push waits for the first run instead of racing it, so two runs on
+# main never claim the same version.
 concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: false
+
+permissions:
+  contents: read
 
 env:
   # Pinned: the image also carries a 27.2 release candidate, which a newest-first pick would choose.
@@ -31,3 +35,230 @@ jobs:
 
       - name: MarqueeCore tests
         run: swift test --package-path Packages/MarqueeCore
+
+  app:
+    name: App
+    runs-on: xcode-27
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Version
+        id: version
+        run: |
+          # Release tags are the record of what shipped: the next version is the newest tag's patch
+          # plus one. The version only reaches the build as overrides, so nothing is committed back.
+          LATEST=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' | sed 's/^v//' | sort -V | tail -1)
+          if [ -z "$LATEST" ]; then
+            VERSION=0.1.0
+          else
+            IFS=. read -r MAJOR MINOR PATCH <<< "$LATEST"
+            VERSION="$MAJOR.$MINOR.$((PATCH + 1))"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Version $VERSION"
+
+      - name: Generate project
+        run: |
+          brew install xcodegen
+          xcodegen generate
+
+      - name: Build for iPhone (unsigned)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set +e
+          xcodebuild build \
+            -project Marquee.xcodeproj \
+            -scheme Marquee \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath build/DD \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$VERSION" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            2>&1 | tee xcodebuild.log | xcbeautify
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          # Compiler diagnostics have the exact form "<path>:<line>:<col>: error: <msg>"; each one is
+          # also annotated on its file and line.
+          if grep -qE ':[0-9]+:[0-9]+: error: ' xcodebuild.log; then
+            grep -E ':[0-9]+:[0-9]+: error: ' xcodebuild.log | sort -u
+            grep -E '\.swift:[0-9]+:[0-9]+: error: ' xcodebuild.log | sort -u \
+              | sed -E "s#^${GITHUB_WORKSPACE}/##" \
+              | sed -E 's#^(.+):([0-9]+):([0-9]+): error: (.*)$#::error file=\1,line=\2,col=\3::\4#'
+            exit 1
+          fi
+          if [ "$STATUS" -ne 0 ]; then
+            grep -E 'error:|BUILD FAILED' xcodebuild.log | sort -u | head -40
+            exit "$STATUS"
+          fi
+
+      - name: Package IPA
+        run: |
+          APP=build/DD/Build/Products/Release-iphoneos/Marquee.app
+          EXE=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$APP/Info.plist")
+          if [ ! -s "$APP/$EXE" ]; then
+            echo "::error::The app has no executable '$EXE': the build did not finish."
+            exit 1
+          fi
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qry Marquee.ipa Payload
+          BYTES=$(wc -c < Marquee.ipa | tr -d ' ')
+          echo "Executable: $(wc -c < "$APP/$EXE" | tr -d ' ') bytes. IPA: $BYTES bytes."
+          # Sized for the shell (291 KB, no FFmpeg yet); raise it when the video engine links.
+          if [ "$BYTES" -lt 200000 ]; then
+            echo "::error::Marquee.ipa is only $BYTES bytes."
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Marquee-ipa
+          path: Marquee.ipa
+          if-no-files-found: error
+
+      - name: Boot iPhone 18 Pro simulator
+        id: simulator
+        run: |
+          UDID=$(xcrun simctl list -j devices available | python3 -c '
+          import json, sys
+          for runtime, devices in json.load(sys.stdin)["devices"].items():
+              if runtime.endswith("iOS-27-0"):
+                  for device in devices:
+                      if device["name"] == "iPhone 18 Pro":
+                          print(device["udid"])
+                          raise SystemExit
+          raise SystemExit("No iPhone 18 Pro simulator on iOS 27.0")
+          ')
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl ui "$UDID" appearance light
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: UI tests and screenshots
+        env:
+          UDID: ${{ steps.simulator.outputs.udid }}
+        run: |
+          mkdir -p screens
+          set +e
+          TEST_RUNNER_SCREENS_DIR="$PWD/screens" xcodebuild test \
+            -project Marquee.xcodeproj \
+            -scheme Marquee \
+            -destination "id=$UDID" \
+            -derivedDataPath build/DD-sim \
+            -resultBundlePath build/UITests.xcresult \
+            2>&1 | tee xcodebuild-test.log | xcbeautify
+          STATUS=${PIPESTATUS[0]}
+          set -e
+          if grep -qE ':[0-9]+:[0-9]+: error: ' xcodebuild-test.log; then
+            grep -E ':[0-9]+:[0-9]+: error: ' xcodebuild-test.log | sort -u
+            grep -E '\.swift:[0-9]+:[0-9]+: error: ' xcodebuild-test.log | sort -u \
+              | sed -E "s#^${GITHUB_WORKSPACE}/##" \
+              | sed -E 's#^(.+):([0-9]+):([0-9]+): error: (.*)$#::error file=\1,line=\2,col=\3::\4#'
+          fi
+          exit "$STATUS"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: screens
+          path: screens/
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: UITests-xcresult
+          path: build/UITests.xcresult
+          if-no-files-found: ignore
+
+  release:
+    name: Release
+    needs: [core, app]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.app.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: Marquee-ipa
+
+      - name: Publish release
+        run: |
+          gh release create "v$VERSION" Marquee.ipa \
+            --target "$GITHUB_SHA" \
+            --title "Marquee $VERSION" \
+            --notes "Unsigned IPA for Feather or AltStore, built from ${GITHUB_SHA::7}."
+
+      # The Feather and AltStore source lives as a release asset on the fixed tag `feed`, so its
+      # address never changes and publishing needs no commit to main.
+      - name: Update feed
+        run: |
+          if ! gh release view feed > /dev/null 2>&1; then
+            gh release create feed \
+              --target "$GITHUB_SHA" \
+              --latest=false \
+              --title "Feather and AltStore source" \
+              --notes "apps.json on this release is the source address for Feather and AltStore. It lists every Marquee release."
+          fi
+          if gh release view feed --json assets --jq '.assets[].name' | grep -qx apps.json; then
+            gh release download feed --pattern apps.json
+          fi
+          python3 - <<'PY'
+          import datetime, json, os, pathlib, plistlib, zipfile
+
+          version = os.environ["VERSION"]
+          repo = os.environ["GH_REPO"]
+          with zipfile.ZipFile("Marquee.ipa") as ipa:
+              info = plistlib.loads(ipa.read("Payload/Marquee.app/Info.plist"))
+
+          # Everything but the version history is rewritten each release, so the listing follows
+          # this workflow and the built app rather than whatever the first release wrote.
+          feed = pathlib.Path("apps.json")
+          versions = json.loads(feed.read_text())["apps"][0]["versions"] if feed.exists() else []
+          entry = {
+              "version": version,
+              "buildVersion": info["CFBundleVersion"],
+              "date": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+              "localizedDescription": f"Unsigned IPA, built from {os.environ['GITHUB_SHA'][:7]}.",
+              "downloadURL": f"https://github.com/{repo}/releases/download/v{version}/Marquee.ipa",
+              "size": os.path.getsize("Marquee.ipa"),
+              "minOSVersion": info["MinimumOSVersion"],
+          }
+          source = {
+              "name": "Marquee",
+              "subtitle": "Plex for iPhone",
+              "description": "Feather and AltStore source for Marquee, a native Plex client for iPhone.",
+              "website": f"https://github.com/{repo}",
+              "apps": [{
+                  "name": "Marquee",
+                  "bundleIdentifier": info["CFBundleIdentifier"],
+                  "developerName": "Nitin",
+                  "subtitle": "Plex for iPhone",
+                  "localizedDescription": "A native Plex client for iPhone, in 40 colour themes.",
+                  "category": "entertainment",
+                  "deviceFamilies": [1],
+                  "appPermissions": {
+                      "entitlements": [],
+                      "privacy": {key: value for key, value in info.items() if key.endswith("UsageDescription")},
+                  },
+                  "versions": [entry] + [v for v in versions if v["version"] != version],
+              }],
+          }
+          feed.write_text(json.dumps(source, indent=2) + "\n")
+          PY
+          gh release upload feed apps.json --clobber

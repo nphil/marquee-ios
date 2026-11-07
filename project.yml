@@ -1,0 +1,80 @@
+name: Marquee
+
+options:
+  bundleIdPrefix: com.nphil
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "27.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    # Defaults for local builds; CI passes the release version as overrides.
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "0.1.0"
+
+packages:
+  MarqueeCore:
+    path: Packages/MarqueeCore
+
+targets:
+  Marquee:
+    type: application
+    platform: iOS
+    sources:
+      - path: App
+        excludes:
+          - Info.plist
+      - path: Resources
+    dependencies:
+      - package: MarqueeCore
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Marquee
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        # Lifts the iPhone's 60 fps cap on Core Animation so animations reach 120 Hz.
+        CADisableMinimumFrameDurationOnPhone: true
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: Marquee looks for Plex servers on the local network and plays from them.
+        NSBonjourServices:
+          - _plex._tcp
+        UIAppFonts:
+          - Manrope.ttf
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UIBackgroundModes:
+          - audio
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nphil.marquee
+        TARGETED_DEVICE_FAMILY: "1"
+        # No icon set exists yet; XcodeGen's preset names one, which actool would fail to find.
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+    scheme:
+      testTargets:
+        - MarqueeUITests
+
+  MarqueeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: Marquee
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nphil.marquee.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Marquee
+        TARGETED_DEVICE_FAMILY: "1"

@@ -16,6 +16,22 @@ Marquee for iPhone shares a name and behaviour with the Marquee TV app, which is
 
 Video remux and transcode use [stashy-videoengine](https://github.com/nphil/stashy-videoengine) (FFmpeg, LGPL-2.1, linked statically; its source and build scripts are public in that repo).
 
+## Install
+
+Add this source in Feather or AltStore:
+
+```
+https://github.com/nphil/marquee-ios/releases/download/feed/apps.json
+```
+
+Each release also carries `Marquee.ipa` for a manual install. Marquee needs iOS 27.
+
 ## Building
 
-There is no local Mac. GitHub Actions builds on the `xcode-27` runner image: core tests, an app build, simulator screenshots, and on `main` an unsigned IPA attached to a GitHub release.
+There is no local Mac. GitHub Actions builds on the `xcode-27` runner image (`.github/workflows/ios.yml`):
+
+- **Core:** the theme checker and the MarqueeCore tests.
+- **App:** an unsigned Release build for iPhone, then UI tests on the iPhone 18 Pro simulator (iOS 27.0) that save a screenshot of each screen in several themes as the `screens` artifact.
+- **Release** (`main` only): the IPA goes out as a GitHub release `vX.Y.Z`, one patch above the newest tag, and the source `apps.json` on the `feed` release gains that version. Nothing is committed back to `main`.
+
+The Xcode project is generated from `project.yml` with XcodeGen and is not stored in git.
