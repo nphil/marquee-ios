@@ -19,7 +19,7 @@ struct ProfileSettings: Equatable, Sendable {
     var subtitles = SubtitleSettings()
     /// Remembers the audio and subtitles picked for each show or movie, per profile and server.
     var remembersTracks = true
-    var subtitleStyle = SubtitleStyle()
+    var subtitleStyle = SubtitleLook()
     var homeRows = HomeLayout()
     var posterLabels = PosterLabels()
     /// The default quality; picking one in the player's More menu saves it too.
@@ -87,88 +87,5 @@ enum VideoAspect: String, Codable, CaseIterable, Sendable {
         case .zoom: "Zoom"
         case .stretch: "Stretch"
         }
-    }
-}
-
-/// How subtitles look over the video (behaviour spec §3, "Subtitle look").
-struct SubtitleStyle: Equatable, Sendable {
-    var size = Size.medium
-    var colour = Colour.white
-    var edge = Edge.shadow
-    /// A dark box behind the text.
-    var hasBackground = false
-    var isBold = false
-    var position = Position.bottom
-
-    enum Size: String, Codable, CaseIterable, Sendable {
-        case small, medium, large, extraLarge
-
-        var title: String {
-            switch self {
-            case .small: "Small"
-            case .medium: "Medium"
-            case .large: "Large"
-            case .extraLarge: "Extra Large"
-            }
-        }
-
-        /// Text height as a share of the picture's height.
-        var heightFraction: Double {
-            switch self {
-            case .small: 0.045
-            case .medium: 0.055
-            case .large: 0.067
-            case .extraLarge: 0.08
-            }
-        }
-    }
-
-    /// The colour of the text; the views map it onto the picture palette.
-    enum Colour: String, Codable, CaseIterable, Sendable {
-        case white, yellow, cyan
-
-        var title: String {
-            switch self {
-            case .white: "White"
-            case .yellow: "Yellow"
-            case .cyan: "Cyan"
-            }
-        }
-    }
-
-    enum Edge: String, Codable, CaseIterable, Sendable {
-        case none, outline, shadow
-
-        var title: String {
-            switch self {
-            case .none: "None"
-            case .outline: "Outline"
-            case .shadow: "Drop Shadow"
-            }
-        }
-    }
-
-    enum Position: String, Codable, CaseIterable, Sendable {
-        case bottom, top
-
-        var title: String { self == .bottom ? "Bottom" : "Top" }
-    }
-}
-
-extension SubtitleStyle: Codable {
-    enum CodingKeys: String, CodingKey {
-        case size, colour, edge, hasBackground, isBold, position
-    }
-
-    init(from decoder: any Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        func value<T: Decodable>(_ key: CodingKeys) -> T? { try? c.decodeIfPresent(T.self, forKey: key) }
-        self.init()
-        size = value(.size) ?? size
-        colour = value(.colour) ?? colour
-        edge = value(.edge) ?? edge
-        hasBackground = value(.hasBackground) ?? hasBackground
-        isBold = value(.isBold) ?? isBold
-        position = value(.position) ?? position
     }
 }

@@ -132,7 +132,7 @@ struct PlayerView: View {
             SubtitleOverlay(
                 model: model, picture: rect, screen: size,
                 lift: model.chromeVisible ? max(0, size.height - bottomControls.minY) : 0,
-                style: session.settings.subtitleStyle
+                look: session.settings.subtitleStyle
             )
         }
         .frame(width: size.width, height: size.height)
@@ -277,7 +277,7 @@ private struct SubtitleOverlay: View {
     let picture: CGRect
     let screen: CGSize
     let lift: CGFloat
-    let style: SubtitleStyle
+    let look: SubtitleLook
 
     var body: some View {
         let visible = picture.intersection(CGRect(origin: .zero, size: screen))
@@ -288,14 +288,15 @@ private struct SubtitleOverlay: View {
                 BitmapSubtitles(bitmaps: model.bitmaps, picture: picture, floor: screen.height - lift - margin)
             }
             if let text = model.cueText {
+                let distance = CGFloat(look.edgeDistance) * area.height / 1080
                 VStack(spacing: 0) {
-                    if style.position == .bottom { Spacer(minLength: 0) }
-                    SubtitleLine(text: text, style: style, pictureHeight: area.height)
-                    if style.position == .top { Spacer(minLength: 0) }
+                    if look.anchor == .bottom { Spacer(minLength: 0) }
+                    SubtitleLine(text: text, look: look, pictureHeight: area.height)
+                    if look.anchor == .top { Spacer(minLength: 0) }
                 }
                 .padding(.horizontal, area.width * 0.06)
-                .padding(.top, margin)
-                .padding(.bottom, max(margin, lift - (screen.height - area.maxY) + Space.s2))
+                .padding(.top, distance)
+                .padding(.bottom, max(distance, lift - (screen.height - area.maxY) + Space.s2))
                 .frame(width: area.width, height: area.height)
                 .offset(x: area.minX, y: area.minY)
             }

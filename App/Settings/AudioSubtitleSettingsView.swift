@@ -58,8 +58,14 @@ struct AudioSubtitleSettingsView: View {
             .listRowBackground(theme.sheet)
 
             Section {
-                NavigationLink("Subtitle Style") {
+                NavigationLink {
                     SubtitleStyleView()
+                } label: {
+                    let look = session.settings.subtitleStyle
+                    LabeledContent("Subtitle Style") {
+                        Text(look.isCustom ? "Custom" : look.preset.title)
+                            .foregroundStyle(theme.ink2)
+                    }
                 }
                 .accessibilityIdentifier("subtitles.style")
             }

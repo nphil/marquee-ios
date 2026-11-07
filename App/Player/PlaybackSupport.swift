@@ -193,42 +193,43 @@ enum MediaSelection {
     }
 }
 
-/// The subtitle style for text AVPlayer draws. Left to the system's caption settings until the profile
-/// changes the style; `lifted` raises the line above the bottom chrome.
+/// The look for text AVPlayer draws itself; `lifted` raises the line above the bottom chrome.
 @MainActor
 enum CaptionStyle {
-    static func rules(for style: SubtitleStyle, lifted: Bool) -> [AVTextStyleRule]? {
-        var attributes: [String: Any] = [:]
-        if style != SubtitleStyle() {
-            attributes[kCMTextMarkupAttribute_ForegroundColorARGB as String] = argb(PictureColours.subtitle(style.colour))
-            attributes[kCMTextMarkupAttribute_BaseFontSizePercentageRelativeToVideoHeight as String] = style.size.heightFraction * 100
-            attributes[kCMTextMarkupAttribute_CharacterEdgeStyle as String] = edge(style.edge)
-            if style.isBold { attributes[kCMTextMarkupAttribute_BoldStyle as String] = true }
-            if style.hasBackground {
-                attributes[kCMTextMarkupAttribute_CharacterBackgroundColorARGB as String] = argb(PictureColours.subtitleBox)
-            }
+    static func rules(for look: SubtitleLook, lifted: Bool) -> [AVTextStyleRule]? {
+        let text = PictureColours.subtitleRGB(look)
+        var attributes: [String: Any] = [
+            kCMTextMarkupAttribute_ForegroundColorARGB as String: [Double(look.opacity) / 100, text.red, text.green, text.blue],
+            kCMTextMarkupAttribute_BaseFontSizePercentageRelativeToVideoHeight as String: 5.5 * Double(look.size) / 100,
+            kCMTextMarkupAttribute_CharacterEdgeStyle as String: edge(look.edge),
+        ]
+        if look.isBold { attributes[kCMTextMarkupAttribute_BoldStyle as String] = true }
+        switch look.font {
+        case .standard: break
+        case .serif: attributes[kCMTextMarkupAttribute_GenericFontFamilyName as String] = kCMTextMarkupGenericFontName_Serif as String
+        case .mono: attributes[kCMTextMarkupAttribute_GenericFontFamilyName as String] = kCMTextMarkupGenericFontName_Monospace as String
+        case .legible: attributes[kCMTextMarkupAttribute_FontFamilyName as String] = "Atkinson Hyperlegible"
         }
-        if style.position == .top {
-            attributes[kCMTextMarkupAttribute_OrthogonalLinePositionPercentageRelativeToWritingDirection as String] = 10
-        } else if lifted {
-            attributes[kCMTextMarkupAttribute_OrthogonalLinePositionPercentageRelativeToWritingDirection as String] = 62
+        if look.background != .none {
+            let box = PictureColours.rgb(look.backgroundColour)
+            attributes[kCMTextMarkupAttribute_CharacterBackgroundColorARGB as String] =
+                [Double(look.backgroundOpacity) / 100, box.red, box.green, box.blue]
         }
-        guard !attributes.isEmpty else { return nil }
+        // The line's place as a share of the picture's height, from its top.
+        let distance = Double(look.edgeDistance) / 1080 * 100
+        attributes[kCMTextMarkupAttribute_OrthogonalLinePositionPercentageRelativeToWritingDirection as String] =
+            look.anchor == .top ? distance : lifted ? 62 : 100 - distance
         return AVTextStyleRule(textMarkupAttributes: attributes).map { [$0] }
     }
 
-    private static func edge(_ edge: SubtitleStyle.Edge) -> String {
+    private static func edge(_ edge: SubtitleLook.Edge) -> String {
         switch edge {
         case .none: kCMTextMarkupCharacterEdgeStyle_None as String
         case .outline: kCMTextMarkupCharacterEdgeStyle_Uniform as String
-        case .shadow: kCMTextMarkupCharacterEdgeStyle_DropShadow as String
+        case .dropShadow, .softShadow: kCMTextMarkupCharacterEdgeStyle_DropShadow as String
+        case .raised: kCMTextMarkupCharacterEdgeStyle_Raised as String
+        case .depressed: kCMTextMarkupCharacterEdgeStyle_Depressed as String
         }
-    }
-
-    private static func argb(_ color: Color) -> [Double] {
-        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
-        UIColor(color).getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        return [alpha, red, green, blue].map(Double.init)
     }
 }
 

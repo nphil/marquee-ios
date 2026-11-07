@@ -59,6 +59,7 @@ private struct Notice: Identifiable {
     static let app = [
         Notice(id: "marquee", name: "Marquee", licence: "MIT", files: ["LICENSE"]),
         Notice(id: "manrope", name: "Manrope", licence: "SIL OFL 1.1", files: ["OFL.txt"]),
+        Notice(id: "atkinson", name: "Atkinson Hyperlegible", licence: "SIL OFL 1.1", files: ["AtkinsonHyperlegible-OFL.txt"]),
     ]
 
     #if canImport(Libavutil)

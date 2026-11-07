@@ -67,6 +67,10 @@ targets:
           - _plex._tcp
         UIAppFonts:
           - Manrope.ttf
+          - AtkinsonHyperlegible-Regular.ttf
+          - AtkinsonHyperlegible-Bold.ttf
+          - AtkinsonHyperlegible-Italic.ttf
+          - AtkinsonHyperlegible-BoldItalic.ttf
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UIBackgroundModes:
