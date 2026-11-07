@@ -78,14 +78,15 @@ extension XCTestCase {
         try snap("livetv-04-menu-\(suffix)")
     }
 
-    /// The category chips and the time strip scroll sideways, which XCUITest does not do for a tap, and
-    /// at accessibility sizes most of them start off screen.
+    /// The category chips and the time strip scroll sideways, which XCUITest does not reliably do for a
+    /// tap, and at accessibility sizes most of them start off screen. `isHittable` fails the test for an
+    /// element off screen, so this compares frames.
     @MainActor
     func tap(_ identifier: String, inStrip strip: String, in app: XCUIApplication) {
         let target = element(identifier, in: app)
         let row = element(strip, in: app)
         XCTAssertTrue(target.waitForExistence(timeout: 10), "No element \(identifier)")
-        for _ in 0..<6 where !target.isHittable {
+        for _ in 0..<6 where !row.frame.contains(CGPoint(x: target.frame.midX, y: target.frame.midY)) {
             if target.frame.midX < row.frame.midX {
                 row.swipeRight(velocity: .slow)
             } else {
