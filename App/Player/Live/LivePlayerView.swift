@@ -24,7 +24,7 @@ struct LivePlayerView: View {
     /// How far the channel card leans with the finger while surfing.
     @State private var lean: CGFloat = 0
     @State private var details: ProgrammeSelection?
-    @State private var isWide = true
+    @State private var size = CGSize(width: 2, height: 1)
     @State private var cameFromPortrait = false
 
     /// One swipe gesture, read the way it started.
@@ -41,6 +41,16 @@ struct LivePlayerView: View {
     private static let surfStep: CGFloat = 110
 
     private var showsChrome: Bool { model.chromeVisible || model.state != .playing }
+    private var isWide: Bool { size.width > size.height }
+
+    /// The room the Quick Guide's panel takes. The picture moves clear of it and keeps playing; the
+    /// controls step aside until the guide closes.
+    private var guideRoom: EdgeInsets {
+        guard model.showsGuide else { return EdgeInsets() }
+        return isWide
+            ? EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: QuickGuide.width(in: size))
+            : EdgeInsets(top: 0, leading: 0, bottom: QuickGuide.height(in: size), trailing: 0)
+    }
 
     var body: some View {
         let theme = themes.selected(for: .dark)
@@ -48,10 +58,10 @@ struct LivePlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             picture
-            if showsChrome {
+            if showsChrome && !model.showsGuide {
                 LiveChrome(model: model, lean: lean, close: close)
                     .transition(.opacity)
-            } else if let status = model.source.status {
+            } else if !model.showsGuide, let status = model.source.status {
                 LiveStatusLabel(text: status)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                     .padding(.horizontal, Space.inset)
@@ -74,10 +84,10 @@ struct LivePlayerView: View {
         }
         .animation(Motion.spring(reduceMotion: reduceMotion), value: model.showsGuide)
         .animation(.easeOut(duration: 0.18), value: model.source.status)
-        .onGeometryChange(for: Bool.self) { proxy in
-            proxy.size.width > proxy.size.height
-        } action: { wide in
-            isWide = wide
+        .onGeometryChange(for: CGSize.self) { proxy in
+            proxy.size
+        } action: { size in
+            self.size = size
         }
         .environment(\.theme, theme)
         .preferredColorScheme(.dark)
@@ -132,6 +142,8 @@ struct LivePlayerView: View {
             LiveVideoHost(view: model.source.videoView, fills: model.fillsScreen)
         }
         .ignoresSafeArea()
+        // After ignoring the safe area, so the picture's region ends exactly where the panel begins.
+        .padding(guideRoom)
         .offset(y: pull)
         .scaleEffect(1 - min(pull, 400) / 4000)
         .contentShape(Rectangle())

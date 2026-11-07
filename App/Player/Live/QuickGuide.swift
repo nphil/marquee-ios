@@ -22,12 +22,22 @@ struct QuickGuide: View {
                     .accessibilityHidden(true)
                 panel
                     .frame(
-                        width: isWide ? min(420, proxy.size.width * 0.5) : nil,
-                        height: isWide ? nil : max(320, proxy.size.height * 0.6)
+                        width: isWide ? Self.width(in: proxy.size) : nil,
+                        height: isWide ? nil : Self.height(in: proxy.size)
                     )
             }
         }
         .accessibilityAction(.escape) { model.setGuide(false) }
+    }
+
+    /// The panel's width on the phone's side and its height upright, in the safe area; the player moves
+    /// the picture clear of it.
+    static func width(in size: CGSize) -> CGFloat {
+        min(420, size.width * 0.5)
+    }
+
+    static func height(in size: CGSize) -> CGFloat {
+        max(320, size.height * 0.6)
     }
 
     private var panel: some View {

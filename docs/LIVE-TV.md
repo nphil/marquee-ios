@@ -411,7 +411,7 @@ While surfing a card (`Radius.card`, `glassRaised` over `scrim`) follows the fin
 
 ### 6.9 Quick Guide and programme sheet
 
-- **Quick Guide:** swipe up or the guide button opens a sheet (`Radius.sheet`, opaque `sheet` over video, M DESIGN.md:150) at the medium detent while video plays above. First row: the last 3 channels. Below: the §6.4 rows. A tap changes channel and closes the sheet.
+- **Quick Guide:** swipe up or the guide button opens a panel (`Radius.sheet`, opaque `sheet`, M DESIGN.md:150): the trailing side, up to 420 pt, with the phone on its side; the lower 60 % upright. The picture moves clear of it and keeps playing; the controls step aside until it closes. First row: the last 3 channels. Below: the §6.4 rows. A tap changes channel and closes the panel.
 - **Programme sheet:** art, title, "S2 E5 · Episode title", "Tonight 8:00–8:30 PM · 2.1 WXXX", summary, badges (NEW, HD). Actions: Watch (on now), Record Episode, Record Series or Record Movie (template types 4, 2, 1), Options (start and end padding, new episodes only). Recording actions are hidden for users who cannot record (Home members, servers without Plex Pass).
 
 ### 6.10 Recordings
