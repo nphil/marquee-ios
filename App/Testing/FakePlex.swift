@@ -16,7 +16,8 @@ import Foundation
 ///   joins the `all` lists of the sections in `library/sections.json`.
 /// - Images are files under the folder: `/photo/:/transcode` serves the path of its `url` item, and
 ///   any URL ending in an image extension serves its own path.
-/// - A write, or an action under `/:/` or `/actions/`, without a fixture is answered 200 `{}`.
+/// - A write, or a path with `/:/` in it or under `/actions/`, without a fixture is answered 200 `{}`.
+/// - Every channel's tune reads `pms/livetv/tune.json`.
 /// - A fixture whose object has `"__anchor": T` has every `beginsAt` and `endsAt` in it moved by
 ///   `liveEvening` minus T, so the Live TV guide always airs around `liveNow`.
 /// - `live.json` holds the Live TV favourites and recent channels the app starts with.
@@ -127,7 +128,7 @@ struct FakePlexRouter {
             }
             return .success(json(object, status: status))
         }
-        if method != "GET" || path.hasPrefix("/:/") || path.hasPrefix("/actions/") {
+        if method != "GET" || path.contains("/:/") || path.hasPrefix("/actions/") {
             return .success(json([String: Any]()))
         }
         return .success(json(["MediaContainer": ["size": 0]], status: 404))
@@ -170,6 +171,7 @@ struct FakePlexRouter {
 
     private func derived(_ base: String, query: [URLQueryItem]) -> Any? {
         if base == "pms/library/all" { return libraryWide() }
+        if base.hasPrefix("pms/livetv/dvrs/"), base.hasSuffix("/tune") { return load("pms/livetv/tune.json") }
         guard base.hasSuffix("/firstCharacter"),
               let all = load(String(base.dropLast("firstCharacter".count)) + "all.json") as? [String: Any]
         else { return nil }

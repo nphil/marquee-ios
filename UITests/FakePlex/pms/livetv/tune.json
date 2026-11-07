@@ -1,0 +1,49 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "MediaSubscription": [
+   {
+    "key": "201",
+    "type": 4,
+    "title": "This Episode",
+    "airingsType": "New Airings Only",
+    "channelIdentifier": "ch-0201",
+    "MediaGrabOperation": [
+     {
+      "rolling": true,
+      "mediaSubscriptionID": 201,
+      "mediaIndex": 0,
+      "status": "inprogress",
+      "id": "ch-0201-uitest",
+      "key": "/media/grabbers/operations/ch-0201-uitest",
+      "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+      "grabberProtocol": "livetv",
+      "Metadata": {
+       "ratingKey": "live-201",
+       "key": "/livetv/sessions/5d0c7a3e-0000-4000-8000-000000000201",
+       "type": "episode",
+       "title": "Live TV",
+       "Media": [
+        {
+         "uuid": "5d0c7a3e-0000-4000-8000-000000000201",
+         "videoCodec": "mpeg2video",
+         "container": "mpegts",
+         "protocol": "hls",
+         "Part": [
+          {
+           "key": "/livetv/sessions/5d0c7a3e-0000-4000-8000-000000000201/uitest/index.m3u8?offset=-1.000000",
+           "Stream": [
+            {"streamType": 1, "codec": "mpeg2video", "width": 1280, "height": 720, "scanType": "progressive", "frameRate": 59.94},
+            {"streamType": 2, "codec": "ac3", "channels": 2, "samplingRate": 48000}
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     }
+    ]
+   }
+  ]
+ }
+}

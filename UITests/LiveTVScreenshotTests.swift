@@ -31,14 +31,29 @@ final class LiveTVScreenshotTests: XCTestCase {
     func testRecordingsDawn() throws {
         try recordingsFlow(mode: "light", suffix: "dawn")
     }
+
+    @MainActor
+    func testPlayerRosePine() throws {
+        try playerFlow(mode: "dark", suffix: "rose-pine")
+    }
+
+    @MainActor
+    func testPlayerDawn() throws {
+        try playerFlow(mode: "light", suffix: "dawn")
+    }
 }
 
-/// The list with Increase Contrast on and the text at accessibility size 2; CI runs this class in its
-/// own pass.
+/// The guide list and the live player with Increase Contrast on and the text at accessibility size 2;
+/// CI runs this class in its own pass.
 final class LiveTVAccessibilityScreenshots: XCTestCase {
     @MainActor
     func testGuide() throws {
         try guideFlow(mode: "light", suffix: "ax-dawn")
+    }
+
+    @MainActor
+    func testPlayer() throws {
+        try playerFlow(mode: "light", suffix: "ax-dawn")
     }
 }
 
@@ -128,5 +143,66 @@ extension XCTestCase {
         recorded.tap()
         waitFor("livetv.recorded.2102", in: app)
         try snap("livetv-12-recorded-\(suffix)")
+    }
+
+    /// The live player over the fake tuner's picture: playing on its side, the Quick Guide, the next
+    /// channel, stopped, and the Quick Guide upright; then back to the guide.
+    @MainActor
+    func playerFlow(mode: String, suffix: String) throws {
+        let app = launch(
+            matchSystem: false, fixedMode: mode, dark: "rose-pine",
+            arguments: ["-marquee.fakeSignedIn", "YES", "-marquee.uitest.frame", "art/spring-backdrop.jpg"]
+        )
+        addTeardownBlock {
+            await MainActor.run { XCUIDevice.shared.orientation = .portrait }
+        }
+        open(tab: "Live TV", title: "Live TV", in: app)
+        tap("livetv.row.ch-0201", in: app)
+        waitFor("liveplayer", in: app)
+        // The player turns the screen on its side; turning the phone with it keeps the shots upright.
+        XCUIDevice.shared.orientation = .landscapeLeft
+        let stop = element("liveplayer.stop", in: app)
+        XCTAssertTrue(stop.waitForExistence(timeout: 10), "Channel 2.1 did not play")
+        try snap("livetv-13-player-\(suffix)")
+
+        raiseLiveControls(in: app)
+        tap("liveplayer.guide", in: app)
+        waitFor("liveplayer.quickguide", in: app)
+        try snap("livetv-14-quickguide-\(suffix)")
+        tap("liveplayer.recent.ch-0701", in: app)
+        XCTAssertTrue(element("liveplayer.quickguide", in: app).waitForNonExistence(timeout: 5), "The Quick Guide stayed open")
+
+        raiseLiveControls(in: app)
+        tap("liveplayer.next", in: app)
+        XCTAssertTrue(stop.waitForExistence(timeout: 10), "The next channel did not play")
+        try snap("livetv-15-next-\(suffix)")
+
+        raiseLiveControls(in: app)
+        stop.tap()
+        let play = app.buttons.matching(NSPredicate(format: "identifier == 'liveplayer.stop' AND label == 'Play'")).firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 5), "The stream did not stop")
+        try snap("livetv-16-stopped-\(suffix)")
+
+        XCUIDevice.shared.orientation = .portrait
+        tap("liveplayer.guide", in: app)
+        waitFor("liveplayer.quickguide", in: app)
+        try snap("livetv-17-quickguide-upright-\(suffix)")
+        tap("liveplayer.guide.close", in: app)
+        tap("liveplayer.close", in: app)
+        XCTAssertTrue(element("liveplayer", in: app).waitForNonExistence(timeout: 5), "The live player stayed open")
+        waitFor("livetv.row.ch-0201", in: app)
+    }
+
+    /// While a channel plays, the controls fade 3 s after the last touch and a tap on the picture
+    /// toggles them. This waits for the channel to play and the controls to fade, then taps them back,
+    /// so the next step has the full 3 s.
+    @MainActor
+    func raiseLiveControls(in app: XCUIApplication) {
+        let stop = element("liveplayer.stop", in: app)
+        // Stop shows once the channel plays; false here only means the controls faded unseen.
+        _ = stop.waitForExistence(timeout: 10)
+        XCTAssertTrue(stop.waitForNonExistence(timeout: 6), "The live player's controls did not fade")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        XCTAssertTrue(stop.waitForExistence(timeout: 3), "The live player's controls did not come back")
     }
 }

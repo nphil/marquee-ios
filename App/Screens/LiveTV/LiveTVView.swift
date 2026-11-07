@@ -42,8 +42,10 @@ struct LiveTVView: View {
 private struct LiveGuideScreen: View {
     let store: LiveTVStore
 
+    @Environment(AppSession.self) private var session
     @Environment(ToastCenter.self) private var toasts
     @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -56,6 +58,9 @@ private struct LiveGuideScreen: View {
     @State private var nowVisible = true
     @State private var details: ProgrammeSelection?
     @State private var showsRecordings = false
+    @State private var playing: LivePlaybackModel?
+    /// Watch in the programme sheet: plays once the sheet has gone, so the player can present.
+    @State private var watchAfterSheet: LiveChannel?
 
     /// The grid on its side and at regular width; the list in portrait and at accessibility sizes
     /// (docs/LIVE-TV.md §6.3).
@@ -75,8 +80,17 @@ private struct LiveGuideScreen: View {
                 }
             }
             .navigationDestination(isPresented: $showsRecordings) { RecordingsView(store: store) }
-            .sheet(item: $details) { selection in
-                ProgrammeSheet(store: store, selection: selection)
+            .sheet(item: $details, onDismiss: { playAfterSheet() }) { selection in
+                ProgrammeSheet(store: store, selection: selection) { channel in
+                    watchAfterSheet = channel
+                    details = nil
+                }
+            }
+            .fullScreenCover(item: $playing) { model in
+                LivePlayerView(model: model, outerTheme: theme, outerScheme: colorScheme) {
+                    model.close()
+                    playing = nil
+                }
             }
             .onAppear { backToNow() }
             .onChange(of: scenePhase) { _, phase in
@@ -253,7 +267,7 @@ private struct LiveGuideScreen: View {
 
     private var actions: GuideActions {
         GuideActions(
-            play: { _ in toasts.show("Watching live TV comes in the next update") },
+            play: { channel in play(channel) },
             open: { airing, channel in details = ProgrammeSelection(airing: airing, channel: channel) },
             record: { airing, channel in quickRecord(airing, channel) },
             toggleFavourite: { channel in
@@ -283,6 +297,18 @@ private struct LiveGuideScreen: View {
                 toasts.show(LiveText.recordingProblem(error, server: store.serverName))
             }
         }
+    }
+
+    /// Opens the live player; a film playing, in Picture in Picture too, stops first.
+    private func play(_ channel: LiveChannel) {
+        session.player.stopAll()
+        playing = LivePlaybackModel(store: store, channel: channel)
+    }
+
+    private func playAfterSheet() {
+        guard let channel = watchAfterSheet else { return }
+        watchAfterSheet = nil
+        play(channel)
     }
 
     private func backToNow() {
