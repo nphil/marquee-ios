@@ -1,5 +1,6 @@
 import MarqueeCore
 import SwiftUI
+import UIKit
 
 /// Playback info from the More menu: how the item plays and why, and the file's tracks. Codec names
 /// appear here and nowhere else (DESIGN §8.6).
@@ -7,6 +8,7 @@ struct PlaybackInfoView: View {
     let model: PlayerModel
     @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
+    @State private var copied = false
 
     var body: some View {
         List {
@@ -61,6 +63,29 @@ struct PlaybackInfoView: View {
                 }
                 .listRowBackground(theme.sheet)
             }
+
+            Section {
+                Button {
+                    Task {
+                        let server = await PlayerStats.Server.read(model)
+                        UIPasteboard.general.string = PlayerStats.report(model, server: server)
+                        Haptics.impact(.light)
+                        AccessibilityNotification.Announcement("Copied").post()
+                        copied = true
+                    }
+                } label: {
+                    Label(copied ? "Copied" : "Copy Diagnostics", systemImage: copied ? "checkmark" : "doc.on.doc")
+                        .foregroundStyle(theme.accentText)
+                }
+                .textRole(.body)
+                .accessibilityIdentifier("playbackInfo.copy")
+            } header: {
+                Text("Diagnostics")
+            } footer: {
+                Text("The route, the stream's numbers, the engine's recent measurements and this iPhone's decoders, as text for a bug report.")
+                    .foregroundStyle(theme.ink2)
+            }
+            .listRowBackground(theme.sheet)
         }
         .themedList(theme)
         .navigationTitle("Playback Info")

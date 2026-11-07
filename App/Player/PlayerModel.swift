@@ -99,7 +99,7 @@ final class PlayerModel: Identifiable {
 
     private unowned let session: AppSession
     let library: PlexLibrary
-    private let capabilities: PlaybackCapabilities
+    let capabilities: PlaybackCapabilities
     private let backend: any VideoBackend
     private let audioSession = AudioSession()
 

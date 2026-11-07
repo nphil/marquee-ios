@@ -48,6 +48,14 @@ struct PlayerView: View {
                 SkipFlashView(flash: flash)
                     .allowsHitTesting(false)
             }
+            // Under the chrome and the offers: the panel only reports, so the controls over it stay
+            // legible and take the touches.
+            if model.showsStats {
+                StatsOverlay(model: model)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .padding(.top, model.chromeVisible ? 76 : Space.s3)
+                    .padding(.horizontal, Space.inset)
+            }
             if model.chromeVisible || model.phase != .playing {
                 PlayerChrome(model: model, frames: frames, close: close) { bottomControls = $0 }
                     .transition(.opacity)
@@ -61,12 +69,6 @@ struct PlayerView: View {
                 FallbackBanner(model: model)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .padding(.top, model.chromeVisible ? 76 : Space.s3)
-            }
-            if model.showsStats {
-                StatsOverlay(model: model)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                    .padding(.top, model.chromeVisible ? 76 : Space.s3)
-                    .padding(.horizontal, Space.inset)
             }
         }
         .environment(\.theme, theme)

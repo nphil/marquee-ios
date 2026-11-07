@@ -84,6 +84,7 @@ private extension XCTestCase {
         XCTAssertTrue(stats.waitForExistence(timeout: 5), "No Stats for Nerds item")
         stats.tap()
         waitFor("player.stats", in: app)
+        XCTAssertTrue(app.buttons["player.stats.copy"].exists, "No Copy button on the stats overlay")
         try snap("player-06-stats-\(suffix)")
     }
 
@@ -102,6 +103,18 @@ private extension XCTestCase {
         info.tap()
         waitFor("player.info", in: app)
         try snap("player-04-playback-info-\(suffix)")
+        // app.swipeUp() left this landscape sheet unscrolled, so the drag runs between two points of
+        // the list. At accessibility sizes the section is several screens down.
+        let list = app.collectionViews["player.info"]
+        let copy = app.buttons["Copy Diagnostics"]
+        var drags = 0
+        while !(copy.exists && copy.isHittable), drags < 15 {
+            list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+                .press(forDuration: 0.1, thenDragTo: list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)))
+            drags += 1
+        }
+        XCTAssertTrue(copy.wait(for: \.isHittable, toEqual: true, timeout: 5), "No Copy Diagnostics")
+        try snap("player-04-playback-info-diagnostics-\(suffix)")
         app.navigationBars["Playback Info"].buttons["Done"].tap()
 
         tap("player.episodes", in: app)

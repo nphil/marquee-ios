@@ -374,7 +374,9 @@ Round brackets are 56 pt glass buttons; the picture runs behind everything.
 2. **Top row:** Close (`chevron.down`) leading; the title block in the middle (title, "S2 · E5" in white at 70%); trailing AirPlay (`airplayvideo`, system route picker) and Picture in Picture (`pip.enter`).
 3. **Centre transport:** skip back (`gobackward.N`), Play/Pause, skip forward (`goforward.N`), with N from the skip setting (5, 10, 15, 30 or 60 s, `B:§4`; default 10). Glyph names to check in the SF Symbols app.
 4. **Scrubber:** a 6 pt readable track (§5.1) with a 56 pt-tall hit area and a white thumb; elapsed time leading, remaining time trailing (Caption, tabular). Dragging shows the scene-thumbnail preview and the time above the thumb, a selection tick per preview frame, and moving the finger away vertically slows the scrub (`S:Features/Player/PlayerControlsView.swift:513-534`). Intro and credits ranges from the server cut the track into segments, a 2 pt gap at each edge, with an accessible label (`B:§2`).
-5. **Bottom row:** Previous (`backward.end.fill`) and Next (`forward.end.fill`) leading; Tracks (`captions.bubble`) and More (`ellipsis`) trailing. Previous restarts the item when 5 s or more in, otherwise goes to the previous item (`B:§4`). A button with no target is dimmed, and VoiceOver reads "unavailable" (`B:§4`, `L:74`). More: Aspect (Fit, Fill, Original, Zoom, Stretch, `B:§4`), Playback info.
+5. **Bottom row:** Previous (`backward.end.fill`) and Next (`forward.end.fill`) leading; Tracks (`captions.bubble`) and More (`ellipsis`) trailing. Previous restarts the item when 5 s or more in, otherwise goes to the previous item (`B:§4`). A button with no target is dimmed, and VoiceOver reads "unavailable" (`B:§4`, `L:74`). More: Aspect (Fit, Fill, Original, Zoom, Stretch, `B:§4`), Playback Info, Stats for Nerds.
+
+**Stats for nerds:** More › Stats for Nerds, or a long press on the title, lays a glass panel over the top leading corner, refreshed twice a second: the route and why, server address type, file, video, picture (dynamic range and whether this iPhone decodes it in hardware), audio (copied or converted), subtitles; then display size, network, buffer, dropped frames and stalls, player errors, the remux lead or the server's transcode (speed, throttling, decisions, GPU), heat and memory. Two columns in landscape. Only its Copy button takes touches, so the picture's gestures still work through it, and it sits under the chrome and offers, so the controls stay legible over it. Copy, and Playback Info's Copy Diagnostics, put the same lines on the clipboard with the engine's recent measurements and this iPhone's hardware report, for bug reports.
 
 **Tracks menu:** one native menu; audio and subtitles together, as Apple's own player does.
 
@@ -446,7 +448,7 @@ No haptic on loads, countdowns or auto-skips. No sound from the app. [INFERENCE:
 
 ## 10. Accessibility
 
-- **Text size:** every text uses a Dynamic Type style (§4.3). Test at default, XXL, accessibility 2 (about 200%) and the largest size; labels wrap, nothing clips (`L:115,387`). The hero title is the only capped text.
+- **Text size:** every text uses a Dynamic Type style (§4.3). Test at default, XXL, accessibility 2 (about 200%) and the largest size; labels wrap, nothing clips (`L:115,387`). Text stops growing only where it would break a fixed shape or hide the picture: the hero title (accessibility 3), the PIN keys, the A–Z rail and the stats panel (XXXL).
 - **Contrast:** 4.5:1 for text and 3:1 for non-text on composited colours in all 40 themes (§5.3, §5.5). Increase Contrast and Reduce Transparency follow §5.3.
 - **Reduce Motion:** §9. **Bold Text:** Manrope steps up one cut (design choice; the HIG sets no step). **Differentiate Without Colour:** every status pairs a glyph with words; selection uses a check, not only a ring colour.
 - **Targets:** 48 pt, at least 12 pt apart.
