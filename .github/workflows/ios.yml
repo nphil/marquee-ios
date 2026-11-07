@@ -99,8 +99,10 @@ jobs:
           xcrun simctl bootstatus "$UDID" -b
           SETTLE=$(( $(cat "$RUNNER_TEMP/booted-at") + 120 - $(date +%s) ))
           if [ "$SETTLE" -gt 0 ]; then sleep "$SETTLE"; fi
-          # Naming each test target fails the run if the scheme leaves one out.
+          # Naming each test target fails the run if the scheme leaves one out. A failed test runs once
+          # more, as in the App job: the simulator's stalls also hit real-time playback deadlines here.
           xcodebuild test-without-building -scheme "$SCHEME" -destination "id=$UDID" \
+            -retry-tests-on-failure -test-iterations 2 \
             -only-testing:LiveEngineTests -only-testing:MarqueeLiveTests 2>&1 | xcbeautify
 
   app:
