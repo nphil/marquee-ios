@@ -1,0 +1,17 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Channel": [
+   {
+    "id": "ch-1101",
+    "gridKey": "ch-1101",
+    "vcn": "11.1",
+    "isHd": "0",
+    "callSign": "WKID",
+    "title": "Kids 11",
+    "language": "en",
+    "thumb": "https://provider-static.plex.tv/art/logos/wkid.png"
+   }
+  ]
+ }
+}

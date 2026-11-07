@@ -1,0 +1,17 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Channel": [
+   {
+    "id": "ch-0901",
+    "gridKey": "ch-0901",
+    "vcn": "9.1",
+    "isHd": "1",
+    "callSign": "WSPT",
+    "title": "Sports 9",
+    "language": "en",
+    "thumb": "https://provider-static.plex.tv/art/logos/wspt.png"
+   }
+  ]
+ }
+}

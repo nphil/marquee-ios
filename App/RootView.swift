@@ -96,7 +96,7 @@ private struct MainTabs: View {
                 BrowseStack { LibraryView() }
             }
             Tab("Live TV", systemImage: "play.tv", value: AppTab.liveTV) {
-                NavigationStack { LiveTVView() }
+                BrowseStack { LiveTVView() }
             }
             Tab("Watchlist", systemImage: "bookmark", value: AppTab.watchlist) {
                 BrowseStack { WatchlistView() }

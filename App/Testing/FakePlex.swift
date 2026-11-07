@@ -17,6 +17,9 @@ import Foundation
 /// - Images are files under the folder: `/photo/:/transcode` serves the path of its `url` item, and
 ///   any URL ending in an image extension serves its own path.
 /// - A write, or an action under `/:/` or `/actions/`, without a fixture is answered 200 `{}`.
+/// - A fixture whose object has `"__anchor": T` has every `beginsAt` and `endsAt` in it moved by
+///   `liveEvening` minus T, so the Live TV guide always airs around `liveNow`.
+/// - `live.json` holds the Live TV favourites and recent channels the app starts with.
 enum FakePlex {
     static let environmentKey = "MARQUEE_FAKE_PLEX"
 
@@ -30,6 +33,18 @@ enum FakePlex {
     }()
 
     static var isActive: Bool { root != nil }
+
+    /// 9 PM today while active: where an anchored fixture's T lands.
+    static let liveEvening: Date? = isActive ? Calendar.current.date(bySettingHour: 21, minute: 0, second: 0, of: Date()) : nil
+
+    /// The time the Live TV guide is drawn at while active, so its screenshots never move.
+    static var liveNow: Date? { liveEvening?.addingTimeInterval(41 * 60) }
+
+    /// Live TV lists to start with, by name (`favourites`, `recents`), from `live.json`.
+    static let liveSeeds: [String: [String]] = {
+        guard let root, let data = try? Data(contentsOf: root.appending(path: "live.json")) else { return [:] }
+        return (try? JSONDecoder().decode([String: [String]].self, from: data)) ?? [:]
+    }()
 
     /// Routes every request of sessions made from `configuration` to the fixtures while active.
     static func install(into configuration: URLSessionConfiguration) {
@@ -101,6 +116,10 @@ struct FakePlexRouter {
         if let found = fixture(base, query: query) ?? derived(base, query: query) {
             guard var object = found as? [String: Any] else { return .success(json(found)) }
             let status = object.removeValue(forKey: "__status") as? Int ?? 200
+            if let anchor = object.removeValue(forKey: "__anchor") as? Int, let evening = FakePlex.liveEvening,
+               let moved = Self.shifted(object, by: Int(evening.timeIntervalSince1970) - anchor) as? [String: Any] {
+                object = moved
+            }
             if path == "/hubs/search", let text = query.first(where: { $0.name == "query" })?.value {
                 object = Self.search(object, for: text, limit: query.first { $0.name == "limit" }?.value.flatMap(Int.init))
             } else {
@@ -198,6 +217,29 @@ struct FakePlexRouter {
     private func json(_ object: Any, status: Int = 200) -> Reply {
         let body = (try? JSONSerialization.data(withJSONObject: object)) ?? Data("{}".utf8)
         return Reply(status: status, body: body, contentType: "application/json")
+    }
+
+    private static let timeKeys: Set<String> = ["beginsAt", "endsAt"]
+
+    /// `value` with every `beginsAt` and `endsAt` in it moved by `delta` seconds, as numbers or strings.
+    private static func shifted(_ value: Any, by delta: Int) -> Any {
+        if let object = value as? [String: Any] {
+            var result: [String: Any] = [:]
+            for (key, entry) in object {
+                if timeKeys.contains(key), let seconds = entry as? Int {
+                    result[key] = seconds + delta
+                } else if timeKeys.contains(key), let text = entry as? String, let seconds = Int(text) {
+                    result[key] = String(seconds + delta)
+                } else {
+                    result[key] = shifted(entry, by: delta)
+                }
+            }
+            return result
+        }
+        if let array = value as? [Any] {
+            return array.map { shifted($0, by: delta) }
+        }
+        return value
     }
 
     // MARK: Lists

@@ -1,0 +1,88 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Dvr": [
+   {
+    "key": "12",
+    "uuid": "dvr-living-room",
+    "language": "eng",
+    "lineupTitle": "Antenna",
+    "lineup": "lineup://tv.plex.providers.epg.cloud/OTA-00000#Antenna",
+    "epgIdentifier": "tv.plex.providers.epg.cloud",
+    "Device": [
+     {
+      "key": "21",
+      "uuid": "device://tv.plex.grabbers.hdhomerun/10AA0001",
+      "uri": "http://192.0.2.42:5004",
+      "protocol": "livetv",
+      "status": "alive",
+      "state": "enabled",
+      "make": "Silicondust",
+      "model": "HDHomeRun FLEX 4K",
+      "tuners": "4",
+      "ChannelMapping": [
+       {
+        "channelKey": "ch-0201",
+        "deviceIdentifier": "2.1",
+        "enabled": "1",
+        "lineupIdentifier": "002"
+       },
+       {
+        "channelKey": "ch-0401",
+        "deviceIdentifier": "4.1",
+        "enabled": "1",
+        "lineupIdentifier": "004"
+       },
+       {
+        "channelKey": "ch-0501",
+        "deviceIdentifier": "5.1",
+        "enabled": "1",
+        "lineupIdentifier": "005"
+       },
+       {
+        "channelKey": "ch-0701",
+        "deviceIdentifier": "7.1",
+        "enabled": "1",
+        "lineupIdentifier": "007"
+       },
+       {
+        "channelKey": "ch-0901",
+        "deviceIdentifier": "9.1",
+        "enabled": "1",
+        "lineupIdentifier": "009"
+       },
+       {
+        "channelKey": "ch-1101",
+        "deviceIdentifier": "11.1",
+        "enabled": "1",
+        "lineupIdentifier": "011"
+       },
+       {
+        "channelKey": "ch-1301",
+        "deviceIdentifier": "13.1",
+        "enabled": "1",
+        "lineupIdentifier": "013"
+       },
+       {
+        "channelKey": "ch-4601",
+        "deviceIdentifier": "46.1",
+        "enabled": "1",
+        "lineupIdentifier": "046"
+       }
+      ]
+     }
+    ],
+    "Setting": [
+     {
+      "id": "startOffsetMinutes",
+      "value": 1
+     },
+     {
+      "id": "endOffsetMinutes",
+      "value": 2
+     }
+    ]
+   }
+  ]
+ }
+}

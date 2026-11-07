@@ -1,0 +1,128 @@
+{
+ "__anchor": 1800000000,
+ "MediaContainer": {
+  "size": 3,
+  "MediaSubscription": [
+   {
+    "key": "41",
+    "type": 4,
+    "title": "This Episode",
+    "librarySectionTitle": "TV Shows",
+    "targetLibrarySectionID": 2,
+    "Video": {
+     "type": "episode",
+     "title": "News 7 Tonight",
+     "grandparentTitle": "News 7 Tonight"
+    },
+    "Setting": [],
+    "MediaGrabOperation": [
+     {
+      "id": "grab-41",
+      "mediaSubscriptionID": 41,
+      "status": "inprogress",
+      "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+      "Metadata": {
+       "type": "episode",
+       "title": "News 7 Tonight",
+       "guid": "plex://episode/ch-0701-5065",
+       "grandparentTitle": "News 7 Tonight",
+       "Media": [
+        {
+         "beginsAt": 1800000000,
+         "endsAt": 1800003600,
+         "channelIdentifier": "ch-0701",
+         "channelVcn": "7.1",
+         "channelCallSign": "WNWS"
+        }
+       ]
+      }
+     }
+    ]
+   },
+   {
+    "key": "42",
+    "type": 2,
+    "title": "All Episodes",
+    "airingsType": "New Airings Only",
+    "librarySectionTitle": "TV Shows",
+    "targetLibrarySectionID": 2,
+    "Directory": {
+     "type": "show",
+     "title": "City Desk"
+    },
+    "Setting": [
+     {
+      "id": "onlyNewAirings",
+      "type": "int",
+      "value": "1",
+      "enumValues": "0:New and Repeat Airings|1:New Airings Only"
+     }
+    ],
+    "MediaGrabOperation": [
+     {
+      "id": "grab-42",
+      "mediaSubscriptionID": 42,
+      "status": "scheduled",
+      "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+      "Metadata": {
+       "type": "episode",
+       "title": "Deadline",
+       "guid": "plex://episode/ch-0201-5005",
+       "grandparentTitle": "City Desk",
+       "parentIndex": 3,
+       "index": 10,
+       "Media": [
+        {
+         "beginsAt": 1800003600,
+         "endsAt": 1800007200,
+         "channelIdentifier": "ch-0201",
+         "channelVcn": "2.1",
+         "channelCallSign": "WMRQ"
+        }
+       ]
+      }
+     }
+    ]
+   },
+   {
+    "key": "43",
+    "type": 4,
+    "title": "This Episode",
+    "librarySectionTitle": "TV Shows",
+    "targetLibrarySectionID": 2,
+    "Video": {
+     "type": "episode",
+     "title": "Sintel",
+     "grandparentTitle": "Open Movie Night"
+    },
+    "Setting": [],
+    "MediaGrabOperation": [
+     {
+      "id": "grab-43",
+      "mediaSubscriptionID": 43,
+      "status": "scheduled",
+      "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+      "Metadata": {
+       "type": "episode",
+       "title": "Sintel",
+       "guid": "plex://episode/ch-1301-5166",
+       "grandparentTitle": "Open Movie Night",
+       "parentIndex": 1,
+       "index": 3,
+       "thumb": "https://metadata-static.plex.tv/art/sintel-backdrop.jpg",
+       "Media": [
+        {
+         "beginsAt": 1800003600,
+         "endsAt": 1800005400,
+         "channelIdentifier": "ch-1301",
+         "channelVcn": "13.1",
+         "channelCallSign": "WQXL"
+        }
+       ]
+      }
+     }
+    ]
+   }
+  ]
+ }
+}
