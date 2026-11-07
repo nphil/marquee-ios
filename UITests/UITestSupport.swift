@@ -1,3 +1,4 @@
+import UIKit
 import XCTest
 
 extension XCTestCase {
@@ -115,7 +116,24 @@ extension XCTestCase {
         attachment.lifetime = .keepAlways
         add(attachment)
         if let directory = ProcessInfo.processInfo.environment["SCREENS_DIR"] {
-            try shot.pngRepresentation.write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
+            try upright(shot).write(to: URL(fileURLWithPath: directory).appendingPathComponent("\(name).png"))
         }
+    }
+
+    /// The screen's pixels stay portrait with the phone on its side, so a landscape shot is turned
+    /// upright before it is written.
+    @MainActor
+    private func upright(_ shot: XCUIScreenshot) -> Data {
+        let orientation: UIImage.Orientation
+        switch XCUIDevice.shared.orientation {
+        case .landscapeLeft: orientation = .left
+        case .landscapeRight: orientation = .right
+        default: return shot.pngRepresentation
+        }
+        guard let pixels = shot.image.cgImage else { return shot.pngRepresentation }
+        let image = UIImage(cgImage: pixels, scale: 1, orientation: orientation)
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        return UIGraphicsImageRenderer(size: image.size, format: format).pngData { _ in image.draw(at: .zero) }
     }
 }
