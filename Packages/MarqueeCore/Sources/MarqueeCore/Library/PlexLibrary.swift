@@ -220,8 +220,8 @@ public struct PlexLibrary: Sendable {
     }
 
     /// Sends through the chosen address. When it gives no answer, the address is dropped; a read is
-    /// repeated once if probing finds a different one.
-    private func send(
+    /// repeated once if probing finds a different one. `PlexLiveTV` sends through here too.
+    func send(
         _ method: HTTPMethod,
         _ path: String,
         _ query: [URLQueryItem],
@@ -258,7 +258,7 @@ public struct PlexLibrary: Sendable {
     }
 
     /// `/hubs/home/recentlyAdded?type=1` as a path and its query items.
-    private static func split(_ key: String) -> (path: String, query: [URLQueryItem]) {
+    static func split(_ key: String) -> (path: String, query: [URLQueryItem]) {
         guard let mark = key.firstIndex(of: "?") else { return (key, []) }
         let query = URLComponents(string: "?" + key[key.index(after: mark)...])?.queryItems ?? []
         return (String(key[..<mark]), query)

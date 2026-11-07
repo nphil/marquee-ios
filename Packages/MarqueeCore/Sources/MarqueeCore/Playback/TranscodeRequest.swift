@@ -4,7 +4,7 @@ import Foundation
 /// subtitle the server uses are the part's selected streams: set them with
 /// `PlexLibrary.selectStreams` before starting.
 public struct TranscodeRequest: Sendable, Hashable {
-    /// `/library/metadata/<ratingKey>`.
+    /// `/library/metadata/<ratingKey>`, or a tuned channel's `/livetv/sessions/<id>`.
     public var path: String
     public var mediaIndex: Int
     public var partIndex: Int
@@ -42,6 +42,25 @@ public struct TranscodeRequest: Sendable, Hashable {
         burnsSubtitles = if case .burnedIn = route.subtitle { true } else { false }
         self.maxVideoBitrateKbps = maxVideoBitrateKbps ?? max(media?.bitrate ?? 0, 8_000)
         self.videoResolution = videoResolution ?? "\(media?.width ?? 1920)x\(media?.height ?? 1080)"
+    }
+
+    /// A channel the server tuned. The server copies H.264 and HEVC and converts the rest (MPEG-2),
+    /// since AVPlayer has no MPEG-2 decoder.
+    public init(
+        live session: PlexLiveSession,
+        maxVideoBitrateKbps: Int = 8_000,
+        videoResolution: String = "1920x1080",
+        session transcodeSession: String = UUID().uuidString
+    ) {
+        path = session.path
+        mediaIndex = 0
+        partIndex = 0
+        self.session = transcodeSession
+        offset = 0
+        copiesVideo = session.phoneDecodesVideo
+        burnsSubtitles = false
+        self.maxVideoBitrateKbps = maxVideoBitrateKbps
+        self.videoResolution = videoResolution
     }
 
     func queryItems(location: String) -> [URLQueryItem] {

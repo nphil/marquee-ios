@@ -79,7 +79,24 @@ Tracks titled Signs or Songs count as on-screen text, as the spec's forced-word 
   - Unplayable audio is first swapped for a playable track in the same language. Automatic subtitle picks never burn; a remembered one burns only when the video is re-encoded anyway.
 - `PlaybackRoute`: kind, `RouteReason`s, played audio and whether it stands in, audio conversion, video re-encode, `SubtitleDelivery` (sidecar, in stream, burned in, not shown).
 - `RouteReason`: plain-English reasons. `RouteLimits`: server only after an on-device failure, bitrate cap.
-- `TranscodeRequest`: start offset, quality, video copy and burn-in for `PlexLibrary.transcodeURL(_:)`. The server takes audio and subtitle from the streams set with `selectStreams`.
+- `TranscodeRequest`: start offset, quality, video copy and burn-in for `PlexLibrary.transcodeURL(_:)`. The server takes audio and subtitle from the streams set with `selectStreams`. `init(live:)` streams a tuned channel; the server copies H.264 and HEVC and converts MPEG-2.
+
+## Live TV (`Live/`)
+
+The endpoints and the route rules are in `docs/LIVE-TV.md`.
+
+- `PlexLiveTV(library:)`: one server's Live TV and DVR.
+  - `dvrs()`, `channels(_:)`: DVRs with their devices and channel mappings; the lineup's enabled channels in number order ("2.1" < "2.10" < "10.1"), each joined to the device that receives it (a live one first).
+  - `guide(_:channels:from:to:)`: airings overlapping a window, one per channel a programme airs on; channels no device maps are dropped. `channelFilters(_:)`, `channelKeys(in:)`: the provider's genres and their channels.
+  - `tune(_:)` → `PlexLiveSession`, then `streamURL(_:)` with `TranscodeRequest(live:)`, `reportTimeline(_:)` with `LiveTimelineUpdate`, and `stopStream(transcodeSession:)`, which frees the tuner.
+  - `recordOptions(_:)` → `RecordOption`s (this episode, all episodes, the movie), `record(_:values:)`, `update(_:values:)`, `rules()`, `scheduled()`, `cancel(_:)` (skips one airing), `delete(_:)` (a rule).
+- `LiveDVR`, `TunerDevice`, `LiveChannelMapping`, `LiveChannel`, `LiveAiring`, `LiveChannelFilter`: values, Codable for the guide cache.
+- `LiveGuide`: channels and per-channel airings for the loaded span. `airing(on:at:)`, `nowAndNext(on:at:)`, `airings(on:from:to:)`, `merging(_:from:to:channels:)` (a refreshed span replaces what it covers; an overlap is cut at the later start), `trimmed(before:)`.
+- `GuideCache` (actor): the last guide per server and DVR on disk, loaded re-anchored to now (up to 2 h of past airings) or nil once it ends before now.
+- `RecordingRule`, `ScheduledRecording`, `RecordSetting`, `LiveRecordings.mark(for:)` → `RecordingMark` (scheduled, series, recording, failed, recorded) for the guide's record glyphs.
+- `LiveRouteDecider.route(_:_:)` with `RouteContext` → `LiveRoute`: `.direct(URL)`, `.plex(PlexRouteReason)` or `.protectedChannel`, by the first matching rule of §2.2.
+- `HDHomeRunClient`: a tuner's `discover.json` (0.5 s timeout, the reachability check) and `lineup.json` (`HDHomeRunChannel` with codecs, HD and DRM when the tuner sends them).
+- `LiveSource` (`@MainActor` protocol): what the live player plays through; `LiveState`, `LiveError`.
 
 ## Not yet checked against a live server
 
@@ -88,3 +105,4 @@ Tracks titled Signs or Songs count as on-screen text, as the spec's forced-word 
 - The universal transcode parameters, including identity sent as query items and the offset format.
 - The Keychain store, which has no tests.
 - Dolby Vision, HEVC level and HDR limits, and CEA-608 captions on the actual phone.
+- The live endpoints: fixtures follow the server's API spec and the shapes recorded in `docs/LIVE-TV.md` §1, not a captured response.
