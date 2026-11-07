@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// A screen with nothing to show: an SF Symbol, a title, one short line and at most one action
-/// (DESIGN §11), centred on the canvas. Laid out by hand because ContentUnavailableView bolds its title
-/// past the type scale's SemiBold.
+/// (DESIGN §11), centred on the canvas. Without a symbol it shows a spinner: the screen is waiting.
+/// Laid out by hand because ContentUnavailableView bolds its title past the type scale's SemiBold.
 struct EmptyState: View {
     struct Action {
         let title: String
@@ -12,7 +12,7 @@ struct EmptyState: View {
 
     let title: String
     let message: String
-    let systemImage: String
+    let systemImage: String?
     var action: Action?
 
     @Environment(\.theme) private var theme
@@ -20,11 +20,18 @@ struct EmptyState: View {
 
     var body: some View {
         VStack(spacing: Space.s3) {
-            Image(systemName: systemImage)
-                .font(.system(size: iconSize))
-                .foregroundStyle(theme.ink2)
-                .padding(.bottom, Space.s1)
-                .accessibilityHidden(true)
+            Group {
+                if let systemImage {
+                    Image(systemName: systemImage)
+                        .font(.system(size: iconSize))
+                        .foregroundStyle(theme.ink2)
+                } else {
+                    ProgressView()
+                        .controlSize(.large)
+                }
+            }
+            .padding(.bottom, Space.s1)
+            .accessibilityHidden(true)
             Text(title)
                 .textRole(.title)
                 .foregroundStyle(theme.ink)

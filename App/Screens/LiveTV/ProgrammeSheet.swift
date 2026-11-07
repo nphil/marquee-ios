@@ -65,11 +65,11 @@ struct ProgrammeSheet: View {
                     ProgressLine(progress: airing.progress(at: now))
                 }
                 if let mark {
-                    StatusLine(mark: mark)
+                    RecordStatusLine(mark: mark)
                 }
                 actions
                 if let problem {
-                    ProblemLine(text: problem)
+                    ProgrammeProblemLine(text: problem)
                 }
                 if let summary = airing.summary, !summary.isEmpty {
                     Text(summary)
@@ -369,7 +369,7 @@ private struct Banner: View {
 
 /// The record state: its glyph in the role colour and the words in ink, with SERIES when a series rule
 /// covers the airing (docs/LIVE-TV.md §6.10).
-private struct StatusLine: View {
+private struct RecordStatusLine: View {
     let mark: RecordingMark
     @Environment(\.theme) private var theme
 
@@ -389,7 +389,7 @@ private struct StatusLine: View {
     }
 }
 
-private struct ProblemLine: View {
+private struct ProgrammeProblemLine: View {
     let text: String
     @Environment(\.theme) private var theme
 

@@ -39,6 +39,16 @@ final class PlayerScreenshotTests: XCTestCase {
     func testUpNextCountsDownThenPlaysNext() throws {
         try upNextFlow(suffix: "rose-pine")
     }
+
+    @MainActor
+    func testWrongSubtitlesAndBazarr() throws {
+        try subtitleFixFlow(mode: "dark", suffix: "rose-pine")
+    }
+
+    @MainActor
+    func testWrongSubtitlesAndBazarrInLightTheme() throws {
+        try subtitleFixFlow(mode: "light", suffix: "paper")
+    }
 }
 
 /// Run by CI with Increase Contrast and an accessibility text size.
@@ -56,6 +66,11 @@ final class PlayerAccessibilityScreenshots: XCTestCase {
     @MainActor
     func testUpNext() throws {
         try upNextFlow(suffix: "ax")
+    }
+
+    @MainActor
+    func testWrongSubtitlesAndBazarr() throws {
+        try subtitleFixFlow(mode: "dark", suffix: "ax")
     }
 }
 
@@ -164,10 +179,100 @@ private extension XCTestCase {
         try snap("player-12-next-episode-\(suffix)")
     }
 
-    /// Opens the player on episode 212 at `seconds` with the phone on its side, and waits until it
-    /// has landed there. `introSkipDelay` overrides the profile's intro countdown for this launch.
+    /// "Wrong Subtitles?" on the episode's own English track, Bazarr's results, a download that Plex
+    /// lists and the player shows, then that file removed from Plex again.
     @MainActor
-    func launchPlayer(at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil) -> XCUIApplication {
+    func subtitleFixFlow(mode: String, suffix: String) throws {
+        let app = launchPlayer(at: 61, paused: true, mode: mode, bazarr: true)
+
+        tap("player.tracks", in: app)
+        let off = app.buttons["Off"]
+        XCTAssertTrue(off.waitForExistence(timeout: 5), "No subtitle list in the menu")
+        // The audio list has an English row too; the subtitle rows sit below Off.
+        let english = app.buttons.matching(NSPredicate(format: "label == 'English'"))
+        let subtitle = scrollMenu(in: app) {
+            english.allElementsBoundByIndex
+                .filter { $0.isHittable && (!off.exists || $0.frame.minY > off.frame.minY) }
+                .min { $0.frame.minY < $1.frame.minY }
+        }
+        XCTAssertNotNil(subtitle, "No English subtitle in the menu")
+        subtitle?.tap()
+        openWrongSubtitles(in: app)
+        let removal = element("subtitleFix.removal", in: app)
+        XCTAssertTrue(removal.waitForExistence(timeout: 5), "No removal line")
+        XCTAssertEqual(removal.label, "Part of the video file, so it can't be removed.", "An embedded track offers removal")
+        try snap("player-13-wrong-subtitles-\(suffix)")
+
+        reveal("subtitleFix.findAnother", in: app).tap()
+        XCTAssertTrue(element("bazarr.result", in: app).waitForExistence(timeout: 10), "No Bazarr results")
+        try snap("player-14-bazarr-results-\(suffix)")
+
+        reveal("bazarr.result", in: app).tap()
+        let state = element("bazarr.state", in: app)
+        XCTAssertTrue(state.waitForExistence(timeout: 5), "The download did not start")
+        XCTAssertTrue(state.wait(for: \.label, toEqual: "Active in player", timeout: 20), "The download did not show: \(state.label)")
+        try snap("player-15-bazarr-downloaded-\(suffix)")
+
+        tap("subtitleFix.done", in: app)
+        XCTAssertTrue(element("subtitleFix.search", in: app).waitForNonExistence(timeout: 5), "The sheet did not close")
+        try snap("player-16-downloaded-subtitle-\(suffix)")
+
+        openWrongSubtitles(in: app)
+        let showing = element("subtitleFix.showing", in: app)
+        XCTAssertTrue(showing.waitForExistence(timeout: 5), "Nothing is named as showing")
+        XCTAssertTrue(showing.label.hasSuffix("A separate file next to the video"), "The download is not the subtitle showing: \(showing.label)")
+        reveal("subtitleFix.remove", in: app).tap()
+        let confirm = labelled("Remove Subtitle", in: app)
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Removal was not confirmed first")
+        try snap("player-17-remove-subtitle-\(suffix)")
+
+        confirm.tap()
+        // Once the file is gone, Bazarr's results come up for another.
+        waitFor("subtitleFix.search", in: app)
+        goBack(from: "Bazarr", in: app)
+        XCTAssertTrue(removal.wait(for: \.label, toEqual: "Removed from Plex.", timeout: 5), "No word that the file was removed: \(removal.label)")
+        try snap("player-18-subtitle-removed-\(suffix)")
+    }
+
+    @MainActor
+    func openWrongSubtitles(in app: XCUIApplication) {
+        tap("player.tracks", in: app)
+        XCTAssertTrue(app.buttons["Off"].waitForExistence(timeout: 5), "No tracks menu")
+        let wrong = labelled("Wrong Subtitles?", in: app)
+        let row = scrollMenu(in: app) { wrong.exists && wrong.isHittable ? wrong : nil }
+        XCTAssertNotNil(row, "No Wrong Subtitles? in the menu")
+        row?.tap()
+        waitFor("subtitleFix.wrong", in: app)
+    }
+
+    /// An open menu lays out only the rows that fit on screen. The tracks menu hangs from the right of
+    /// the screen with its first rows at the top, so drags up its middle bring the rest in, held still
+    /// before letting go so it stops where the drag ends, until `row` finds one that can be tapped.
+    @MainActor
+    func scrollMenu(in app: XCUIApplication, to row: () -> XCUIElement?) -> XCUIElement? {
+        for _ in 0..<12 {
+            if let found = row() { return found }
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.85)).press(
+                forDuration: 0.1,
+                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.3)),
+                withVelocity: .slow,
+                thenHoldForDuration: 0.2
+            )
+        }
+        return row()
+    }
+
+    /// A button by its label alone, whatever identifier it carries.
+    @MainActor
+    func labelled(_ label: String, in app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label == %@", label)).firstMatch
+    }
+
+    /// Opens the player on episode 212 at `seconds` with the phone on its side, and waits until it
+    /// has landed there. `introSkipDelay` overrides the profile's intro countdown for this launch;
+    /// `bazarr` sets up the fake Bazarr.
+    @MainActor
+    func launchPlayer(at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, bazarr: Bool = false) -> XCUIApplication {
         XCUIDevice.shared.orientation = .landscapeLeft
         // A failed step ends the test early; the next test still has to start upright.
         addTeardownBlock {
@@ -181,6 +286,7 @@ private extension XCTestCase {
             "-marquee.uitest.frame", "art/caminandes-backdrop.jpg",
         ]
         if let introSkipDelay { arguments += ["-marquee.uitest.introSkipDelay", String(introSkipDelay)] }
+        if bazarr { arguments += ["-marquee.uitest.bazarr", "http://bazarr.local:6767"] }
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", light: "paper", arguments: arguments, waitingFor: nil)
         // Up Next hides the transport, so whichever control shows first means the player is up.
         let landed = app.descendants(matching: .any)

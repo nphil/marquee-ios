@@ -112,6 +112,26 @@ public struct BazarrSubtitle: Sendable, Hashable, Identifiable {
     public var usesOriginalFormat: Bool
 
     public var id: String { provider + "/" + subtitle }
+
+    public var trackLanguage: TrackLanguage { TrackLanguage(tag: language) }
+
+    /// What the track it becomes holds.
+    public var kind: SubtitleTrack.Kind { isForced ? .onScreenText : isHearingImpaired ? .captions : .full }
+
+    /// The release it was made for, else the provider.
+    public var name: String { releases.first { !$0.isEmpty } ?? providerName }
+
+    /// The provider as its site names itself; Bazarr sends its own lower-case id.
+    public var providerName: String {
+        Self.providerNames[provider] ?? provider.prefix(1).uppercased() + provider.dropFirst()
+    }
+
+    private static let providerNames = [
+        "addic7ed": "Addic7ed", "animetosho": "Animetosho", "embeddedsubtitles": "Embedded Subtitles",
+        "gestdown": "Gestdown", "opensubtitles": "OpenSubtitles.org", "opensubtitlescom": "OpenSubtitles.com",
+        "podnapisi": "Podnapisi", "subdl": "SubDL", "subf2m": "Subf2m", "supersubtitles": "SuperSubtitles",
+        "tvsubtitles": "TVsubtitles", "whisperai": "Whisper", "yifysubtitles": "YIFY Subtitles",
+    ]
 }
 
 public enum BazarrError: Error, Sendable, Equatable {

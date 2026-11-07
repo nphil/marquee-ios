@@ -1,0 +1,28 @@
+{
+ "data": [
+  {
+   "sonarrSeriesId": 7,
+   "sonarrEpisodeId": 71,
+   "season": 1,
+   "episode": 1,
+   "title": "Llama Drama",
+   "path": "/media/tv/Caminandes/Season 01/Caminandes - s01e01.mp4"
+  },
+  {
+   "sonarrSeriesId": 7,
+   "sonarrEpisodeId": 72,
+   "season": 1,
+   "episode": 2,
+   "title": "Gran Dillama",
+   "path": "/media/tv/Caminandes/Season 01/Caminandes - s01e02.mp4"
+  },
+  {
+   "sonarrSeriesId": 7,
+   "sonarrEpisodeId": 73,
+   "season": 1,
+   "episode": 3,
+   "title": "Llamigos",
+   "path": "/media/tv/Caminandes/Season 01/Caminandes - s01e03.mp4"
+  }
+ ]
+}

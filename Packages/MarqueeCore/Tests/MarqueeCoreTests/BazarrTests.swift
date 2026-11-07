@@ -89,6 +89,8 @@ struct BazarrTests {
         #expect(offers.map(\.provider) == ["opensubtitlescom", "podnapisi"])
         #expect(offers[0].isHearingImpaired && offers[0].uploader == "kim")
         #expect(offers[1].releases == ["Show.S01E02.WEB"] && offers[1].uploader == nil)
+        #expect(offers.map(\.name) == ["OpenSubtitles.com", "Show.S01E02.WEB"])
+        #expect(offers.map(\.providerName) == ["OpenSubtitles.com", "Podnapisi"])
         let request = try #require(await transport.requests(to: "/bazarr/api/providers/episodes").first)
         #expect(request.url.query("episodeid") == "71" && request.url.query("seriesid") == "7")
     }

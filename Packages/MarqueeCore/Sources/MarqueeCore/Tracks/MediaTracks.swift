@@ -175,6 +175,13 @@ public struct MediaTracks: Sendable, Hashable {
     public func visible(_ track: SubtitleTrack) -> SubtitleTrack {
         track.replacedBy.flatMap(subtitle(id:)) ?? track
     }
+
+    /// The separate subtitle file a download added: one in `language` that `before` did not list, the
+    /// one of `kind` when there are several.
+    public func arrived(_ language: TrackLanguage, kind: SubtitleTrack.Kind, since before: Set<Int>) -> SubtitleTrack? {
+        let new = subtitles.filter { $0.isExternal && !before.contains($0.id) && $0.language.matches(language) }
+        return new.first { $0.kind == kind } ?? new.first
+    }
 }
 
 /// Gives each track a plain name and keeps names in one menu apart: first by region or script, then (for

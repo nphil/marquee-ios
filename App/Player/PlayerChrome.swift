@@ -436,6 +436,7 @@ struct TracksMenu: View {
             Section { otherLanguages(languages.other) }
         }
         subtitleTools
+        subtitleFixes
     }
 
     /// One row per language, A to Z: a language with one track is that track, one with more opens its own
@@ -514,6 +515,29 @@ struct TracksMenu: View {
     private func enhancementToggle(_ title: String, _ enhancement: AudioEnhancements, _ state: PlayerModel.EnhancementState) -> some View {
         Toggle(title, isOn: Binding { state.asked.contains(enhancement) } set: { _ in model.toggleEnhancement(enhancement) })
             .disabled(state.unavailable != nil)
+    }
+
+    /// Bazarr's search once it is set up, and the way out of a subtitle that doesn't match the video.
+    @ViewBuilder
+    private var subtitleFixes: some View {
+        let showing = model.subtitle?.track != nil
+        if showing || model.bazarr != nil {
+            Section {
+                if model.bazarr != nil {
+                    Button {
+                        model.openSubtitleFix(.search)
+                    } label: {
+                        Text("Search Subtitles")
+                        Text("Bazarr")
+                    }
+                    .accessibilityIdentifier("player.tracks.search")
+                }
+                if showing {
+                    Button("Wrong Subtitles?") { model.openSubtitleFix(.wrong) }
+                        .accessibilityIdentifier("player.tracks.wrong")
+                }
+            }
+        }
     }
 
     private func subtitleRows(_ tracks: [SubtitleTrack]) -> some View {

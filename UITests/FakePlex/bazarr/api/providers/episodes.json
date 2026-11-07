@@ -1,0 +1,48 @@
+{
+ "data": [
+  {
+   "provider": "podnapisi",
+   "subtitle": "ZmFrZS1wb2RuYXBpc2ktMjEy",
+   "language": "en",
+   "hearing_impaired": "True",
+   "forced": "False",
+   "score": 88.33,
+   "original_format": "False",
+   "release_info": ["Caminandes.Gran.Dillama.2013.1080p.BluRay.x264"],
+   "uploader": ""
+  },
+  {
+   "provider": "opensubtitlescom",
+   "subtitle": "ZmFrZS1vcGVuc3VidGl0bGVzLTIxMg==",
+   "language": "en",
+   "hearing_impaired": "False",
+   "forced": "False",
+   "score": 96.67,
+   "original_format": "False",
+   "release_info": ["Caminandes.S01E02.Gran.Dillama.1080p.WEB.h264"],
+   "uploader": "koro"
+  },
+  {
+   "provider": "subdl",
+   "subtitle": "ZmFrZS1zdWJkbC1lcy0yMTI=",
+   "language": "es",
+   "hearing_impaired": "False",
+   "forced": "False",
+   "score": 80.0,
+   "original_format": "False",
+   "release_info": ["Caminandes.S01E02.WEB"],
+   "uploader": ""
+  },
+  {
+   "provider": "yifysubtitles",
+   "subtitle": "ZmFrZS15aWZ5LTIxMg==",
+   "language": "en",
+   "hearing_impaired": "False",
+   "forced": "False",
+   "score": 71.67,
+   "original_format": "False",
+   "release_info": [],
+   "uploader": ""
+  }
+ ]
+}

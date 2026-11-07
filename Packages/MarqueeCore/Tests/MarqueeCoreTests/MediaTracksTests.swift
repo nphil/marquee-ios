@@ -84,6 +84,20 @@ struct MediaTracksTests {
         #expect(tracks.visible(tracks.subtitles[0]).id == 4)
     }
 
+    @Test func aDownloadIsTheNewFileInItsLanguage() throws {
+        let tracks = try Fixture.tracks([
+            Fixture.subtitle(1, "eng"),
+            Fixture.subtitle(2, "eng", external: true),
+            Fixture.subtitle(3, "fre", external: true),
+            Fixture.subtitle(4, "eng", external: true),
+            Fixture.subtitle(5, "eng", external: true, hearingImpaired: true),
+        ])
+
+        #expect(tracks.arrived(.english, kind: .captions, since: [1, 2, 3])?.id == 5)
+        #expect(tracks.arrived(.english, kind: .onScreenText, since: [1, 2, 3])?.id == 4)
+        #expect(tracks.arrived(TrackLanguage(tag: "fr"), kind: .full, since: [1, 2, 3]) == nil)
+    }
+
     @Test func viewersLanguagesStayOnTheMenuAndTheRestGoAToZ() throws {
         let tracks = try Fixture.tracks([
             Fixture.subtitle(1, "spa"),

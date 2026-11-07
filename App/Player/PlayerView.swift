@@ -102,6 +102,12 @@ struct PlayerView: View {
             }
             .panel(model, theme: outerTheme, scheme: outerScheme)
         }
+        .sheet(item: $model.subtitleSheet) { start in
+            if let fix = model.subtitleFix {
+                SubtitleFixSheet(model: model, fix: fix, start: start)
+                    .panel(model, theme: outerTheme, scheme: outerScheme)
+            }
+        }
         .onChange(of: session.settings.subtitleStyle) { model.styleChanged() }
         .onChange(of: voiceOver || switchControl) { _, on in
             if on { model.showChrome() }

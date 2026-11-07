@@ -62,6 +62,14 @@ final class PlayerModel: Identifiable {
         var serial: Int
     }
 
+    /// The sheets "Wrong Subtitles?" and "Search Subtitles" open.
+    enum SubtitleSheet: Identifiable {
+        case wrong
+        case search
+
+        var id: Self { self }
+    }
+
     nonisolated let id = UUID()
 
     private(set) var item: PlexMetadata
@@ -129,6 +137,9 @@ final class PlayerModel: Identifiable {
     var showsStyle = false
     var showsStats = false
     var showsEpisodes = false
+    var subtitleSheet: SubtitleSheet?
+    /// The playing item's subtitle removal, Bazarr search and downloads.
+    private(set) var subtitleFix: SubtitleFix?
 
     let layerView = PlayerLayerView()
     /// The UI tests' stand-in for the picture.
@@ -393,6 +404,7 @@ final class PlayerModel: Identifiable {
         generation += 1
         for task in [loadTask, seekTask, eventsTask, countdownTask, hideTask, stageTask, trickplayLoad?.task] { task?.cancel() }
         sideTasks.forEach { $0.cancel() }
+        subtitleFix?.cancel()
         stopStream()
         backend.tearDown()
         pictureInPicture?.tearDown()
@@ -658,6 +670,11 @@ final class PlayerModel: Identifiable {
 
     private func begin(_ full: PlexMetadata, generation: Int) async {
         item = full
+        if subtitleFix?.ratingKey != full.ratingKey {
+            subtitleFix?.cancel()
+            subtitleFix = nil
+            subtitleSheet = nil
+        }
         mediaIndex = isFirstItem ? request.mediaIndex : 0
         guard let media = full.media.indices.contains(mediaIndex) ? full.media[mediaIndex] : full.media.first,
               let part = media.parts.first else {
@@ -992,6 +1009,8 @@ final class PlayerModel: Identifiable {
                 await startStream(at: at, generation: generation)
             } else {
                 applySubtitleSources()
+                // Paused, no time update comes to draw the new subtitle's line.
+                updateSubtitles(at: time)
                 await applySelection()
             }
             if handPick { writeBack() }
@@ -1441,6 +1460,80 @@ final class PlayerModel: Identifiable {
 
     func closeTiming() {
         showsTiming = false
+    }
+
+    // MARK: Wrong subtitles
+
+    /// Bazarr, once its address and key are saved in Settings.
+    var bazarr: BazarrClient? { session.bazarr.client }
+
+    func openSubtitleFix(_ sheet: SubtitleSheet) {
+        if subtitleFix == nil {
+            let showing = subtitle?.track?.language.code.map { TrackLanguage(code: $0) }
+            subtitleFix = SubtitleFix(model: self, language: showing ?? session.settings.subtitles.language)
+        }
+        subtitleFix?.open()
+        subtitleSheet = sheet
+    }
+
+    /// Reads the item again for its subtitle files. Nil once another item or file plays.
+    func reloadTracks() async throws -> MediaTracks? {
+        guard let fresh = try await reloadPart() else { return nil }
+        if fresh != part { setPart(fresh) }
+        return tracks
+    }
+
+    /// Puts a track on screen as a pick from the menu would; true once it shows.
+    func show(_ track: SubtitleTrack) async -> Bool {
+        pickSubtitle(.track(track.id))
+        await loadTask?.value
+        return subtitle?.track?.id == track.id && subtitleProblem == nil
+    }
+
+    /// A subtitle file was deleted from the server: it leaves the menu, and the screen if it was showing.
+    func removed(_ track: SubtitleTrack) async {
+        let key = item.ratingKey
+        let reloaded: PlexPart?
+        do { reloaded = try await reloadPart() } catch { reloaded = part }
+        guard key == item.ratingKey, var fresh = reloaded else { return }
+        fresh.streams.removeAll { $0.id == track.id }
+        setPart(fresh)
+        if handSubtitle == .track(track.id) { handSubtitle = nil }
+        if sidecarID == track.id {
+            sidecar = nil
+            sidecarID = nil
+        }
+        if subtitle?.track?.id == track.id { reroute(handPick: false) }
+    }
+
+    /// What Bazarr is asked to find: the movie, or the episode by its show.
+    func bazarrLookup() async -> BazarrLookup {
+        let item = item, file = part?.file
+        guard item.type == .episode else {
+            let ids = (try? await library.externalIDs(item.ratingKey)) ?? []
+            return BazarrLookup(title: item.title, year: item.year, externalIDs: ids, file: file)
+        }
+        var ids: [String] = []
+        if let show = item.grandparentRatingKey { ids = (try? await library.externalIDs(show)) ?? [] }
+        return BazarrLookup(
+            title: item.grandparentTitle ?? item.title, year: nil, externalIDs: ids,
+            season: item.parentIndex, episode: item.index, file: file
+        )
+    }
+
+    /// The playing file as the server lists it now; nil once another item or file plays.
+    private func reloadPart() async throws -> PlexPart? {
+        guard let partID = part?.id else { return nil }
+        let key = item.ratingKey
+        let full = try await library.metadata(key)
+        guard key == item.ratingKey, part?.id == partID else { return nil }
+        return full.media.lazy.flatMap(\.parts).first { $0.id == partID }
+    }
+
+    private func setPart(_ fresh: PlexPart) {
+        if let index = media?.parts.firstIndex(where: { $0.id == fresh.id }) { media?.parts[index] = fresh }
+        part = fresh
+        tracks = MediaTracks(part: fresh)
     }
 
     // MARK: Offers

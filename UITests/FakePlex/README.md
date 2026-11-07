@@ -4,8 +4,10 @@ The UI tests launch the app with `MARQUEE_FAKE_PLEX` set to this folder. `App/Te
 
 ## Rules
 
-- A request reads `<prefix>/<path>.json`: prefix `plextv` for plex.tv, `discover` for discover.provider.plex.tv, `pms` for any other host. `GET /library/metadata/12` on the fake server reads `pms/library/metadata/12.json`.
+- A request reads `<prefix>/<path>.json`: prefix `plextv` for plex.tv, `discover` for discover.provider.plex.tv, `bazarr` for a host starting with `bazarr`, `pms` for any other host. `GET /library/metadata/12` on the fake server reads `pms/library/metadata/12.json`.
 - `<path>@<name>=<value>.json` wins over `<path>.json` when the request has that query item, e.g. `plextv/api/v2/home/users/<uuid>/switch@pin=1234.json`.
+- After a write (any method but GET) to `/a/b`, `<path>@after=a_b.json` wins over every other fixture of the path; of several, the one for the latest write. `pms/library/metadata/212@after=api_providers_episodes.json` is the episode once Bazarr has downloaded a subtitle for it.
+- A GET without a JSON fixture serves `<path>.srt` as text when that file exists, as `pms/library/streams/21217.srt` does for an external subtitle.
 - `"__status": 401` at the top of a fixture answers with that status.
 - `hosts.json` maps a host to the machine identifier its `/identity` reports, or to `null` for a host that cannot be reached. Unlisted hosts report `fake-server`.
 - Lists under `MediaContainer.Metadata` are filtered, sorted and paged like a server does for `type`, `guid`, `unwatched`, `unwatchedLeaves`, `sort` and `X-Plex-Container-Start`/`-Size`. `/hubs/search` keeps the entries whose title contains the query.
@@ -26,6 +28,8 @@ Living Room has two libraries. Movies holds eleven Blender open movies: Sintel i
 Living Room has an antenna DVR with one four-tuner HDHomeRun and eight channels, 2.1 Metro 2 to 46.1 Music 46, guided from 7 PM to 11 PM the next day. The provider groups them into News, Sports, Movies and Kids. News 7 Tonight is recording, Harbour Lights failed to record at 8 PM, City Desk (new airings only) and Wild Coasts record as series, and Open Movie Night's Sintel as a single episode. Record offers every airing as This Episode or All Episodes. Asked for episodes, TV Shows lists five past recordings. Movies 5 and Public 13 are favourites; News 7, Metro 2 and Sports 9 were watched last. Music 46 has no logo, so its call sign stands in. Channels, programmes and logos are invented; Open Movie Night airs the Blender films with their frames.
 
 The player tests play Caminandes episode 2, Gran Dillama (`212`): an intro from 0:05 to 0:35, final credits from 2:10, Spanish audio beside the English, and English, English SDH and Spanish subtitles. `pms/playQueues@continuous=1.json` queues the season around it.
+
+Bazarr, at `http://bazarr.local:6767` when a test passes `-marquee.uitest.bazarr`, knows the Caminandes series and its episodes, and offers three English subtitles and a Spanish one for episode 2. Downloading one adds it to the episode in Plex as an external English subtitle (`21217`); removing that brings the episode back to its own tracks.
 
 ## Artwork
 

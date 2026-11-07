@@ -1,12 +1,17 @@
 import Foundation
+import Synchronization
 
 /// A stand-in Plex for the UI tests. When they launch the app with `MARQUEE_FAKE_PLEX` set to a
 /// fixtures folder, every request of a session set up through `install(into:)` is answered from that
 /// folder and nothing reaches the network. Release builds never activate it.
 ///
 /// Fixture rules (`UITests/FakePlex/README.md` has them with examples):
-/// - `plex.tv` reads `plextv/<path>.json`, `discover.provider.plex.tv` reads `discover/<path>.json`,
-///   any other host `pms/<path>.json`. `<path>@<name>=<value>.json` wins for a request with that query item.
+/// - `plex.tv` reads `plextv/<path>.json`, `discover.provider.plex.tv` reads `discover/<path>.json`, a
+///   host starting with `bazarr` reads `bazarr/<path>.json`, any other host `pms/<path>.json`.
+///   `<path>@<name>=<value>.json` wins for a request with that query item.
+/// - After a write (any method but GET) to `/a/b`, `<path>@after=a_b.json` wins over every other
+///   fixture of the path; of several, the one for the latest write.
+/// - A GET without a JSON fixture serves `<path>.srt` as text when that file exists.
 /// - A fixture whose object has `"__status": N` is answered with status N.
 /// - `hosts.json` maps a host to the machine identifier its `/identity` reports, or to null for a host
 ///   that cannot be reached. Unlisted hosts report `fake-server`.
@@ -115,6 +120,7 @@ struct FakePlexRouter {
             return .success(image(at: path))
         }
 
+        if method != "GET" { Self.wrote(path) }
         // The fixtures keep a deleted title, as a server lists one until its trash is emptied.
         if method == "DELETE" {
             return .success(json([String: Any]()))
@@ -137,7 +143,21 @@ struct FakePlexRouter {
         if method != "GET" || path.contains("/:/") || path.hasPrefix("/actions/") {
             return .success(json([String: Any]()))
         }
+        if let text = file("\(base).srt") {
+            return .success(Reply(status: 200, body: text, contentType: "text/plain; charset=utf-8"))
+        }
         return .success(json(["MediaContainer": ["size": 0]], status: 404))
+    }
+
+    /// The paths written to so far as `a_b` for `/a/b`, latest last, each once.
+    private static let writes = Mutex<[String]>([])
+
+    private static func wrote(_ path: String) {
+        let name = path.split(separator: "/").joined(separator: "_")
+        writes.withLock { names in
+            names.removeAll { $0 == name }
+            names.append(name)
+        }
     }
 
     // MARK: Fixtures
@@ -148,6 +168,7 @@ struct FakePlexRouter {
         switch host {
         case "plex.tv": "plextv"
         case "discover.provider.plex.tv": "discover"
+        case _ where host.hasPrefix("bazarr"): "bazarr"
         default: "pms"
         }
     }
@@ -159,20 +180,24 @@ struct FakePlexRouter {
     }
 
     private func fixture(_ base: String, query: [URLQueryItem]) -> Any? {
+        let after = Self.writes.withLock { $0.reversed().map { "\(base)@after=\($0).json" } }
         let variants = query.compactMap { item -> String? in
             guard let value = item.value, !value.contains("/") else { return nil }
             return "\(base)@\(item.name)=\(value).json"
         }
-        for name in variants + ["\(base).json"] {
+        for name in after + variants + ["\(base).json"] {
             if let object = load(name) { return object }
         }
         return nil
     }
 
     private func load(_ name: String) -> Any? {
+        file(name).flatMap { try? JSONSerialization.jsonObject(with: $0) }
+    }
+
+    private func file(_ name: String) -> Data? {
         let relative = String(name.drop { $0 == "/" })
-        guard let data = try? Data(contentsOf: root.appending(path: relative)) else { return nil }
-        return try? JSONSerialization.jsonObject(with: data)
+        return try? Data(contentsOf: root.appending(path: relative))
     }
 
     private func derived(_ base: String, query: [URLQueryItem]) -> Any? {

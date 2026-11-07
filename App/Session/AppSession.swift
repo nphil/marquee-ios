@@ -345,9 +345,13 @@ final class AppSession {
     }
 
     /// UI-test launches start signed out unless `-marquee.fakeSignedIn YES` (open on the first server)
-    /// or `-marquee.fakeServerList YES` (open on the server list) is passed.
+    /// or `-marquee.fakeServerList YES` (open on the server list) is passed. `-marquee.uitest.bazarr`
+    /// with an address saves a Bazarr there, answered by the fake Plex's `bazarr` fixtures.
     private func restoreUITest() {
         let arguments = UserDefaults.standard
+        if let address = arguments.string(forKey: "marquee.uitest.bazarr").flatMap(URL.init(string:)) {
+            bazarr.save(BazarrConfig(address: address, apiKey: "fake"))
+        }
         let pick: ServerPick
         if arguments.bool(forKey: "marquee.fakeSignedIn") {
             pick = .first
