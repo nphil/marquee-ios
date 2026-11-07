@@ -238,19 +238,32 @@ private struct LiveChrome: View {
 
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The top row's bottom edge and the bottom row's top edge, on screen, for the scrims.
+    @State private var topRow: CGFloat = 0
+    @State private var bottomRow: CGFloat = .infinity
 
     var body: some View {
         VStack(spacing: 0) {
             top
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.frame(in: .global).maxY
+                } action: { maxY in
+                    topRow = maxY
+                }
             Spacer(minLength: Space.s3)
             centre
             Spacer(minLength: Space.s3)
             bottom
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.frame(in: .global).minY
+                } action: { minY in
+                    bottomRow = minY
+                }
         }
         .padding(.horizontal, Space.inset)
         .padding(.vertical, Space.s2)
         .background {
-            Scrims()
+            Scrims(topRow: topRow, bottomRow: bottomRow)
                 .allowsHitTesting(false)
         }
     }
