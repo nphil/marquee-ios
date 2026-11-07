@@ -44,8 +44,12 @@ final class PictureInPicture: NSObject {
     /// The window was closed without returning to the app's player.
     var onClose: (() -> Void)?
     var onPossibleChange: ((Bool) -> Void)?
+    /// The window opened or closed: AVPlayer draws the subtitles in it.
+    var onActiveChange: ((Bool) -> Void)?
 
-    private(set) var isActive = false
+    private(set) var isActive = false {
+        didSet { if isActive != oldValue { onActiveChange?(isActive) } }
+    }
     private let controller: AVPictureInPictureController?
     private var restoring = false
     private var possible: NSKeyValueObservation?
@@ -77,6 +81,7 @@ final class PictureInPicture: NSObject {
         onRestore = nil
         onClose = nil
         onPossibleChange = nil
+        onActiveChange = nil
         if isActive { controller?.stopPictureInPicture() }
     }
 

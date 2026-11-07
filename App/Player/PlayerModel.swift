@@ -95,6 +95,10 @@ final class PlayerModel: Identifiable {
     private(set) var countdown: Countdown?
     private(set) var cueText: AttributedString?
     private(set) var bitmaps: [SubtitleBitmap] = []
+    /// How far the subtitles are moved from their own times, for this item only.
+    private(set) var timing = SubtitleTiming()
+    /// The timing control over the picture.
+    private(set) var showsTiming = false
     private(set) var skipFlash: SkipFlash?
     private(set) var mediaInfo: MediaInfo?
     private(set) var hasNext = false
@@ -136,6 +140,7 @@ final class PlayerModel: Identifiable {
     let capabilities: PlaybackCapabilities
     private let backend: any VideoBackend
     private let audioSession = AudioSession()
+    private let streamText = StreamText()
 
     private enum Stream {
         case direct
@@ -288,10 +293,15 @@ final class PlayerModel: Identifiable {
         return subtitle.track.map { .track($0.id) } ?? .off
     }
 
-    /// Image subtitles are drawn as the file has them.
+    /// Image subtitles keep their own size and position; the look's colour tints them.
     var subtitleIsImage: Bool { subtitle?.track?.isImageBased ?? false }
 
-    var preferredSubtitleLanguage: TrackLanguage { session.settings.subtitles.language }
+    /// The viewer's languages for the subtitle menu, most wanted first: the subtitle setting, the playing
+    /// audio, the phone's own.
+    var subtitleLanguages: [TrackLanguage] {
+        [session.settings.subtitles.language] + [audio?.language].compactMap { $0 }
+            + Locale.preferredLanguages.map { TrackLanguage(tag: $0) }
+    }
 
     var preferredAudioLanguage: TrackLanguage? { session.settings.audioLanguage }
 
@@ -351,6 +361,7 @@ final class PlayerModel: Identifiable {
     func start() {
         backend.onEvent = { [weak self] event in self?.handle(event) }
         pictureInPicture?.onPossibleChange = { [weak self] possible in self?.canPictureInPicture = possible }
+        pictureInPicture?.onActiveChange = { [weak self] _ in self?.textRendererChanged() }
         audioSession.onInterruption = { [weak self] began, shouldResume in self?.interrupted(began: began, shouldResume: shouldResume) }
         audioSession.onRouteLost = { [weak self] in self?.pause() }
         audioSession.activate()
@@ -847,7 +858,8 @@ final class PlayerModel: Identifiable {
     private func load(_ url: URL) {
         let playerItem = AVPlayerItem(asset: AVURLAsset(url: url))
         if case .remux = stream { playerItem.preferredForwardBufferDuration = Self.startBuffer }
-        playerItem.textStyleRules = CaptionStyle.rules(for: session.settings.subtitleStyle, lifted: chromeVisible)
+        playerItem.textStyleRules = textStyleRules
+        streamText.attach(to: playerItem)
         playerItem.externalMetadata = metadataItems()
         itemReady = false
         backend.load(playerItem)
@@ -1094,6 +1106,8 @@ final class PlayerModel: Identifiable {
         route = nil
         subtitle = nil
         subtitleProblem = nil
+        timing.reset()
+        showsTiming = false
         trickplay = nil
         trickplayLoad?.task.cancel()
         trickplayLoad = nil
@@ -1179,6 +1193,7 @@ final class PlayerModel: Identifiable {
         seekSerial += 1
         let serial = seekSerial
         isSeeking = true
+        streamText.reset()
         seekTask?.cancel()
         seekTask = Task { [weak self] in
             guard let self else { return }
@@ -1257,6 +1272,7 @@ final class PlayerModel: Identifiable {
     private func externalPlaybackChanged(_ active: Bool) {
         isExternalPlayback = active
         PlaybackCapabilities.externalPlaybackActive = active
+        textRendererChanged()
         // An AirPlay receiver cannot reach the remux's address on the phone.
         guard active, case .remux = stream, session.settings.directPlay != .force else { return }
         reroute(handPick: false)
@@ -1269,13 +1285,16 @@ final class PlayerModel: Identifiable {
         overlayTrack = nil
         cueText = nil
         bitmaps = []
+        timing.fit(canGoEarlier: timingCanGoEarlier)
+        if !canTimeSubtitles { showsTiming = false }
         guard let route else { return }
         switch route.subtitle {
         case .sidecar(let track):
             guard sidecarID == track.id, let sidecar else { return }
             if let images = sidecar.bitmaps {
                 overlayTrack = images
-            } else if route.kind != .remux {
+            } else {
+                // Over a remux the file also rides in the stream, for AVPlayer to draw in Picture in Picture.
                 textCues = sidecar.cues
             }
         case .inStream(let track) where route.kind == .remux && track.isImageBased:
@@ -1318,11 +1337,17 @@ final class PlayerModel: Identifiable {
     }
 
     private func updateSubtitles(at movie: TimeInterval) {
+        // A positive offset shows each line later: what shows now was due that long ago.
+        let due = movie - timing.seconds
         if let overlayTrack {
-            let shown = overlayTrack.bitmaps(at: movie)
+            let shown = overlayTrack.bitmaps(at: due)
             if shown.map(\.start) != bitmaps.map(\.start) || shown.map(\.y) != bitmaps.map(\.y) { bitmaps = shown }
         }
-        guard !textCues.isEmpty else { return }
+        let text = textCues.isEmpty ? streamLine(at: due) : cueLine(at: due)
+        if text != cueText { cueText = text }
+    }
+
+    private func cueLine(at movie: TimeInterval) -> AttributedString? {
         var text: AttributedString?
         for cue in textCues where cue.start <= movie && movie < cue.end {
             if var joined = text {
@@ -1333,11 +1358,89 @@ final class PlayerModel: Identifiable {
                 text = cue.text
             }
         }
-        if text != cueText { cueText = text }
+        return text
+    }
+
+    private func streamLine(at movie: TimeInterval) -> AttributedString? {
+        guard !playerDrawsText, let origin else { return nil }
+        return streamText.text(at: movie - origin)
+    }
+
+    /// AVPlayer draws the stream's text where Marquee's overlay is not seen: in Picture in Picture and on an
+    /// AirPlay screen.
+    private var playerDrawsText: Bool { isExternalPlayback || (pictureInPicture?.isActive ?? false) }
+
+    private var textStyleRules: [AVTextStyleRule]? {
+        playerDrawsText ? CaptionStyle.rules(for: session.settings.subtitleStyle, lifted: chromeVisible) : nil
+    }
+
+    private func textRendererChanged() {
+        streamText.playerDraws = playerDrawsText
+        applyTextStyle()
+        updateSubtitles(at: time)
     }
 
     private func applyTextStyle() {
-        backend.player?.currentItem?.textStyleRules = CaptionStyle.rules(for: session.settings.subtitleStyle, lifted: chromeVisible)
+        backend.player?.currentItem?.textStyleRules = textStyleRules
+    }
+
+    // MARK: Subtitle timing
+
+    /// The subtitle on screen is drawn on the phone, so its timing can move.
+    var canTimeSubtitles: Bool {
+        switch route?.subtitle {
+        case .sidecar?, .inStream?: true
+        default: false
+        }
+    }
+
+    /// Why Timing and Style can't reach the subtitle on screen: the server draws it into the picture.
+    var subtitleDrawnByServer: String? {
+        guard let route, case .burnedIn = route.subtitle else { return nil }
+        let convertsAudio = route.reasons.contains { if case .audio = $0 { true } else { false } }
+        return convertsAudio ? "Drawn by your server while it converts the audio." : "Drawn by your server at this quality."
+    }
+
+    /// "Original timing", "Subtitles 0.3 s later".
+    var timingText: String {
+        if timing.isOriginal { return "Original timing" }
+        return "Subtitles \(timing.magnitude) \(timing.seconds > 0 ? "later" : "earlier")"
+    }
+
+    /// Only a downloaded file's lines are all read up front, so only they can be shown early.
+    private var timingCanGoEarlier: Bool {
+        if case .sidecar? = route?.subtitle { return true }
+        return false
+    }
+
+    func canNudgeTiming(_ direction: Int) -> Bool {
+        timing.canNudge(direction, canGoEarlier: timingCanGoEarlier)
+    }
+
+    /// One step later (1) or earlier (-1).
+    func nudgeTiming(_ direction: Int) {
+        guard canNudgeTiming(direction) else { return }
+        timing.nudge(direction, canGoEarlier: timingCanGoEarlier)
+        Haptics.selection()
+        updateSubtitles(at: time)
+    }
+
+    func resetTiming() {
+        guard !timing.isOriginal else { return }
+        timing.reset()
+        Haptics.impact(.light)
+        updateSubtitles(at: time)
+    }
+
+    /// The controls step aside, so the lines being matched show where they always do.
+    func openTiming() {
+        guard canTimeSubtitles else { return }
+        showsTiming = true
+        if !UIAccessibility.isVoiceOverRunning, !UIAccessibility.isSwitchControlRunning { setChrome(false) }
+    }
+
+    func closeTiming() {
+        showsTiming = false
     }
 
     // MARK: Offers

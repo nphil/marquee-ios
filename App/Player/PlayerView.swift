@@ -65,6 +65,9 @@ struct PlayerView: View {
                 .padding(.trailing, Space.inset)
                 .padding(.bottom, model.chromeVisible ? bottomControls.height + Space.s2 : Space.s6)
                 .animation(.easeOut(duration: 0.18), value: model.chromeVisible)
+            if model.showsTiming, model.canTimeSubtitles, model.phase == .playing {
+                timingCapsule
+            }
             if model.fallback != nil {
                 FallbackBanner(model: model)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -90,7 +93,7 @@ struct PlayerView: View {
         }
         .sheet(isPresented: $model.showsStyle) {
             NavigationStack {
-                SubtitleStyleView()
+                SubtitleStyleView(imageSubtitles: model.subtitleIsImage)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button("Done") { model.showsStyle = false }
@@ -110,6 +113,17 @@ struct PlayerView: View {
         .onDisappear { rotate(to: .portrait) }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("player")
+    }
+
+    /// Opposite the subtitles, clear of the chrome while it shows.
+    private var timingCapsule: some View {
+        let atTop = session.settings.subtitleStyle.anchor == .bottom
+        return TimingCapsule(model: model)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: atTop ? .top : .bottom)
+            .padding(.top, atTop ? (model.chromeVisible ? 76 : Space.s3) : 0)
+            .padding(.bottom, atTop ? 0 : (model.chromeVisible ? bottomControls.height + Space.s2 : Space.s6))
+            .animation(.easeOut(duration: 0.18), value: model.chromeVisible)
+            .transition(.opacity)
     }
 
     // MARK: Picture
@@ -286,6 +300,8 @@ private struct SubtitleOverlay: View {
         ZStack(alignment: .topLeading) {
             if !model.bitmaps.isEmpty {
                 BitmapSubtitles(bitmaps: model.bitmaps, picture: picture, floor: screen.height - lift - margin)
+                    // The look's colour tints the picture's white letters; their own outline stays dark.
+                    .colorMultiply(PictureColours.subtitle(look))
             }
             if let text = model.cueText {
                 let distance = CGFloat(look.edgeDistance) * area.height / 1080

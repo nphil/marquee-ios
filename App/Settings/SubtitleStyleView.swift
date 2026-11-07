@@ -4,6 +4,8 @@ import SwiftUI
 /// How subtitles look (behaviour spec §3, "Subtitle look"), saved for the active profile: a preset, every
 /// setting under it, and a preview that follows each change.
 struct SubtitleStyleView: View {
+    /// The subtitle playing is a picture: it keeps its own size and position, and takes only the colour.
+    var imageSubtitles = false
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
     @State private var sample = SubtitleSample.accents
@@ -43,6 +45,7 @@ struct SubtitleStyleView: View {
             Section {
                 picker("Font", "font", $session.settings.subtitleStyle.font, SubtitleLook.Font.allCases, \.title)
                 picker("Size", "size", $session.settings.subtitleStyle.size, SubtitleLook.sizes, Self.percent)
+                    .disabled(imageSubtitles)
                 picker("Colour", "colour", $session.settings.subtitleStyle.colour, SubtitleLook.TextColour.allCases, \.title)
                 picker("Opacity", "opacity", $session.settings.subtitleStyle.opacity, SubtitleLook.opacities, Self.percent)
                 Toggle("Bold", isOn: $session.settings.subtitleStyle.isBold)
@@ -50,6 +53,8 @@ struct SubtitleStyleView: View {
                     .accessibilityIdentifier("style.bold")
             } header: {
                 Text("Text")
+            } footer: {
+                if imageSubtitles { imageNote }
             }
             .listRowBackground(theme.sheet)
 
@@ -85,9 +90,14 @@ struct SubtitleStyleView: View {
             } header: {
                 Text("Position")
             } footer: {
-                Text("Sizes and distances are pixels of a 1080-line picture, so subtitles keep their place on any screen.")
-                    .foregroundStyle(theme.ink2)
+                if imageSubtitles {
+                    imageNote
+                } else {
+                    Text("Sizes and distances are pixels of a 1080-line picture, so subtitles keep their place on any screen.")
+                        .foregroundStyle(theme.ink2)
+                }
             }
+            .disabled(imageSubtitles)
             .listRowBackground(theme.sheet)
 
             Section {
@@ -112,7 +122,7 @@ struct SubtitleStyleView: View {
             } header: {
                 Text("Behaviour")
             } footer: {
-                Text("Keep draws a styled file’s own colours; My Look draws it in this look. Image subtitles keep their own look.")
+                Text("Keep draws a styled file’s own colours; My Look draws it in this look.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)
@@ -132,6 +142,12 @@ struct SubtitleStyleView: View {
         } set: { preset in
             if let preset { session.settings.subtitleStyle.apply(preset) }
         }
+    }
+
+    private var imageNote: some View {
+        Text("Image subtitles keep their own size and position.")
+            .foregroundStyle(theme.ink2)
+            .accessibilityIdentifier("style.imageNote")
     }
 
     private func picker<Value: Hashable>(

@@ -321,6 +321,84 @@ struct FallbackBanner: View {
     }
 }
 
+/// Moves the subtitles against the picture, a tenth of a second a step, for the playing item only. It sits
+/// on the side of the picture away from the subtitles, so the line being matched stays in sight.
+struct TimingCapsule: View {
+    let model: PlayerModel
+    @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 0) {
+            step(-1, symbol: "minus", label: "Earlier")
+            Text(model.timingText)
+                .textRole(.label)
+                .monospacedDigit()
+                .foregroundStyle(theme.ink)
+                .contentTransition(.numericText(value: model.timing.seconds))
+                .animation(reduceMotion ? nil : .snappy(duration: 0.2), value: model.timing)
+                .lineLimit(1)
+                .frame(minWidth: 172)
+                .accessibilityHidden(true)
+            step(1, symbol: "plus", label: "Later")
+            Rectangle()
+                .fill(theme.edge)
+                .frame(width: 1, height: 28)
+                .padding(.horizontal, Space.s1)
+            glyph("arrow.counterclockwise", label: "Original Timing", id: "reset") { model.resetTiming() }
+                .disabled(model.timing.isOriginal)
+            glyph("xmark", label: "Done", id: "done") { model.closeTiming() }
+        }
+        .padding(.horizontal, Space.s1)
+        .frame(minHeight: 56)
+        .background(theme.glassRaised, in: Capsule())
+        .overlay(Capsule().strokeBorder(theme.edge, lineWidth: 1))
+        .fixedSize()
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Subtitle Timing")
+        .accessibilityAction(.escape) { model.closeTiming() }
+        .accessibilityIdentifier("player.timing")
+    }
+
+    private func step(_ direction: Int, symbol: String, label: String) -> some View {
+        glyph(symbol, label: label, id: direction > 0 ? "later" : "earlier") { model.nudgeTiming(direction) }
+            .buttonRepeatBehavior(.enabled)
+            .disabled(!model.canNudgeTiming(direction))
+            .accessibilityValue(model.timingText)
+    }
+
+    private func glyph(_ symbol: String, label: String, id: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 20, weight: .semibold))
+                .frame(width: Size.target, height: Size.target)
+                .contentShape(Circle())
+        }
+        .buttonStyle(TimingGlyphStyle())
+        .accessibilityLabel(label)
+        .accessibilityIdentifier("player.timing.\(id)")
+    }
+}
+
+private struct TimingGlyphStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        TimingGlyph(configuration: configuration)
+    }
+}
+
+private struct TimingGlyph: View {
+    let configuration: ButtonStyleConfiguration
+    @Environment(\.theme) private var theme
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        configuration.label
+            .foregroundStyle(theme.ink)
+            .opacity(isEnabled ? 1 : 0.35)
+            .pressed(configuration.isPressed, in: Circle())
+    }
+}
+
 /// The running total of quick skips, flashed on the side that was tapped.
 struct SkipFlashView: View {
     let flash: PlayerModel.SkipFlash

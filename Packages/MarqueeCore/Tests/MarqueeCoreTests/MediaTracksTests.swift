@@ -84,6 +84,26 @@ struct MediaTracksTests {
         #expect(tracks.visible(tracks.subtitles[0]).id == 4)
     }
 
+    @Test func viewersLanguagesStayOnTheMenuAndTheRestGoAToZ() throws {
+        let tracks = try Fixture.tracks([
+            Fixture.subtitle(1, "spa"),
+            Fixture.subtitle(2, "eng", title: "Commentary"),
+            Fixture.subtitle(3, "fre"),
+            Fixture.subtitle(4, "eng", hearingImpaired: true),
+            Fixture.subtitle(5, "jpn"),
+            Fixture.subtitle(6, "eng"),
+            Fixture.subtitle(7, nil),
+        ])
+
+        let all = SubtitleLanguages(tracks.visibleSubtitles, yours: [TrackLanguage(tag: "jpn"), .english, .english])
+        #expect(all.yours.map(\.name) == ["Japanese", "English"])
+        #expect(all.yours[1].tracks.map(\.id) == [6, 4, 2])
+        #expect(all.other.map(\.name) == ["French", "Spanish", "Unknown"])
+
+        let pair = SubtitleLanguages(tracks.visibleSubtitles.filter { [2, 3, 6].contains($0.id) }, yours: [.english])
+        #expect(pair.yours.map(\.name) == ["English", "French"] && pair.other.isEmpty)
+    }
+
     @Test func memoryIsKeptPerShowNotPerEpisode() throws {
         let episode = try decode(PlexMetadata.self, ["ratingKey": "12", "type": "episode", "grandparentRatingKey": "10"])
         let movie = try decode(PlexMetadata.self, ["ratingKey": "99", "type": "movie"])

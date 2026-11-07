@@ -379,6 +379,7 @@ struct LoadingArc: View {
 /// Audio and subtitles in one native menu, as Apple's own player has them (DESIGN §8.6, Tracks menu).
 struct TracksMenu: View {
     @Bindable var model: PlayerModel
+    @Environment(AppSession.self) private var session
 
     var body: some View {
         Menu {
@@ -414,39 +415,85 @@ struct TracksMenu: View {
                 }
             }
         }
-        let groups = SubtitleGroup.make(tracks.visibleSubtitles, preferred: model.preferredSubtitleLanguage, audio: model.audio)
+        let languages = SubtitleLanguages(tracks.visibleSubtitles, yours: model.subtitleLanguages)
+        // A language with one track goes without a header: its row already starts with the language.
         Section("Subtitles") {
             choice("Off", value: SubtitleChoice.off, selection: $model.subtitlePick)
             if tracks.visibleSubtitles.contains(where: { $0.kind == .onScreenText }) {
                 choice("On-Screen Text Only", value: SubtitleChoice.onScreenTextOnly, selection: $model.subtitlePick)
             }
+            ForEach(languages.yours.filter { $0.tracks.count == 1 }) { group in
+                subtitleRows(group.tracks)
+            }
         }
         // The one section every tracks menu has reports the menu opening and closing.
         .onAppear { model.menuOpened() }
         .onDisappear { model.menuClosed() }
-        let shown = groups.count <= 3 ? groups : Array(groups.prefix(2))
-        ForEach(shown) { group in
-            subtitleSection(group)
+        ForEach(languages.yours.filter { $0.tracks.count > 1 }) { group in
+            Section(group.name) { subtitleRows(group.tracks) }
         }
-        if groups.count > 3 {
-            Menu("Other Languages (\(groups.count - 2))") {
-                ForEach(groups.dropFirst(2)) { group in
-                    subtitleSection(group)
+        if !languages.other.isEmpty {
+            Section { otherLanguages(languages.other) }
+        }
+        subtitleTools
+    }
+
+    /// One row per language, A to Z: a language with one track is that track, one with more opens its own
+    /// list. A row that holds the subtitle on screen names it in place of its count.
+    private func otherLanguages(_ groups: [SubtitleLanguages.Group]) -> some View {
+        let picked = groups.lazy.flatMap(\.tracks).first { SubtitleChoice.track($0.id) == model.subtitlePick }
+        return Menu {
+            ForEach(groups) { group in
+                if group.tracks.count == 1 {
+                    subtitleRows(group.tracks)
+                } else {
+                    Menu {
+                        subtitleRows(group.tracks)
+                    } label: {
+                        Text(group.name)
+                        if let picked, group.tracks.contains(picked) {
+                            Text(variant(picked))
+                        } else {
+                            Text("\(group.tracks.count) tracks")
+                        }
+                    }
                 }
             }
+        } label: {
+            Text("Other Languages")
+            Text(picked?.languageName ?? "\(groups.count) languages")
         }
+        .accessibilityIdentifier("player.tracks.otherLanguages")
+    }
+
+    /// Timing and Style; both stay but dim, with the reason, while the server draws the subtitle into the
+    /// picture. Timing shows only while a subtitle is on.
+    @ViewBuilder
+    private var subtitleTools: some View {
+        let drawnByServer = model.subtitleDrawnByServer
+        let look = session.settings.subtitleStyle
         Section {
+            if model.canTimeSubtitles || drawnByServer != nil {
+                Button {
+                    model.openTiming()
+                } label: {
+                    Text("Subtitle Timing")
+                    Text(model.timingText)
+                }
+                .disabled(drawnByServer != nil)
+                .accessibilityIdentifier("player.tracks.timing")
+            }
             Button {
                 model.showsStyle = true
             } label: {
-                if model.subtitleIsImage {
-                    Text("Subtitle Style")
-                    Text("Image subtitles can't be restyled")
-                } else {
-                    Label("Subtitle Style", systemImage: "textformat")
-                }
+                Text("Subtitle Style")
+                Text(look.isCustom ? "Custom" : look.preset.title)
             }
-            .disabled(model.subtitleIsImage)
+            .disabled(drawnByServer != nil)
+            .accessibilityIdentifier("player.tracks.style")
+            if let drawnByServer {
+                Text(drawnByServer)
+            }
             if let problem = model.subtitleProblem {
                 Text(problem)
             }
@@ -469,18 +516,8 @@ struct TracksMenu: View {
             .disabled(state.unavailable != nil)
     }
 
-    /// A language with one track goes without a header: its row already starts with the language.
-    @ViewBuilder
-    private func subtitleSection(_ group: SubtitleGroup) -> some View {
-        if group.tracks.count == 1 {
-            Section { subtitleRows(group) }
-        } else {
-            Section(group.name) { subtitleRows(group) }
-        }
-    }
-
-    private func subtitleRows(_ group: SubtitleGroup) -> some View {
-        ForEach(group.tracks) { track in
+    private func subtitleRows(_ tracks: [SubtitleTrack]) -> some View {
+        ForEach(tracks) { track in
             choice(
                 track.label,
                 detail: detail(track.badges, imageFormat: track.imageFormat),
@@ -488,6 +525,15 @@ struct TracksMenu: View {
                 selection: $model.subtitlePick
             )
         }
+    }
+
+    /// What tells a track apart within its language: "on-screen text", "Captions", "Track 2". A plain
+    /// track goes by its own name.
+    private func variant(_ track: SubtitleTrack) -> String {
+        var rest = track.label.hasPrefix(track.languageName) ? String(track.label.dropFirst(track.languageName.count)) : ""
+        rest = rest.trimmingCharacters(in: CharacterSet(charactersIn: " ()–"))
+        let words = [rest].filter { !$0.isEmpty } + track.badges.map(\.rawValue) + [track.imageFormat].compactMap { $0 }
+        return words.isEmpty ? track.label : words.joined(separator: " · ")
     }
 
     /// A menu row with a checkmark while `selection` holds `value`; choosing it again keeps it.
@@ -512,37 +558,6 @@ struct TracksMenu: View {
         guard let code = model.preferredAudioLanguage?.code else { return tracks.audio }
         let wanted = tracks.audio.filter { $0.language.code == code }
         return wanted + tracks.audio.filter { $0.language.code != code }
-    }
-}
-
-/// One language's subtitles, ranked Full, SDH, Forced, Commentary (behaviour spec §3).
-struct SubtitleGroup: Identifiable {
-    let id: String
-    let name: String
-    let tracks: [SubtitleTrack]
-
-    /// The subtitle language setting first, then the playing audio's language, then the file's order.
-    static func make(_ tracks: [SubtitleTrack], preferred: TrackLanguage, audio: AudioTrack?) -> [SubtitleGroup] {
-        var order: [String] = []
-        var members: [String: [SubtitleTrack]] = [:]
-        var names: [String: String] = [:]
-        for track in tracks {
-            let key = track.language.code ?? "und"
-            if members[key] == nil { order.append(key) }
-            members[key, default: []].append(track)
-            names[key] = names[key] ?? track.languageName
-        }
-        let first = [preferred.code, audio?.language.code].compactMap { $0 }
-        order.sort { lhs, rhs in
-            let l = first.firstIndex(of: lhs) ?? Int.max, r = first.firstIndex(of: rhs) ?? Int.max
-            return l < r
-        }
-        return order.map { key in
-            let sorted = (members[key] ?? []).enumerated().sorted { a, b in
-                a.element.kind == b.element.kind ? a.offset < b.offset : a.element.kind < b.element.kind
-            }.map(\.element)
-            return SubtitleGroup(id: key, name: names[key] ?? "Unknown", tracks: sorted)
-        }
     }
 }
 
