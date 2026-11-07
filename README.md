@@ -9,7 +9,7 @@ Marquee for iPhone shares a name and behaviour with the Marquee TV app, which is
 ## Layout
 
 - `App/`: the SwiftUI app (screens, player, theming).
-- `Packages/MarqueeCore/`: Plex API client, connection choice, playback route decision, audio and subtitle rules. Foundation only, unit-tested with `swift test`.
+- `Packages/MarqueeCore/`: Plex API client, connection choice, playback route decision, audio and subtitle rules. Foundation only, unit-tested with `swift test`; its API is summarised in `docs/core-api.md`.
 - `Resources/`: `themes.json` (40 Lucent colour-role themes) and the Manrope font (OFL).
 - `docs/DESIGN.md`: design direction. `docs/behaviour-spec.md`: behaviour.
 - `tools/check_themes.py`: contrast and distinctness gate for `themes.json`; CI fails on any failing theme.
