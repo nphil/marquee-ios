@@ -1,6 +1,6 @@
 # Live TV design
 
-Status: design for review. Scope: the Live TV tab of Marquee for iPhone (iOS 27): guide, channel surfing, live playback and DVR. It works with any source Plex Live TV supports and is tuned first for LumaTuner, the LumaTV plugin that shares the LG TV's antenna tuner as a one-tuner HDHomeRun on port 5004.
+Status: decided. Built: L1, L2, L3 and L6, and of L5 the player gestures, channel card, Quick Guide and last channel (no PiP, Now Playing or AirPlay switch yet). The Plex path is timed against the home server (§1.3); playback on a phone is untested. Scope: the Live TV tab of Marquee for iPhone (iOS 27): guide, channel surfing, live playback and DVR. It works with any source Plex Live TV supports and is tuned first for LumaTuner, the LumaTV plugin that shares the LG TV's antenna tuner as a one-tuner HDHomeRun on port 5004.
 
 Source key used in citations:
 
