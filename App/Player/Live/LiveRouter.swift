@@ -71,7 +71,8 @@ final class LiveRouter: LiveVideoSource {
         recordingGuard?.cancel()
         say(nil)
         ownState = .opening
-        if !isPrepared { await prepare(devices: [channel.device]) }
+        // With the switch off every tune goes through Plex, and nothing reads the tuner or the schedule.
+        if !isPrepared, !prefersPlex { await prepare(devices: [channel.device]) }
         let route = await decide(channel)
         guard mine == generation else { return }
         self.route = route
