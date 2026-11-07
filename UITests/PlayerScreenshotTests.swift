@@ -105,7 +105,9 @@ private extension XCTestCase {
         app.navigationBars["Playback Info"].buttons["Done"].tap()
 
         tap("player.episodes", in: app)
-        waitFor("player.episode.213", in: app)
+        // The list opens on the playing episode, also when large text leaves room for one row.
+        let playing = element("player.episode.212", in: app)
+        XCTAssertTrue(playing.wait(for: \.isHittable, toEqual: true, timeout: 10), "The list did not open on episode 2")
         try snap("player-05-episodes-\(suffix)")
         app.navigationBars["Caminandes"].buttons["Done"].tap()
     }

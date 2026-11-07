@@ -14,23 +14,37 @@ struct EpisodeSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                if let episodes {
-                    ForEach(episodes) { episode in
-                        row(episode)
-                            .listRowBackground(theme.sheet)
+            ScrollViewReader { proxy in
+                List {
+                    if let episodes {
+                        ForEach(episodes) { episode in
+                            row(episode)
+                                .listRowBackground(theme.sheet)
+                        }
                     }
                 }
-            }
-            .themedList(theme)
-            .overlay {
-                if failed {
-                    EmptyState(
-                        title: "Can't load episodes",
-                        message: "Check the connection to the server.",
-                        systemImage: "wifi.exclamationmark",
-                        action: .init(title: "Retry", systemImage: "arrow.clockwise") { failed = false; reload() }
-                    )
+                .themedList(theme)
+                .overlay {
+                    if failed {
+                        EmptyState(
+                            title: "Can't load episodes",
+                            message: "Check the connection to the server.",
+                            systemImage: "wifi.exclamationmark",
+                            action: .init(title: "Retry", systemImage: "arrow.clockwise") { failed = false; reload() }
+                        )
+                    }
+                }
+                .onChange(of: episodes?.map(\.ratingKey)) { _, keys in
+                    guard let keys, let first = keys.first else { return }
+                    let playing = model.item.ratingKey
+                    // A turn later, once the list holds the new rows.
+                    Task {
+                        if keys.contains(playing) {
+                            proxy.scrollTo(playing, anchor: .center)
+                        } else {
+                            proxy.scrollTo(first, anchor: .top)
+                        }
+                    }
                 }
             }
             .navigationTitle(model.title)

@@ -326,6 +326,9 @@ struct TracksMenu: View {
         } label: {
             Image(systemName: "captions.bubble")
         }
+        // Opening upward, the automatic order reverses the list and the subtitle languages end up above
+        // the Subtitles header; fixed reads Audio, then Subtitles, top down.
+        .menuOrder(.fixed)
         .menuStyle(.button)
         .buttonStyle(PlayerButtonStyle())
         .disabled(model.tracks == nil)
