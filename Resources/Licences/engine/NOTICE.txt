@@ -1,0 +1,21 @@
+This software uses libraries from the FFmpeg project (https://ffmpeg.org)
+under the GNU Lesser General Public License, version 2.1 or later
+(ffmpeg/COPYING.LGPLv2.1). FFmpeg n8.1.3 is built unmodified with the
+configuration in BUILDINFO.txt.
+
+The source code of FFmpeg and of every library below, with the scripts that
+build them, is published with stashy-videoengine release v1.3.0:
+https://github.com/nphil/stashy-videoengine/releases/tag/v1.3.0
+A modified FFmpeg can be used by building that repository with the change
+and pointing the app's stashy-videoengine package at the result.
+
+This software is based in part on the work of the FreeType Team.
+
+Also included; licence texts are in the folders named:
+  dav1d 1.5.4                BSD-2-Clause         dav1d/
+  FreeType 2.13.3            FreeType License     freetype/
+  FriBiDi 1.0.18             LGPL-2.1-or-later    fribidi/
+  HarfBuzz 11.5.1            MIT                  harfbuzz/
+  libass 0.17.5              ISC                  libass/
+  zimg release-3.0.6         WTFPL                zimg/
+

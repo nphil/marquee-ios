@@ -35,6 +35,35 @@ final class AppSession {
     private(set) var networkChanges = 0
     /// The item whose Play was pressed; RootView explains that playback is not built yet.
     var playbackNotice: PlexMetadata?
+    /// The profile switcher sheet, opened from Home's profile button and the Settings Account row.
+    var showsProfileSwitcher = false
+    /// The active profile's playback, audio and subtitle settings; every change is saved at once.
+    var settings: ProfileSettings {
+        get { profileSettings }
+        set {
+            profileSettings = newValue
+            storage.setSettings(newValue, for: user?.uuid)
+        }
+    }
+    /// SpeechDock (DESIGN §8.7 Integrations), off until enabled. A service address is not a viewing
+    /// preference, so it is kept per iPhone rather than per profile.
+    var speechDockEnabled: Bool {
+        get { speechDockOn }
+        set {
+            speechDockOn = newValue
+            storage.speechDockEnabled = newValue
+        }
+    }
+    var speechDockAddress: String {
+        get { speechDockText }
+        set {
+            speechDockText = newValue
+            storage.speechDockAddress = newValue
+        }
+    }
+    private var profileSettings = ProfileSettings()
+    private var speechDockOn = false
+    private var speechDockText = ""
 
     let identity: PlexClientIdentity
     let transport: URLSessionTransport
@@ -53,6 +82,8 @@ final class AppSession {
         let configuration = URLSessionConfiguration.default
         FakePlex.install(into: configuration)
         transport = URLSessionTransport(session: URLSession(configuration: configuration))
+        speechDockOn = storage.speechDockEnabled
+        speechDockText = storage.speechDockAddress
         restore()
         watchNetwork()
     }
@@ -224,7 +255,7 @@ final class AppSession {
         let tv = makePlexTV(token: token)
         plexTV = tv
         servers = storage.servers
-        user = storage.profile
+        setUser(storage.profile)
         if let server = rememberedServer(in: servers) {
             connect(to: server)
         } else {
@@ -379,9 +410,11 @@ final class AppSession {
         storage.setAddress(found.uri, for: connection.server.id)
     }
 
+    /// Loads the profile's own settings along with it.
     private func setUser(_ profile: PlexHomeUser?) {
         user = profile
         storage.profile = profile
+        profileSettings = storage.settings(for: profile?.uuid)
     }
 
     private func watchNetwork() {

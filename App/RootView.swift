@@ -19,6 +19,9 @@ struct RootView: View {
         @Bindable var session = session
         let theme = store.theme(for: colorScheme)
             .adjusted(increaseContrast: contrast == .increased, reduceTransparency: reduceTransparency)
+        // Matching the system leaves the scheme to the iPhone; a fixed theme forces its own. The
+        // modifier applies to the nearest presentation, so each sheet sets it as well.
+        let scheme = store.matchSystem ? nil : theme.mode.colorScheme
         Group {
             switch session.state {
             case .ready:
@@ -31,11 +34,15 @@ struct RootView: View {
         }
         .sheet(item: $session.playbackNotice) { item in
             PlaybackNoticeView(item: item)
+                .preferredColorScheme(scheme)
+        }
+        .sheet(isPresented: $session.showsProfileSwitcher) {
+            ProfileSwitcher()
+                .preferredColorScheme(scheme)
         }
         .environment(\.theme, theme)
         .tint(theme.accentText)
-        // Matching the system leaves the scheme to the iPhone; a fixed theme forces its own.
-        .preferredColorScheme(store.matchSystem ? nil : theme.mode.colorScheme)
+        .preferredColorScheme(scheme)
         .onChange(of: BarInputs(theme: theme, typeSize: typeSize, boldText: legibilityWeight == .bold), initial: true) { _, inputs in
             NavigationBarStyle.apply(inputs.theme, typeSize: inputs.typeSize, boldText: inputs.boldText)
         }

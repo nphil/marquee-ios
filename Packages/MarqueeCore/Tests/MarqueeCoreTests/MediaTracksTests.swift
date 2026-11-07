@@ -15,6 +15,15 @@ struct MediaTracksTests {
         #expect(!TrackLanguage(tag: "und").matches(TrackLanguage(tag: "und")))
     }
 
+    @Test func catalogueNamesEachLanguageOnceInOrder() {
+        let names = TrackLanguage.all.compactMap(\.name)
+        #expect(names.count == TrackLanguage.all.count)
+        #expect(Set(names).count == names.count)
+        #expect(names == names.sorted())
+        #expect(TrackLanguage.all.contains(.english))
+        #expect(TrackLanguage.all.contains(TrackLanguage(tag: "heb")))
+    }
+
     @Test func flagsAndTitleWordsDecideWhatASubtitleHolds() throws {
         let tracks = try Fixture.tracks([
             Fixture.subtitle(1, "eng", title: "Signs / Songs", codec: "pgs"),

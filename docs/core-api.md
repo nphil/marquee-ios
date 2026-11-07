@@ -57,7 +57,7 @@
 
 ## Tracks (`Tracks/`)
 
-- `TrackLanguage`: `eng`, `en` and `en-US` compare as English. `matches(_:)`, `name`, `variantName`, `.english`.
+- `TrackLanguage`: `eng`, `en` and `en-US` compare as English. `matches(_:)`, `name`, `variantName`, `.english`; `all` lists every two-letter language by English name, for language pickers.
 - `AudioTrack`, `SubtitleTrack`, `TrackBadge`: tracks with plain menu labels ("English – 7.1", "English (on-screen text)", "Spanish (Latin America)") and Captions or Audio description badges. `SubtitleTrack.Kind` is full, captions, on-screen text or commentary.
 - `MediaTracks(part:)`: one part's tracks, separate files last. An embedded subtitle with an exact separate-file twin is hidden behind the file (`visibleSubtitles`, `visible(_:)`).
 - `SubtitlePicker.decide(tracks:audio:handPick:remembered:settings:canDrawImageSubtitles:)`: `SubtitleDecision` with its source. Order: hand pick, server selection, remembered choice, file default, setting. Automatic picks take only tracks the app can draw and follow the audio: the dub transcript for audio in the preferred language, the full translation for other audio.

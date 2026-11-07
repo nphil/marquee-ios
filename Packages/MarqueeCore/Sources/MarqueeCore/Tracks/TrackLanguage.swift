@@ -17,6 +17,13 @@ public struct TrackLanguage: Sendable, Hashable, Codable {
 
     public static let english = TrackLanguage(code: "en")
 
+    /// Every language with a two-letter code, by English name: the choices for a preferred language.
+    /// Built from the codes tracks are normalised to, so a choice always matches its tracks.
+    public static let all: [TrackLanguage] = Set(alpha2.values)
+        .map { TrackLanguage(code: $0) }
+        .filter { $0.name != nil }
+        .sorted { ($0.name ?? "") < ($1.name ?? "") }
+
     /// Parses a BCP 47 tag (`pt-BR`, `zh-Hant`) or an ISO 639 code (`jpn`, `fre`).
     public init(tag: String?) {
         let parts = (tag ?? "").split(whereSeparator: { $0 == "-" || $0 == "_" }).map(String.init)

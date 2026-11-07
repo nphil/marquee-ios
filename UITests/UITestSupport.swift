@@ -59,6 +59,32 @@ extension XCTestCase {
         XCTAssertTrue(element(identifier, in: app).waitForExistence(timeout: 10), "No element \(identifier)")
     }
 
+    /// Lists create rows only as they scroll in, so this swipes up until the row can be tapped.
+    @MainActor
+    func reveal(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
+        let target = element(identifier, in: app)
+        for _ in 0..<8 where !(target.exists && target.isHittable) {
+            app.swipeUp(velocity: .slow)
+        }
+        XCTAssertTrue(target.waitForExistence(timeout: 5), "No element \(identifier)")
+        return target
+    }
+
+    /// The back button leads the bar of the page being left.
+    @MainActor
+    func goBack(from title: String, in app: XCUIApplication) {
+        app.navigationBars[title].buttons.element(boundBy: 0).tap()
+    }
+
+    /// A tap on a toggle row's label does nothing, so this taps the switch at its trailing end.
+    @MainActor
+    func flip(_ identifier: String, in app: XCUIApplication) {
+        let row = element(identifier, in: app)
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "No element \(identifier)")
+        let control = row.switches.firstMatch.exists ? row.switches.firstMatch : row
+        control.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+    }
+
     @MainActor
     func waitForBar(_ title: String, in app: XCUIApplication) {
         XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10), "No \(title) screen")

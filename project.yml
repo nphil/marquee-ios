@@ -30,6 +30,13 @@ targets:
         excludes:
           # Published for the Feather feed; the app gets its icon from the asset catalog.
           - AppIcon-1024.png
+          - Licences
+      # A folder reference keeps the licence tree intact; several files share the name COPYING.
+      - path: Resources/Licences
+        type: folder
+        buildPhase: resources
+      - path: LICENSE
+        buildPhase: resources
     dependencies:
       - package: MarqueeCore
     info:

@@ -2,8 +2,9 @@ import Foundation
 import MarqueeCore
 
 /// Where the sign-in is kept between launches: the account token and the server list (which carries
-/// each server's access token) in the Keychain, the chosen server, the active profile and the last
-/// working addresses in UserDefaults. UI-test launches keep everything in memory and start empty.
+/// each server's access token) in the Keychain; the chosen server, the active profile, the last working
+/// addresses, each profile's settings and the device's integrations in UserDefaults. UI-test launches
+/// keep secrets in memory and start from an emptied defaults suite.
 @MainActor
 final class SessionStorage {
     let defaults: UserDefaults
@@ -17,6 +18,9 @@ final class SessionStorage {
         static let serverID = "marquee.server.id"
         static let profile = "marquee.profile"
         static let addressPrefix = "marquee.server.address."
+        static let settingsPrefix = "marquee.settings."
+        static let speechDockEnabled = "marquee.speechDock.enabled"
+        static let speechDockAddress = "marquee.speechDock.address"
     }
 
     private init(defaults: UserDefaults, keychain: KeychainStore?) {
@@ -64,6 +68,26 @@ final class SessionStorage {
 
     func setAddress(_ uri: URL, for serverID: String) {
         defaults.set(uri, forKey: Key.addressPrefix + serverID)
+    }
+
+    /// A profile's settings, keyed by its Plex uuid; defaults for a profile that has none.
+    func settings(for profile: String?) -> ProfileSettings {
+        defaults.data(forKey: Key.settingsPrefix + (profile ?? ""))
+            .flatMap { try? JSONDecoder().decode(ProfileSettings.self, from: $0) } ?? ProfileSettings()
+    }
+
+    func setSettings(_ settings: ProfileSettings, for profile: String?) {
+        defaults.set(try? JSONEncoder().encode(settings), forKey: Key.settingsPrefix + (profile ?? ""))
+    }
+
+    var speechDockEnabled: Bool {
+        get { defaults.bool(forKey: Key.speechDockEnabled) }
+        set { defaults.set(newValue, forKey: Key.speechDockEnabled) }
+    }
+
+    var speechDockAddress: String {
+        get { defaults.string(forKey: Key.speechDockAddress) ?? "" }
+        set { defaults.set(newValue, forKey: Key.speechDockAddress) }
     }
 
     /// Sign-out: the token and servers leave the Keychain; settings and themes stay.
