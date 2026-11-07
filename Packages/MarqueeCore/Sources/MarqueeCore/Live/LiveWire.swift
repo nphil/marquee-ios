@@ -278,7 +278,10 @@ struct WireAiringItem: Decodable {
     }
 }
 
+/// A tune's answer. PMS 1.43.5 sends a rolling `MediaSubscription` whose one `MediaGrabOperation`
+/// carries the tuned session as its `Metadata`.
 struct WireTune: Decodable {
+    let grabKey: String?
     let ratingKey: String?
     let uuid: String?
     let videoCodec: String?
@@ -287,7 +290,27 @@ struct WireTune: Decodable {
     let audioCodec: String?
     let audioChannels: Int?
 
-    enum CodingKeys: String, CodingKey { case metadata = "Metadata" }
+    enum CodingKeys: String, CodingKey { case subscriptions = "MediaSubscription" }
+
+    struct Subscription: Decodable {
+        let grabs: [Grab]
+        enum CodingKeys: String, CodingKey { case grabs = "MediaGrabOperation" }
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            grabs = c.list(.grabs)
+        }
+    }
+
+    struct Grab: Decodable {
+        let key: String?
+        let item: Item?
+        enum CodingKeys: String, CodingKey { case key, item = "Metadata" }
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            key = c.string(.key)
+            item = try? c.decodeIfPresent(Item.self, forKey: .item)
+        }
+    }
 
     struct Item: Decodable {
         let ratingKey: String?
@@ -339,12 +362,14 @@ struct WireTune: Decodable {
 
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        let items: [Item] = c.list(.metadata)
-        let item = items.first
+        let subscriptions: [Subscription] = c.list(.subscriptions)
+        let grab = subscriptions.first?.grabs.first
+        let item = grab?.item
         let media = item?.media.first
         let streams = media?.parts.first?.streams ?? []
         let video = streams.first { $0.type == 1 }
         let audio = streams.first { $0.type == 2 }
+        grabKey = grab?.key
         ratingKey = item?.ratingKey
         uuid = media?.uuid
         videoCodec = video?.codec

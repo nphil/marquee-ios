@@ -70,16 +70,18 @@ public struct PlexLiveTV: Sendable {
 
     // MARK: Playback
 
-    /// Asks the server to tune `channel`. The server holds one of the device's tuners until the stream
-    /// stops.
-    public func tune(_ channel: LiveChannel) async throws -> PlexLiveSession {
+    /// Asks the server to tune `channel` for the playback named `session`. The server holds one of the
+    /// device's tuners until `stopStream`.
+    public func tune(_ channel: LiveChannel, session: String = UUID().uuidString) async throws -> PlexLiveSession {
         let path = "/livetv/dvrs/\(channel.dvrKey)/channels/\(PlexURL.encode(channel.id))/tune"
-        let response = try await library.send(.post, path, [], headers: [:])
+        let response = try await library.send(.post, path, [], headers: [PlexHeader.sessionIdentifier: session])
         let tune = try PlexJSON.decode(LiveEnvelope<WireTune>.self, from: response.body).container
-        guard let uuid = tune.uuid else { throw PlexError.decoding("tune without a session") }
+        guard let uuid = tune.uuid, let grab = tune.grabKey else { throw PlexError.decoding("tune without a session") }
         return PlexLiveSession(
             id: uuid,
             channel: channel,
+            sessionIdentifier: session,
+            grabKey: grab,
             ratingKey: tune.ratingKey ?? "",
             videoCodec: tune.videoCodec,
             videoHeight: tune.videoHeight,
@@ -98,13 +100,17 @@ public struct PlexLiveTV: Sendable {
     }
 
     public func reportTimeline(_ update: LiveTimelineUpdate) async throws {
-        let headers = [PlexHeader.sessionIdentifier: update.transcodeSession]
+        let headers = [PlexHeader.sessionIdentifier: update.session.sessionIdentifier]
         _ = try await library.send(.get, "/:/timeline", update.queryItems, headers: headers, idempotent: false)
     }
 
-    /// Ends the server's stream, which lets go of the tuner.
-    public func stopStream(transcodeSession: String) async throws {
-        try await library.stopTranscode(session: transcodeSession)
+    /// Ends the stream and cancels its grab. While the transcode reads, a stopped timeline frees the
+    /// tuner about 1 s later (PMS 1.43.5); a grab nobody reads, because the transcode never started or
+    /// already failed, holds it on a 300 s timer until cancelled, which takes 0.5 s. So the grab is
+    /// cancelled whatever the transcode stop answers.
+    public func stopStream(_ session: PlexLiveSession) async throws {
+        try? await library.stopTranscode(session: session.sessionIdentifier)
+        _ = try await library.send(.delete, session.grabKey, [], headers: [:])
     }
 
     // MARK: Recording

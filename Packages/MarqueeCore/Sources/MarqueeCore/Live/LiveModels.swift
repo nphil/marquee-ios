@@ -320,6 +320,12 @@ public struct PlexLiveSession: Identifiable, Sendable, Hashable {
     /// `Media.uuid`; the stream is `/livetv/sessions/<id>`.
     public var id: String
     public var channel: LiveChannel
+    /// Names this playback (`X-Plex-Session-Identifier`). The tune registers it as the stream's reader
+    /// and the transcoder reads `/livetv/sessions/<id>/<sessionIdentifier>/index.m3u8`, so the
+    /// transcode, timeline reports and the stop all carry it.
+    public var sessionIdentifier: String
+    /// The rolling grab that holds the tuner, `/media/grabbers/operations/<channel>-<sessionIdentifier>`.
+    public var grabKey: String
     /// New for every tune; timeline reports carry it.
     public var ratingKey: String
     public var videoCodec: String?
@@ -331,6 +337,8 @@ public struct PlexLiveSession: Identifiable, Sendable, Hashable {
     public init(
         id: String,
         channel: LiveChannel,
+        sessionIdentifier: String,
+        grabKey: String,
         ratingKey: String,
         videoCodec: String? = nil,
         videoHeight: Int? = nil,
@@ -340,6 +348,8 @@ public struct PlexLiveSession: Identifiable, Sendable, Hashable {
     ) {
         self.id = id
         self.channel = channel
+        self.sessionIdentifier = sessionIdentifier
+        self.grabKey = grabKey
         self.ratingKey = ratingKey
         self.videoCodec = videoCodec
         self.videoHeight = videoHeight
@@ -362,14 +372,11 @@ public struct LiveTimelineUpdate: Sendable, Hashable {
     public var state: PlaybackState
     /// Milliseconds since the tune.
     public var time: Int
-    /// The transcode session the stream belongs to.
-    public var transcodeSession: String
 
-    public init(session: PlexLiveSession, state: PlaybackState, time: Int, transcodeSession: String) {
+    public init(session: PlexLiveSession, state: PlaybackState, time: Int) {
         self.session = session
         self.state = state
         self.time = time
-        self.transcodeSession = transcodeSession
     }
 
     var queryItems: [URLQueryItem] {

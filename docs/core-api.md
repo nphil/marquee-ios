@@ -88,7 +88,7 @@ The endpoints and the route rules are in `docs/LIVE-TV.md`.
 - `PlexLiveTV(library:)`: one server's Live TV and DVR.
   - `dvrs()`, `channels(_:)`: DVRs with their devices and channel mappings; the lineup's enabled channels in number order ("2.1" < "2.10" < "10.1"), each joined to the device that receives it (a live one first).
   - `guide(_:channels:from:to:)`: airings overlapping a window, one per channel a programme airs on; channels no device maps are dropped. `channelFilters(_:)`, `channelKeys(in:)`: the provider's genres and their channels.
-  - `tune(_:)` → `PlexLiveSession`, then `streamURL(_:)` with `TranscodeRequest(live:)`, `reportTimeline(_:)` with `LiveTimelineUpdate`, and `stopStream(transcodeSession:)`, which frees the tuner.
+  - `tune(_:session:)` → `PlexLiveSession`, whose `sessionIdentifier` names the tune, the transcode (`streamURL(_:)` with `TranscodeRequest(live:)`), the timeline reports (`reportTimeline(_:)` with `LiveTimelineUpdate`) and `stopStream(_:)`; the transcoder finds the tuned stream only under that name. `stopStream(_:)` also cancels the session's grab (`grabKey`), which frees the tuner.
   - `recordOptions(_:)` → `RecordOption`s (this episode, all episodes, the movie), `record(_:values:)`, `update(_:values:)`, `rules()`, `scheduled()`, `cancel(_:)` (skips one airing), `delete(_:)` (a rule).
 - `LiveDVR`, `TunerDevice`, `LiveChannelMapping`, `LiveChannel`, `LiveAiring`, `LiveChannelFilter`: values, Codable for the guide cache.
 - `LiveGuide`: channels and per-channel airings for the loaded span. `airing(on:at:)`, `nowAndNext(on:at:)`, `airings(on:from:to:)`, `merging(_:from:to:channels:)` (a refreshed span replaces what it covers; an overlap is cut at the later start), `trimmed(before:)`.
