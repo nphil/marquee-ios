@@ -54,6 +54,12 @@ enum LiveText {
         }
     }
 
+    /// "S2 E5 · Episode title" for an airing due to record, or nil.
+    static func subtitle(_ recording: ScheduledRecording) -> String? {
+        let parts = [recording.episodeCode, recording.episodeTitle == recording.title ? nil : recording.episodeTitle].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
     /// The record state in words, for VoiceOver and the programme sheet.
     static func mark(_ mark: RecordingMark?) -> String? {
         switch mark {
@@ -91,5 +97,50 @@ enum LiveText {
             if error is URLError { return "\(server) can't be reached right now." }
             return "The guide from \(server) couldn't be read."
         }
+    }
+
+    /// A sentence for a recording change the server turned down.
+    static func recordingProblem(_ error: any Error, server: String) -> String {
+        switch error as? PlexError {
+        case .unauthorized?:
+            return "\(server) doesn't let this profile record."
+        case .server(let status, _)? where status == 401 || status == 403:
+            return "\(server) doesn't let this profile record."
+        case .unreachable?:
+            return "\(server) can't be reached right now."
+        case .server(let status, _)?:
+            return "\(server) turned the change down (error \(status))."
+        default:
+            if error is URLError { return "\(server) can't be reached right now." }
+            return "\(server) didn't confirm the change."
+        }
+    }
+
+    /// The record state as the programme sheet and Recordings write it.
+    static func status(_ mark: RecordingMark) -> String {
+        switch mark {
+        case .scheduled, .series: "Will record"
+        case .recording: "Recording now"
+        case .failed: "Didn't record"
+        case .recorded: "Recorded"
+        }
+    }
+
+    /// "Record Episode", "Record Series" or "Record Movie" (template types 4, 2 and 1).
+    static func recordTitle(_ option: RecordOption) -> String {
+        switch option.kind {
+        case .episode?: "Record Episode"
+        case .show?: "Record Series"
+        case .movie?: "Record Movie"
+        case nil: "Record \(option.title)"
+        }
+    }
+
+    /// How early a recording starts or how late it ends, mid-sentence: "on time", "2 min early",
+    /// "1 hr late".
+    static func padding(minutes: Int, early: Bool) -> String {
+        guard minutes > 0 else { return "on time" }
+        let amount = Duration.seconds(minutes * 60).formatted(.units(allowed: [.hours, .minutes], width: .abbreviated))
+        return "\(amount) \(early ? "early" : "late")"
     }
 }

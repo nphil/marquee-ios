@@ -1,0 +1,106 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "SubscriptionTemplate": [
+   {
+    "MediaSubscription": [
+     {
+      "parameters": "hints%5Bguid%5D=plex%3A%2F%2Fepisode%2Ftemplate&params%5BmediaProviderID%5D=13",
+      "type": 4,
+      "targetLibrarySectionID": 2,
+      "targetSectionLocationID": 3,
+      "title": "This Episode",
+      "librarySectionTitle": "TV Shows",
+      "Video": {
+       "type": "episode",
+       "title": "Episode",
+       "grandparentTitle": "Show"
+      },
+      "Setting": [
+       {
+        "id": "startOffsetMinutes",
+        "label": "Start recording",
+        "type": "int",
+        "value": "1",
+        "hidden": false
+       },
+       {
+        "id": "endOffsetMinutes",
+        "label": "Stop recording",
+        "type": "int",
+        "value": "2",
+        "hidden": false
+       },
+       {
+        "id": "minVideoQuality",
+        "label": "Resolution",
+        "type": "int",
+        "value": "0",
+        "hidden": false,
+        "enumValues": "0:Prefer HD|720:HD Only|1080:Full HD Only"
+       },
+       {
+        "id": "oneShot",
+        "label": "",
+        "type": "bool",
+        "value": "true",
+        "hidden": true
+       }
+      ]
+     },
+     {
+      "parameters": "hints%5Bguid%5D=plex%3A%2F%2Fshow%2Ftemplate&hints%5Btype%5D=2&params%5BlibraryType%5D=2",
+      "type": 2,
+      "targetLibrarySectionID": 2,
+      "title": "All Episodes",
+      "airingsType": "New Airings Only",
+      "librarySectionTitle": "TV Shows",
+      "Directory": {
+       "type": "show",
+       "title": "Show"
+      },
+      "Setting": [
+       {
+        "id": "startOffsetMinutes",
+        "label": "Start recording",
+        "type": "int",
+        "value": "1",
+        "hidden": false
+       },
+       {
+        "id": "endOffsetMinutes",
+        "label": "Stop recording",
+        "type": "int",
+        "value": "2",
+        "hidden": false
+       },
+       {
+        "id": "onlyNewAirings",
+        "label": "Airings",
+        "type": "int",
+        "value": "1",
+        "hidden": false,
+        "enumValues": "0:New and Repeat Airings|1:New Airings Only"
+       },
+       {
+        "id": "minVideoQuality",
+        "label": "Resolution",
+        "type": "int",
+        "value": "0",
+        "hidden": false,
+        "enumValues": "0:Prefer HD|720:HD Only|1080:Full HD Only"
+       },
+       {
+        "id": "oneShot",
+        "label": "",
+        "type": "bool",
+        "value": "false",
+        "hidden": true
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}
