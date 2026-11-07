@@ -65,19 +65,34 @@ extension XCTestCase {
         open(tab: "Live TV", title: "Live TV", in: app)
         waitFor("livetv.row.ch-0201", in: app)
         try snap("livetv-01-guide-\(suffix)")
-        tap("livetv.category.genre-/tv.plex.providers.epg.cloud/lineups/dvr/channels?genre=genre_movies", in: app)
+        tap("livetv.category.genre-/tv.plex.providers.epg.cloud/lineups/dvr/channels?genre=genre_movies", inStrip: "livetv.categories", in: app)
         waitFor("livetv.row.ch-0501", in: app)
         try snap("livetv-02-movies-\(suffix)")
-        // Tapping Movies scrolled the chips; All sits off the leading edge until they scroll back.
-        element("livetv.categories", in: app).swipeRight()
-        tap("livetv.category.all", in: app)
-        tap("livetv.slot.2", in: app)
+        tap("livetv.category.all", inStrip: "livetv.categories", in: app)
+        tap("livetv.slot.2", inStrip: "livetv.times", in: app)
         waitFor("livetv.row.ch-0201", in: app)
         try snap("livetv-03-later-\(suffix)")
-        tap("livetv.slot.now", in: app)
+        tap("livetv.slot.now", inStrip: "livetv.times", in: app)
         reveal("livetv.row.ch-0901", in: app).press(forDuration: 1)
         XCTAssertTrue(app.buttons["Watch"].waitForExistence(timeout: 5), "No channel menu")
         try snap("livetv-04-menu-\(suffix)")
+    }
+
+    /// The category chips and the time strip scroll sideways, which XCUITest does not do for a tap, and
+    /// at accessibility sizes most of them start off screen.
+    @MainActor
+    func tap(_ identifier: String, inStrip strip: String, in app: XCUIApplication) {
+        let target = element(identifier, in: app)
+        let row = element(strip, in: app)
+        XCTAssertTrue(target.waitForExistence(timeout: 10), "No element \(identifier)")
+        for _ in 0..<6 where !target.isHittable {
+            if target.frame.midX < row.frame.midX {
+                row.swipeRight(velocity: .slow)
+            } else {
+                row.swipeLeft(velocity: .slow)
+            }
+        }
+        target.tap()
     }
 
     /// The time grid with the phone on its side, at now and further on.

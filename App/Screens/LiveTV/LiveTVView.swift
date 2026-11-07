@@ -410,6 +410,7 @@ private struct TimeStrip: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Time")
+        .accessibilityIdentifier("livetv.times")
     }
 
     private func pick(_ date: Date?) {
