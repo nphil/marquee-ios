@@ -98,6 +98,11 @@ extension XCTestCase {
         reveal("subtitles.style", in: app).tap()
         waitForBar("Subtitle Style", in: app)
         try snap("acct-08-subtitle-style-\(suffix)")
+        tap("style.size", in: app)
+        let extraLarge = app.buttons["Extra Large"]
+        XCTAssertTrue(extraLarge.waitForExistence(timeout: 5), "No Extra Large size")
+        extraLarge.tap()
+        try snap("acct-08b-subtitle-xl-\(suffix)")
         goBack(from: "Subtitle Style", in: app)
         goBack(from: "Audio & Subtitles", in: app)
 

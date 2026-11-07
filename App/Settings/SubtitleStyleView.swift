@@ -58,24 +58,21 @@ struct SubtitleStyleView: View {
     }
 }
 
-/// A 16:9 frame, half dark and half bright, with one subtitle line in the chosen style, so the edge and
-/// background choices show over both kinds of picture. The rows read out the same choices, so the
-/// preview is hidden from VoiceOver.
+/// A 16:9 frame shaded from dark to bright, with a subtitle in the chosen style, so the edge and background
+/// choices show over both kinds of picture. Played in landscape, the picture spans the phone's short side,
+/// which the preview's width matches, so the line takes about the size it has on a video. The rows read
+/// out the same choices, so the preview is hidden from VoiceOver.
 private struct SubtitlePreview: View {
     let style: SubtitleStyle
 
     var body: some View {
         GeometryReader { proxy in
-            ZStack(alignment: style.position == .top ? .top : .bottom) {
-                HStack(spacing: 0) {
-                    PictureColours.black
-                    PictureColours.bright
-                }
-                SubtitleLine(text: "Subtitles look like this.", style: style, pictureHeight: proxy.size.height)
-                    .padding(proxy.size.height * 0.06)
-            }
+            SubtitleLine(text: "Subtitles look\nlike this.", style: style, pictureHeight: proxy.size.width)
+                .padding(proxy.size.height * 0.06)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: style.position == .top ? .top : .bottom)
         }
         .aspectRatio(16 / 9, contentMode: .fit)
+        .background(LinearGradient(colors: [PictureColours.black, PictureColours.bright], startPoint: .leading, endPoint: .trailing))
         .clipShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
         .accessibilityHidden(true)
     }
