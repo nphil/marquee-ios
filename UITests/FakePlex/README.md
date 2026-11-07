@@ -19,6 +19,8 @@ plex.tv lists four servers of the account and its Home: Living Room (reached loc
 
 Living Room has two libraries. Movies holds eleven Blender open movies: Sintel is half watched and has two versions (4K Dolby Vision with Atmos, and 1080p) and a full set of tracks, Tears of Steel is part watched, Big Buck Bunny and Elephants Dream are watched. TV Shows holds Caminandes, one season of three episodes with the second in progress. One collection, Blender Open Movies, gathers the films. The watchlist on plex.tv holds Wing It! (not on the server), Spring, Caminandes, Cosmos Laundromat and Elephants Dream. Titles, years and credits are real; summaries, dates, ratings, files and watch state are invented.
 
+The player tests play Caminandes episode 2, Gran Dillama (`212`): an intro from 0:05 to 0:35, final credits from 2:10, Spanish audio beside the English, and English, English SDH and Spanish subtitles. `pms/playQueues@continuous=1.json` queues the season around it.
+
 ## Artwork
 
 `art/` holds frames from the films, cropped and resized to posters (400 × 600), backdrops (960 × 540) and episode stills (640 × 360). Each film's licence applies to its frames; the frames from the two CC BY-SA films are shared under CC BY-SA 3.0 as well. The source videos are on Wikimedia Commons.
