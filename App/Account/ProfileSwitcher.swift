@@ -1,17 +1,18 @@
 import MarqueeCore
 import SwiftUI
 
-/// Home's profile button (DESIGN §8.1). RootView presents the switcher, so Settings opens the same one.
+/// Home's profile button (DESIGN §8.1): the profile's photo, opening Settings, whose Account row switches
+/// profiles, as in the Apple TV app.
 struct ProfileButton: View {
     @Environment(AppSession.self) private var session
 
     var body: some View {
         Button {
-            session.showsProfileSwitcher = true
+            session.showsSettings = true
         } label: {
-            Image(systemName: "person.crop.circle")
+            AvatarView(user: session.user, size: Size.target - Space.s4)
         }
-        .accessibilityLabel("Switch Profile")
+        .accessibilityLabel("Settings")
         .accessibilityValue(session.user?.title ?? "")
         .accessibilityIdentifier("profile.button")
     }

@@ -14,14 +14,13 @@ struct RootView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.legibilityWeight) private var legibilityWeight
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         @Bindable var session = session
         let theme = store.theme(for: colorScheme)
             .adjusted(increaseContrast: contrast == .increased, reduceTransparency: reduceTransparency)
-        // Matching the system leaves the scheme to the iPhone; a fixed theme forces its own. The
-        // modifier applies to the nearest presentation, so each sheet sets it as well.
-        let scheme = store.matchSystem ? nil : theme.mode.colorScheme
+        let scheme = store.presentationScheme(for: theme)
         Group {
             switch session.state {
             case .ready:
@@ -32,13 +31,24 @@ struct RootView: View {
                 SignInView()
             }
         }
+        // Sign-in, the server list and the tabs fade into each other rather than cut (DESIGN §9 layer;
+        // Reduce Motion keeps a short fade).
+        .animation(reduceMotion ? .linear(duration: 0.12) : .easeOut(duration: 0.22), value: stage)
         .sheet(item: $session.playbackNotice) { item in
             PlaybackNoticeView(item: item)
                 .preferredColorScheme(scheme)
         }
-        .sheet(isPresented: $session.showsProfileSwitcher) {
-            ProfileSwitcher()
-                .preferredColorScheme(scheme)
+        .sheet(isPresented: $session.showsSettings) {
+            NavigationStack {
+                SettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { session.showsSettings = false }
+                                .accessibilityIdentifier("settings.done")
+                        }
+                    }
+            }
+            .preferredColorScheme(scheme)
         }
         .environment(\.theme, theme)
         // Here rather than on the tabs, so the sheets above resolve artwork too.
@@ -47,6 +57,16 @@ struct RootView: View {
         .preferredColorScheme(scheme)
         .onChange(of: BarInputs(theme: theme, typeSize: typeSize, boldText: legibilityWeight == .bold), initial: true) { _, inputs in
             NavigationBarStyle.apply(inputs.theme, typeSize: inputs.typeSize, boldText: inputs.boldText)
+        }
+    }
+
+    /// Which of the three screens the state shows, so a change within one, such as a refreshed server
+    /// list, does not fade.
+    private var stage: Int {
+        switch session.state {
+        case .signedOut, .signingIn, .failed: 0
+        case .choosingServer: 1
+        case .ready: 2
         }
     }
 

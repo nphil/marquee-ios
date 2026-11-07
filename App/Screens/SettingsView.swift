@@ -5,6 +5,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
+    @Environment(ThemeStore.self) private var store
     @State private var confirmingSignOut = false
 
     private var version: String {
@@ -12,6 +13,7 @@ struct SettingsView: View {
     }
 
     var body: some View {
+        @Bindable var session = session
         List {
             Section("Account") {
                 Button {
@@ -115,6 +117,10 @@ struct SettingsView: View {
         }
         .themedList(theme)
         .navigationTitle("Settings")
+        .sheet(isPresented: $session.showsProfileSwitcher) {
+            ProfileSwitcher()
+                .preferredColorScheme(store.presentationScheme(for: theme))
+        }
     }
 }
 

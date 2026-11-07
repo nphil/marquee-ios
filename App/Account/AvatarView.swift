@@ -33,6 +33,7 @@ struct AvatarView: View {
         }
         .foregroundStyle(theme.ink)
         .frame(width: size, height: size)
-        .background(theme.glassRaised)
+        // trackOff, the placeholder fill, stays visible on light pages, where the raised glass does not.
+        .background(theme.trackOff)
     }
 }

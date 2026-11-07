@@ -33,6 +33,12 @@ final class ThemeStore {
         selected(for: matchSystem ? ThemeMode(systemScheme) : fixedMode)
     }
 
+    /// The scheme a presentation forces: none while matching the iPhone, the theme's own otherwise. Each
+    /// sheet applies it, because the modifier reaches only the nearest presentation.
+    func presentationScheme(for theme: Theme) -> ColorScheme? {
+        matchSystem ? nil : theme.mode.colorScheme
+    }
+
     func selected(for mode: ThemeMode) -> Theme {
         mode == .dark ? dark : light
     }

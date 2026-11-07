@@ -10,7 +10,7 @@ struct SpeechDockView: View {
         @Bindable var session = session
         List {
             Section {
-                Toggle("SpeechDock", isOn: $session.speechDockEnabled)
+                Toggle("SpeechDock", isOn: $session.speechDockEnabled.animation())
                     .tint(theme.accent)
                     .accessibilityIdentifier("speechDock.enabled")
             } footer: {

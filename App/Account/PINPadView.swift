@@ -11,22 +11,42 @@ struct PINPadView: View {
 
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var digits = ""
     @State private var isChecking = false
     @State private var message: String?
+    @State private var refusals = 0
 
     private static let length = 4
 
     var body: some View {
+        // Side by side in landscape, where the stacked pad would run off the bottom of the screen.
+        let layout = verticalSizeClass == .compact
+            ? AnyLayout(HStackLayout(spacing: Space.s8))
+            : AnyLayout(VStackLayout(spacing: Space.s6))
         GeometryReader { proxy in
             ScrollView {
-                VStack(spacing: Space.s6) {
+                layout {
                     VStack(spacing: Space.s4) {
                         AvatarView(user: profile, size: Size.rowMin)
                         Text("Enter PIN")
                             .textRole(.headline)
                             .foregroundStyle(theme.ink)
                         PINDots(filled: digits.count, length: Self.length)
+                            // The dots shake at a wrong PIN, as the iPhone's own passcode does. With Reduce
+                            // Motion the message and the haptic say it alone.
+                            .keyframeAnimator(initialValue: 0.0, trigger: reduceMotion ? 0 : refusals) { dots, x in
+                                dots.offset(x: x)
+                            } keyframes: { _ in
+                                KeyframeTrack {
+                                    LinearKeyframe(-10.0, duration: 0.05)
+                                    LinearKeyframe(10.0, duration: 0.07)
+                                    LinearKeyframe(-7.0, duration: 0.07)
+                                    LinearKeyframe(7.0, duration: 0.07)
+                                    LinearKeyframe(0.0, duration: 0.06)
+                                }
+                            }
                         // The clear line holds the height while there is no message, so the keys never
                         // move under a finger between tries.
                         ZStack {
@@ -98,6 +118,7 @@ struct PINPadView: View {
         Haptics.error()
         message = text
         digits = ""
+        refusals += 1
         UIAccessibility.post(notification: .announcement, argument: text)
     }
 }

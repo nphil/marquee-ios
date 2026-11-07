@@ -35,7 +35,9 @@ final class AppSession {
     private(set) var networkChanges = 0
     /// The item whose Play was pressed; RootView explains that playback is not built yet.
     var playbackNotice: PlexMetadata?
-    /// The profile switcher sheet, opened from Home's profile button and the Settings Account row.
+    /// Settings, in a sheet opened from Home's profile button.
+    var showsSettings = false
+    /// The profile switcher sheet, opened from the Settings Account row.
     var showsProfileSwitcher = false
     /// The active profile's playback, audio and subtitle settings; every change is saved at once.
     var settings: ProfileSettings {
@@ -204,6 +206,8 @@ final class AppSession {
     /// Forgets the sign-in: the token and the server list leave the Keychain. Settings and themes stay.
     func signOut() {
         for task in [signInTask, refreshTask, addressTask] { task?.cancel() }
+        showsProfileSwitcher = false
+        showsSettings = false
         storage.clearSignIn()
         plexTV = nil
         library = nil

@@ -256,10 +256,10 @@ Apple's rule: Liquid Glass is the navigation layer, not the content layer; use r
 
 ## 7. Navigation model
 
-- **Root:** a tab view with Home, Library, Watchlist, Settings and a Search tab in the search role (the separate search bubble) (`W25-323`). The tab bar collapses on scroll down on Home and Library (`tabBarMinimizeBehavior`, `W25-323`) and stays put on Settings and Search.
+- **Root:** a tab view with Home, Library, Live TV, Watchlist and a Search tab in the search role (the separate search bubble) (`W25-323`). The tab bar collapses on scroll down on Home and Library (`tabBarMinimizeBehavior`, `W25-323`) and stays put elsewhere. Settings is not a tab: the profile button at the top of Home opens it in a sheet, as in the Apple TV app.
 - **Each tab owns a navigation stack.** Detail pushes with a zoom transition from the tapped poster (`W26-251`); Reduce Motion makes it a 120 ms crossfade. The left-edge back swipe is never disabled or overlaid (`I:15`). No custom back buttons, no hamburger menu (`I:14`).
 - **Player:** a full-screen cover (`I:39`). The way out is a swipe down on the picture, the Close button, or the VoiceOver escape gesture; none depends on the chrome being visible.
-- **Sheets** hold short self-contained tasks: profile switcher, subtitle style, subtitle timing, version picker, tracks info. Long tasks (subtitle search) are full pages pushed inside the sheet (`L:160`). **Menus** hold short choices: sort, filter, season, tracks, more. **Confirmation dialog** for sign-out and removals. **Alert** only for blocking errors.
+- **Sheets** hold short self-contained tasks: Settings, profile switcher (over Settings), subtitle style, subtitle timing, version picker, tracks info. Long tasks (subtitle search) are full pages pushed inside the sheet (`L:160`). **Menus** hold short choices: sort, filter, season, tracks, more. **Confirmation dialog** for sign-out and removals. **Alert** only for blocking errors.
 - **Search tab:** the standard variant (a landing page with recents), not the prominent variant that opens the keyboard at once (`W26-292`, `W26-269`).
 - **Rotation and size:** browse screens work in every orientation [INFERENCE: WCAG 1.3.4]; the player follows the phone, and in portrait the picture is letterboxed on black with the same chrome over it. Tabs become a sidebar in iPhone landscape (`sidebarAdaptable`) [INFERENCE: first-beta]. Layout uses size classes, layout margins and safe areas, never device or `UIScreen.main` checks, so resizable windows and the foldable iPhone Duo (on sale 2026-10-23; the inner display can be regular width) work (`W26-269`, Apple developer news 2026-10-05).
 - **Unused:** the tab-bar bottom accessory (`tabViewBottomAccessory`) is kept free for a possible mini-player or a future TV-remote strip [INFERENCE: no design exists for either].
@@ -382,7 +382,7 @@ Round brackets are 56 pt glass buttons; the picture runs behind everything.
 
 ### 8.7 Settings and the theme picker
 
-Settings is a system inset-grouped list (`I:40`), rows 56 pt minimum. Top to bottom:
+Settings opens from Home's profile button in a sheet with Done (§7). It is a system inset-grouped list (`I:40`), rows 56 pt minimum. Top to bottom:
 
 1. **Account:** profile name and server name; opens the profile switcher.
 2. **Appearance:** the theme picker (below).

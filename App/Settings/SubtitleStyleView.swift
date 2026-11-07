@@ -65,6 +65,10 @@ struct SubtitleStyleView: View {
 private struct SubtitlePreview: View {
     let style: SubtitleStyle
 
+    /// About an iPhone's short side. A landscape list row is far wider, and would make both the frame and
+    /// the line larger than any video shows them.
+    private static let maxWidth: CGFloat = 400
+
     var body: some View {
         GeometryReader { proxy in
             SubtitleLine(text: "Subtitles look\nlike this.", style: style, pictureHeight: proxy.size.width)
@@ -74,6 +78,8 @@ private struct SubtitlePreview: View {
         .aspectRatio(16 / 9, contentMode: .fit)
         .background(LinearGradient(colors: [PictureColours.black, PictureColours.bright], startPoint: .leading, endPoint: .trailing))
         .clipShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
+        .frame(maxWidth: Self.maxWidth)
+        .frame(maxWidth: .infinity)
         .accessibilityHidden(true)
     }
 }

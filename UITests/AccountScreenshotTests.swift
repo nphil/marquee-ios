@@ -53,6 +53,30 @@ final class AccountAccessibilityScreenshots: XCTestCase {
     }
 }
 
+/// The same screens in landscape, in Rosé Pine. In landscape the swipes that scroll a list did not bring
+/// lower Settings rows in, so Settings is walked upright and each page turned for its shot. Every test
+/// ends upright, so the classes that follow are not affected.
+final class AccountLandscapeScreenshots: XCTestCase {
+    @MainActor
+    func testSignIn() throws {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        try signInFlow(mode: "dark", suffix: "land-rose-pine")
+    }
+
+    @MainActor
+    func testSettings() throws {
+        try settingsFlow(mode: "dark", suffix: "land-rose-pine", turned: true)
+    }
+
+    @MainActor
+    func testProfiles() throws {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        try profileFlow(mode: "dark", suffix: "land-rose-pine")
+    }
+}
+
 extension XCTestCase {
     /// Sign-in screen, code panel, browser sign-in (the fake approves at once), server list, then Home.
     @MainActor
@@ -76,33 +100,33 @@ extension XCTestCase {
     }
 
     /// Each Settings page in list order, an invalid SpeechDock address, a licence and the sign-out
-    /// confirmation.
+    /// confirmation; `turned` takes each shot in landscape.
     @MainActor
-    func settingsFlow(mode: String, suffix: String) throws {
+    func settingsFlow(mode: String, suffix: String, turned: Bool = false) throws {
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine")
         open(tab: "Settings", title: "Settings", in: app)
-        try snap("acct-04-settings-\(suffix)")
+        try snap("acct-04-settings-\(suffix)", turned: turned)
 
         reveal("settings.video", in: app).tap()
         waitForBar("Video & Playback", in: app)
-        try snap("acct-05-video-\(suffix)")
+        try snap("acct-05-video-\(suffix)", turned: turned)
         goBack(from: "Video & Playback", in: app)
 
         reveal("settings.audio", in: app).tap()
         waitForBar("Audio & Subtitles", in: app)
-        try snap("acct-06-audio-\(suffix)")
+        try snap("acct-06-audio-\(suffix)", turned: turned)
         tap("audio.language", in: app)
         waitForBar("Audio Language", in: app)
-        try snap("acct-07-language-\(suffix)")
+        try snap("acct-07-language-\(suffix)", turned: turned)
         goBack(from: "Audio Language", in: app)
         reveal("subtitles.style", in: app).tap()
         waitForBar("Subtitle Style", in: app)
-        try snap("acct-08-subtitle-style-\(suffix)")
+        try snap("acct-08-subtitle-style-\(suffix)", turned: turned)
         tap("style.size", in: app)
         let extraLarge = app.buttons["Extra Large"]
         XCTAssertTrue(extraLarge.waitForExistence(timeout: 5), "No Extra Large size")
         extraLarge.tap()
-        try snap("acct-08b-subtitle-xl-\(suffix)")
+        try snap("acct-08b-subtitle-xl-\(suffix)", turned: turned)
         goBack(from: "Subtitle Style", in: app)
         goBack(from: "Audio & Subtitles", in: app)
 
@@ -112,21 +136,30 @@ extension XCTestCase {
         tap("speechDock.address", in: app)
         element("speechDock.address", in: app).typeText("speechdock.local\n")
         waitFor("speechDock.invalid", in: app)
-        try snap("acct-09-speechdock-\(suffix)")
+        try snap("acct-09-speechdock-\(suffix)", turned: turned)
         goBack(from: "SpeechDock", in: app)
 
         reveal("settings.notices", in: app).tap()
         waitForBar("Open-Source Notices", in: app)
-        try snap("acct-10-notices-\(suffix)")
+        try snap("acct-10-notices-\(suffix)", turned: turned)
         tap("notice.marquee", in: app)
         waitForBar("Marquee", in: app)
-        try snap("acct-11-licence-\(suffix)")
+        try snap("acct-11-licence-\(suffix)", turned: turned)
         goBack(from: "Marquee", in: app)
         goBack(from: "Open-Source Notices", in: app)
 
         reveal("settings.signOut", in: app).tap()
         waitFor("signOut.confirm", in: app)
-        try snap("acct-12-signout-\(suffix)")
+        try snap("acct-12-signout-\(suffix)", turned: turned)
+    }
+
+    /// A shot of the screen as it stands, or turned to landscape for the shot and back after it.
+    @MainActor
+    func snap(_ name: String, turned: Bool) throws {
+        guard turned else { return try snap(name) }
+        XCUIDevice.shared.orientation = .landscapeLeft
+        defer { XCUIDevice.shared.orientation = .portrait }
+        try snap(name)
     }
 
     /// The switcher from Settings, Alex's PIN pad, a wrong PIN, then the right one (1234 in the
