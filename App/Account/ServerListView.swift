@@ -45,10 +45,10 @@ struct ServerListView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Sign Out") { confirmingSignOut = true }
                         .accessibilityIdentifier("servers.signOut")
+                        .signOutConfirmation(isPresented: $confirmingSignOut, session: session)
                 }
             }
         }
-        .signOutConfirmation(isPresented: $confirmingSignOut, session: session)
     }
 }
 

@@ -32,7 +32,6 @@ struct SignInView: View {
             .scrollBounceBehavior(.basedOnSize)
         }
         .background(theme.canvas)
-        .signOutConfirmation(isPresented: $confirmingSignOut, session: session)
     }
 
     @ViewBuilder private var content: some View {
@@ -164,6 +163,7 @@ struct SignInView: View {
                 .textRole(.body)
                 .foregroundStyle(theme.accentText)
                 .frame(minHeight: Size.target)
+                .signOutConfirmation(isPresented: $confirmingSignOut, session: session)
             } else if error != .pinExpired {
                 Button("Use a code instead") {
                     session.signInWithCode()

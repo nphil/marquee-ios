@@ -18,22 +18,30 @@ struct PINPadView: View {
     private static let length = 4
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: Space.s6) {
-                VStack(spacing: Space.s4) {
-                    AvatarView(user: profile, size: Size.rowMin)
-                    Text("Enter PIN")
-                        .textRole(.headline)
-                        .foregroundStyle(theme.ink)
-                    PINDots(filled: digits.count, length: Self.length)
-                    status
-                        .frame(minHeight: Size.target)
+        GeometryReader { proxy in
+            ScrollView {
+                VStack(spacing: Space.s6) {
+                    VStack(spacing: Space.s4) {
+                        AvatarView(user: profile, size: Size.rowMin)
+                        Text("Enter PIN")
+                            .textRole(.headline)
+                            .foregroundStyle(theme.ink)
+                        PINDots(filled: digits.count, length: Self.length)
+                        // The clear line holds the height while there is no message, so the keys never
+                        // move under a finger between tries.
+                        ZStack {
+                            Color.clear.frame(height: Size.target)
+                            status
+                        }
+                    }
+                    Keypad(onDigit: { add($0) }, onDelete: { delete() })
+                        .disabled(isChecking)
                 }
-                Keypad(onDigit: { add($0) }, onDelete: { delete() })
-                    .disabled(isChecking)
+                .padding(Space.inset)
+                // Centred in the full-height sheet, so the keys sit within reach rather than under the bar.
+                .frame(maxWidth: .infinity, minHeight: proxy.size.height)
             }
-            .padding(Space.inset)
-            .frame(maxWidth: .infinity)
+            .scrollBounceBehavior(.basedOnSize)
         }
         .background(theme.canvas)
         .navigationTitle(profile.title)

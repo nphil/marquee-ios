@@ -108,12 +108,13 @@ struct SettingsView: View {
                 }
                 .foregroundStyle(theme.accentText)
                 .accessibilityIdentifier("settings.signOut")
+                // On the button, so the dialog points at the row that opened it.
+                .signOutConfirmation(isPresented: $confirmingSignOut, session: session)
             }
             .listRowBackground(theme.sheet)
         }
         .themedList(theme)
         .navigationTitle("Settings")
-        .signOutConfirmation(isPresented: $confirmingSignOut, session: session)
     }
 }
 

@@ -85,12 +85,13 @@ private struct Notice: Identifiable {
     }
     #endif
 
-    var text: String {
+    /// The bundled files in order, as paragraphs reflowed for the screen.
+    var paragraphs: [String] {
         files
             .compactMap { file in
                 Bundle.main.resourceURL.flatMap { try? String(contentsOf: $0.appending(path: file), encoding: .utf8) }
             }
-            .joined(separator: "\n\n")
+            .flatMap(LicenceText.paragraphs)
     }
 }
 
@@ -98,18 +99,25 @@ private struct LicenceTextView: View {
     let notice: Notice
 
     @Environment(\.theme) private var theme
+    @State private var paragraphs: [String] = []
 
     var body: some View {
         ScrollView {
-            Text(notice.text)
-                .textRole(.caption)
-                .foregroundStyle(theme.ink2)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(Space.inset)
+            // The LGPL alone is some 500 lines, so paragraphs lay out as they scroll in.
+            LazyVStack(alignment: .leading, spacing: Space.s3) {
+                ForEach(paragraphs.indices, id: \.self) { index in
+                    Text(paragraphs[index])
+                        .textRole(.caption)
+                        .foregroundStyle(theme.ink2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .textSelection(.enabled)
+            .padding(Space.inset)
         }
         .background(theme.canvas)
         .navigationTitle(notice.name)
         .navigationBarTitleDisplayMode(.inline)
+        .task { paragraphs = notice.paragraphs }
     }
 }
