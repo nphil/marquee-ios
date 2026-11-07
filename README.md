@@ -11,7 +11,7 @@ Marquee for iPhone shares a name and behaviour with the Marquee TV app, which is
 - `App/`: the SwiftUI app (screens, player, theming).
 - `Packages/MarqueeCore/`: Plex API client, connection choice, playback route decision, audio and subtitle rules. Foundation only, unit-tested with `swift test`; its API is summarised in `docs/core-api.md`.
 - `Resources/`: `themes.json` (40 Lucent colour-role themes), the Manrope font (OFL), the app icon, and `Licences/engine`: the licence files of the linked stashy-videoengine release, shown under Open-Source Notices.
-- `docs/DESIGN.md`: design direction. `docs/behaviour-spec.md`: behaviour.
+- `docs/DESIGN.md`: design direction. `docs/behaviour-spec.md`: behaviour. `docs/DEVICE-TEST.md`: playback checks that need a real iPhone.
 - `tools/check_themes.py`: contrast and distinctness gate for `themes.json`; CI fails on any failing theme.
 
 Video remux and transcode use [stashy-videoengine](https://github.com/nphil/stashy-videoengine) (FFmpeg, LGPL-2.1, linked statically; its source and build scripts are public in that repo).
