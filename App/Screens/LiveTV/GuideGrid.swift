@@ -772,7 +772,12 @@ private final class AiringCell: UICollectionViewCell {
             badge.alpha = roomy ? 1 : 0
             if roomy { right = badge.frame.minX - Space.s1 }
         }
-        let left = Space.s3 + min(titleShift, max(0, bounds.width - 72))
+        // The text keeps clear of the channel column while the airing scrolls under it, truncating as it
+        // narrows. Under 32 pt a title is only "…", so a sliver goes bare.
+        let left = Space.s3 + titleShift
+        let readable = right - left >= 32
+        titleLabel.alpha = readable ? 1 : 0
+        detailLabel.alpha = readable ? 1 : 0
         titleLabel.frame = CGRect(x: left, y: top, width: max(0, right - left), height: titleHeight)
         detailLabel.frame = CGRect(x: left, y: top + titleHeight + 2, width: max(0, bounds.maxX - Space.s3 - left), height: detailHeight)
     }

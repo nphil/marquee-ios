@@ -343,12 +343,15 @@ private struct CategoryChips: View {
     }
 }
 
-/// Now, then each half hour the guide reaches, with Tonight and Tomorrow marking where they start.
+/// Now, then each half hour the guide reaches, with Tonight and Tomorrow marking where they start. Plain
+/// times over a sliding underline, so the strip reads as a timeline rather than a second row of filters.
 private struct TimeStrip: View {
     let now: Date
     let end: Date
     @Binding var slot: Date?
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var underline
 
     private struct Slot: Identifiable {
         let date: Date
@@ -375,10 +378,9 @@ private struct TimeStrip: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal) {
-                HStack(spacing: Space.s2) {
-                    SelectChip(title: "Now", isSelected: slot == nil) {
-                        Haptics.selection()
-                        slot = nil
+                HStack(spacing: 0) {
+                    TimeTab(title: "Now", isLive: true, isSelected: slot == nil, underline: underline) {
+                        pick(nil)
                     }
                     .accessibilityIdentifier("livetv.slot.now")
                     .id(Date.distantPast)
@@ -386,19 +388,20 @@ private struct TimeStrip: View {
                         if let mark = item.mark {
                             Text(mark)
                                 .textRole(.caption)
-                                .foregroundStyle(theme.ink2)
-                                .padding(.leading, Space.s2)
+                                .foregroundStyle(theme.ink3)
+                                .padding(.leading, Space.s3)
                                 .accessibilityHidden(true)
                         }
-                        SelectChip(title: LiveText.time(item.date), isSelected: slot == item.date) {
-                            Haptics.selection()
-                            slot = item.date
+                        TimeTab(title: LiveText.time(item.date), isSelected: slot == item.date, underline: underline) {
+                            pick(item.date)
                         }
                         .accessibilityLabel("\(LiveText.day(item.date, now: now)) \(LiveText.time(item.date))")
                         .accessibilityIdentifier("livetv.slot.\(index + 1)")
                     }
                 }
-                .padding(.horizontal, Space.inset)
+                // The first time lines up with the screen inset; each tab carries its own side padding.
+                .padding(.horizontal, Space.inset - Space.s3)
+                .animation(Motion.spring(reduceMotion: reduceMotion), value: slot)
             }
             .scrollIndicators(.hidden)
             .onChange(of: slot) { _, new in
@@ -407,6 +410,53 @@ private struct TimeStrip: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Time")
+    }
+
+    private func pick(_ date: Date?) {
+        Haptics.selection()
+        slot = date
+    }
+}
+
+/// One time in the strip: ink over the accent underline when chosen, quieter ink otherwise. Now carries
+/// the live dot.
+private struct TimeTab: View {
+    let title: String
+    var isLive = false
+    let isSelected: Bool
+    let underline: Namespace.ID
+    let action: @MainActor () -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Space.s1) {
+                if isLive {
+                    Circle()
+                        .fill(theme.live)
+                        .frame(width: 6, height: 6)
+                }
+                Text(title)
+                    .textRole(.label)
+                    .monospacedDigit()
+                    .lineLimit(1)
+            }
+            .foregroundStyle(isSelected ? theme.ink : theme.ink2)
+            .padding(.horizontal, Space.s3)
+            .frame(minHeight: Size.target)
+            .overlay(alignment: .bottom) {
+                if isSelected {
+                    Capsule()
+                        .fill(theme.accent)
+                        .frame(height: 3)
+                        .padding(.horizontal, Space.s3)
+                        .matchedGeometryEffect(id: "underline", in: underline)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 }
 

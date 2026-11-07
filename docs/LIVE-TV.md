@@ -350,7 +350,7 @@ Live TV                                    [⏺ Recordings]    display, ink
 - Progress 3 pt capsule, `accent` on `trackOff`, advanced every 30 s without relayout.
 - Record glyph trailing (§6.10). Separator `edge` hairline from the text column.
 - Chips: height 32 (`Space.s7`) with a 48 pt hit area (`Size.target`); selected solid `accent` with `accentInk`, others outlined in `ink2` (M DESIGN.md:125, 138). Categories: All, Favourites (local, per profile), Recent, then the provider's genre filters.
-- Time strip: Now, half hours to 24 h ahead, then Tonight and Tomorrow. A chosen time shows the airing at that time and the one after; tapping such a row opens the programme sheet unless the airing is on now.
+- Time strip: Now (with the `live` dot), half hours to 24 h ahead, then Tonight and Tomorrow. Plain `label` times in `ink2`; the chosen one in `ink` over a 3 pt `accent` underline that slides between them, so the strip reads as a timeline rather than a second row of chips. A chosen time shows the airing at that time and the one after; tapping such a row opens the programme sheet unless the airing is on now.
 - Tap a row on now: plays. Long press: menu (Watch, Record, Details, Favourite). Pull to refresh reloads the guide.
 
 ### 6.5 Landscape grid
@@ -372,7 +372,7 @@ rail │ Today ▾   8:00            8:30            9:00            9:30   8:18
 - Scale: 6 pt per minute on phones (30 min = 180 pt), 8 pt per minute at regular width.
 - Row height max(`Size.rowMin`, content height at the current text size). Cell gap `Space.s1` (4); cell radius `Radius.control` (14); cell padding `Space.s2` × `Space.s3`.
 - Fill: on now `glassRaised`, future `glass`, past none with `ink2` text. Title `label`; time `caption` `ink2`; NEW and LIVE as small chips; record glyph trailing.
-- A cell that began before the visible edge pins its title to the screen edge so it stays readable.
+- A cell that began before the visible edge pins its title to the screen edge so it stays readable; the title truncates as the cell leaves and disappears below 32 pt, where it would show only "…". A time range that crosses midnight shows times only ("10:35 PM – 12:30 AM").
 - Now line: 2 pt in `live` (M DESIGN.md:131), moved every 30 s by a transform on a decoration view, no relayout. Jump to Now: a 48 pt capsule (`Size.target`) in `accent` with `accentInk`, shown when the now line is off screen; scrolls to 15 min before now.
 - Left of now: up to 2 h back, read-only, dimmed. Right: the cached 24 h. The day menu jumps to Tonight 8 PM and Tomorrow.
 - Tap a now cell or channel cell: plays. Tap a future cell: programme sheet. Long press: menu.
