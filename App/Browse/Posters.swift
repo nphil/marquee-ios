@@ -98,20 +98,23 @@ extension ButtonStyle where Self == PressButtonStyle {
     static var press: PressButtonStyle { PressButtonStyle() }
 }
 
+/// What a long press on a Home shelf's title offers (DESIGN §8.1).
+struct ShelfMenu {
+    let hide: @MainActor () -> Void
+    let edit: @MainActor () -> Void
+}
+
 /// A shelf's title (a heading for VoiceOver's rotor) with "See all" as a trailing chevron (DESIGN §8.1).
 struct ShelfHeader: View {
     let title: String
     var seeAll: Route?
+    var menu: ShelfMenu?
 
     @Environment(\.theme) private var theme
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-            Text(title)
-                .textRole(.title)
-                .foregroundStyle(theme.ink)
-                .accessibilityAddTraits(.isHeader)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            heading
             if let seeAll {
                 NavigationLink(value: seeAll) {
                     Image(systemName: "chevron.right")
@@ -127,6 +130,32 @@ struct ShelfHeader: View {
         .padding(.leading, Space.inset)
         .padding(.trailing, Space.s1)
     }
+
+    @ViewBuilder
+    private var heading: some View {
+        let text = Text(title)
+            .textRole(.title)
+            .foregroundStyle(theme.ink)
+            .accessibilityAddTraits(.isHeader)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        if let menu {
+            // The whole width answers a long press; the lifted preview is the title with a margin.
+            text
+                .contentShape(Rectangle())
+                .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: Radius.control, style: .continuous).inset(by: -Space.s2))
+                .contextMenu {
+                    Button("Hide This Row", systemImage: "eye.slash", action: menu.hide)
+                    Button("Edit Home", systemImage: "slider.horizontal.3", action: menu.edit)
+                }
+                .accessibilityActions {
+                    Button("Hide This Row", action: menu.hide)
+                    Button("Edit Home", action: menu.edit)
+                }
+                .accessibilityIdentifier("shelf.\(title)")
+        } else {
+            text
+        }
+    }
 }
 
 /// A row of posters under its header; each opens its detail page, zooming from its art. The first six
@@ -136,6 +165,7 @@ struct PosterShelf: View {
     let title: String
     let items: [PlexMetadata]
     var seeAll: Route?
+    var menu: ShelfMenu?
 
     @State private var appeared = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -143,7 +173,7 @@ struct PosterShelf: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            ShelfHeader(title: title, seeAll: seeAll)
+            ShelfHeader(title: title, seeAll: seeAll, menu: menu)
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: Space.s3) {
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -176,13 +206,16 @@ struct PosterShelf: View {
 }
 
 extension PosterShelf {
-    /// A server hub as a shelf, with "See all" when the server holds more than it sent.
-    init(hub: PlexHub) {
+    /// A server hub as a shelf, with "See all" when the server holds more than it sent. A Home row
+    /// passes its own id and title, since two libraries can hold hubs of one name.
+    init(hub: PlexHub, id: String? = nil, title: String? = nil, menu: ShelfMenu? = nil) {
+        let title = title ?? hub.title
         self.init(
-            id: hub.id,
-            title: hub.title,
+            id: id ?? hub.id,
+            title: title,
             items: hub.items,
-            seeAll: hub.more ? hub.key.map { Route.hub(key: $0, title: hub.title) } : nil
+            seeAll: hub.more ? hub.key.map { Route.hub(key: $0, title: title) } : nil,
+            menu: menu
         )
     }
 }

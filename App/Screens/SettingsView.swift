@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Settings (DESIGN §8.7). Playback, audio and subtitle choices belong to the active Plex profile;
-/// the theme and the integrations belong to the iPhone.
+/// Settings (DESIGN §8.7). Home rows and playback, audio and subtitle choices belong to the active Plex
+/// profile; the theme and the integrations belong to the iPhone.
 struct SettingsView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
@@ -56,6 +56,21 @@ struct SettingsView: View {
                     }
                 }
                 .accessibilityIdentifier("settings.theme")
+            }
+            .listRowBackground(theme.sheet)
+
+            Section("Home") {
+                NavigationLink {
+                    HomeRowsView()
+                } label: {
+                    LabeledContent {
+                        Text(session.settings.homeRows.isDefault ? "Default" : "Custom")
+                            .foregroundStyle(theme.ink2)
+                    } label: {
+                        Text("Rows")
+                    }
+                }
+                .accessibilityIdentifier("settings.homeRows")
             }
             .listRowBackground(theme.sheet)
 

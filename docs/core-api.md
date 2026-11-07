@@ -43,6 +43,7 @@
   - `createPlayQueue(for:)`, `playQueue(_:)`: a queue that continues through the show for episodes.
   - `selectStreams(partID:audioStreamID:subtitleStreamID:)`, `playbackURL(path:query:)`, `transcodeURL(_:)`, `stopTranscode(session:)`: playback. These URLs carry the token because the player cannot send headers; they are never logged or cached.
   - `imageURL(_:width:height:scale:)`, `authorizationHeaders()`: artwork and headers for the image loader and the remux.
+- `HomeRow`, `HomeLayout`: a profile's Home rows. A row is a Home hub or a library hub (id prefixed with the library's uuid). `arrange(_:)` orders rows by the saved placements, then unplaced ones in server order with their default visibility (library rows hidden); `save(_:)` keeps placements of rows the server did not send this time; `shownLibraries` names the libraries worth asking.
 - `SectionQuery`: item type, sort, Unwatched filter and genre for a grid.
 - `PlexPage`: one page and the total behind it.
 - `AlphabetIndexEntry.entries(from:)`: jump-bar letters with the offset where each starts.

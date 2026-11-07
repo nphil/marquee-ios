@@ -1,18 +1,23 @@
 import MarqueeCore
 import SwiftUI
 
-/// Home (DESIGN §8.1): Continue Watching as 16:9 cards, then the server's shelves in its order.
+/// Home (DESIGN §8.1): the rows the profile chose in Home Rows, in its order. Continue Watching shows
+/// as 16:9 cards and every other row as a poster shelf.
 struct HomeView: View {
     @Environment(\.plexLibrary) private var library
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(LibraryChanges.self) private var changes
-    @State private var hubs = Remote<[PlexHub]>()
+    @Environment(AppSession.self) private var session
+    @Environment(ThemeStore.self) private var store
+    @Environment(ToastCenter.self) private var toasts
+    @State private var rows = Remote<[HomeRow]>()
+    @State private var editing = false
 
     var body: some View {
         WidthReader { width in
-            RemoteContent(remote: hubs) { hubs in
-                content(hubs, width: width)
+            RemoteContent(remote: rows) { rows in
+                content(session.settings.homeRows.arrange(rows), width: width)
             } skeleton: {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Space.s7) {
@@ -31,31 +36,57 @@ struct HomeView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { ProfileButton() }
         }
-        .task(id: LoadKey(library: library?.instance, attempt: hubs.attempt, extra: changes.revision)) {
+        // A library's hubs are asked for only while one of its rows is shown, so showing one reloads.
+        .task(id: LoadKey(library: library?.instance, attempt: rows.attempt, extra: Reload(
+            revision: changes.revision,
+            libraries: session.settings.homeRows.shownLibraries
+        ))) {
             await load()
+        }
+        .sheet(isPresented: $editing) {
+            EditHomeSheet()
+                .preferredColorScheme(store.presentationScheme(for: theme))
         }
     }
 
     @ViewBuilder
-    private func content(_ hubs: [PlexHub], width: CGFloat) -> some View {
-        let continuing = hubs.first(where: Self.isContinueWatching)
-        let shelves = Self.shelves(hubs)
-        if (continuing?.items.isEmpty ?? true) && shelves.isEmpty {
+    private func content(_ arranged: [HomeRow], width: CGFloat) -> some View {
+        let shown = arranged.filter { $0.shown && !$0.hub.items.isEmpty }
+        if shown.isEmpty, arranged.contains(where: { !$0.hub.items.isEmpty }) {
+            EmptyState(
+                title: "Every row is hidden",
+                message: "Choose the rows Home shows.",
+                systemImage: "rectangle.stack",
+                action: EmptyState.Action(title: "Edit Home", systemImage: "slider.horizontal.3") { editing = true }
+            )
+        } else if shown.isEmpty {
             EmptyState(
                 title: "Nothing here yet",
                 message: "Add some on the server.",
                 systemImage: "film.stack",
-                action: EmptyState.Action(title: "Refresh", systemImage: "arrow.clockwise") { self.hubs.retry() }
+                action: EmptyState.Action(title: "Refresh", systemImage: "arrow.clockwise") { rows.retry() }
             )
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Space.s7) {
-                    if let continuing, !continuing.items.isEmpty, width > 0 {
-                        ContinueShelf(hub: continuing, cardWidth: Self.cardWidth(for: width), setShown: setShown)
+                    ForEach(shown) { row in
+                        let menu = ShelfMenu(hide: { hide(row, in: arranged) }, edit: { editing = true })
+                        if row.isContinueWatching {
+                            if width > 0 {
+                                ContinueShelf(hub: row.hub, title: row.title, cardWidth: Self.cardWidth(for: width), header: menu, setShown: setShown)
+                            }
+                        } else {
+                            PosterShelf(hub: row.hub, id: row.id, title: row.title, menu: menu)
+                        }
                     }
-                    ForEach(shelves) { hub in
-                        PosterShelf(hub: hub)
+                    Button {
+                        editing = true
+                    } label: {
+                        Label("Edit Home", systemImage: "slider.horizontal.3")
                     }
+                    .buttonStyle(.tonal)
+                    .frame(maxWidth: .infinity)
+                    .accessibilityIdentifier("home.edit")
                 }
                 .padding(.vertical, Space.s3)
             }
@@ -73,42 +104,48 @@ struct HomeView: View {
 
     private func load() async {
         guard let library else { return }
-        await hubs.load { try await library.promotedHubs() }
+        let libraries = session.settings.homeRows.shownLibraries
+        await rows.load { try await HomeRows.load(from: library, libraries: libraries) }
+    }
+
+    /// Hides a row from its title's long press, with Undo in the toast.
+    private func hide(_ row: HomeRow, in arranged: [HomeRow]) {
+        guard let index = arranged.firstIndex(where: { $0.id == row.id }) else { return }
+        let session = session
+        let animation = Motion.spring(reduceMotion: reduceMotion)
+        let before = session.settings.homeRows
+        var edited = arranged
+        edited[index].shown = false
+        withAnimation(animation) { session.settings.homeRows.save(edited) }
+        toasts.show("\(row.title) hidden", undo: {
+            withAnimation(animation) { session.settings.homeRows = before }
+        })
     }
 
     /// Takes a card out of Continue Watching, or puts it back where it was, ahead of the server.
     private func setShown(_ shown: Bool, _ item: PlexMetadata, at index: Int) {
         withAnimation(Motion.spring(reduceMotion: reduceMotion)) {
-            hubs.update { hubs in
-                guard let row = hubs.firstIndex(where: Self.isContinueWatching) else { return }
-                hubs[row].items.removeAll { $0.ratingKey == item.ratingKey }
-                if shown { hubs[row].items.insert(item, at: min(index, hubs[row].items.count)) }
+            rows.update { rows in
+                guard let row = rows.firstIndex(where: \.isContinueWatching) else { return }
+                rows[row].hub.items.removeAll { $0.ratingKey == item.ratingKey }
+                if shown { rows[row].hub.items.insert(item, at: min(index, rows[row].hub.items.count)) }
             }
         }
     }
 
-    nonisolated static func isContinueWatching(_ hub: PlexHub) -> Bool {
-        hub.style == "hero" || hub.identifier == "home.continue"
+    private struct Reload: Hashable {
+        let revision: Int
+        let libraries: Set<String>
     }
-
-    /// The hubs after Continue Watching that hold films or TV, in server order, without empty ones.
-    nonisolated static func shelves(_ hubs: [PlexHub]) -> [PlexHub] {
-        hubs.compactMap { hub in
-            guard !isContinueWatching(hub), hub.type.map(videoHubTypes.contains) ?? true else { return nil }
-            var hub = hub
-            hub.items.removeAll { $0.type == .playlist || $0.type == .unknown }
-            return hub.items.isEmpty ? nil : hub
-        }
-    }
-
-    private nonisolated static let videoHubTypes: Set<String> = ["movie", "show", "season", "episode", "mixed", "clip"]
 }
 
 /// The Continue Watching row: snapping 16:9 cards. A tap resumes; a long press offers Details, Mark
 /// Watched and Remove from Continue Watching.
 private struct ContinueShelf: View {
     let hub: PlexHub
+    let title: String
     let cardWidth: CGFloat
+    let header: ShelfMenu
     let setShown: @MainActor (Bool, PlexMetadata, Int) -> Void
 
     @Environment(\.sessionActions) private var session
@@ -117,7 +154,7 @@ private struct ContinueShelf: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Space.s3) {
-            ShelfHeader(title: hub.title.isEmpty ? "Continue Watching" : hub.title)
+            ShelfHeader(title: title, menu: header)
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: Space.s3) {
                     ForEach(Array(hub.items.enumerated()), id: \.element.id) { index, item in
@@ -214,14 +251,14 @@ private struct ContinueSkeleton: View {
     }
 }
 
-private extension PlexMetadata {
+extension PlexMetadata {
     /// Wide art for a card: a show's backdrop for an episode, so a still never gives the plot away.
     var cardArtPath: String? {
         type == .episode ? (grandparentArt ?? art ?? thumb) : (art ?? thumb)
     }
 
     /// "S2 · E5 · 42 min left".
-    var continueLine: String? {
+    fileprivate var continueLine: String? {
         let parts = [episodeCode, minutesLeft.map(ItemText.left)].compactMap(\.self)
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }

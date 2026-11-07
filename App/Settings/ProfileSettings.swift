@@ -1,7 +1,7 @@
 import Foundation
 import MarqueeCore
 
-/// One Plex Home profile's playback, audio and subtitle settings (behaviour spec §1, §3, §4).
+/// One Plex Home profile's playback, audio and subtitle settings (behaviour spec §1, §3, §4) and its Home rows.
 /// Decoding fills a missing or unreadable key with its default, so settings saved by an older build load.
 struct ProfileSettings: Equatable, Sendable {
     /// Seconds for both skip directions.
@@ -20,6 +20,7 @@ struct ProfileSettings: Equatable, Sendable {
     /// Remembers the audio and subtitles picked for each show or movie, per profile and server.
     var remembersTracks = true
     var subtitleStyle = SubtitleStyle()
+    var homeRows = HomeLayout()
 
     static let skipIntervals = [5, 10, 15, 30, 60]
     static let countdowns = [3, 5, 10, 15, 30]
@@ -28,7 +29,7 @@ struct ProfileSettings: Equatable, Sendable {
 extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
         case skipInterval, introSkipDelay, nextEpisodeDelay, directPlay, aspect, readsTunerDirectly
-        case audioLanguage, subtitles, remembersTracks, subtitleStyle
+        case audioLanguage, subtitles, remembersTracks, subtitleStyle, homeRows
     }
 
     init(from decoder: any Decoder) throws {
@@ -45,6 +46,7 @@ extension ProfileSettings: Codable {
         subtitles = value(.subtitles) ?? subtitles
         remembersTracks = value(.remembersTracks) ?? remembersTracks
         subtitleStyle = value(.subtitleStyle) ?? subtitleStyle
+        homeRows = value(.homeRows) ?? homeRows
     }
 }
 

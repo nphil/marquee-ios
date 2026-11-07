@@ -290,7 +290,8 @@ The phone sign-in mechanism is not confirmed (`B:§0`), so only the screen is sp
 1. **Large title** "Home". Trailing: the profile button (the profile's photo), which opens Settings in a sheet; switching profile is the first row there [INFERENCE: a protected profile may ask for a PIN].
 2. **Continue Watching** (hidden when empty, `B:§1`): a horizontal snap shelf of 16:9 cards, about 82% of the width so the next card peeks (33% from 600 pt wide, so a landscape card and its caption stay above the floating tab bar). Under each card, never over the art: a 3 pt progress bar (accent on `trackOff`), the title (Headline) and one line such as "S2 · E5 · 42 min left" in ink2 (the remaining time is the helpful context Apple asks for, `W26-250`). Tap resumes at once. Long-press opens a menu: Details, Mark watched, Remove from Continue Watching (with Undo).
 3. **Hubs**, in server order, empty ones hidden (`B:§1`). Each is a title (Manrope SemiBold 24) with a trailing `chevron.right` (accessible name "See all …") over a poster shelf. Poster cell: 2:3 art, a 3 pt progress bar if part-watched, a one-line title (Caption). Badge on the art, top trailing: a solid canvas-coloured pill with ink text (unwatched episode count; a check for watched), never glass.
-4. Pull to refresh.
+4. **Rows are the profile's choice.** Home shows the rows of Home Rows (§8.7) in its order: by default the server's Home hubs, with Continue Watching wherever it is placed. Long-press on a row's title (or its VoiceOver actions) offers Hide This Row (a toast with Undo) and Edit Home. An Edit Home button (tonal) ends the page; with every row hidden the page is an empty state with Edit Home. Edit Home opens Home Rows in a sheet at half height, so Home above it follows each change.
+5. Pull to refresh.
 
 ### 8.2 Library
 
@@ -399,10 +400,11 @@ Settings opens from Home's profile button in a sheet with Done (§7). It is a sy
 
 1. **Account:** profile name and server name; opens the profile switcher.
 2. **Appearance:** the theme picker (below).
-3. **Video & playback** (`B:§1`): skip interval, intro skip (manual or auto, countdown), credits and auto-next delay, direct play mode (Auto, Disabled, Force; Force asks for confirmation with Cancel first), default aspect (`B:§4`); under **Live TV**, **Direct from Tuner** (on by default; off, every channel plays through Plex, docs/LIVE-TV.md §2.2).
-4. **Audio & subtitles** (`B:§1`): preferred audio language, subtitle mode, follow-dub rule, remember choices, **Subtitle style** with a live preview (`B:§3`).
-5. **Integrations:** each is off until enabled and has its own page; plugins supply data, never styling (`/data/home/lgtv/CLAUDE.md`). First entry: the optional SpeechDock address (`B:§1`).
-6. **About:** version, open-source notices. **Sign out** is destructive: a confirmation dialog that names what is removed.
+3. **Home:** Rows, reading Default or Custom, opens Home Rows: every row Home can show (the server's Home hubs, then each movie and TV library's hubs, named "Top Rated in Movies"), each with a small preview of its first posters, its first titles and a switch. The list is always in edit mode, so a row drags by its handle; VoiceOver offers Move Up and Move Down. A library's rows start off. Reset to Default restores the server's rows and order. Changes save at once for the profile, keyed by each hub's `hubIdentifier` (a library's prefixed with its uuid); a hub the server adds later shows at the end, and a library with no shown row is never asked for its hubs.
+4. **Video & playback** (`B:§1`): skip interval, intro skip (manual or auto, countdown), credits and auto-next delay, direct play mode (Auto, Disabled, Force; Force asks for confirmation with Cancel first), default aspect (`B:§4`); under **Live TV**, **Direct from Tuner** (on by default; off, every channel plays through Plex, docs/LIVE-TV.md §2.2).
+5. **Audio & subtitles** (`B:§1`): preferred audio language, subtitle mode, follow-dub rule, remember choices, **Subtitle style** with a live preview (`B:§3`).
+6. **Integrations:** each is off until enabled and has its own page; plugins supply data, never styling (`/data/home/lgtv/CLAUDE.md`). First entry: the optional SpeechDock address (`B:§1`).
+7. **About:** version, open-source notices. **Sign out** is destructive: a confirmation dialog that names what is removed.
 
 **Theme picker** (Appearance page)
 
