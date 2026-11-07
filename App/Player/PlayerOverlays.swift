@@ -173,10 +173,14 @@ private struct PlayerPillLabel: View {
     let prominent: Bool
     @Environment(\.theme) private var theme
     @Environment(\.isEnabled) private var isEnabled
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
         configuration.label
             .textRole(.headline)
+            // One line at standard sizes, where every pill fits: offered less as the offer appeared,
+            // "Skip Intro" wrapped inside the pill. Accessibility sizes may need the second line.
+            .fixedSize(horizontal: !typeSize.isAccessibilitySize, vertical: false)
             .foregroundStyle(prominent ? theme.accentInk : theme.ink)
             .padding(.horizontal, Space.s5)
             .frame(minHeight: 56)
