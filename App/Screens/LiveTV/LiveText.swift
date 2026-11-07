@@ -131,11 +131,12 @@ enum LiveText {
         }
     }
 
-    /// "Record Episode", "Record Series" or "Record Movie" (template types 4, 2 and 1).
+    /// "Record This Airing", "Record All Episodes" or "Record Movie" (template types 4, 2 and 1); a
+    /// whole-show rule over sports reads "Record All Events", as Plex names it.
     static func recordTitle(_ option: RecordOption) -> String {
         switch option.kind {
-        case .episode?: "Record Episode"
-        case .show?: "Record Series"
+        case .episode?: "Record This Airing"
+        case .show?: option.title.localizedCaseInsensitiveContains("event") ? "Record All Events" : "Record All Episodes"
         case .movie?: "Record Movie"
         case nil: "Record \(option.title)"
         }

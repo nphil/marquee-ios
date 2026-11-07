@@ -132,6 +132,11 @@ private struct ScheduledList: View {
             presenting: stopping
         ) { recording in
             Button("Stop Recording", role: .destructive) { unschedule(recording) }
+            if store.offersSeriesDeletion(recording) {
+                Button("Stop and Delete the Series Rule", role: .destructive) { unschedule(recording, deletingSeries: true) }
+            }
+        } message: { _ in
+            Text("The tuner is freed at once.")
         }
     }
 
@@ -156,11 +161,11 @@ private struct ScheduledList: View {
         }
     }
 
-    private func unschedule(_ recording: ScheduledRecording) {
+    private func unschedule(_ recording: ScheduledRecording, deletingSeries: Bool = false) {
         withAnimation { _ = hidden.insert(recording.id) }
         Task {
             do {
-                try await store.unschedule(recording)
+                try await store.unschedule(recording, deletingSeries: deletingSeries)
                 Haptics.success()
                 toasts.show("\(recording.title) won't record")
             } catch {

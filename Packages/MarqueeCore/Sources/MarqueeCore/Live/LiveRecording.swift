@@ -41,6 +41,25 @@ public struct RecordOption: Identifiable, Hashable, Sendable {
     public func setting(_ id: String) -> RecordSetting? {
         settings.first { $0.id == id }
     }
+
+    /// The template's hidden `oneShot` setting, which makes a rule take one airing and no more.
+    public var isOneShot: Bool {
+        ["true", "1"].contains(setting("oneShot")?.value ?? "")
+    }
+}
+
+extension Array where Element == RecordOption {
+    /// What a plain Record takes: this airing, or the movie. Never the whole show: a rule for one
+    /// would book every airing, on every channel, until it is deleted. A programme whose template
+    /// offers only a whole-show rule (sports events can) has no default.
+    public var defaultOption: RecordOption? {
+        first { $0.kind == .episode } ?? first { $0.kind == .movie } ?? first { $0.kind == nil && $0.isOneShot }
+    }
+
+    /// The whole-show rule, which only an explicit choice creates.
+    public var wholeShow: RecordOption? {
+        first { $0.kind == .show }
+    }
 }
 
 /// A recording preference: `startOffsetMinutes`, `onlyNewAirings`, `minVideoQuality` and the rest.
@@ -187,6 +206,13 @@ public struct ScheduledRecording: Identifiable, Hashable, Sendable {
     /// "S2 E5", as the guide writes it.
     public var episodeCode: String? { LiveAiring.episodeCode(season: season, episode: episode) }
 
+    /// Why a channel failed to tune while this airing records: "Recording College Football on 17.1 is
+    /// using the tuner".
+    public var tunerHeldSentence: String {
+        let channel = channelNumber.map { " on \($0)" } ?? ""
+        return "Recording \(title)\(channel) is using the tuner"
+    }
+
     public func covers(_ airing: LiveAiring) -> Bool {
         guard let channelKey else { return false }
         return channelKey == airing.channelKey && abs(start.timeIntervalSince(airing.start)) < 60
@@ -236,5 +262,33 @@ public struct LiveRecordings: Sendable, Hashable {
 
     public func rule(_ id: String?) -> RecordingRule? {
         rules.first { $0.id == id }
+    }
+
+    /// The airings of `rule` that are recording now.
+    public func running(under rule: RecordingRule) -> [ScheduledRecording] {
+        scheduled.filter { $0.ruleID == rule.id && $0.status == .inprogress }
+    }
+
+    /// The rule to delete along with a stopped airing: a one-off rule always goes, since its airing
+    /// would come back when the server restarts; a series rule only when `deletingSeries` says so.
+    public func rule(deletedWhenStopping recording: ScheduledRecording, deletingSeries: Bool) -> RecordingRule? {
+        guard let rule = rule(recording.ruleID) else { return nil }
+        return rule.isSeries && !deletingSeries ? nil : rule
+    }
+
+    /// The recording that holds a tuner `channel` needs: every tuner of its device taken by airings
+    /// recording now, none of them on `channel` itself (Plex shares a tuner among viewers of one
+    /// channel). The earliest started comes first.
+    public func holdingTuner(for channel: LiveChannel, dvr: LiveDVR?) -> ScheduledRecording? {
+        let device = channel.device
+        let busy = scheduled
+            .filter { recording in
+                guard recording.status == .inprogress else { return false }
+                guard let key = recording.channelKey, let dvr else { return true }
+                return dvr.device(device, carries: key)
+            }
+            .sorted { $0.start < $1.start }
+        guard busy.count >= device.tunerCount, !busy.contains(where: { $0.channelKey == channel.id }) else { return nil }
+        return busy.first
     }
 }

@@ -154,13 +154,23 @@ public struct PlexLiveTV: Sendable {
         try await get(WireGrabList.self, "/media/subscriptions/scheduled").recordings.sorted { $0.start < $1.start }
     }
 
-    /// Skips one airing. The server forgets the skip when it restarts.
+    /// Skips one airing, or stops it when it is recording: the grab operation is deleted. The server
+    /// forgets the skip when it restarts.
     public func cancel(_ recording: ScheduledRecording) async throws {
         _ = try await library.send(.delete, "/media/grabbers/operations/\(PlexURL.encode(recording.id))", [], headers: [:])
     }
 
-    /// Deletes a rule and its scheduled airings.
-    public func delete(_ rule: RecordingRule) async throws {
+    /// Stops an airing that is recording and, with `rule`, deletes its rule. The grab goes first:
+    /// deleting it frees the tuner in about 0.5 s, and deleting a rule does not end a grab under way.
+    public func stop(_ recording: ScheduledRecording, deleting rule: RecordingRule? = nil) async throws {
+        try await cancel(recording)
+        if let rule { try await delete(rule) }
+    }
+
+    /// Deletes a rule and its scheduled airings. `running` are the rule's airings recording now; they
+    /// are stopped first.
+    public func delete(_ rule: RecordingRule, stopping running: [ScheduledRecording] = []) async throws {
+        for recording in running { try await cancel(recording) }
         _ = try await library.send(.delete, "/media/subscriptions/\(PlexURL.encode(rule.id))", [], headers: [:])
     }
 

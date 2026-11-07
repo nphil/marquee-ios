@@ -412,11 +412,11 @@ While surfing a card (`Radius.card`, `glassRaised` over `scrim`) follows the fin
 ### 6.9 Quick Guide and programme sheet
 
 - **Quick Guide:** swipe up or the guide button opens a panel (`Radius.sheet`, opaque `sheet`, M DESIGN.md:150): the trailing side, up to 420 pt, with the phone on its side; the lower 60 % upright. The picture moves clear of it and keeps playing; the controls step aside until it closes. First row: the last 3 channels. Below: the §6.4 rows. A tap changes channel and closes the panel.
-- **Programme sheet:** art, title, "S2 E5 · Episode title", "Tonight 8:00–8:30 PM · 2.1 WXXX", summary, badges (NEW, HD). Actions: Watch (on now), Record Episode, Record Series or Record Movie (template types 4, 2, 1), Options (start and end padding, new episodes only). Recording actions are hidden for users who cannot record (Home members, servers without Plex Pass).
+- **Programme sheet:** art, title, "S2 E5 · Episode title", "Tonight 8:00–8:30 PM · 2.1 WXXX", summary, badges (NEW, HD). Actions: Watch (on now), Record This Airing (or Record Movie; template types 4, 1) and Record All Episodes (type 2, "All Events" for sports), Options (start and end padding, new episodes only). Record, in the sheet and the guide's menu, takes this airing or the movie and never the whole show: a whole-show rule books every airing on every channel, so it is a separate tonal button that asks first, and a programme whose template offers only that rule (sports events) has no default and opens the sheet. Stop Recording deletes the airing's grab operation (`DELETE /media/grabbers/operations/{id}`, which frees the tuner in about 0.5 s; deleting a rule does not end a grab under way) and then a one-off rule; under a series rule the confirmation offers to delete the rule too. Recording actions are hidden for users who cannot record (Home members, servers without Plex Pass).
 
 ### 6.10 Recordings
 
-Recordings (header button) has Scheduled | Recorded. Scheduled lists upcoming airings by day from `/media/subscriptions/scheduled`, swipe to cancel one, with series rules at the top (edit, delete). Recorded lists the newest items in the DVR's target library sections; they are ordinary library items and play in the normal player.
+Recordings (header button) has Scheduled | Recorded. Scheduled lists upcoming airings by day from `/media/subscriptions/scheduled`, swipe to cancel one, with series rules at the top (edit, delete; deleting a rule stops its running airings first). Recorded lists the newest items in the DVR's target library sections; they are ordinary library items and play in the normal player.
 
 | State | Glyph | Role |
 |---|---|---|

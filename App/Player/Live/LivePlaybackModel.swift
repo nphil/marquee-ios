@@ -18,6 +18,10 @@ final class LivePlaybackModel: Identifiable {
     private(set) var isStopped = false
     private(set) var chromeVisible = true
     private(set) var showsGuide = false
+    /// The recording that has taken the tuner the failed channel needs.
+    private(set) var tunerHolder: ScheduledRecording?
+    private(set) var isStoppingHolder = false
+    private(set) var holderProblem: String?
     var fillsScreen = false
     var showsDiagnostics = false
     /// VoiceOver or Switch Control is on: the controls stay up.
@@ -26,6 +30,7 @@ final class LivePlaybackModel: Identifiable {
     @ObservationIgnored private let audio = AudioSession()
     @ObservationIgnored private var surfCommit: Task<Void, Never>?
     @ObservationIgnored private var chromeTimer: Task<Void, Never>?
+    @ObservationIgnored private var holderCheck: Task<Void, Never>?
     @ObservationIgnored private var started = false
     @ObservationIgnored private var closed = false
     /// A call stopped the stream; it comes back when the call ends.
@@ -76,6 +81,7 @@ final class LivePlaybackModel: Identifiable {
     func close() {
         guard !closed else { return }
         closed = true
+        holderCheck?.cancel()
         surfCommit?.cancel()
         chromeTimer?.cancel()
         source.stop()
@@ -205,6 +211,49 @@ final class LivePlaybackModel: Identifiable {
     /// The picture came, went or stopped.
     func stateChanged() {
         if state == .playing { scheduleHide() } else { showChrome() }
+        if case .failed(let error) = state, error != .protectedChannel {
+            findHolder()
+        } else if !isStoppingHolder {
+            holderCheck?.cancel()
+            tunerHolder = nil
+        }
+    }
+
+    // MARK: Recording holds the tuner
+
+    /// Asks the server which recording, if any, has the tuner the failed channel needs.
+    private func findHolder() {
+        holderCheck?.cancel()
+        let failed = channel
+        holderCheck = Task { [weak self] in
+            guard let self else { return }
+            let holder = await store.tunerHolder(for: failed)
+            guard !Task.isCancelled, case .failed = state, channel.id == failed.id else { return }
+            tunerHolder = holder
+            holderProblem = nil
+        }
+    }
+
+    /// Stops the recording holding the tuner, and the series rule too when asked, then tunes again once
+    /// the server has let go (deleting the grab frees the tuner in about 0.5 s).
+    func stopHolder(deletingSeries: Bool) {
+        guard let recording = tunerHolder, !isStoppingHolder else { return }
+        isStoppingHolder = true
+        holderProblem = nil
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                try await store.unschedule(recording, deletingSeries: deletingSeries)
+                try? await Task.sleep(for: .milliseconds(700))
+                tunerHolder = nil
+                isStoppingHolder = false
+                guard !closed else { return }
+                tune(channel)
+            } catch {
+                holderProblem = LiveText.recordingProblem(error, server: store.serverName)
+                isStoppingHolder = false
+            }
+        }
     }
 
     /// The controls stay while nothing plays, while surfing or the guide is open, and for VoiceOver.

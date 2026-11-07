@@ -291,7 +291,11 @@ private struct LiveChrome: View {
     @ViewBuilder
     private var centre: some View {
         if case .failed(let error) = model.state, model.surfing == nil {
-            FailureCard(message: error.description, close: close, retry: model.retry)
+            if let holder = model.tunerHolder {
+                TunerHeldCard(model: model, recording: holder, close: close)
+            } else {
+                FailureCard(message: error.description, close: close, retry: model.retry)
+            }
         } else {
             HStack(spacing: Space.s6) {
                 surfButton(by: -1)

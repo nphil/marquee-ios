@@ -289,3 +289,107 @@ struct LiveGuideTests {
         #expect(afterTheGuide == nil)
     }
 }
+
+// MARK: - Record and stop
+
+struct RecordingChoiceTests {
+    static func option(_ kind: RecordOption.Kind, oneShot: Bool? = nil) -> RecordOption {
+        RecordOption(
+            type: kind.rawValue, title: "\(kind)",
+            settings: oneShot.map { [RecordSetting(id: "oneShot", label: "", type: "bool", value: $0 ? "true" : "false", isHidden: true)] } ?? []
+        )
+    }
+
+    @Test func plainRecordTakesThisEpisodeWhateverTheOrder() async throws {
+        let (live, _) = LiveTVTests.live()
+        let airing = LiveAiring(id: "901", channelKey: "aaa-0201", guid: "plex://episode/news12", title: "Evening News", start: LiveTVTests.at(0), end: LiveTVTests.at(30))
+
+        let options = try await live.recordOptions(airing)
+
+        #expect(options.defaultOption?.kind == .episode)
+        #expect(Array(options.reversed()).defaultOption?.kind == .episode)
+        #expect(options.wholeShow?.kind == .show)
+    }
+
+    @Test func aMovieIsTheDefaultWhenNoEpisodeIsOffered() {
+        #expect([Self.option(.show), Self.option(.movie)].defaultOption?.kind == .movie)
+    }
+
+    @Test func aProgrammeOfferedOnlyAsAWholeShowHasNoDefault() {
+        let events = [Self.option(.show, oneShot: false)]
+
+        #expect(events.defaultOption == nil)
+        #expect(events.wholeShow?.kind == .show)
+    }
+
+    @Test func anUnknownTypeIsTheDefaultOnlyWhenItIsAOneShot() {
+        let other = RecordOption(type: 9, title: "This Event", settings: [RecordSetting(id: "oneShot", label: "", type: "bool", value: "true", isHidden: true)])
+
+        #expect([Self.option(.show), other].defaultOption == other)
+        #expect([RecordOption(type: 9, title: "All Events")].defaultOption == nil)
+    }
+}
+
+struct StopRecordingTests {
+    static func recordings(_ live: PlexLiveTV) async throws -> LiveRecordings {
+        LiveRecordings(rules: try await live.rules(), scheduled: try await live.scheduled())
+    }
+
+    @Test func stoppingDeletesTheGrabAndKeepsASeriesRuleUnlessAsked() async throws {
+        let (live, transport) = LiveTVTests.live()
+        let recordings = try await Self.recordings(live)
+        let running = try #require(recordings.scheduled.first { $0.status == .inprogress })
+
+        try await live.stop(running, deleting: recordings.rule(deletedWhenStopping: running, deletingSeries: false))
+
+        let sent = await transport.requests.filter { $0.method == .delete }.map(\.url.path)
+        #expect(sent == ["/media/grabbers/operations/grab-1"])
+    }
+
+    @Test func stoppingAndDeletingTheSeriesEndsTheGrabBeforeTheRule() async throws {
+        let (live, transport) = LiveTVTests.live()
+        let recordings = try await Self.recordings(live)
+        let running = try #require(recordings.scheduled.first { $0.status == .inprogress })
+
+        try await live.stop(running, deleting: recordings.rule(deletedWhenStopping: running, deletingSeries: true))
+
+        let sent = await transport.requests.filter { $0.method == .delete }.map(\.url.path)
+        #expect(sent == ["/media/grabbers/operations/grab-1", "/media/subscriptions/31"])
+    }
+
+    @Test func aOneOffRuleGoesWithItsStoppedAiring() {
+        let rule = RecordingRule(id: "7", type: RecordOption.Kind.episode.rawValue, title: "Game")
+        let grab = ScheduledRecording(id: "g", ruleID: "7", status: .inprogress, title: "Game", start: LiveTVTests.at(0), end: LiveTVTests.at(30))
+        let recordings = LiveRecordings(rules: [rule], scheduled: [grab])
+
+        #expect(recordings.rule(deletedWhenStopping: grab, deletingSeries: false) == rule)
+    }
+
+    @Test func deletingARuleEndsItsRunningAiringsFirst() async throws {
+        let (live, transport) = LiveTVTests.live()
+        let recordings = try await Self.recordings(live)
+        let rule = try #require(recordings.rules.first)
+
+        try await live.delete(rule, stopping: recordings.running(under: rule))
+
+        let sent = await transport.requests.filter { $0.method == .delete }.map(\.url.path)
+        #expect(sent == ["/media/grabbers/operations/grab-1", "/media/subscriptions/31"])
+    }
+
+    @Test func aRecordingHoldsTheTunerOnlyWhenItTakesTheLastOne() {
+        let other = LiveChannel(id: "aaa-0701", dvrKey: "12", number: "7.1", callSign: "WGGG", title: "G", logo: nil, isHD: true, device: RouteCase.luma)
+        var dvr = RouteCase.dvr
+        dvr.mappings.append(LiveChannelMapping(channelKey: "aaa-0701", deviceKey: "21", number: "7.1", isEnabled: true))
+        let grab = ScheduledRecording(id: "g", status: .inprogress, channelKey: "aaa-0701", channelNumber: "7.1", title: "College Football", start: LiveTVTests.at(-10), end: LiveTVTests.at(50))
+        let later = ScheduledRecording(id: "h", status: .scheduled, channelKey: "aaa-0701", title: "College Football", start: LiveTVTests.at(60), end: LiveTVTests.at(90))
+
+        #expect(grab.tunerHeldSentence == "Recording College Football on 7.1 is using the tuner")
+        #expect(LiveRecordings(scheduled: [grab]).holdingTuner(for: RouteCase.channel, dvr: dvr) == grab)
+        #expect(LiveRecordings(scheduled: [later]).holdingTuner(for: RouteCase.channel, dvr: dvr) == nil)
+        // Plex shares a recording's tuner with a viewer of the same channel.
+        #expect(LiveRecordings(scheduled: [grab]).holdingTuner(for: other, dvr: dvr) == nil)
+        var twoTuners = RouteCase.channel
+        twoTuners.device.tunerCount = 2
+        #expect(LiveRecordings(scheduled: [grab]).holdingTuner(for: twoTuners, dvr: dvr) == nil)
+    }
+}

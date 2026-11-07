@@ -280,13 +280,13 @@ private struct LiveGuideScreen: View {
         )
     }
 
-    /// Record from the guide's menu takes this episode, or the movie, with the server's settings. A
-    /// programme offered only as a whole show opens its sheet to choose.
+    /// Record from the guide's menu takes this airing, or the movie, with the server's settings; never a
+    /// whole-show rule. A programme offered only as a whole show opens its sheet to choose.
     private func quickRecord(_ airing: LiveAiring, _ channel: LiveChannel) {
         Task {
             do {
                 let options = try await store.recordOptions(for: airing)
-                guard let option = options.first(where: { $0.kind == .episode }) ?? options.first(where: { $0.kind == .movie }) else {
+                guard let option = options.defaultOption else {
                     details = ProgrammeSelection(airing: airing, channel: channel)
                     return
                 }

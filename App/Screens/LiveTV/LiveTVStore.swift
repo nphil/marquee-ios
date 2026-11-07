@@ -272,8 +272,10 @@ final class LiveTVStore {
         await loadRecordings()
     }
 
+    /// Deletes the rule, ending the airings it is recording first: deleting a rule alone leaves a grab
+    /// under way holding its tuner.
     func delete(_ rule: RecordingRule) async throws {
-        try await live.delete(rule)
+        try await live.delete(rule, stopping: recordings.running(under: rule))
         await loadRecordings()
     }
 
@@ -282,23 +284,38 @@ final class LiveTVStore {
         await loadRecordings()
     }
 
-    /// Takes `airing` off the schedule.
-    func unschedule(_ airing: LiveAiring) async throws {
+    /// Takes `airing` off the schedule, or stops it when it is recording.
+    func unschedule(_ airing: LiveAiring, deletingSeries: Bool = false) async throws {
         guard let recording = recordings.recording(of: airing) else { return }
-        try await unschedule(recording)
+        try await unschedule(recording, deletingSeries: deletingSeries)
     }
 
-    /// A one-off rule is deleted, since a skipped airing comes back when the server restarts; under a
-    /// series the airing alone is skipped; an airing under way stops.
-    func unschedule(_ recording: ScheduledRecording) async throws {
-        if recording.status != .inprogress, let rule = recordings.rule(recording.ruleID), !rule.isSeries {
+    /// An airing under way stops: its grab is deleted, which frees the tuner, and so is a one-off
+    /// rule, or a series rule when `deletingSeries`. An upcoming airing of a one-off rule deletes the
+    /// rule, since a skipped airing comes back when the server restarts; under a series the airing
+    /// alone is skipped.
+    func unschedule(_ recording: ScheduledRecording, deletingSeries: Bool = false) async throws {
+        if recording.status == .inprogress {
+            try await live.stop(recording, deleting: recordings.rule(deletedWhenStopping: recording, deletingSeries: deletingSeries))
+            await loadRecordings()
+        } else if let rule = recordings.rule(recording.ruleID), !rule.isSeries {
             try await delete(rule)
         } else {
             try await cancel(recording)
         }
     }
 
-    /// The series rules, by title.
+    /// Whether stopping `recording` can also delete a series rule, which the stop confirmation offers.
+    func offersSeriesDeletion(_ recording: ScheduledRecording) -> Bool {
+        recording.status == .inprogress && recordings.rule(recording.ruleID)?.isSeries == true
+    }
+
+    /// The recording that has taken the tuner `channel` needs, read fresh from the server.
+    func tunerHolder(for channel: LiveChannel) async -> ScheduledRecording? {
+        await loadRecordings()
+        return recordings.holdingTuner(for: channel, dvr: dvr)
+    }
+
     var seriesRules: [RecordingRule] {
         recordings.rules.filter(\.isSeries).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
