@@ -180,11 +180,12 @@ extension XCTestCase {
         let stop = element("liveplayer.stop", in: app)
         // Stop shows once the channel plays and fades with the controls 3 s later. At accessibility sizes
         // turning the screen took most of that window (Stop on screen 16.8-19.0 s, first check at 19.4 s),
-        // so a missed Stop is raised again with a tap on the picture.
+        // so a missed Stop is raised again with a tap on the picture. A wait's first check lands about 1 s
+        // in, so Stop found on the first wait is not waited for again: by then it had faded.
         if !stop.waitForExistence(timeout: 10) {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+            XCTAssertTrue(stop.waitForExistence(timeout: 5), "Channel 2.1 did not play")
         }
-        XCTAssertTrue(stop.waitForExistence(timeout: 5), "Channel 2.1 did not play")
         try snap("livetv-13-player-\(suffix)")
 
         raiseLiveControls(in: app)
