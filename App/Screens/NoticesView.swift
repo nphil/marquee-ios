@@ -79,7 +79,7 @@ private struct Notice: Identifiable {
         Notice(id: "videoengine", name: "stashy-videoengine", licence: "MIT", files: ["Licences/engine/stashy-videoengine/LICENSE"]),
     ]
 
-    /// FFmpeg's own account of the build that is linked in, e.g. "FFmpeg n8.1.3, LGPL version 2.1 or later".
+    /// FFmpeg's own account of the build that is linked in, e.g. "FFmpeg n9.0.2, LGPL version 2.1 or later".
     static var ffmpegBuild: String {
         "FFmpeg \(String(cString: av_version_info())), \(String(cString: avutil_license()))"
     }

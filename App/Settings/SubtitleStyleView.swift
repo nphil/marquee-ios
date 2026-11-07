@@ -85,11 +85,21 @@ private struct SubtitlePreview: View {
 }
 
 /// One subtitle line in a style. The text height is a share of the picture's, as on a TV, so it
-/// does not follow the iPhone's text size.
+/// does not follow the iPhone's text size. The player passes cue text with its italics and bold.
 struct SubtitleLine: View {
-    let text: String
+    let text: AttributedString
     let style: SubtitleStyle
     let pictureHeight: CGFloat
+
+    init(text: AttributedString, style: SubtitleStyle, pictureHeight: CGFloat) {
+        self.text = text
+        self.style = style
+        self.pictureHeight = pictureHeight
+    }
+
+    init(text: String, style: SubtitleStyle, pictureHeight: CGFloat) {
+        self.init(text: AttributedString(text), style: style, pictureHeight: pictureHeight)
+    }
 
     var body: some View {
         let size = pictureHeight * CGFloat(style.size.heightFraction)

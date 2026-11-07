@@ -17,6 +17,9 @@ settings:
 packages:
   MarqueeCore:
     path: Packages/MarqueeCore
+  VideoEngine:
+    url: https://github.com/nphil/stashy-videoengine.git
+    exactVersion: 2.0.0
 
 targets:
   Marquee:
@@ -39,6 +42,8 @@ targets:
         buildPhase: resources
     dependencies:
       - package: MarqueeCore
+      - package: VideoEngine
+        product: VideoEngine
     info:
       path: App/Info.plist
       properties:

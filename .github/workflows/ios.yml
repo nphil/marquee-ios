@@ -67,6 +67,23 @@ jobs:
           brew install xcodegen
           xcodegen generate
 
+      # The video engine brings six FFmpeg xcframework zips from a GitHub release, and that download
+      # times out often enough (Stashy, 2026-08-10: all six at once) that one failure is retried
+      # before the run counts as red. Every later xcodebuild reads the same checkout.
+      - name: Resolve Swift packages
+        run: |
+          for attempt in 1 2 3; do
+            if xcodebuild -resolvePackageDependencies \
+                 -project Marquee.xcodeproj \
+                 -scheme Marquee \
+                 -clonedSourcePackagesDirPath build/SourcePackages; then
+              exit 0
+            fi
+            echo "Package resolution failed (attempt $attempt of 3)."
+            sleep $((attempt * 20))
+          done
+          exit 1
+
       - name: Build for iPhone (unsigned)
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -78,6 +95,7 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build/DD \
+            -clonedSourcePackagesDirPath build/SourcePackages \
             MARKETING_VERSION="$VERSION" \
             CURRENT_PROJECT_VERSION="$VERSION" \
             CODE_SIGNING_ALLOWED=NO \
@@ -154,6 +172,7 @@ jobs:
             -scheme Marquee \
             -destination "id=$UDID" \
             -derivedDataPath build/DD-sim \
+            -clonedSourcePackagesDirPath build/SourcePackages \
             -resultBundlePath build/UITests.xcresult \
             -skip-testing:MarqueeUITests/ScreenshotTests/testAccessibilitySettings \
             -skip-testing:MarqueeUITests/AccountAccessibilityScreenshots \
@@ -180,6 +199,7 @@ jobs:
             -scheme Marquee \
             -destination "id=$UDID" \
             -derivedDataPath build/DD-sim \
+            -clonedSourcePackagesDirPath build/SourcePackages \
             -resultBundlePath build/UITests-accessibility.xcresult \
             -only-testing:MarqueeUITests/ScreenshotTests/testAccessibilitySettings \
             -only-testing:MarqueeUITests/AccountAccessibilityScreenshots \

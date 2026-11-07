@@ -7,6 +7,8 @@ import QuartzCore
 enum Haptics {
     private static let selectionGenerator = UISelectionFeedbackGenerator()
     private static let notificationGenerator = UINotificationFeedbackGenerator()
+    private static let lightGenerator = UIImpactFeedbackGenerator(style: .light)
+    private static let mediumGenerator = UIImpactFeedbackGenerator(style: .medium)
     private static var lastTick: CFTimeInterval = 0
 
     /// The picker-style tick for choosing among discrete options (theme tiles, scrub frames, A–Z).
@@ -28,5 +30,12 @@ enum Haptics {
     static func error() {
         notificationGenerator.notificationOccurred(.error)
         notificationGenerator.prepare()
+    }
+
+    /// Medium for play and pause; light for skips and track picks.
+    static func impact(_ style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        let generator = style == .medium ? mediumGenerator : lightGenerator
+        generator.impactOccurred()
+        generator.prepare()
     }
 }
