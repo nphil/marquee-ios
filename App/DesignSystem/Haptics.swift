@@ -6,6 +6,7 @@ import QuartzCore
 @MainActor
 enum Haptics {
     private static let selectionGenerator = UISelectionFeedbackGenerator()
+    private static let notificationGenerator = UINotificationFeedbackGenerator()
     private static var lastTick: CFTimeInterval = 0
 
     /// The picker-style tick for choosing among discrete options (theme tiles, scrub frames, A–Z).
@@ -15,5 +16,17 @@ enum Haptics {
         lastTick = now
         selectionGenerator.selectionChanged()
         selectionGenerator.prepare()
+    }
+
+    /// The server confirmed a change. Never before the confirmation.
+    static func success() {
+        notificationGenerator.notificationOccurred(.success)
+        notificationGenerator.prepare()
+    }
+
+    /// A change failed and was rolled back, or an entry was refused.
+    static func error() {
+        notificationGenerator.notificationOccurred(.error)
+        notificationGenerator.prepare()
     }
 }
