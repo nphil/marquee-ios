@@ -95,7 +95,7 @@ Timing: tune to the first `playing` timeline 2.3-3.4 s (median 2.95 s); `stopped
 5. The lineup says a codec the phone cannot decode (`VideoCodec` not MPEG2/H264/HEVC, or `AudioCodec` not AC3/EAC3/AAC/MPEG) → Plex. LumaTuner sends no codec fields today (T docs.rs:103-111; R3), so absence means "try direct".
 6. The lineup marks the channel `DRM=1` → show "Protected channel" (neither path can play it) [INFERENCE for Plex].
 7. A Plex recording uses this device now, or starts on it within 2 min and the device has fewer tuners than recordings plus one → Plex.
-8. Otherwise → Direct. If Direct fails before the first picture with a network error or no data for 5 s, the app retries once through Plex and says so in the status line. Tuner refusals do not fall back (§2.3).
+8. Otherwise → Direct. If Direct fails before the first picture with a network error, no data for 5 s, or a stream the phone cannot decode, the app retries once through Plex and says so in the status line. Tuner refusals do not fall back (§2.3).
 
 ### 2.3 One-tuner rules (LumaTuner)
 
@@ -212,24 +212,29 @@ public struct LiveClockServo { public mutating func rate(buffered: Double, targe
 
 // Packages/MarqueeLive — depends on the engine's FFmpeg product
 @MainActor public final class LiveStreamPlayer {
-    public let displayLayer: AVSampleBufferDisplayLayer
-    public private(set) var state: LiveState       // idle, opening, slate, picture, playing, stalled, failed(LiveError)
-    public var cues: AsyncStream<TextCue>
+    public let view: LiveVideoView                     // backed by the AVSampleBufferDisplayLayer
+    public private(set) var state: State               // idle, opening, slate, picture, playing, stalled, failed(Failure)
+    public var onStateChange: ((State) -> Void)?
     public private(set) var audioTracks: [LiveAudioTrack]
-    public func open(_ url: URL)
-    public func change(to url: URL)                 // takeover order, warm decoders
-    public func select(_ track: LiveAudioTrack)
+    public private(set) var diagnostics: LiveDiagnostics
+    public private(set) var pictureInPicture: LivePictureInPicture?
+    public func open(_ url: URL)                       // while another plays: a change, in takeover order
+    public func play(_ ring: ByteRing)                 // bytes the caller writes: tests and screenshots
     public func close()
-    public var diagnostics: LiveDiagnostics { get }
+    public func resume()
 }
+// L7 adds caption cues and audio track selection.
 
 // App — the player talks only to this
 @MainActor public protocol LiveSource: AnyObject {
     var state: LiveState { get }
+    var status: String? { get }
+    var diagnosticsLine: String? { get }
     func play(_ channel: LiveChannel) async
     func stop()
 }
-// DirectLiveSource wraps LiveStreamPlayer; PlexLiveSource wraps tune + decision + PB VideoBackend.
+// LiveRouter decides each tune (§2.2) and plays it through DirectLiveSource (LiveStreamPlayer) or
+// PlexLiveSource (tune + decision + PB VideoBackend).
 ```
 
 `MarqueeLive` is a separate local package so `MarqueeCore` stays free of FFmpeg and its unit tests stay fast.
@@ -238,17 +243,21 @@ public struct LiveClockServo { public mutating func rate(buffered: Double, targe
 
 ### 4.1 Budget
 
-Direct path on LumaTuner; targets are from tap.
+Direct path on LumaTuner; targets are from tap, measured times from the request.
 
-| Step | Target p50 / p90 | Basis |
-|---|---|---|
-| Request on the wire | 30 / 50 ms | Channel, URL and route are decided while the guide is on screen |
-| First picture (slate) | 0.30 / 0.50 s | The tuner sends its slate at once (T live-tv-tuner.md:22) with an intra picture every 0.5 s (T tuner-slates.md:41-43); an SD intra picture decodes in milliseconds [INFERENCE until L0] |
-| Station picture | Tuner delivery + at most 0.15 s | The TV routes about 0.7 s after the request; the first picture packet comes 0.1-0.7 s after routing, the first whole picture up to 3.0 s (T stream.rs:258-267); first byte median 1.81 s, 0.93-4.27 s (T capture.md:111) |
-| Motion and sound | Still + 0.5-1.0 s [INFERENCE] | §3.2 step 8 |
-| Channel change to slate | 0.35 / 0.60 s | Same-client takeover plus slate |
-| Never-seen channel | Slate held up to 4 s | `shape_wait` (T stream.rs:264-268); R4 removes it |
-| Plex path, for comparison | 2.95 s to playing; change 2.9-3.1 s | O |
+| Step | Target p50 / p90 | Measured (O) | Basis |
+|---|---|---|---|
+| Request on the wire | 30 / 50 ms | The tuner answers in 0.04-0.11 s; first byte 0.07-0.16 s (34.4: 1.79 s) | Channel, URL and route are decided while the guide is on screen |
+| First picture (slate) | 0.30 / 0.50 s | 0.61-0.79 s on 10 channels; R7 would make it about 0.2 s | The tuner sends its slate at once (T live-tv-tuner.md:22) with an intra picture every 0.5 s (T tuner-slates.md:41-43); an SD intra picture decodes in milliseconds [INFERENCE until L0] |
+| Station picture | Tuner delivery + at most 0.15 s | 1.53-5.31 s on 10 channels; 2.36-2.86 s live on 2.1 | The TV routes about 0.7 s after the request; the first picture packet comes 0.1-0.7 s after routing, the first whole picture up to 3.0 s (T stream.rs:258-267); first byte median 1.81 s, 0.93-4.27 s (T capture.md:111) |
+| Motion and sound | Still + 0.5-1.0 s [INFERENCE] | Still + 0.21-1.22 s | §3.2 step 8 |
+| Channel change to slate | 0.35 / 0.60 s | 0.98-1.10 s: the tuner ends the old stream 0.27-0.37 s after the new request and answers it in 0.32-0.41 s | Same-client takeover plus slate |
+| Never-seen channel | Slate held up to 4 s | 30.1: slate at 3.35 s, no station within 20 s | `shape_wait` (T stream.rs:264-268); R4 removes it |
+| Plex path, for comparison | 2.95 s to playing; change 2.9-3.1 s | | O |
+
+The measured column is LiveEngine on BeastNAS (Linux) with a clock-only output in place of the phone's layers, on the live tuner and on its captures replayed at their recorded arrival times; the phone's own numbers are L4b's receipt. Station picture and playing per channel: 2.1 2.60 / 3.67 s, 5.1 1.92 / 2.81, 11.11 3.65 / 4.28 (1080i), 46.1 2.10 / 3.32 (1080i), 34.4 2.40 / 2.61 (H.264 640×480i, no slate), 2.2 3.60 / 4.56, 36.1 3.16 / 3.95, 69.1 5.31 / 6.12 (1080i), 17.1 2.47 / 3.62, 63.1 1.53 / 2.52. Live change 2.1 → 5.1: connected 0.39 s, slate 1.04 s, picture 3.54 s, playing 4.67 s, no drops.
+
+Soak, 30 min live on 2.1 (MPEG-2 1280×720p, AC-3 5.1 mixed to stereo): no underruns or re-anchors, J held at 0.30 s, buffer 0.29-0.37 s, rate 1.000-1.001, 29 of 107,011 pictures dropped (0.03 %), resident memory 56 MB after the first minute, 60 MB at most, 38 MB at the end.
 
 ### 4.2 Work done in parallel
 
@@ -286,10 +295,11 @@ The app works without any of these; each makes it faster or clearer.
 - **R4 No shape wait for clients that cope.** A query flag (for example `?slate=now`) that sends the fallback-shape slate at once for a never-seen channel. The 4 s hold exists because Plex's transcoder restarts on a size change (T stream.rs:264-267); the phone rebuilds its filter graph instead.
 - **R5 Holder in refusals.** Name the holder in a refusal (for example `X-LumaTuner-Holder: plex|tv|<address>`), so the app can say "Plex is recording 7.1".
 - **R6 Recordings first** (policy for Nitin). Let the Plex server's request take the tuner from another client, ending that stream with the last slate (T stream.rs:279-280). The app's guard covers the phone; this covers every client.
+- **R7 Slate PES length.** Set `PES_packet_length` on the slate's video PES packets. With 0 (unbounded), FFmpeg's mpegts demuxer releases a picture only when the next PES starts, and the slate sends two pictures a second, so its first picture shows at 0.61-0.79 s although its bytes arrive by about 0.2 s (O).
 
-- **Q1** Does any station broadcast E-AC-3? The tuner's E-AC-3 path is untested (T tuner-slates.md:56-57); the app decodes both.
+- **Q1** Does any station broadcast E-AC-3? The tuner's E-AC-3 path is untested (T tuner-slates.md:56-57); the app decodes both. Answer: none seen; the 10 stations measured all send AC-3 (O).
 - **Q2** The tuner tells clients apart by address (`take(peer: IpAddr)`, T stream.rs:409). A phone on Tailscale reaching the LAN through BeastNAS's subnet route may arrive with BeastNAS's address, the same as the Plex server's, and take over a Plex recording instead of being refused [INFERENCE: depends on the subnet router's address translation]. Direct is used on the home network only (§2.2 rule 2).
-- **Q3** Does any station broadcast 1080i? Only the fallback slate is 1080i (T tuner-slates.md:41-43); 1080i MPEG-2 is the expensive software case, and L0 tests it either way (E ENGINE.md:186).
+- **Q3** Does any station broadcast 1080i? Only the fallback slate is 1080i (T tuner-slates.md:41-43); 1080i MPEG-2 is the expensive software case, and L0 tests it either way (E ENGINE.md:186). Answer: yes, 11.11, 46.1 and 69.1 (O).
 - **Q4** Should the TV go back to its previous channel after a phone stream? Streaming moves the TV's last channel (T capture.md:115), so the TV's own Live TV later opens on what the phone watched.
 
 ## 6. Interface
