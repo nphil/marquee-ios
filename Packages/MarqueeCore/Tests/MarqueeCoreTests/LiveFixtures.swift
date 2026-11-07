@@ -103,16 +103,24 @@ enum LiveFixtures {
         ]
     }
 
-    static var tune: [String: Any] { ["size": 1, "Metadata": [[
-        "ratingKey": "live-77",
-        "live": true,
-        "genuineMediaAnalysis": true,
-        "Media": [[
-            "uuid": "sess-1111",
-            "Part": [["Stream": [
-                ["streamType": 1, "codec": "mpeg2video", "height": 480, "width": 704, "scanType": "interlaced", "frameRate": 29.97],
-                ["streamType": 2, "codec": "ac3", "channels": 6, "samplingRate": 48000],
-            ]]],
+    /// What PMS 1.43.5 answers a tune for session "ts-1" with: a rolling subscription whose grab holds
+    /// the tuned session.
+    static var tune: [String: Any] { ["size": 1, "MediaSubscription": [[
+        "key": "147", "type": 4, "title": "This Episode", "airingsType": "New Airings Only", "channelIdentifier": "aaa-0201",
+        "MediaGrabOperation": [[
+            "rolling": true, "mediaSubscriptionID": 147, "mediaIndex": 0, "status": "inprogress",
+            "id": "aaa-0201-ts-1", "key": "/media/grabbers/operations/aaa-0201-ts-1",
+            "grabberIdentifier": "tv.plex.grabbers.hdhomerun", "grabberProtocol": "livetv",
+            "Metadata": [
+                "ratingKey": "live-77", "key": "/livetv/sessions/sess-1111", "type": "episode", "title": "Evening News",
+                "Media": [[
+                    "uuid": "sess-1111", "videoCodec": "mpeg2video", "container": "mpegts", "protocol": "hls",
+                    "Part": [["key": "/livetv/sessions/sess-1111/ts-1/index.m3u8?offset=-1.000000", "Stream": [
+                        ["streamType": 1, "codec": "mpeg2video", "height": 480, "width": 704, "scanType": "interlaced", "frameRate": 29.97],
+                        ["streamType": 2, "codec": "ac3", "channels": 6, "samplingRate": 48000],
+                    ]]],
+                ]],
+            ],
         ]],
     ]]] }
 

@@ -79,25 +79,32 @@ struct LiveTVTests {
     }
 
     @Test func tuneStreamTimelineAndStopNameOneSession() async throws {
-        let (live, transport) = Self.live()
+        // The transcode has often ended by the time the player stops.
+        let (live, transport) = Self.live { request in
+            request.url.path == "/video/:/transcode/universal/stop" ? json([:], status: 404) : nil
+        }
         let (_, channels) = try await Self.lineup(live)
 
-        let session = try await live.tune(channels[0])
-        let url = try await live.streamURL(TranscodeRequest(live: session, session: "ts-1"))
-        try await live.reportTimeline(LiveTimelineUpdate(session: session, state: .playing, time: 5_000, transcodeSession: "ts-1"))
-        try await live.stopStream(transcodeSession: "ts-1")
+        let session = try await live.tune(channels[0], session: "ts-1")
+        let url = try await live.streamURL(TranscodeRequest(live: session))
+        try await live.reportTimeline(LiveTimelineUpdate(session: session, state: .playing, time: 5_000))
+        try await live.stopStream(session)
 
         #expect(session.id == "sess-1111" && session.ratingKey == "live-77")
         #expect(session.videoCodec == "mpeg2video" && session.isInterlaced && session.audioChannels == 6)
-        #expect(await transport.requests(to: "/livetv/dvrs/12/channels/aaa-0201/tune").first?.method == .post)
+        // The transcoder reads the tuned stream under the tune's session name.
+        let tune = try #require(await transport.requests(to: "/livetv/dvrs/12/channels/aaa-0201/tune").first)
+        #expect(tune.method == .post && tune.headers[PlexHeader.sessionIdentifier] == "ts-1")
         // MPEG-2 has no decoder in AVPlayer, so the server converts the video.
-        #expect(url.path == "/video/:/transcode/universal/start.m3u8")
+        #expect(url.path == "/video/:/transcode/universal/start.m3u8" && url.query("session") == "ts-1")
         #expect(url.query("path") == "/livetv/sessions/sess-1111" && url.query("directStream") == "0")
-        #expect(await transport.requests(to: "/video/:/transcode/universal/decision").count == 1)
+        #expect(await transport.requests(to: "/video/:/transcode/universal/decision").first?.url.query("session") == "ts-1")
         let timeline = try #require(await transport.requests(to: "/:/timeline").first)
         #expect(timeline.headers[PlexHeader.sessionIdentifier] == "ts-1")
         #expect(timeline.url.query("key") == "/livetv/sessions/sess-1111" && timeline.url.query("ratingKey") == "live-77")
         #expect(await transport.requests(to: "/video/:/transcode/universal/stop").first?.url.query("session") == "ts-1")
+        // Cancelling the grab is what frees the tuner.
+        #expect(await transport.requests(to: "/media/grabbers/operations/aaa-0201-ts-1").first?.method == .delete)
     }
 
     @Test func recordingSendsBackTheTemplatesParametersAndSettings() async throws {
