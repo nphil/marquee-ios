@@ -17,7 +17,7 @@ Citation key:
 
 ## 1. The short version
 
-- **Five tabs:** Home, Library, Watchlist, Settings and Search. System tab bar, system back swipe, system sheets.
+- **Five tabs:** Home, Library, Live TV, Watchlist and Search; Settings opens from the profile button on Home. System tab bar, system back swipe, system sheets.
 - **Home:** one large Continue Watching card, then poster shelves. Posters carry the colour; everything else stays quiet.
 - **Detail:** art that melts into the page, the title in Manrope, one wide Play button (it reads Resume on a part-watched title).
 - **Player:** full-screen video. Controls fade after 3 seconds; one tap brings them back. Audio and subtitles share one native menu with plain track names.
@@ -59,6 +59,19 @@ No PRODUCT.md interview was possible. This section is inferred from the brief, L
 - **Colour strategy:** Restrained. A tinted near-black (or soft paper) canvas, one accent on at most about 10% of a screen, and poster art as the only large colour. Dark is the first design target; light gets equal verification (`I:31`).
 - **Signature:** Manrope headings; a 1 pt lit rim on panels; the theme as personality; poster-first shelves with very little text.
 - **Craft floor:** no kicker lines above headings, no gradient text, no side stripes, no card inside a card, no hard offset shadows, no emoji or Unicode icons (SF Symbols only), no decorative glass. Gradients exist only as functional fades behind text (hero, player).
+
+### 3.1 Borrowed from other media apps, and avoided
+
+Patterns only, from the best-rated iPhone media apps: no assets, logos or trade dress.
+
+- **Apple TV app.** Borrow: wide Continue Watching cards with the progress under the art, the profile button at the top of Home, the zoom from a tapped poster into a detail page whose backdrop runs under the status bar. Avoid: autoplaying previews (the room is dark and quiet, and Lucent's phone profile has no motion previews, `L:160`) and store shelves mixed into owned titles.
+- **Infuse.** Borrow: technical honesty on the detail page: format chips read from the file, a Version menu only when there are several files, the full audio and subtitle lists with codecs. Avoid: walls of coloured badges; one row of solid chips is enough.
+- **Netflix.** Borrow: shelf rhythm (one poster size per shelf, the next poster peeking), skeletons shaped like the page they become, results that change while typing. Avoid: a billboard hero that pushes Continue Watching off the first screen, autoplay, rank badges over the art.
+- **Plex.** Borrow: the server's own hubs in its order, the library switch in the title menu, an A–Z jump, Unwatched as a filter. Avoid: streaming and Discover titles mixed into the library, nested sort and filter screens (one View menu replaces them).
+- **Channels.** Borrow: plain episode rows that scan fast (still, number and name, runtime, air date) and swipe to mark watched. Avoid: guide-grid density on a phone.
+- **Letterboxd.** Borrow: the detail hierarchy: backdrop, title with one meta line, a synopsis that expands, cast as round photos, related titles as a shelf. Avoid: the social layer (reviews, friends' ratings, lists).
+
+Apple TV and Netflix tint a page with colour taken from its artwork. Marquee does not: each theme's contrast is proved against its own roles (§5.5), and a colour taken from a poster would void that proof on every page. The art stays the only large colour and the hero fades into the theme's canvas.
 
 ## 4. Phone profile
 
@@ -256,7 +269,7 @@ Apple's rule: Liquid Glass is the navigation layer, not the content layer; use r
 
 ## 7. Navigation model
 
-- **Root:** a tab view with Home, Library, Live TV, Watchlist and a Search tab in the search role (the separate search bubble) (`W25-323`). The tab bar collapses on scroll down on Home and Library (`tabBarMinimizeBehavior`, `W25-323`) and stays put elsewhere. Settings is not a tab: the profile button at the top of Home opens it in a sheet, as in the Apple TV app.
+- **Root:** a tab view with Home, Library, Live TV, Watchlist and a Search tab in the search role (`W25-323`); built with the iOS 27 SDK the standard search tab sits in line with the others (`W26-292`). The tab bar collapses on scroll down on Home and Library (`tabBarMinimizeBehavior`, `W25-323`) and stays put elsewhere. Settings is not a tab: the profile button at the top of Home opens it in a sheet, as in the Apple TV app.
 - **Each tab owns a navigation stack.** Detail pushes with a zoom transition from the tapped poster (`W26-251`); Reduce Motion makes it a 120 ms crossfade. The left-edge back swipe is never disabled or overlaid (`I:15`). No custom back buttons, no hamburger menu (`I:14`).
 - **Player:** a full-screen cover (`I:39`). The way out is a swipe down on the picture, the Close button, or the VoiceOver escape gesture; none depends on the chrome being visible.
 - **Sheets** hold short self-contained tasks: Settings, profile switcher (over Settings), subtitle style, subtitle timing, version picker, tracks info. Long tasks (subtitle search) are full pages pushed inside the sheet (`L:160`). **Menus** hold short choices: sort, filter, season, tracks, more. **Confirmation dialog** for sign-out and removals. **Alert** only for blocking errors.
@@ -274,8 +287,8 @@ The phone sign-in mechanism is not confirmed (`B:§0`), so only the screen is sp
 
 ### 8.1 Home
 
-1. **Large title** "Home". Trailing: the profile button (`person.crop.circle`), which opens the profile switcher sheet [INFERENCE: a protected profile may ask for a PIN].
-2. **Continue Watching** (hidden when empty, `B:§1`): a horizontal snap shelf of 16:9 cards, about 82% of the width so the next card peeks. Under each card, never over the art: a 3 pt progress bar (accent on `trackOff`), the title (Headline) and one line such as "S2 · E5 · 42 min left" in ink2 (the remaining time is the helpful context Apple asks for, `W26-250`). Tap resumes at once. Long-press opens a menu: Details, Mark watched, Remove from Continue Watching (with Undo).
+1. **Large title** "Home". Trailing: the profile button (the profile's photo), which opens Settings in a sheet; switching profile is the first row there [INFERENCE: a protected profile may ask for a PIN].
+2. **Continue Watching** (hidden when empty, `B:§1`): a horizontal snap shelf of 16:9 cards, about 82% of the width so the next card peeks (42% from 600 pt wide, so a landscape card stays shorter than the screen). Under each card, never over the art: a 3 pt progress bar (accent on `trackOff`), the title (Headline) and one line such as "S2 · E5 · 42 min left" in ink2 (the remaining time is the helpful context Apple asks for, `W26-250`). Tap resumes at once. Long-press opens a menu: Details, Mark watched, Remove from Continue Watching (with Undo).
 3. **Hubs**, in server order, empty ones hidden (`B:§1`). Each is a title (Manrope SemiBold 24) with a trailing `chevron.right` (accessible name "See all …") over a poster shelf. Poster cell: 2:3 art, a 3 pt progress bar if part-watched, a one-line title (Caption). Badge on the art, top trailing: a solid canvas-coloured pill with ink text (unwatched episode count; a check for watched), never glass.
 4. Pull to refresh.
 
@@ -305,7 +318,7 @@ The phone sign-in mechanism is not confirmed (`B:§0`), so only the screen is sp
 +--------------------------------+
 ```
 
-1. **Hero:** the backdrop at its natural 16:9 ratio, full width, bleeding to the top edge under the status bar, fading to canvas over its lower 45% or so (§5.3). No portrait crop, so faces are not cut. Where the art is narrower than the screen (iPad width, folded), `backgroundExtensionEffect` fills the sides (`W25-323`). With no backdrop: the poster, blurred, as the fallback [INFERENCE].
+1. **Hero:** the backdrop at its natural 16:9 ratio, full width, bleeding to the top edge under the status bar, fading to canvas over its lower 45% or so (§5.3). No portrait crop, so faces are not cut. Where the art is narrower than the screen (iPad width, folded), `backgroundExtensionEffect` fills the sides (`W25-323`). With no backdrop: the poster, blurred, as the fallback [INFERENCE]. In landscape a full-width hero would be taller than the screen, so the backdrop becomes a rounded 16:9 card on the leading half with the title block and actions beside it, and Play stays on the first screen.
 2. **Title block** on the faded part: the title (display; wraps up to 3 lines), a meta line (year, runtime, content rating), solid format chips (4K, HDR, Atmos) and a star glyph with the rating in ink2.
 3. **Action row, one size (48):** a full-width **Play** pill in accent ("Play", or "Resume · 42 min left"; for a show "Play S1 · E1" or "Resume S2 · E5"), then round icon buttons: watchlist (`bookmark`), watched (`checkmark.circle`), More (`ellipsis`: Play from beginning, Version, Tracks, Share). Watched and watchlist apply at once with a toast and Undo (`L:365`).
 4. **Version** menu ("4K HDR · 12 GB" with a chevron) only when the title has more than one version.
@@ -325,7 +338,7 @@ The phone sign-in mechanism is not confirmed (`B:§0`), so only the screen is sp
 
 ### 8.5 Search (a tab)
 
-1. **Search field** in the bottom toolbar (Apple's preferred placement, `W26-292`), prompt "Search your library": it searches only the user's own servers (`B:§1`).
+1. **Search field** at the top of the landing page, always shown (the standard search tab, `W26-292`), prompt "Search your library": it searches only the user's own servers (`B:§1`).
 2. **Landing (empty query):** recents inline, the last 4 kept (`B:§1`), swipe to remove, a Clear at the end (`W26-292`). Nothing else: no trending, no ads.
 3. **Typing:** results as the text changes, grouped Movies, Shows, Episodes, People. A scope control under the field: All, Movies, Shows, Episodes (`W26-292`). Result row: a 56 × 84 poster, the title (Headline), "Movie · 2019" (ink2).
 4. **No results:** the system no-results view with the typed text and the magnifier kept, one short line (`W26-292`).
@@ -470,7 +483,7 @@ Little copy: a title and one short line, one action (`L:380`). Icons are SF Symb
 | Bottom sheet | system sheet with detents; a custom opaque panel only over video |
 | Dialog, alert | system alert or confirmation dialog; the danger button only in a custom confirmation |
 | Toast, Undo | custom overlay above the tab bar, one at a time, 5 s or more |
-| Search field | system search (bottom toolbar, Search tab) |
+| Search field | system search (top of the Search tab's landing page) |
 | Chip, badge | solid chip, never glass; meaning survives without colour |
 | Empty, error, skeleton | system content-unavailable view; static skeleton |
 | Picture grid | adaptive poster grid (§8.2) |
@@ -480,7 +493,7 @@ Icons: SF Symbols only. [INFERENCE: every name needs a check in the SF Symbols a
 
 | Meaning | Symbol |
 |---|---|
-| Tabs | `house`, `rectangle.stack`, `bookmark`, `gearshape`, `magnifyingglass` |
+| Tabs | `house`, `rectangle.stack`, `play.tv`, `bookmark`, `magnifyingglass` |
 | Profile, close, expand, more, see all | `person.crop.circle`, `chevron.down`, `chevron.down`, `ellipsis`, `chevron.right` |
 | Watched, remove filter | `checkmark.circle`, `xmark` |
 | Player | `play.fill`, `pause.fill`, `gobackward.N`, `goforward.N`, `backward.end.fill`, `forward.end.fill`, `captions.bubble`, `airplayvideo`, `pip.enter` |

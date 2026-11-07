@@ -232,14 +232,6 @@ enum CaptionStyle {
     }
 }
 
-extension PlexMetadata {
-    /// "S2 · E5" for an episode.
-    var episodeCode: String? {
-        guard type == .episode, let season = parentIndex, let episode = index else { return nil }
-        return "S\(season) · E\(episode)"
-    }
-}
-
 /// "1:02:03" or "4:05"; "0:04:05" with `hours` set, so the two times beside a long film's scrubber match.
 func clockText(_ seconds: TimeInterval, hours: Bool = false) -> String {
     let total = Int(max(0, seconds.isFinite ? seconds : 0))

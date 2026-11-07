@@ -2,7 +2,7 @@ import MarqueeCore
 import SwiftUI
 
 enum AppTab: Hashable {
-    case home, library, watchlist, settings, search
+    case home, library, liveTV, watchlist, search
 }
 
 /// Sign-in until a server is chosen, then five tabs (DESIGN §7), all drawn in the active theme.
@@ -78,30 +78,42 @@ struct RootView: View {
     }
 }
 
-/// The five tabs, each with its own navigation stack.
+/// The five tabs, each with its own navigation stack; Settings opens from Home's profile button. The
+/// browse tabs share the toasts, the record of watch-state changes, the profile's watchlist and the way
+/// into playback.
 private struct MainTabs: View {
+    @Environment(AppSession.self) private var session
     @State private var selection: AppTab = .home
+    @State private var toasts = ToastCenter()
+    @State private var changes = LibraryChanges()
 
     var body: some View {
         TabView(selection: $selection) {
             Tab("Home", systemImage: "house", value: AppTab.home) {
-                NavigationStack { HomeView() }
+                BrowseStack { HomeView() }
             }
             Tab("Library", systemImage: "rectangle.stack", value: AppTab.library) {
-                NavigationStack { LibraryView() }
+                BrowseStack { LibraryView() }
+            }
+            Tab("Live TV", systemImage: "play.tv", value: AppTab.liveTV) {
+                NavigationStack { LiveTVView() }
             }
             Tab("Watchlist", systemImage: "bookmark", value: AppTab.watchlist) {
-                NavigationStack { WatchlistView() }
-            }
-            Tab("Settings", systemImage: "gearshape", value: AppTab.settings) {
-                NavigationStack { SettingsView() }
+                BrowseStack { WatchlistView() }
             }
             Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
-                NavigationStack { SearchView() }
+                BrowseStack { SearchView() }
             }
         }
         .tabViewStyle(.sidebarAdaptable)
         // The bar tucks away while scrolling the browse tabs and stays put elsewhere.
         .tabBarMinimizeBehavior(selection == .home || selection == .library ? .onScrollDown : .never)
+        .environment(toasts)
+        .environment(changes)
+        .environment(\.plexWatchlist, session.plexTV.map { PlexWatchlist(http: $0.http) })
+        .environment(\.sessionActions, SessionActions(
+            startPlayback: { item, index, fromStart in session.play(item: item, mediaIndex: index, fromStart: fromStart) },
+            signInAgain: { session.signOut() }
+        ))
     }
 }
