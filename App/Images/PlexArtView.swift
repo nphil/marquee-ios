@@ -54,9 +54,15 @@ struct PlexArtView: View {
         .clipped()
         .accessibilityHidden(true)
         .task(id: request) {
-            guard let request, ImagePipeline.shared.cachedImage(request) == nil else { return }
-            let loaded = try? await ImagePipeline.shared.image(request, library: library)
-            guard !Task.isCancelled else { return }
+            guard let request else { return }
+            // A load started elsewhere (a prefetch, or the backdrop under the detail hero's mirror) can
+            // land between this view's first frame and this task; taking the hit here keeps the fill drawn
+            // on that frame from staying.
+            var loaded = ImagePipeline.shared.cachedImage(request)
+            if loaded == nil {
+                loaded = try? await ImagePipeline.shared.image(request, library: library)
+                guard !Task.isCancelled else { return }
+            }
             withAnimation(.easeOut(duration: 0.12)) {
                 art = Art(key: request.cacheKey, image: loaded)
             }
