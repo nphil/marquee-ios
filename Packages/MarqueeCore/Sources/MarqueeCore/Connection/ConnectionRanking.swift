@@ -40,8 +40,24 @@ public enum ConnectionRanking {
         return .noneReachable
     }
 
+    /// Whether a remembered address may be tried alone, before probing the rest: only a local one. A
+    /// remote address can have won only because the LAN probe failed while iOS was still asking for Local
+    /// Network access, or while a VPN was on, and trusting it would keep the phone off the LAN for good.
+    public static func triesAlone(_ remembered: PlexConnection) -> Bool {
+        tier(remembered) == 0
+    }
+
+    /// The addresses in a better tier than `current` (local over remote, direct over relay), best first,
+    /// from a list in `ordered` order. Empty while a local address is in use.
+    public static func upgrades(from current: PlexConnection, in ordered: [PlexConnection]) -> [PlexConnection] {
+        ordered.filter { tier($0) < tier(current) }
+    }
+
+    private static func tier(_ connection: PlexConnection) -> Int {
+        connection.isRelay ? 2 : connection.isLocal ? 0 : 1
+    }
+
     private static func sortKey(_ connection: PlexConnection) -> (Int, Int, Int) {
-        let tier = connection.isRelay ? 2 : connection.isLocal ? 0 : 1
-        return (tier, connection.isHTTPS ? 0 : 1, connection.isIPv6 ? 1 : 0)
+        (tier(connection), connection.isHTTPS ? 0 : 1, connection.isIPv6 ? 1 : 0)
     }
 }

@@ -59,19 +59,81 @@ struct ConnectionTests {
         #expect(await transport.requests.allSatisfy { $0.headers[PlexHeader.token] == nil })
     }
 
-    @Test func rememberedAddressIsTriedAloneUntilItFails() async throws {
+    @Test func rememberedLocalAddressIsTriedAlone() async throws {
+        let transport = FakeTransport { _, _ in Self.identity() }
+        let connection = PlexServerConnection(
+            server: Self.server([Self.local, Self.remote]), identity: testIdentity, transport: transport,
+            remembered: Self.local.uri
+        )
+
+        #expect(try await connection.connection() == Self.local)
+        #expect(await transport.requests.map(\.url.host) == [Self.local.uri.host])
+    }
+
+    @Test func rememberedRemoteAddressStillLetsTheLANAddressWin() async throws {
         let transport = FakeTransport { _, _ in Self.identity() }
         let connection = PlexServerConnection(
             server: Self.server([Self.local, Self.remote]), identity: testIdentity, transport: transport,
             remembered: Self.remote.uri
         )
 
-        #expect(try await connection.connection() == Self.remote)
-        #expect(await transport.requests.map(\.url.host) == [Self.remote.uri.host])
-
-        await connection.reportFailure(of: Self.remote)
-
         #expect(try await connection.connection() == Self.local)
+    }
+
+    @Test func lanAddressTakesOverOnceItAnswers() async throws {
+        let localHost = Self.local.uri.host
+        // The first two LAN probes fail, as they do while iOS asks for Local Network access.
+        let transport = FakeTransport { request, earlier in
+            if request.url.host == localHost, earlier.filter({ $0.url.host == localHost }).count < 2 {
+                throw NetworkFailure.cannotConnect
+            }
+            return Self.identity()
+        }
+        let connection = PlexServerConnection(
+            server: Self.server([Self.local, Self.remote]), identity: testIdentity, transport: transport
+        )
+
+        #expect(try await connection.connection() == Self.remote)
+        #expect(await connection.preferLocal() == Self.remote)
+        #expect(await connection.preferLocal() == Self.local)
+        #expect(await connection.currentConnection == Self.local)
+
+        let probes = await transport.requests.count
+        #expect(await connection.preferLocal() == Self.local)
+        #expect(await transport.requests.count == probes)
+    }
+
+    @Test func probeRoundRecordsWhatEachAddressDid() async throws {
+        // The LAN address never answers, as when a VPN routes it nowhere.
+        let transport = FakeTransport { request, _ in
+            if request.url.host == Self.local.uri.host { try await Task.sleep(for: .seconds(30)) }
+            if request.url.host == Self.relay.uri.host { throw NetworkFailure.offline }
+            return Self.identity()
+        }
+        let connection = PlexServerConnection(
+            server: Self.server([Self.local, Self.remote, Self.relay]), identity: testIdentity, transport: transport,
+            grace: .milliseconds(20)
+        )
+
+        #expect(try await connection.connection() == Self.remote)
+        let round = try #require(await connection.probeRounds.last)
+        #expect(round.picked == Self.remote)
+        #expect(round.probes.map(\.connection) == [Self.local, Self.remote, Self.relay])
+        #expect(round.probes.map(\.outcome) == [.pending, .answered, .failed(.offline)])
+    }
+
+    @Test func probeLinesNameEachAddressItsOutcomeAndTheOneUsed() {
+        let round = ProbeRound(started: Date(), probes: [
+            .init(connection: Self.local, outcome: .failed(.offline), seconds: 0.012),
+            .init(connection: Self.remote, outcome: .answered, seconds: 0.2104),
+            .init(connection: Self.relay, outcome: .pending, seconds: 0.2104),
+        ], picked: Self.remote)
+
+        #expect(round.lines == [
+            "Local 192.168.1.5: offline after 12 ms",
+            "Remote 81.2.3.4: answered in 210 ms (used)",
+            "Relay 5.6.7.8:8443: no answer after 210 ms",
+        ])
     }
 
     @Test func readMovesToAnotherAddressWhenTheChosenOneStopsAnswering() async throws {

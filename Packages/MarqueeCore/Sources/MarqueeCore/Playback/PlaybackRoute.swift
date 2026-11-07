@@ -23,6 +23,8 @@ public struct PlaybackRoute: Sendable, Hashable {
     /// The server re-encodes the video. False for direct play, the remux, and a server stream that copies
     /// the video.
     public var reencodesVideo: Bool
+    /// The rate the server encodes the video under, when a reason sets one; nil leaves the default.
+    public var maxVideoBitrateKbps: Int?
     public var subtitle: SubtitleDelivery
 }
 
@@ -68,13 +70,18 @@ public enum RouteReason: Sendable, Hashable, CustomStringConvertible {
     case directPlayOff
     /// AirPlay is showing the video, and the receiver cannot reach a stream made on the phone.
     case airPlay
+    /// The server is reached over the internet, too slowly for the remux to read the file.
+    case remoteConnection
+    /// The link to the server, as last measured, carries less than the file's bitrate with a quarter to
+    /// spare; the server re-encodes the video to fit it.
+    case slowLink(kbps: Int)
 
     /// The server has to re-encode the video for this reason.
     var needsReencode: Bool {
         switch self {
-        case .videoCodec, .videoFormat, .dolbyVision, .hdrOnSDRScreen, .levelOrFrameRate, .bitrateLimit, .burnsSubtitle:
+        case .videoCodec, .videoFormat, .dolbyVision, .hdrOnSDRScreen, .levelOrFrameRate, .bitrateLimit, .burnsSubtitle, .slowLink:
             true
-        case .container, .hevcTag, .dolbyVisionBaseLayer, .audio, .onDeviceFailed, .directPlayOff, .airPlay:
+        case .container, .hevcTag, .dolbyVisionBaseLayer, .audio, .onDeviceFailed, .directPlayOff, .airPlay, .remoteConnection:
             false
         }
     }
@@ -95,6 +102,8 @@ public enum RouteReason: Sendable, Hashable, CustomStringConvertible {
         case .onDeviceFailed: "Playing on the phone failed"
         case .directPlayOff: "Direct play turned off"
         case .airPlay: "AirPlay needs a server stream"
+        case .remoteConnection: "Server reached over the internet"
+        case .slowLink(let kbps): "Link measured at \(Double(kbps / 100) / 10) Mbps"
         }
     }
 }
@@ -108,11 +117,22 @@ public struct RouteLimits: Sendable, Hashable {
     public var phoneOnly: Bool
     /// The picked quality in kbit/s; a source above it is transcoded down.
     public var maxBitrateKbps: Int?
+    /// The server is reached through a remote or relay address. A file that needs the remux then streams
+    /// from the server: the remux reads the file's header, index and start point one request at a time,
+    /// which took 11 s before the first picture over a 14 Mbit/s remote path. Direct play is unaffected.
+    public var remoteConnection: Bool
+    /// The link to the server as the last stream measured it, in kbit/s.
+    public var linkKbps: Int?
 
-    public init(serverReason: RouteReason? = nil, phoneOnly: Bool = false, maxBitrateKbps: Int? = nil) {
+    public init(
+        serverReason: RouteReason? = nil, phoneOnly: Bool = false, maxBitrateKbps: Int? = nil, remoteConnection: Bool = false,
+        linkKbps: Int? = nil
+    ) {
         self.serverReason = serverReason
         self.phoneOnly = phoneOnly
         self.maxBitrateKbps = maxBitrateKbps
+        self.remoteConnection = remoteConnection
+        self.linkKbps = linkKbps
     }
 }
 
@@ -153,6 +173,7 @@ public enum PlaybackRouteDecider {
         if let reason = limits.serverReason { serverReasons.append(reason) }
         if let video, let reason = undecodable(video, codec: codec, capabilities) { serverReasons.append(reason) }
         if let cap = limits.maxBitrateKbps, let bitrate = media.bitrate, bitrate > cap { serverReasons.append(.bitrateLimit(kbps: cap)) }
+        if let link = limits.linkKbps, let bitrate = media.bitrate, link * 4 < bitrate * 5 { serverReasons.append(.slowLink(kbps: link)) }
 
         if !directContainers.contains(container) {
             remuxReasons.append(.container(container.isEmpty ? "unknown" : container))
@@ -194,7 +215,12 @@ public enum PlaybackRouteDecider {
         } else if remuxReasons.isEmpty {
             kind = .directPlay
         } else if capabilities.canRemux, !audioNeedsConversion || capabilities.remuxConvertsAudio {
-            kind = .remux
+            if limits.remoteConnection {
+                serverReasons.append(.remoteConnection)
+                kind = .serverTranscode
+            } else {
+                kind = .remux
+            }
         } else {
             kind = .serverTranscode
         }
@@ -225,6 +251,14 @@ public enum PlaybackRouteDecider {
             }
         }
 
+        // A fifth of a slow link stays free for audio and the requests around the stream.
+        let cap = serverReasons.lazy.compactMap { reason -> Int? in
+            switch reason {
+            case .slowLink(let kbps): kbps * 4 / 5
+            case .bitrateLimit(let kbps): kbps
+            default: nil
+            }
+        }.min()
         return PlaybackRoute(
             kind: kind,
             reasons: kind == .directPlay ? [] : serverReasons + remuxReasons,
@@ -232,6 +266,7 @@ public enum PlaybackRouteDecider {
             audioIsStandIn: audioIsStandIn,
             convertsAudio: kind == .remux && audioNeedsConversion,
             reencodesVideo: kind == .serverTranscode && reencodes,
+            maxVideoBitrateKbps: kind == .serverTranscode && reencodes ? cap : nil,
             subtitle: delivery
         )
     }

@@ -75,6 +75,8 @@ final class AppSession {
     @ObservationIgnored private var refreshTask: Task<Void, Never>?
     @ObservationIgnored private var addressTask: Task<Void, Never>?
     @ObservationIgnored private var networkTask: Task<Void, Never>?
+    @ObservationIgnored private var foregroundObserver: (any NSObjectProtocol)?
+    @ObservationIgnored private let localNetwork = LocalNetworkAccess()
 
     private static let forwardURL = URL(string: "marquee://signed-in")!
 
@@ -89,6 +91,9 @@ final class AppSession {
         speechDockText = storage.speechDockAddress
         restore()
         watchNetwork()
+        watchForeground()
+        // The fake server is plain HTTP on the test host; no prompt should cover the UI tests' screens.
+        if !FakePlex.isActive { localNetwork.request() }
     }
 
     // MARK: Sign-in
@@ -467,5 +472,23 @@ final class AppSession {
         guard let connection = library?.connection else { return }
         addressTask?.cancel()
         addressTask = Task { await keepAddress(of: connection, reprobe: true) }
+    }
+
+    /// A remote address may have won while iOS asked for Local Network access, or while a VPN was on;
+    /// coming back to the foreground, which is also when that prompt closes, is when either changes.
+    private func watchForeground() {
+        foregroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.preferLocalAddress() }
+        }
+    }
+
+    private func preferLocalAddress() {
+        guard let connection = library?.connection else { return }
+        Task {
+            guard let found = await connection.preferLocal() else { return }
+            storage.setAddress(found.uri, for: connection.server.id)
+        }
     }
 }

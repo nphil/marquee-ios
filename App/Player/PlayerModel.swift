@@ -28,6 +28,15 @@ final class PlayerModel: Identifiable {
         case failed(String)
     }
 
+    /// What a start waits for, in the order it passes through them.
+    enum LoadStage: Equatable {
+        case connecting
+        case opening
+        /// The share of the start buffer in hand.
+        case buffering(Double)
+        case starting
+    }
+
     enum Offer: Equatable {
         case skipIntro(end: TimeInterval)
         case upNext(PlexMetadata)
@@ -59,9 +68,15 @@ final class PlayerModel: Identifiable {
     private(set) var phase: Phase = .loading
     /// A second into loading the stage word shows.
     private(set) var showsStage = false
+    private(set) var loadStage: LoadStage = .connecting
     private(set) var route: PlaybackRoute?
-    /// Why the phone's own route was given up for the server's.
+    /// Why the phone's own route was given up for the server's: the error's domain and code, for stats and
+    /// Playback info. The banner says only that the server took over.
     private(set) var fallback: String?
+    /// The technical side of a failure the card shows in plain words.
+    private(set) var failureDetail: String?
+    /// The address the stream comes from.
+    private(set) var streamConnection: PlexConnection?
     private(set) var tracks: MediaTracks?
     /// The audio playing: the pick, or the track standing in for it.
     private(set) var audio: AudioTrack?
@@ -177,6 +192,7 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var hideTask: Task<Void, Never>?
     @ObservationIgnored private var stageTask: Task<Void, Never>?
     @ObservationIgnored private var sideTasks: [Task<Void, Never>] = []
+    @ObservationIgnored private var trickplayLoad: (part: Int, task: Task<Void, Never>, waits: Bool)?
 
     init(request: PlaybackRequest, session: AppSession, library: PlexLibrary, capabilities: PlaybackCapabilities) {
         self.request = request
@@ -218,7 +234,20 @@ final class PlayerModel: Identifiable {
         return item.year.map(String.init)
     }
 
-    var stageText: String { route == nil ? "Connecting" : "Preparing" }
+    var stageText: String {
+        switch loadStage {
+        case .connecting: "Connecting"
+        case .opening: "Opening file"
+        case .buffering: "Buffering"
+        case .starting: "Starting"
+        }
+    }
+
+    /// The share of the start buffer in hand while buffering; nil while the wait has no measure.
+    var loadFraction: Double? {
+        if case .buffering(let fraction) = loadStage { return fraction }
+        return nil
+    }
 
     var isWaiting: Bool { phase == .loading || isBuffering || landing != nil }
 
@@ -318,7 +347,7 @@ final class PlayerModel: Identifiable {
         closed = true
         report(.stopped)
         generation += 1
-        for task in [loadTask, seekTask, eventsTask, countdownTask, hideTask, stageTask] { task?.cancel() }
+        for task in [loadTask, seekTask, eventsTask, countdownTask, hideTask, stageTask, trickplayLoad?.task] { task?.cancel() }
         sideTasks.forEach { $0.cancel() }
         stopStream()
         backend.tearDown()
@@ -464,6 +493,7 @@ final class PlayerModel: Identifiable {
         isScrubbing = true
         hideTask?.cancel()
         interruptCountdown()
+        loadTrickplay(now: true)
     }
 
     func endScrub(at target: TimeInterval) {
@@ -590,17 +620,26 @@ final class PlayerModel: Identifiable {
         time = start
         publishItem()
         nextFromStart = false
-        loadTrickplay(part)
+        // Scene thumbnails load after the first picture (`arrived`).
         await decideRoute()
         guard generation == self.generation else { return }
         await startStream(at: start, generation: generation)
     }
 
-    private func routeLimits() -> RouteLimits {
+    private func routeLimits(connection: PlexConnection?) -> RouteLimits {
         switch session.settings.directPlay {
-        case .force: RouteLimits(phoneOnly: true)
-        case .disabled: RouteLimits(serverReason: .directPlayOff)
-        case .auto: RouteLimits(serverReason: onDeviceFailed ? .onDeviceFailed : nil)
+        case .force:
+            return RouteLimits(phoneOnly: true)
+        case .disabled:
+            return RouteLimits(serverReason: .directPlayOff)
+        case .auto:
+            // A file that failed on the phone earlier in this run goes straight to the server when reopened.
+            let failedBefore = part.map { session.player.phoneFailures.contains($0.id) } ?? false
+            return RouteLimits(
+                serverReason: onDeviceFailed || failedBefore ? .onDeviceFailed : nil,
+                remoteConnection: connection.map { !$0.isLocal } ?? false,
+                linkKbps: connection.flatMap { session.player.linkKbps[$0.uri] }
+            )
         }
     }
 
@@ -610,7 +649,8 @@ final class PlayerModel: Identifiable {
         let memory = settings.remembersTracks ? session.trackMemory(for: item) : nil
         let picked = AudioPicker.pick(in: tracks, handPick: handAudio, remembered: memory?.audio, preferredLanguage: settings.audioLanguage)
         let device = await capabilities.current()
-        var limits = routeLimits()
+        let connection = try? await library.connection.connection()
+        var limits = routeLimits(connection: connection)
         func decide(drawsImages: Bool) -> (SubtitleDecision, PlaybackRoute) {
             let decision = SubtitlePicker.decide(
                 tracks: tracks, audio: picked, handPick: handSubtitle, remembered: memory?.subtitle,
@@ -664,6 +704,7 @@ final class PlayerModel: Identifiable {
     private func startStream(at target: TimeInterval, generation: Int) async {
         guard let route, let part else { return }
         stopStream()
+        loadStage = .opening
         landing = target
         origin = nil
         streamKey = StreamKey(route)
@@ -672,13 +713,15 @@ final class PlayerModel: Identifiable {
             switch route.kind {
             case .directPlay:
                 url = try await library.playbackURL(path: part.key)
+                streamConnection = await library.connection.currentConnection
                 stream = .direct
                 origin = 0
                 reporter = TimelineReporter(library: library, item: item)
             case .remux:
-                let base = try await library.connection.connection().uri
+                let connection = try await library.connection.connection()
                 guard generation == self.generation else { return }
-                guard let source = PlexURL.make(base: base, path: part.key) else { throw URLError(.badURL) }
+                guard let source = PlexURL.make(base: connection.uri, path: part.key) else { throw URLError(.badURL) }
+                streamConnection = connection
                 let remux = makeRemux(source: source, part: part, route: route)
                 stream = .remux(remux)
                 listen(to: remux)
@@ -693,19 +736,24 @@ final class PlayerModel: Identifiable {
                 url = try await library.transcodeURL(
                     TranscodeRequest(item: item, mediaIndex: mediaIndex, route: route, offset: target, session: session)
                 )
+                streamConnection = await library.connection.currentConnection
             }
             guard generation == self.generation else { return }
             applySubtitleSources()
             load(url)
         } catch {
             guard generation == self.generation, !(error is CancellationError) else { return }
-            streamFailed(Self.message(error))
+            streamFailed(PlaybackFailure(text: Self.message(error)))
         }
     }
 
+    /// Seconds of a remux AVPlayer holds before it starts; once playing, the engine's larger forward
+    /// buffer applies (`arrived`).
+    private static let startBuffer: TimeInterval = 3
+
     private func load(_ url: URL) {
         let playerItem = AVPlayerItem(asset: AVURLAsset(url: url))
-        if case .remux = stream { playerItem.preferredForwardBufferDuration = RemuxSession.recommendedForwardBufferDuration }
+        if case .remux = stream { playerItem.preferredForwardBufferDuration = Self.startBuffer }
         playerItem.textStyleRules = CaptionStyle.rules(for: session.settings.subtitleStyle, lifted: chromeVisible)
         playerItem.externalMetadata = metadataItems()
         itemReady = false
@@ -757,10 +805,17 @@ final class PlayerModel: Identifiable {
                 case .timeline(let origin):
                     if self.origin == nil {
                         self.origin = origin
+                        if !itemReady { loadStage = .buffering(0) }
                         land()
                     }
+                case .progress(let progress):
+                    if case .buffering = loadStage, let origin, let target = landing {
+                        // The first segment has to reach past the landing point by the start buffer.
+                        let needed = max(0, target - origin) + Self.startBuffer
+                        loadStage = .buffering(min(1, progress.mediaSeconds / needed))
+                    }
                 case .failed(let error, _):
-                    streamFailed(error.localizedDescription)
+                    streamFailed(PlaybackFailure(text: error.localizedDescription))
                 default:
                     break
                 }
@@ -773,6 +828,7 @@ final class PlayerModel: Identifiable {
         eventsTask = nil
         seekTask?.cancel()
         seekTask = nil
+        measureLink()
         backend.load(nil)
         itemReady = false
         farSeeking = false
@@ -787,6 +843,23 @@ final class PlayerModel: Identifiable {
         }
         stream = nil
         mediaInfo = nil
+    }
+
+    /// Keeps what the ending stream measured of the link to its server, for the next route: the remux's
+    /// reads from the file, or AVPlayer's segment downloads from the server. Direct play is not measured.
+    private func measureLink() {
+        guard let address = streamConnection?.uri else { return }
+        var bitsPerSecond: Double?
+        switch stream {
+        case .remux(let remux):
+            bitsPerSecond = remux.progress.sourceBytesPerSecond.map { $0 * 8 }
+        case .transcode:
+            bitsPerSecond = backend.player?.currentItem?.accessLog()?.events.last?.observedBitrate
+        case .direct, nil:
+            break
+        }
+        guard let bitsPerSecond, bitsPerSecond > 0 else { return }
+        session.player.linkKbps[address] = Int(bitsPerSecond / 1000)
     }
 
     /// A new stream at `target` on the same route, keeping the screen as it is.
@@ -820,9 +893,9 @@ final class PlayerModel: Identifiable {
         }
     }
 
-    private func streamFailed(_ message: String) {
+    private func streamFailed(_ failure: PlaybackFailure) {
         guard !closed, phase != .finished, let route else {
-            fail(message)
+            fail(failure)
             return
         }
         let at = time
@@ -832,11 +905,12 @@ final class PlayerModel: Identifiable {
         switch route.kind {
         case .directPlay, .remux:
             guard session.settings.directPlay != .force, !onDeviceFailed else {
-                fail(message)
+                fail(failure)
                 return
             }
             onDeviceFailed = true
-            fallback = message
+            if let part { session.player.phoneFailures.insert(part.id) }
+            fallback = failure.detail
             stopStream()
             enterLoading()
             loadTask = Task { [weak self] in
@@ -849,7 +923,7 @@ final class PlayerModel: Identifiable {
             // The server can refuse a new session for a minute or more after a quick stop.
             let delays: [TimeInterval] = [2, 5, 10, 20, 30]
             guard retries < delays.count else {
-                fail(message)
+                fail(failure)
                 return
             }
             let delay = delays[retries]
@@ -865,6 +939,12 @@ final class PlayerModel: Identifiable {
     }
 
     private func fail(_ message: String) {
+        fail(PlaybackFailure(text: message))
+    }
+
+    private func fail(_ failure: PlaybackFailure) {
+        failureDetail = failure.detail
+        let message = failure.text
         stopStream()
         report(.stopped)
         stageTask?.cancel()
@@ -879,6 +959,7 @@ final class PlayerModel: Identifiable {
 
     private func enterLoading() {
         phase = .loading
+        loadStage = route == nil ? .connecting : .opening
         showsStage = false
         stageTask?.cancel()
         stageTask = Task { [weak self] in
@@ -895,6 +976,7 @@ final class PlayerModel: Identifiable {
         handSubtitle = nil
         onDeviceFailed = false
         fallback = nil
+        failureDetail = nil
         wroteBack = false
         retries = 0
         introCancelled = false
@@ -909,6 +991,8 @@ final class PlayerModel: Identifiable {
         subtitle = nil
         subtitleProblem = nil
         trickplay = nil
+        trickplayLoad?.task.cancel()
+        trickplayLoad = nil
         reporter = nil
         lastSkip = nil
         wantsPlay = true
@@ -926,13 +1010,14 @@ final class PlayerModel: Identifiable {
             stateChanged(playing: playing, buffering: buffering)
         case .ready:
             itemReady = true
+            loadStage = .starting
             if case .transcode = stream, origin == nil {
                 // Some servers list the whole film whatever the offset; the stream then starts at zero.
                 if let length = backend.itemDuration, duration > 0, length >= duration - 30 { origin = 0 } else { origin = transcodeOffset }
             }
             land()
-        case .failed(let message):
-            streamFailed(message)
+        case .failed(let failure):
+            streamFailed(failure)
         case .ended:
             ended()
         case .externalPlayback(let active):
@@ -970,6 +1055,10 @@ final class PlayerModel: Identifiable {
         phase = .playing
         stageTask?.cancel()
         showsStage = false
+        if case .remux = stream {
+            backend.player?.currentItem?.preferredForwardBufferDuration = RemuxSession.recommendedForwardBufferDuration
+        }
+        loadTrickplay(now: false)
         await applySelection()
         if !wroteBack {
             wroteBack = true
@@ -1017,7 +1106,7 @@ final class PlayerModel: Identifiable {
                 load(url)
             } catch {
                 guard serial == seekSerial, !(error is CancellationError) else { return }
-                streamFailed(Self.message(error))
+                streamFailed(PlaybackFailure(text: Self.message(error)))
             }
         }
     }
@@ -1265,15 +1354,22 @@ final class PlayerModel: Identifiable {
         nowPlaying?.update(time: time, rate: isPlaying && !isBuffering ? 1 : 0)
     }
 
-    private func loadTrickplay(_ part: PlexPart) {
-        trickplay = nil
-        guard part.hasSceneThumbnails else { return }
+    /// Scene thumbnails wait for the picture, then ten seconds more for the stream's buffer, so they never
+    /// share the link with the start: one episode's index was 7.3 MB, 8.8 s over a 10 Mbit/s path. A scrub
+    /// fetches them at once.
+    private func loadTrickplay(now: Bool) {
+        guard trickplay == nil, let part, part.hasSceneThumbnails else { return }
+        if let load = trickplayLoad, load.part == part.id, !(now && load.waits) { return }
+        trickplayLoad?.task.cancel()
         let library = library, urlSession = session.transport.session, key = item.ratingKey
-        sideTasks.append(Task { [weak self] in
-            guard let data = try? await PlexFetch.data("/library/parts/\(part.id)/indexes/sd", library: library, session: urlSession),
+        let task = Task(priority: .utility) { [weak self] in
+            if !now { try? await Task.sleep(for: .seconds(10)) }
+            guard !Task.isCancelled,
+                  let data = try? await PlexFetch.data("/library/parts/\(part.id)/indexes/sd", library: library, session: urlSession),
                   let self, item.ratingKey == key else { return }
             trickplay = Trickplay(data: data)
-        })
+        }
+        trickplayLoad = (part.id, task, !now)
     }
 
     private func metadataItems() -> [AVMetadataItem] {
@@ -1349,6 +1445,10 @@ final class PlayerCenter {
     var presented: PlayerModel?
     private(set) var active: PlayerModel?
     let capabilities = PlaybackCapabilities()
+    /// Parts that failed to play on the phone in this run; reopening one goes straight to the server.
+    @ObservationIgnored var phoneFailures: Set<Int> = []
+    /// The link to each server address as the last stream from it measured, in kbit/s.
+    @ObservationIgnored var linkKbps: [URL: Int] = [:]
 
     init() {
         RemuxSession.sweepStaleFiles()

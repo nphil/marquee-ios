@@ -169,8 +169,8 @@ final class PlexLiveSource: LiveVideoSource {
             stream.size = size
             current = stream
             diagnosticsLine = Self.diagnostics(stream)
-        case .failed(let message):
-            fail(.network(message))
+        case .failed(let failure):
+            fail(.network(failure.text))
         case .ended:
             fail(.server(status: 0, message: "Plex ended the stream."))
         case .externalPlayback(let active):

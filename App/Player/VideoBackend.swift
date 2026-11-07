@@ -7,11 +7,34 @@ enum BackendEvent {
     case time(TimeInterval)
     case state(isPlaying: Bool, isBuffering: Bool)
     case ready
-    case failed(String)
+    case failed(PlaybackFailure)
     case ended
     case externalPlayback(Bool)
     /// The picture's size in pixels, adjusted for its pixel aspect.
     case presentationSize(CGSize)
+}
+
+/// Why a stream stopped: plain words for the screen, and the error's domain, code and AVPlayer's comment
+/// for stats and Playback info, which say more than the words when a stream will not open.
+struct PlaybackFailure: Equatable {
+    let text: String
+    let detail: String
+
+    init(text: String, detail: String? = nil) {
+        self.text = text
+        self.detail = detail ?? text
+    }
+
+    init(_ error: NSError?, comment: String? = nil) {
+        guard let error else {
+            self.init(text: "The player stopped without saying why.")
+            return
+        }
+        let cause = (error.userInfo[NSUnderlyingErrorKey] as? NSError) ?? error
+        var detail = "\(error.localizedDescription) (\(cause.domain) \(cause.code))"
+        if let comment, !comment.isEmpty { detail += " " + comment }
+        self.init(text: error.localizedDescription, detail: detail)
+    }
 }
 
 /// Plays one stream for the player model: AVPlayer on a phone, a still frame in the UI tests.
@@ -88,9 +111,8 @@ final class AVPlayerBackend: VideoBackend {
                 MainActor.assumeIsolated { self?.onEvent?(.ended) }
             },
             center.addObserver(forName: AVPlayerItem.failedToPlayToEndTimeNotification, object: item, queue: .main) { [weak self] note in
-                let error = note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? NSError
-                let message = Self.describe(error)
-                MainActor.assumeIsolated { self?.onEvent?(.failed(message)) }
+                let failure = PlaybackFailure(note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? NSError)
+                MainActor.assumeIsolated { self?.onEvent?(.failed(failure)) }
             },
         ]
     }
@@ -122,13 +144,6 @@ final class AVPlayerBackend: VideoBackend {
         onEvent = nil
     }
 
-    /// The error with its domain and code, which say more than its text when a stream will not open.
-    nonisolated static func describe(_ error: NSError?) -> String {
-        guard let error else { return "The player stopped without saying why." }
-        let cause = (error.userInfo[NSUnderlyingErrorKey] as? NSError) ?? error
-        return "\(error.localizedDescription) (\(cause.domain) \(cause.code))"
-    }
-
     private func clearItem() {
         itemObservations.forEach { $0.invalidate() }
         itemObservations = []
@@ -151,9 +166,7 @@ final class AVPlayerBackend: VideoBackend {
         case .readyToPlay:
             onEvent?(.ready)
         case .failed:
-            var message = Self.describe(item.error as NSError?)
-            if let comment = item.errorLog()?.events.last?.errorComment, !comment.isEmpty { message += " " + comment }
-            onEvent?(.failed(message))
+            onEvent?(.failed(PlaybackFailure(item.error as NSError?, comment: item.errorLog()?.events.last?.errorComment)))
         default:
             break
         }

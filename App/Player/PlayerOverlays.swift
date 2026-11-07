@@ -279,7 +279,8 @@ struct FailureCard: View {
     }
 }
 
-/// Why playback moved from the phone to the server; shown for six seconds, then with the chrome.
+/// Playback moved from the phone to the server; shown for six seconds, then with the chrome. The error
+/// behind it stays in Playback info.
 struct FallbackBanner: View {
     let model: PlayerModel
     @Environment(\.theme) private var theme
@@ -287,7 +288,7 @@ struct FallbackBanner: View {
 
     var body: some View {
         ZStack {
-            if let reason = model.fallback, fresh || model.chromeVisible {
+            if model.fallback != nil, fresh || model.chromeVisible {
                 HStack(spacing: Space.s3) {
                     Image(systemName: "server.rack")
                         .font(.system(size: 20, weight: .semibold))
@@ -296,7 +297,7 @@ struct FallbackBanner: View {
                         Text("Playing through the server")
                             .textRole(.label)
                             .foregroundStyle(theme.ink)
-                        Text(reason)
+                        Text("This file didn't play on the phone itself.")
                             .textRole(.caption)
                             .foregroundStyle(theme.ink2)
                             .lineLimit(2)

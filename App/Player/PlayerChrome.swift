@@ -105,15 +105,17 @@ struct PlayerChrome: View {
         switch model.phase {
         case .loading:
             VStack(spacing: Space.s3) {
-                LoadingArc()
+                LoadingArc(fraction: model.loadFraction)
                 Text(model.showsStage ? model.stageText : " ")
                     .textRole(.label)
                     .foregroundStyle(theme.ink2)
+                    .contentTransition(.opacity)
                     .animation(.easeOut(duration: 0.12), value: model.showsStage)
+                    .animation(.easeOut(duration: 0.2), value: model.stageText)
             }
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Loading")
-            .accessibilityValue(model.showsStage ? model.stageText : "")
+            .accessibilityValue(model.showsStage ? stageValue : "")
         case .failed(let message):
             FailureCard(message: message, close: close, retry: model.retry)
         case .finished:
@@ -128,6 +130,11 @@ struct PlayerChrome: View {
                     .transition(.opacity)
             }
         }
+    }
+
+    private var stageValue: String {
+        guard let fraction = model.loadFraction else { return model.stageText }
+        return "\(model.stageText), \(Int(fraction * 100)) percent"
     }
 
     private var upNextShowing: Bool {
@@ -335,18 +342,35 @@ private struct RoutePicker: UIViewRepresentable {
     }
 }
 
-/// A short arc that marks loading; static, as DESIGN §8.6 asks, with the stage word doing the talking.
+/// Loading: an arc that turns while the wait has no measure, and fills to the real share of the start
+/// buffer while a stream buffers. Reduce Motion holds it still.
 struct LoadingArc: View {
     var diameter: CGFloat = 56
+    /// The share of the start buffer in hand; nil turns the arc.
+    var fraction: Double?
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Circle()
-            .trim(from: 0, to: 0.22)
-            .stroke(theme.ink, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-            .rotationEffect(.degrees(-90))
-            .frame(width: diameter, height: diameter)
-            .accessibilityHidden(true)
+        TimelineView(.animation(paused: fraction != nil || reduceMotion)) { context in
+            ZStack {
+                if fraction != nil {
+                    Circle().stroke(theme.trackOff, lineWidth: 3)
+                }
+                Circle()
+                    .trim(from: 0, to: fraction.map { max(0.02, $0) } ?? 0.22)
+                    .stroke(theme.ink, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                    .rotationEffect(.degrees(fraction == nil && !reduceMotion ? turn(at: context.date) : -90))
+                    .animation(.easeOut(duration: 0.3), value: fraction)
+            }
+        }
+        .frame(width: diameter, height: diameter)
+        .accessibilityHidden(true)
+    }
+
+    /// One turn every 1.2 s, from the top.
+    private func turn(at date: Date) -> Double {
+        -90 + date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1.2) / 1.2 * 360
     }
 }
 

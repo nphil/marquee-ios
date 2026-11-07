@@ -168,6 +168,8 @@ struct PlexLibraryTests {
             convertsAudio: false, reencodesVideo: true, subtitle: .burnedIn(signs)
         )
         let request = TranscodeRequest(item: item, route: route, offset: 90, session: "s-1")
+        var slow = route
+        slow.maxVideoBitrateKbps = 3_000
 
         let url = try await library.transcodeURL(request)
 
@@ -180,5 +182,6 @@ struct PlexLibraryTests {
         #expect(url.query("maxVideoBitrate") == "8000" && url.query("videoResolution") == "1920x1080")
         #expect(url.query("offset") == "90.0")
         #expect(url.query("session") == "s-1")
+        #expect(TranscodeRequest(item: item, route: slow).maxVideoBitrateKbps == 3_000)
     }
 }

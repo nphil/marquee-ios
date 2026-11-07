@@ -20,7 +20,8 @@ public struct TranscodeRequest: Sendable, Hashable {
     public var videoResolution: String
 
     /// - Parameters:
-    ///   - maxVideoBitrateKbps: The picked quality; defaults to the source bitrate, at least 8 Mbit/s.
+    ///   - maxVideoBitrateKbps: The picked quality; defaults to the route's cap, else the source bitrate,
+    ///     at least 8 Mbit/s.
     ///   - videoResolution: The picked quality's size; defaults to the source size.
     public init(
         item: PlexMetadata,
@@ -40,7 +41,7 @@ public struct TranscodeRequest: Sendable, Hashable {
         self.offset = offset
         copiesVideo = !route.reencodesVideo
         burnsSubtitles = if case .burnedIn = route.subtitle { true } else { false }
-        self.maxVideoBitrateKbps = maxVideoBitrateKbps ?? max(media?.bitrate ?? 0, 8_000)
+        self.maxVideoBitrateKbps = maxVideoBitrateKbps ?? route.maxVideoBitrateKbps ?? max(media?.bitrate ?? 0, 8_000)
         self.videoResolution = videoResolution ?? "\(media?.width ?? 1920)x\(media?.height ?? 1080)"
     }
 

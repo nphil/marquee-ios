@@ -241,10 +241,33 @@ struct PlaybackRouteTests {
         let limited = Self.route(file, limits: RouteLimits(maxBitrateKbps: 8_000))
 
         #expect(limited.kind == .serverTranscode && limited.reencodesVideo && limited.reasons == [.bitrateLimit(kbps: 8_000)])
+        #expect(limited.maxVideoBitrateKbps == 8_000)
         for reason in [RouteReason.onDeviceFailed, .directPlayOff, .airPlay] {
             let route = Self.route(file, limits: RouteLimits(serverReason: reason))
             #expect(route.kind == .serverTranscode && !route.reencodesVideo && route.reasons == [reason])
         }
+    }
+
+    @Test func remoteConnectionStreamsRemuxFilesFromTheServer() throws {
+        let mkv = try Self.file("mkv")
+        let mp4 = try Self.file("mp4")
+
+        let remote = Self.route(mkv, limits: RouteLimits(remoteConnection: true))
+
+        #expect(remote.kind == .serverTranscode && !remote.reencodesVideo)
+        #expect(remote.reasons == [.remoteConnection, .container("mkv")])
+        #expect(Self.route(mp4, limits: RouteLimits(remoteConnection: true)).kind == .directPlay)
+    }
+
+    @Test func aSlowLinkHasTheServerEncodeUnderIt() throws {
+        let file = try Self.file("mkv", bitrate: 4_349)
+
+        let slow = Self.route(file, limits: RouteLimits(linkKbps: 5_000))
+        let fast = Self.route(file, limits: RouteLimits(linkKbps: 5_500))
+
+        #expect(slow.kind == .serverTranscode && slow.reencodesVideo && slow.maxVideoBitrateKbps == 4_000)
+        #expect(slow.reasons == [.slowLink(kbps: 5_000), .container("mkv")])
+        #expect(fast.kind == .remux && fast.maxVideoBitrateKbps == nil)
     }
 
     @Test func forcedDirectPlayNeverUsesTheServer() throws {
