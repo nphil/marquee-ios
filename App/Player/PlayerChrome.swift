@@ -220,7 +220,7 @@ struct PlayerChrome: View {
 
 /// Black gradients at the top and bottom edges, .6 at the edge fading to clear, and a light wash over
 /// the middle so glass controls stay readable over bright pictures.
-private struct Scrims: View {
+struct Scrims: View {
     var body: some View {
         ZStack {
             Color.black.opacity(0.18)
@@ -268,7 +268,7 @@ private struct PlayerButtonLabel: View {
 }
 
 /// The system AirPlay route picker in the player's glass circle; it prefers video receivers.
-private struct AirPlayButton: View {
+struct AirPlayButton: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
