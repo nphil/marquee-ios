@@ -13,11 +13,19 @@ struct PlayerChrome: View {
     let bottomChanged: (CGRect) -> Void
 
     @Environment(\.theme) private var theme
+    /// The top row's bottom edge and the bottom controls' top edge, on screen, for the scrims.
+    @State private var topRow: CGFloat = 0
+    @State private var bottomRow: CGFloat = .infinity
 
     var body: some View {
         VStack(spacing: 0) {
             topBar
                 .opacity(model.isScrubbing ? 0 : 1)
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.frame(in: .global).maxY
+                } action: { maxY in
+                    topRow = maxY
+                }
             Spacer(minLength: Space.s3)
             centre
                 .opacity(model.isScrubbing ? 0 : 1)
@@ -26,6 +34,7 @@ struct PlayerChrome: View {
                 .onGeometryChange(for: CGRect.self) { proxy in
                     proxy.frame(in: .global)
                 } action: { frame in
+                    bottomRow = frame.minY
                     bottomChanged(frame)
                 }
         }
@@ -33,7 +42,7 @@ struct PlayerChrome: View {
         .padding(.top, Space.s2)
         .padding(.bottom, Space.s2)
         .background {
-            Scrims()
+            Scrims(topRow: topRow, bottomRow: bottomRow)
                 .allowsHitTesting(false)
         }
         .animation(.easeOut(duration: 0.18), value: model.isScrubbing)
@@ -218,19 +227,36 @@ struct PlayerChrome: View {
     }
 }
 
-/// Black gradients at the top and bottom edges, .6 at the edge fading to clear, and a light wash over
-/// the middle so glass controls stay readable over bright pictures.
+/// Black behind the top row and the bottom controls, fading to clear over 64 pt towards the middle, on a
+/// light wash that keeps the glass controls readable over bright pictures. Under the title, glyphs and
+/// time codes the two add up to .59 black (DESIGN §5.3 asks .55 or more).
 struct Scrims: View {
+    /// The top row's bottom edge and the bottom controls' top edge, in global coordinates.
+    let topRow: CGFloat
+    let bottomRow: CGFloat
+
+    private static let wash = 0.18
+    private static let edge = 0.5
+    private static let fade: CGFloat = 64
+
     var body: some View {
-        ZStack {
-            Color.black.opacity(0.18)
+        GeometryReader { proxy in
+            let frame = proxy.frame(in: .global)
+            let top = min(frame.height, max(0, topRow - frame.minY))
+            let bottom = min(frame.height - top, max(0, frame.maxY - bottomRow))
+            let fade = min(Self.fade, (frame.height - top - bottom) / 2)
             VStack(spacing: 0) {
-                LinearGradient(colors: [.black.opacity(0.6), .black.opacity(0)], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 160)
+                Color.black.opacity(Self.edge)
+                    .frame(height: top)
+                LinearGradient(colors: [.black.opacity(Self.edge), .clear], startPoint: .top, endPoint: .bottom)
+                    .frame(height: fade)
                 Spacer(minLength: 0)
-                LinearGradient(colors: [.black.opacity(0), .black.opacity(0.7)], startPoint: .top, endPoint: .bottom)
-                    .frame(height: 220)
+                LinearGradient(colors: [.clear, .black.opacity(Self.edge)], startPoint: .top, endPoint: .bottom)
+                    .frame(height: fade)
+                Color.black.opacity(Self.edge)
+                    .frame(height: bottom)
             }
+            .background(Color.black.opacity(Self.wash))
         }
         .ignoresSafeArea()
     }

@@ -60,21 +60,16 @@ struct Scrubber: View {
         let fraction = model.duration > 0 ? min(1, max(0, shown / model.duration)) : 0
         let x = width * fraction
         return ZStack(alignment: .leading) {
-            // The readable track (DESIGN §5.1): trackOff all but vanished over a bright picture.
-            Capsule()
-                .fill(theme.ink.opacity(0.6))
-                .frame(height: Self.trackHeight)
-            Capsule()
-                .fill(theme.ink)
-                .frame(width: max(Self.trackHeight, x), height: Self.trackHeight)
-            ForEach(Array(model.markers.enumerated()), id: \.offset) { _, marker in
-                let start = position(of: marker.start, width: width)
-                let end = position(of: marker.end, width: width)
+            ZStack(alignment: .leading) {
+                // The readable track (DESIGN §5.1): trackOff all but vanished over a bright picture.
                 Capsule()
-                    .fill(theme.ink2)
-                    .frame(width: max(3, end - start), height: 3)
-                    .offset(x: start, y: Self.trackHeight / 2 + 5)
+                    .fill(theme.ink.opacity(0.6))
+                Capsule()
+                    .fill(theme.ink)
+                    .frame(width: max(Self.trackHeight, x))
             }
+            .frame(width: width, height: Self.trackHeight)
+            .mask { TrackSegments(cuts: cuts(width: width)) }
             Circle()
                 .fill(theme.ink)
                 .frame(width: Self.thumb, height: Self.thumb)
@@ -104,6 +99,13 @@ struct Scrubber: View {
     private func position(of milliseconds: Int, width: CGFloat) -> CGFloat {
         guard model.duration > 0 else { return 0 }
         return width * min(1, max(0, Double(milliseconds) / 1000 / model.duration))
+    }
+
+    /// The edges of the intro and credits along the track, leaving out those at its ends.
+    private func cuts(width: CGFloat) -> [CGFloat] {
+        model.markers
+            .flatMap { [position(of: $0.start, width: width), position(of: $0.end, width: width)] }
+            .filter { $0 > Self.trackHeight && $0 < width - Self.trackHeight }
     }
 
     private func drag(width: CGFloat) -> some Gesture {
@@ -160,6 +162,23 @@ struct Scrubber: View {
             }
         }
         .joined(separator: " ")
+    }
+}
+
+/// The track as segments: a 2 pt gap at each cut, so the intro and credits read as parts of the one
+/// track (DESIGN §8.6).
+private struct TrackSegments: Shape {
+    let cuts: [CGFloat]
+
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        var start = rect.minX
+        for cut in cuts.sorted() where cut - 1 > start {
+            path.addRect(CGRect(x: start, y: rect.minY, width: cut - 1 - start, height: rect.height))
+            start = cut + 1
+        }
+        path.addRect(CGRect(x: start, y: rect.minY, width: max(0, rect.maxX - start), height: rect.height))
+        return path
     }
 }
 
