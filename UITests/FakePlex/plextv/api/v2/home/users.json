@@ -1,0 +1,44 @@
+{
+  "id": 1,
+  "name": "Jordan's Home",
+  "guestUserID": null,
+  "subscription": false,
+  "users": [
+    {
+      "id": 1,
+      "uuid": "fake-owner",
+      "title": "Jordan",
+      "username": "jordan",
+      "thumb": "https://plex.tv/users/fake-owner/avatar.png",
+      "admin": true,
+      "protected": false,
+      "restricted": false,
+      "guest": false,
+      "home": true
+    },
+    {
+      "id": 2,
+      "uuid": "fake-alex",
+      "title": "Alex",
+      "username": "alex",
+      "thumb": "https://plex.tv/users/fake-alex/avatar.png",
+      "admin": false,
+      "protected": true,
+      "restricted": false,
+      "guest": false,
+      "home": true
+    },
+    {
+      "id": 3,
+      "uuid": "fake-kids",
+      "title": "Kids",
+      "username": null,
+      "thumb": "https://plex.tv/users/fake-kids/avatar.png",
+      "admin": false,
+      "protected": false,
+      "restricted": true,
+      "guest": false,
+      "home": true
+    }
+  ]
+}

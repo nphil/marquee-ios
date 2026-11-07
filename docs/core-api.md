@@ -19,7 +19,8 @@
   - `createPIN(strong:)`, `authURL(for:forwardURL:)`, `checkPIN(_:)`, `waitForToken(_:every:now:sleep:)`: PIN sign-in. A strong PIN is for the browser; a 4-character one is typed at plex.tv/link.
   - `servers()`: servers with this user's token for each.
   - `homeUsers()`, `switchHomeUser(_:pin:)`: Plex Home profiles; a switch returns that profile's token.
-- `PlexPIN`, `PlexHomeUser`: sign-in code and profile.
+  - `account()`: the user a token belongs to (`/api/v2/user`), the account or the profile switched to.
+- `PlexPIN`, `PlexHomeUser`: sign-in code and profile. `PlexHomeUser` is Codable, so the app keeps the active profile.
 - `PlexWatchlist`: the profile's watchlist on discover.provider.plex.tv, with the account token. `items(start:size:)`, `contains(guid:)`, `add(guid:)`, `remove(guid:)`. `catalogueKey(guid:)` is nil for titles matched by an older agent, which cannot be watchlisted.
 
 ## Server address (`Connection/`)

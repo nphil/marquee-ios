@@ -29,8 +29,9 @@ public struct PlexPIN: Sendable, Hashable, Decodable {
     }
 }
 
-/// A profile in the user's Plex Home.
-public struct PlexHomeUser: Sendable, Hashable, Identifiable, Decodable {
+/// A profile in the user's Plex Home, or the signed-in account itself (`PlexTV.account()`).
+/// Encodes to the keys it decodes from, so the app can keep the active profile between launches.
+public struct PlexHomeUser: Sendable, Hashable, Identifiable, Codable {
     public var id: Int
     public var uuid: String
     public var title: String
@@ -43,7 +44,7 @@ public struct PlexHomeUser: Sendable, Hashable, Identifiable, Decodable {
     public var isGuest: Bool
 
     enum CodingKeys: String, CodingKey {
-        case id, uuid, title, username, thumb, admin, protected, restricted, guest
+        case id, uuid, title, username, thumb, admin, homeAdmin, protected, restricted, guest
     }
 
     public init(from decoder: any Decoder) throws {
@@ -52,10 +53,23 @@ public struct PlexHomeUser: Sendable, Hashable, Identifiable, Decodable {
         uuid = c.string(.uuid) ?? ""
         title = c.string(.title) ?? c.string(.username) ?? ""
         thumb = c.string(.thumb)
-        isAdmin = c.bool(.admin) ?? false
+        // The Home list says `admin`; the account answer (`/api/v2/user`) says `homeAdmin`.
+        isAdmin = c.bool(.admin) ?? c.bool(.homeAdmin) ?? false
         isProtected = c.bool(.protected) ?? false
         isRestricted = c.bool(.restricted) ?? false
         isGuest = c.bool(.guest) ?? false
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(uuid, forKey: .uuid)
+        try c.encode(title, forKey: .title)
+        try c.encodeIfPresent(thumb, forKey: .thumb)
+        try c.encode(isAdmin, forKey: .admin)
+        try c.encode(isProtected, forKey: .protected)
+        try c.encode(isRestricted, forKey: .restricted)
+        try c.encode(isGuest, forKey: .guest)
     }
 }
 
@@ -117,6 +131,11 @@ public struct PlexTV: Sendable {
     }
 
     // MARK: Account
+
+    /// The user the token belongs to: the account, or the Home profile switched to.
+    public func account() async throws -> PlexHomeUser {
+        try await http.decode(PlexHomeUser.self, from: request(.get, "/api/v2/user"))
+    }
 
     /// Servers the account can use, with this user's token for each.
     public func servers() async throws -> [PlexServer] {

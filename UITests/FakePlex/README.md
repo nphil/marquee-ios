@@ -14,3 +14,5 @@ The UI tests launch the app with `MARQUEE_FAKE_PLEX` set to this folder. `App/Te
 - A write, or an action under `/:/` or `/actions/`, without a fixture answers 200 `{}`. Any other missing fixture answers 404.
 
 The fake server is "Living Room", `fake-server`, at `http://192.0.2.10:32400`.
+
+plex.tv lists four servers of the account and its Home: Living Room (reached locally), Cabin (remote only), Office (relay only) and Studio (Alex's, offline), plus a friend's server the app leaves out. The browser sign-in code is approved at once; the plex.tv/link code never is. The Home has three profiles: Jordan (the account), Alex (PIN 1234) and Kids (restricted).

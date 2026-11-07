@@ -1,0 +1,10 @@
+{
+  "192.0.2.10": "fake-server",
+  "192.0.2.20": null,
+  "203.0.113.20": "fake-cabin",
+  "192.0.2.30": null,
+  "198-51-100-30.fake-office.plex.direct": "fake-office",
+  "192.0.2.40": null,
+  "203.0.113.40": null,
+  "203.0.113.50": "fake-friend"
+}

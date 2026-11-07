@@ -1,0 +1,157 @@
+[
+  {
+    "name": "Living Room",
+    "product": "Plex Media Server",
+    "productVersion": "1.42.1.10060",
+    "provides": "server",
+    "clientIdentifier": "fake-server",
+    "owned": true,
+    "home": false,
+    "sourceTitle": null,
+    "presence": true,
+    "httpsRequired": false,
+    "accessToken": "fake-server-token",
+    "connections": [
+      {
+        "protocol": "http",
+        "address": "192.0.2.10",
+        "port": 32400,
+        "uri": "http://192.0.2.10:32400",
+        "local": true,
+        "relay": false,
+        "IPv6": false
+      }
+    ]
+  },
+  {
+    "name": "Cabin",
+    "product": "Plex Media Server",
+    "productVersion": "1.42.1.10060",
+    "provides": "server",
+    "clientIdentifier": "fake-cabin",
+    "owned": true,
+    "home": false,
+    "sourceTitle": null,
+    "presence": true,
+    "httpsRequired": false,
+    "accessToken": "fake-cabin-token",
+    "connections": [
+      {
+        "protocol": "http",
+        "address": "192.0.2.20",
+        "port": 32400,
+        "uri": "http://192.0.2.20:32400",
+        "local": true,
+        "relay": false,
+        "IPv6": false
+      },
+      {
+        "protocol": "https",
+        "address": "203.0.113.20",
+        "port": 32400,
+        "uri": "https://203.0.113.20:32400",
+        "local": false,
+        "relay": false,
+        "IPv6": false
+      }
+    ]
+  },
+  {
+    "name": "Office",
+    "product": "Plex Media Server",
+    "productVersion": "1.42.1.10060",
+    "provides": "server",
+    "clientIdentifier": "fake-office",
+    "owned": true,
+    "home": false,
+    "sourceTitle": null,
+    "presence": true,
+    "httpsRequired": false,
+    "accessToken": "fake-office-token",
+    "connections": [
+      {
+        "protocol": "http",
+        "address": "192.0.2.30",
+        "port": 32400,
+        "uri": "http://192.0.2.30:32400",
+        "local": true,
+        "relay": false,
+        "IPv6": false
+      },
+      {
+        "protocol": "https",
+        "address": "198-51-100-30.fake-office.plex.direct",
+        "port": 8443,
+        "uri": "https://198-51-100-30.fake-office.plex.direct:8443",
+        "local": false,
+        "relay": true,
+        "IPv6": false
+      }
+    ]
+  },
+  {
+    "name": "Studio",
+    "product": "Plex Media Server",
+    "productVersion": "1.42.1.10060",
+    "provides": "server",
+    "clientIdentifier": "fake-studio",
+    "owned": false,
+    "home": true,
+    "sourceTitle": "Alex",
+    "presence": false,
+    "httpsRequired": false,
+    "accessToken": "fake-studio-token",
+    "connections": [
+      {
+        "protocol": "http",
+        "address": "192.0.2.40",
+        "port": 32400,
+        "uri": "http://192.0.2.40:32400",
+        "local": true,
+        "relay": false,
+        "IPv6": false
+      },
+      {
+        "protocol": "https",
+        "address": "203.0.113.40",
+        "port": 32400,
+        "uri": "https://203.0.113.40:32400",
+        "local": false,
+        "relay": false,
+        "IPv6": false
+      }
+    ]
+  },
+  {
+    "name": "Friend's Server",
+    "product": "Plex Media Server",
+    "productVersion": "1.42.1.10060",
+    "provides": "server",
+    "clientIdentifier": "fake-friend",
+    "owned": false,
+    "home": false,
+    "sourceTitle": "Sam",
+    "presence": true,
+    "httpsRequired": false,
+    "accessToken": "fake-friend-token",
+    "connections": [
+      {
+        "protocol": "https",
+        "address": "203.0.113.50",
+        "port": 32400,
+        "uri": "https://203.0.113.50:32400",
+        "local": false,
+        "relay": false,
+        "IPv6": false
+      }
+    ]
+  },
+  {
+    "name": "Living Room Player",
+    "product": "Plex for Apple TV",
+    "provides": "client,player",
+    "clientIdentifier": "fake-player",
+    "owned": true,
+    "connections": []
+  }
+]

@@ -67,6 +67,24 @@ struct PlexTVTests {
         #expect(fromWrapped.first?.isProtected == true && fromWrapped.first?.isRestricted == true)
     }
 
+    @Test func accountReadsTheSignedInUser() async throws {
+        let body = json(["id": 1, "uuid": "u1", "username": "owner", "title": "Owner", "homeAdmin": true, "protected": false])
+        let transport = FakeTransport { _, _ in body }
+
+        let user = try await plexTV(transport).account()
+
+        #expect(user.uuid == "u1" && user.title == "Owner" && user.isAdmin && !user.isProtected)
+        #expect(await transport.requests(to: "/api/v2/user").count == 1)
+    }
+
+    @Test func homeUserSurvivesEncoding() throws {
+        let kid = try decode(PlexHomeUser.self, ["id": 9, "uuid": "u9", "title": "Kid", "thumb": "https://plex.tv/a.png", "protected": "1", "restricted": true])
+
+        let copy = try JSONDecoder().decode(PlexHomeUser.self, from: JSONEncoder().encode(kid))
+
+        #expect(copy == kid)
+    }
+
     @Test func wrongProfilePINIsReportedAsSuch() async throws {
         let transport = FakeTransport { request, _ in
             request.url.query("pin") == "1234"

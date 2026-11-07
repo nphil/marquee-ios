@@ -1,0 +1,13 @@
+{
+  "id": 1,
+  "uuid": "fake-owner",
+  "username": "jordan",
+  "title": "Jordan",
+  "thumb": "https://plex.tv/users/fake-owner/avatar.png",
+  "homeAdmin": true,
+  "protected": false,
+  "restricted": false,
+  "guest": false,
+  "home": true,
+  "authToken": "fake-account-token"
+}
