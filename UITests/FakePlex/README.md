@@ -24,6 +24,8 @@ Living Room has two libraries. Movies holds eleven Blender open movies: Sintel i
 
 Living Room has an antenna DVR with one four-tuner HDHomeRun and eight channels, 2.1 Metro 2 to 46.1 Music 46, guided from 7 PM to 11 PM the next day. The provider groups them into News, Sports, Movies and Kids. News 7 Tonight is recording, Harbour Lights failed to record at 8 PM, City Desk (new airings only) and Wild Coasts record as series, and Open Movie Night's Sintel as a single episode. Record offers every airing as This Episode or All Episodes. Asked for episodes, TV Shows lists five past recordings. Movies 5 and Public 13 are favourites; News 7, Metro 2 and Sports 9 were watched last. Music 46 has no logo, so its call sign stands in. Channels, programmes and logos are invented; Open Movie Night airs the Blender films with their frames.
 
+The player tests play Caminandes episode 2, Gran Dillama (`212`): an intro from 0:05 to 0:35, final credits from 2:10, Spanish audio beside the English, and English, English SDH and Spanish subtitles. `pms/playQueues@continuous=1.json` queues the season around it.
+
 ## Artwork
 
 `art/` holds frames from the films, cropped and resized to posters (400 × 600), backdrops (960 × 540) and episode stills (640 × 360). Each film's licence applies to its frames; the frames from the two CC BY-SA films are shared under CC BY-SA 3.0 as well. The source videos are on Wikimedia Commons.

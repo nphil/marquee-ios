@@ -66,10 +66,64 @@
           "languageCode": "eng",
           "displayTitle": "English (AAC Stereo)",
           "extendedDisplayTitle": "English (AAC Stereo)"
+         },
+         {
+          "id": 21213,
+          "streamType": 2,
+          "codec": "aac",
+          "channels": 2,
+          "language": "Español",
+          "languageCode": "spa",
+          "displayTitle": "Español (AAC Stereo)",
+          "extendedDisplayTitle": "Español (AAC Stereo)"
+         },
+         {
+          "id": 21214,
+          "streamType": 3,
+          "codec": "mov_text",
+          "language": "English",
+          "languageCode": "eng",
+          "displayTitle": "English (MOV_TEXT)",
+          "extendedDisplayTitle": "English (MOV_TEXT)"
+         },
+         {
+          "id": 21215,
+          "streamType": 3,
+          "codec": "mov_text",
+          "language": "English",
+          "languageCode": "eng",
+          "title": "SDH",
+          "hearingImpaired": true,
+          "displayTitle": "English SDH (MOV_TEXT)",
+          "extendedDisplayTitle": "SDH (English MOV_TEXT)"
+         },
+         {
+          "id": 21216,
+          "streamType": 3,
+          "codec": "mov_text",
+          "language": "Español",
+          "languageCode": "spa",
+          "displayTitle": "Español (MOV_TEXT)",
+          "extendedDisplayTitle": "Español (MOV_TEXT)"
          }
         ]
        }
       ]
+     }
+    ],
+    "Marker": [
+     {
+      "id": 21291,
+      "type": "intro",
+      "startTimeOffset": 5000,
+      "endTimeOffset": 35000
+     },
+     {
+      "id": 21292,
+      "type": "credits",
+      "startTimeOffset": 130000,
+      "endTimeOffset": 146000,
+      "final": true
      }
     ]
    }
