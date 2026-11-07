@@ -177,7 +177,8 @@ private struct LiveGuideScreen: View {
                     mark: airing.flatMap { store.mark(for: $0) },
                     canRecord: store.canRecord,
                     isFavourite: store.isFavourite(channel),
-                    actions: actions
+                    actions: actions,
+                    surface: theme.canvas
                 )
             }
         }
