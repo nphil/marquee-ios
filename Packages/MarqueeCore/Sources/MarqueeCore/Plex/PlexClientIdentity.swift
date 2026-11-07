@@ -79,6 +79,8 @@ public enum PlexHeader {
     public static let token = "X-Plex-Token"
     public static let containerStart = "X-Plex-Container-Start"
     public static let containerSize = "X-Plex-Container-Size"
+    /// Ties requests to one playback session, e.g. timeline reports to their transcode.
+    public static let sessionIdentifier = "X-Plex-Session-Identifier"
 }
 
 extension URL {
