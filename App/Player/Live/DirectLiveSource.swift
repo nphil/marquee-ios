@@ -42,6 +42,9 @@ final class DirectLiveSource: LiveVideoSource {
 
     func play(_ channel: LiveChannel) async {
         self.channel = channel
+        #if DEBUG
+        if FakeTuner.isActive { return FakeTuner.play(on: player) }
+        #endif
         player.open(channel.device.streamURL(channel))
     }
 

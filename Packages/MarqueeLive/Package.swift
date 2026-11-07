@@ -9,6 +9,8 @@ let package = Package(
     platforms: [.iOS("27.0")],
     products: [
         .library(name: "MarqueeLive", targets: ["MarqueeLive", "LiveEngine"]),
+        // The app's debug builds play it in UI tests and screenshots.
+        .library(name: "LiveFixtures", targets: ["LiveFixtures"]),
     ],
     dependencies: [
         // The same pin as the app's VideoEngine, so both resolve to one checkout.
@@ -17,7 +19,7 @@ let package = Package(
     targets: [
         // Platform-neutral: no AVFoundation, so a scratch package can test it on Linux.
         .target(name: "LiveEngine", dependencies: [ffmpeg]),
-        .target(name: "LiveFixtures", dependencies: [ffmpeg]),
+        .target(name: "LiveFixtures", dependencies: ["LiveEngine", ffmpeg]),
         .target(name: "MarqueeLive", dependencies: ["LiveEngine", ffmpeg]),
         .testTarget(name: "LiveEngineTests", dependencies: ["LiveEngine", "LiveFixtures", ffmpeg]),
         .testTarget(name: "MarqueeLiveTests", dependencies: ["MarqueeLive", "LiveEngine", "LiveFixtures", ffmpeg]),

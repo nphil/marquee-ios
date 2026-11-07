@@ -18,7 +18,7 @@ public final class ByteRing: @unchecked Sendable {
     private var read: Int64 = 0
     private var droppedBytes: Int64 = 0
     private var finished = false
-    private var isCancelled = false
+    private var cancelled = false
 
     public let capacity: Int
 
@@ -34,7 +34,7 @@ public final class ByteRing: @unchecked Sendable {
         guard !bytes.isEmpty, let base = bytes.baseAddress else { return }
         condition.lock()
         defer { condition.unlock() }
-        guard !finished, !isCancelled else { return }
+        guard !finished, !cancelled else { return }
         // Only the newest `capacity` bytes of an oversized write can survive.
         let skipped = max(0, bytes.count - capacity)
         let count = bytes.count - skipped
@@ -69,9 +69,16 @@ public final class ByteRing: @unchecked Sendable {
     /// Wakes a waiting reader with `.cancelled`; later reads return it too.
     public func cancel() {
         condition.lock()
-        isCancelled = true
+        cancelled = true
         condition.broadcast()
         condition.unlock()
+    }
+
+    /// Whether the reader is gone, so a writer can stop.
+    public var isCancelled: Bool {
+        condition.lock()
+        defer { condition.unlock() }
+        return cancelled
     }
 
     /// Blocks until at least one byte is available, the writer finishes or the ring is cancelled.
@@ -79,8 +86,8 @@ public final class ByteRing: @unchecked Sendable {
         guard !buffer.isEmpty, let target = buffer.baseAddress else { return .bytes(0) }
         condition.lock()
         defer { condition.unlock() }
-        while written == read, !finished, !isCancelled { condition.wait() }
-        if isCancelled { return .cancelled }
+        while written == read, !finished, !cancelled { condition.wait() }
+        if cancelled { return .cancelled }
         let available = Int(written - read)
         if available == 0 { return .end }
         let count = min(available, buffer.count)

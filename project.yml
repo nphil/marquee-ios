@@ -46,6 +46,9 @@ targets:
       - package: MarqueeCore
       - package: MarqueeLive
         product: MarqueeLive
+      # Debug builds play its synthetic tuner in UI tests (App/Testing/FakeTuner.swift).
+      - package: MarqueeLive
+        product: LiveFixtures
       - package: VideoEngine
         product: VideoEngine
     info:
