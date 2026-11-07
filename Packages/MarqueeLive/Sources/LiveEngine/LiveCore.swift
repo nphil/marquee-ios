@@ -52,6 +52,8 @@ public struct LiveTimings: Sendable, Equatable {
     public var picture: Double?
     /// Motion and sound started.
     public var sound: Double?
+
+    public init() {}
 }
 
 /// Playback's state for the diagnostics line.
@@ -67,6 +69,8 @@ public struct LiveDiagnostics: Sendable, Equatable {
     /// Pictures dropped: late, corrupt, or behind a re-anchor.
     public var drops = 0
     public var underruns = 0
+
+    public init() {}
 
     /// "slate 0.21 s · picture 1.62 s · sound 2.18 s · MPEG-2 720×480i bwdif · AC-3 5.1→2.0 · J 0.30 s · buf 0.33 s ·
     /// rate 1.002 · drops 0", leaving out what is not known yet.
