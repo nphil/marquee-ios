@@ -6,7 +6,7 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 - **Sign-in on the phone:** the Plex PIN (link code) flow and QR sign-in are not confirmed in this pass. The TV uses QR sign-in. Check the Plex auth docs before designing this.
 - **Choosing a server connection:** the order of local, remote, relay and https is not confirmed in this pass. The README says relay and https are supported but not verified end to end.
 - **Skip interval default:** the options are 5, 10, 15, 30 or 60 seconds (`locales/en/settings.json` ~778–790). The default was not confirmed.
-- **Playback speed:** no speed control shows up in the docs or strings checked. [INFERENCE] the TV has none.
+- **Playback speed:** More menu › Playback Speed: 0.5×, 0.75×, Normal, 1.25×, 1.5×, 1.75×, 2×. Each new item starts at Normal.
 - **Watched threshold:** about 90% of the length (`docs/pms-api.md` 1392). This was measured on one server version, so treat it as approximate.
 - **Not verified on real hardware:** SpeechDock word timing, Reveal-as-spoken, and the TV decoder details.
 
@@ -184,7 +184,7 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 
 **Playback codecs:** direct play for H.264 and HEVC (up to 4K, 10-bit, Dolby Vision profiles 5 and 8, E-AC-3 Atmos). AV1 and VP9 where the TV's table lists them. Anything else is transcoded.
 
-**Playback speed:** no control found. [INFERENCE] none on TV, so none to port unless the owner wants one.
+**Playback speed:** seven speeds from 0.5× to 2× in the More menu, Normal in the middle; a new item starts at Normal and live TV has no speed control.
 
 ---
 

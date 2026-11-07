@@ -58,6 +58,57 @@ struct PlexLibraryTests {
         #expect(items.contains(URLQueryItem(name: "genre", value: "27")))
     }
 
+    @Test func sortRunsEitherWayFromItsFirstOrderAndRandomHasNone() {
+        #expect(SectionQuery(type: .movie).sortKey == "titleSort")
+        #expect(SectionQuery(type: .movie, reversed: true).sortKey == "titleSort:desc")
+        #expect(SectionQuery(type: .movie, sort: .audienceRating).sortKey == "audienceRating:desc")
+        #expect(SectionQuery(type: .movie, sort: .recentlyWatched, reversed: true).sortKey == "lastViewedAt")
+        #expect(SectionQuery(type: .movie, sort: .random, reversed: true).sortKey == "random")
+        #expect(SectionQuery(type: .movie).isAlphabetical && !SectionQuery(type: .movie, reversed: true).isAlphabetical)
+    }
+
+    @Test func personTitlesComeFromEveryLibraryInOneRequest() async throws {
+        let (library, transport) = Self.library { _ in
+            container(["Metadata": [["ratingKey": "1", "type": "movie"], ["ratingKey": "2", "type": "show"]]])
+        }
+
+        let titles = try await library.titles(ofPerson: "161")
+
+        #expect(titles.map(\.type) == [.movie, .show])
+        #expect(await transport.requests(to: "/library/people/161/media").count == 1)
+    }
+
+    @Test func extrasCarryTheirKind() async throws {
+        let (library, transport) = Self.library { _ in
+            container(["Metadata": [["ratingKey": "70", "type": "clip", "subtype": "trailer", "extraType": 1]]])
+        }
+
+        let extras = try await library.extras(of: "12")
+
+        #expect(extras.first?.type == .clip && extras.first?.extraType == 1 && extras.first?.subtype == "trailer")
+        #expect(await transport.requests(to: "/library/metadata/12/extras").count == 1)
+    }
+
+    @Test func serverRootSaysWhetherDeletingIsAllowedAndPlexPass() async throws {
+        let (library, _) = Self.library { _ in container(["allowMediaDeletion": true, "myPlexSubscription": "1"]) }
+        let (bare, _) = Self.library { _ in container([:]) }
+
+        #expect(try await library.serverInfo() == PlexServerInfo(allowsMediaDeletion: true, hasPlexPass: true))
+        #expect(try await bare.serverInfo() == PlexServerInfo())
+    }
+
+    @Test func deleteRemovesATitleOrOneVersionAndSurfacesARefusal() async throws {
+        let (library, transport) = Self.library { _ in json([String: Any]()) }
+        let (refusing, _) = Self.library { _ in json([String: Any](), status: 403) }
+
+        try await library.delete("12")
+        try await library.deleteVersion(5, of: "12")
+
+        #expect(await transport.requests(to: "/library/metadata/12").map(\.method) == [.delete])
+        #expect(await transport.requests(to: "/library/metadata/12/media/5").map(\.method) == [.delete])
+        await #expect(throws: PlexError.server(status: 403, message: nil)) { try await refusing.delete("12") }
+    }
+
     @Test func listOfAServerKeyKeepsItsQueryAndPages() async throws {
         let (library, transport) = Self.library { _ in
             container(["size": 1, "totalSize": 75, "Metadata": [["ratingKey": "9"]]])
@@ -170,6 +221,7 @@ struct PlexLibraryTests {
         let request = TranscodeRequest(item: item, route: route, offset: 90, session: "s-1")
         var slow = route
         slow.maxVideoBitrateKbps = 3_000
+        slow.videoResolution = "1280x720"
 
         let url = try await library.transcodeURL(request)
 
@@ -183,5 +235,24 @@ struct PlexLibraryTests {
         #expect(url.query("offset") == "90.0")
         #expect(url.query("session") == "s-1")
         #expect(TranscodeRequest(item: item, route: slow).maxVideoBitrateKbps == 3_000)
+        #expect(TranscodeRequest(item: item, route: slow).videoResolution == "1280x720")
+    }
+
+    @Test func audioEnhancementsAreSentOnlyWhenOnAndConvertTheAudio() throws {
+        let item = try decode(PlexMetadata.self, ["ratingKey": "12", "Media": [["id": 1, "Part": [["id": 7]]]]])
+        let route = PlaybackRoute(
+            kind: .serverTranscode, reasons: [.audioEnhancement], audio: nil, audioIsStandIn: false,
+            convertsAudio: false, reencodesVideo: false, subtitle: .none
+        )
+        var boostedRoute = route
+        boostedRoute.audioEnhancements = .boostDialog
+        let plain = Dictionary(uniqueKeysWithValues: TranscodeRequest(item: item, route: route).queryItems(location: "lan").map { ($0.name, $0.value) })
+        let boosted = Dictionary(
+            uniqueKeysWithValues: TranscodeRequest(item: item, route: boostedRoute).queryItems(location: "lan").map { ($0.name, $0.value) }
+        )
+
+        #expect(plain["boostDialog"] == nil && plain["normalizeLoudness"] == nil && plain["directStreamAudio"] == "1")
+        #expect(boosted["boostDialog"] == "1" && boosted["normalizeLoudness"] == nil && boosted["directStreamAudio"] == "0")
+        #expect(boosted["directStream"] == "1")
     }
 }

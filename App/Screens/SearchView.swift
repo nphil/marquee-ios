@@ -254,7 +254,7 @@ private struct ResultRow: View {
             detail = role
             art = person.thumb
             isPerson = true
-            route = .hub(key: person.key, title: name)
+            route = person.id.map { .person(id: $0, name: name, thumb: person.thumb) } ?? .hub(key: person.key, title: name)
         }
     }
 

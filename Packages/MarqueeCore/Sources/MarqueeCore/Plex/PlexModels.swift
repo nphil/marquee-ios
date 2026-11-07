@@ -16,6 +16,10 @@ public struct PlexMediaContainer: Sendable, Decodable {
     public var totalSize: Int?
     public var offset: Int?
     public var machineIdentifier: String?
+    /// On the server root (`/`): the owner lets media be deleted from the apps.
+    public var allowMediaDeletion: Bool
+    /// On the server root (`/`): the owner has Plex Pass.
+    public var myPlexSubscription: Bool
     public var metadata: [PlexMetadata]
     public var hubs: [PlexHub]
     public var directories: [PlexDirectory]
@@ -26,7 +30,7 @@ public struct PlexMediaContainer: Sendable, Decodable {
     public var playQueueVersion: Int?
 
     enum CodingKeys: String, CodingKey {
-        case size, totalSize, offset, machineIdentifier
+        case size, totalSize, offset, machineIdentifier, allowMediaDeletion, myPlexSubscription
         case metadata = "Metadata", hubs = "Hub", directories = "Directory"
         case playQueueID, playQueueSelectedItemID, playQueueSelectedItemOffset, playQueueTotalCount, playQueueVersion
     }
@@ -37,6 +41,8 @@ public struct PlexMediaContainer: Sendable, Decodable {
         totalSize = c.int(.totalSize)
         offset = c.int(.offset)
         machineIdentifier = c.string(.machineIdentifier)
+        allowMediaDeletion = c.bool(.allowMediaDeletion) ?? false
+        myPlexSubscription = c.bool(.myPlexSubscription) ?? false
         metadata = c.list(.metadata)
         hubs = c.list(.hubs)
         directories = c.list(.directories)
@@ -76,8 +82,13 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
     public var key: String
     public var guid: String?
     public var type: PlexMediaType
-    /// What a collection holds: `movie` or `show`.
+    /// What a collection holds (`movie` or `show`), or an extra's kind (`trailer`).
     public var subtype: String?
+    /// An extra's kind as a number: 1 trailer, 2 deleted scene, 3 interview, 5 behind the scenes, 6 scene,
+    /// 10 featurette, 11 short.
+    public var extraType: Int?
+    /// The main trailer's key, "/library/metadata/1073", on a title that has one.
+    public var primaryExtraKey: String?
     public var title: String
     public var titleSort: String?
     public var originalTitle: String?
@@ -133,7 +144,8 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
     private var onDeckItems: [PlexMetadata]
 
     enum CodingKeys: String, CodingKey {
-        case ratingKey, key, guid, type, subtype, title, titleSort, originalTitle, summary, tagline, year, index, parentIndex
+        case ratingKey, key, guid, type, subtype, extraType, primaryExtraKey, title, titleSort, originalTitle, summary, tagline, year
+        case index, parentIndex
         case parentRatingKey, parentTitle, grandparentRatingKey, grandparentTitle
         case thumb, art, parentThumb, grandparentThumb, grandparentArt
         case duration, viewOffset, viewCount, leafCount, viewedLeafCount, childCount
@@ -150,6 +162,8 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
         guid = c.string(.guid)
         type = PlexMediaType(plex: c.string(.type))
         subtype = c.string(.subtype)
+        extraType = c.int(.extraType)
+        primaryExtraKey = c.string(.primaryExtraKey)
         title = c.string(.title) ?? ""
         titleSort = c.string(.titleSort)
         originalTitle = c.string(.originalTitle)
@@ -347,6 +361,9 @@ public struct PlexStream: Sendable, Hashable, Identifiable, Decodable {
     public var isVisualImpaired: Bool
     /// Closed captions carried inside the video stream (CEA-608/708).
     public var isEmbeddedInVideo: Bool
+    /// An audio track the server has analysed for loudness, so Boost dialog and Normalize loudness can
+    /// work on it (PMS 1.43.4 and later).
+    public var canNormalizeLoudness: Bool
     public var channels: Int?
     public var audioChannelLayout: String?
     public var samplingRate: Int?
@@ -376,7 +393,7 @@ public struct PlexStream: Sendable, Hashable, Identifiable, Decodable {
     enum CodingKeys: String, CodingKey {
         case id, streamType, index, key, codec, format, language, languageCode, languageTag
         case title, displayTitle, extendedDisplayTitle
-        case isDefault = "default", selected, forced, hearingImpaired, visualImpaired, embeddedInVideo
+        case isDefault = "default", selected, forced, hearingImpaired, visualImpaired, embeddedInVideo, canNormalizeLoudness
         case channels, audioChannelLayout, samplingRate, bitrate, profile, level, bitDepth, chromaSubsampling
         case colorPrimaries, colorTrc, colorSpace, frameRate, width, height
         case doviPresent = "DOVIPresent", doviProfile = "DOVIProfile", doviLevel = "DOVILevel"
@@ -403,6 +420,7 @@ public struct PlexStream: Sendable, Hashable, Identifiable, Decodable {
         isHearingImpaired = c.bool(.hearingImpaired) ?? false
         isVisualImpaired = c.bool(.visualImpaired) ?? false
         isEmbeddedInVideo = c.bool(.embeddedInVideo) ?? false
+        canNormalizeLoudness = c.bool(.canNormalizeLoudness) ?? false
         channels = c.int(.channels)
         audioChannelLayout = c.string(.audioChannelLayout)
         samplingRate = c.int(.samplingRate)
@@ -497,16 +515,19 @@ public struct PlexChapter: Sendable, Hashable, Decodable {
 
 /// A cast member.
 public struct PlexRole: Sendable, Hashable, Decodable {
+    /// The person's id, for `PlexLibrary.titles(ofPerson:)`; nil on trimmed lists such as search rows.
+    public var id: String?
     public var name: String
     public var character: String?
     public var thumb: String?
 
     enum CodingKeys: String, CodingKey {
-        case tag, role, thumb
+        case id, tag, role, thumb
     }
 
     public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = c.string(.id)
         name = c.string(.tag) ?? ""
         character = c.string(.role)
         thumb = c.string(.thumb)
@@ -572,6 +593,8 @@ public struct PlexDirectory: Sendable, Hashable, Decodable {
     public var title: String
     /// Name of a person or tag.
     public var tag: String?
+    /// A person's or tag's id, e.g. for `PlexLibrary.titles(ofPerson:)`.
+    public var id: String?
     /// `movie`, `show`.
     public var type: String?
     /// Items behind the entry, e.g. titles starting with the letter.
@@ -581,7 +604,7 @@ public struct PlexDirectory: Sendable, Hashable, Decodable {
     public var uuid: String?
 
     enum CodingKeys: String, CodingKey {
-        case key, title, tag, type, size, thumb, art, uuid
+        case key, title, tag, id, type, size, thumb, art, uuid
     }
 
     public init(from decoder: any Decoder) throws {
@@ -589,6 +612,7 @@ public struct PlexDirectory: Sendable, Hashable, Decodable {
         key = c.string(.key) ?? ""
         title = c.string(.title) ?? ""
         tag = c.string(.tag)
+        id = c.string(.id)
         type = c.string(.type)
         size = c.int(.size) ?? 0
         thumb = c.string(.thumb)

@@ -7,6 +7,7 @@ struct SettingsView: View {
     @Environment(\.theme) private var theme
     @Environment(ThemeStore.self) private var store
     @State private var confirmingSignOut = false
+    @State private var confirmingDelete = false
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
@@ -74,6 +75,32 @@ struct SettingsView: View {
             }
             .listRowBackground(theme.sheet)
 
+            Section("Library") {
+                NavigationLink {
+                    FavoriteLibrariesView()
+                } label: {
+                    LabeledContent {
+                        Text(session.settings.hiddenLibraries.isEmpty ? "All" : "Some")
+                            .foregroundStyle(theme.ink2)
+                    } label: {
+                        Text("Favorite Libraries")
+                    }
+                }
+                .accessibilityIdentifier("settings.favoriteLibraries")
+                NavigationLink {
+                    UnderPostersView()
+                } label: {
+                    LabeledContent {
+                        Text(session.settings.posterLabels.summary)
+                            .foregroundStyle(theme.ink2)
+                    } label: {
+                        Text("Under Posters")
+                    }
+                }
+                .accessibilityIdentifier("settings.underPosters")
+            }
+            .listRowBackground(theme.sheet)
+
             Section {
                 NavigationLink("Video & Playback") {
                     VideoPlaybackSettingsView()
@@ -127,6 +154,30 @@ struct SettingsView: View {
                 .accessibilityIdentifier("settings.signOut")
                 // On the button, so the dialog points at the row that opened it.
                 .signOutConfirmation(isPresented: $confirmingSignOut, session: session)
+            }
+            .listRowBackground(theme.sheet)
+
+            Section {
+                Button("Delete All Local Data", role: .destructive) {
+                    confirmingDelete = true
+                }
+                .accessibilityIdentifier("settings.deleteData")
+                .confirmationDialog("Delete all local data?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+                    Button("Delete All Local Data", role: .destructive) {
+                        let store = store
+                        Task {
+                            await session.deleteAllLocalData()
+                            store.reset()
+                        }
+                    }
+                    .accessibilityIdentifier("settings.deleteData.confirm")
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("This signs out and removes everything Marquee keeps on this iPhone: the sign-in, every profile's settings, remembered tracks, themes, Live TV lists and cached artwork. Nothing on the Plex server changes.")
+                }
+            } footer: {
+                Text("Signs out and returns Marquee to how it was when first installed.")
+                    .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)
         }

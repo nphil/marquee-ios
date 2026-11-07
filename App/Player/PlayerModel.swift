@@ -102,6 +102,25 @@ final class PlayerModel: Identifiable {
     private(set) var chromeVisible = true
     private(set) var isScrubbing = false
     private(set) var aspect: VideoAspect
+    /// Playback speed, 1 for normal; back to normal for each new item.
+    private(set) var speed: Float = 1
+    /// Boost dialog and Normalize loudness for this video.
+    private(set) var enhancements = EnhancementState()
+    /// The server refused them on this item: off until the next one.
+    @ObservationIgnored private var enhancementRefused = false
+
+    struct EnhancementState: Equatable {
+        /// The server is the owner's with Plex Pass; without it the toggles do not show.
+        var offered = false
+        var asked: AudioEnhancements = []
+        /// Why they do not apply to this video; nil when they do.
+        var unavailable: String?
+        /// Under the toggles while one applies.
+        var note: String?
+    }
+
+    /// The highest quality videos play at; picking one here changes Settings' default too.
+    var quality: VideoQuality { session.settings.quality }
     var showsInfo = false
     var showsStyle = false
     var showsStats = false
@@ -298,6 +317,20 @@ final class PlayerModel: Identifiable {
         get { aspect }
         set { setAspect(newValue) }
     }
+
+    var qualityPick: VideoQuality {
+        get { quality }
+        set { setQuality(newValue) }
+    }
+
+    var speedPick: Float {
+        get { speed }
+        set { setSpeed(newValue) }
+    }
+
+    /// The picture is being re-encoded at Original quality, for the More menu's "Original · Converted".
+    var isConverting: Bool { route?.reencodesVideo == true }
+    var forcesDirectPlay: Bool { session.settings.directPlay == .force }
 
     var isEpisode: Bool { item.type == .episode }
 
@@ -518,6 +551,25 @@ final class PlayerModel: Identifiable {
         scheduleHide()
     }
 
+    func setQuality(_ quality: VideoQuality) {
+        scheduleHide()
+        guard quality != session.settings.quality else { return }
+        session.settings.quality = quality
+        reroute(handPick: false)
+    }
+
+    func setSpeed(_ speed: Float) {
+        self.speed = speed
+        backend.rate = speed
+        scheduleHide()
+    }
+
+    func toggleEnhancement(_ enhancement: AudioEnhancements) {
+        session.settings.audioEnhancements.formSymmetricDifference(enhancement)
+        scheduleHide()
+        reroute(handPick: false)
+    }
+
     func togglePictureInPicture() {
         guard let pictureInPicture else { return }
         if pictureInPicture.isActive { pictureInPicture.stop() } else { pictureInPicture.start() }
@@ -571,6 +623,9 @@ final class PlayerModel: Identifiable {
         generation += 1
         let generation = generation
         enterLoading()
+        speed = 1
+        backend.rate = 1
+        enhancementRefused = false
         loadTask?.cancel()
         loadTask = Task { [weak self] in
             guard let self else { return }
@@ -631,16 +686,33 @@ final class PlayerModel: Identifiable {
         case .force:
             return RouteLimits(phoneOnly: true)
         case .disabled:
-            return RouteLimits(serverReason: .directPlayOff)
+            return RouteLimits(serverReason: .directPlayOff, quality: session.settings.quality)
         case .auto:
             // A file that failed on the phone earlier in this run goes straight to the server when reopened.
             let failedBefore = part.map { session.player.phoneFailures.contains($0.id) } ?? false
             return RouteLimits(
                 serverReason: onDeviceFailed || failedBefore ? .onDeviceFailed : nil,
+                quality: session.settings.quality,
                 remoteConnection: connection.map { !$0.isLocal } ?? false,
                 linkKbps: connection.flatMap { session.player.linkKbps[$0.uri] }
             )
         }
+    }
+
+    /// Why Boost dialog and Normalize loudness cannot apply to this video, given `base`, the route
+    /// without them; nil when they can.
+    private func enhancementBlock(base: PlaybackRoute, audio: AudioTrack?) -> String? {
+        if session.settings.directPlay == .force {
+            return "Not available while Force Direct Play is on. Set Direct Play to Auto in Settings to use it."
+        }
+        if session.settings.quality != .original { return "Available only at Original quality." }
+        if base.reencodesVideo { return "Not available while your Plex server converts this video." }
+        if part?.videoStream?.dolbyVision?.profile == 5 { return "Not available for this Dolby Vision video." }
+        if audio?.canNormalizeLoudness != true {
+            return "Not ready for this video yet. Your Plex server needs to scan its sound first."
+        }
+        if enhancementRefused { return "Your Plex server couldn't turn this on for this video." }
+        return nil
     }
 
     private func decideRoute() async {
@@ -668,10 +740,31 @@ final class PlayerModel: Identifiable {
         }
         // A server stream shows embedded image subtitles only burned in, which an automatic pick never
         // asks for; it moves to a text track instead.
+        var drawsImages = true
         if route.kind == .serverTranscode, decision.source != .handPick, decision.source != .remembered,
            let track = decision.track, track.isImageBased, !track.isExternal {
+            drawsImages = false
             (decision, route) = decide(drawsImages: false)
         }
+        // Boost dialog and Normalize loudness are the server's: it copies the video and reworks the sound.
+        // They never ride on a stream it re-encodes anyway.
+        let offered = session.serverInfo.hasPlexPass
+        var block = enhancementBlock(base: route, audio: picked)
+        if offered, !settings.audioEnhancements.isEmpty, block == nil {
+            limits.audioEnhancements = settings.audioEnhancements
+            let enhanced = decide(drawsImages: drawsImages)
+            if enhanced.1.reencodesVideo {
+                block = "Your Plex server can't add this to this video right now."
+            } else {
+                (decision, route) = enhanced
+            }
+        }
+        enhancements = EnhancementState(
+            offered: offered,
+            asked: settings.audioEnhancements,
+            unavailable: block,
+            note: !route.audioEnhancements.isEmpty && decision.track != nil ? "Subtitles won't change." : nil
+        )
         subtitle = decision
         self.route = route
         audio = route.audio
@@ -911,6 +1004,17 @@ final class PlayerModel: Identifiable {
             onDeviceFailed = true
             if let part { session.player.phoneFailures.insert(part.id) }
             fallback = failure.detail
+            stopStream()
+            enterLoading()
+            loadTask = Task { [weak self] in
+                guard let self else { return }
+                await decideRoute()
+                guard generation == self.generation else { return }
+                await startStream(at: at, generation: generation)
+            }
+        case .serverTranscode where !route.audioEnhancements.isEmpty && !enhancementRefused:
+            // Refused with the sound reworked: the same video plays without it.
+            enhancementRefused = true
             stopStream()
             enterLoading()
             loadTask = Task { [weak self] in

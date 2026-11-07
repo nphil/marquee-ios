@@ -25,6 +25,11 @@ public struct PlaybackRoute: Sendable, Hashable {
     public var reencodesVideo: Bool
     /// The rate the server encodes the video under, when a reason sets one; nil leaves the default.
     public var maxVideoBitrateKbps: Int?
+    /// The picture size the server encodes the video down to, "1280x720", when the picked quality is
+    /// smaller than the file; nil keeps the file's size.
+    public var videoResolution: String?
+    /// What the server does to the audio on a server stream; empty on the phone's routes.
+    public var audioEnhancements: AudioEnhancements = []
     public var subtitle: SubtitleDelivery
 }
 
@@ -75,13 +80,16 @@ public enum RouteReason: Sendable, Hashable, CustomStringConvertible {
     /// The link to the server, as last measured, carries less than the file's bitrate with a quarter to
     /// spare; the server re-encodes the video to fit it.
     case slowLink(kbps: Int)
+    /// Boost dialog or Normalize loudness is on, which only the server's audio conversion can do.
+    case audioEnhancement
 
     /// The server has to re-encode the video for this reason.
     var needsReencode: Bool {
         switch self {
         case .videoCodec, .videoFormat, .dolbyVision, .hdrOnSDRScreen, .levelOrFrameRate, .bitrateLimit, .burnsSubtitle, .slowLink:
             true
-        case .container, .hevcTag, .dolbyVisionBaseLayer, .audio, .onDeviceFailed, .directPlayOff, .airPlay, .remoteConnection:
+        case .container, .hevcTag, .dolbyVisionBaseLayer, .audio, .onDeviceFailed, .directPlayOff, .airPlay, .remoteConnection,
+             .audioEnhancement:
             false
         }
     }
@@ -104,8 +112,50 @@ public enum RouteReason: Sendable, Hashable, CustomStringConvertible {
         case .airPlay: "AirPlay needs a server stream"
         case .remoteConnection: "Server reached over the internet"
         case .slowLink(let kbps): "Link measured at \(Double(kbps / 100) / 10) Mbps"
+        case .audioEnhancement: "Boost dialog or Normalize loudness on"
         }
     }
+}
+
+/// The highest quality a video plays at (behaviour spec §4, "Default quality"): the server converts a
+/// file above it to fit. The raw value is the bitrate ceiling in kbit/s, 0 for Original.
+public enum VideoQuality: Int, Sendable, Hashable, Codable, CaseIterable {
+    case original = 0
+    case mbps20 = 20_000
+    case mbps12 = 12_000
+    case mbps8 = 8_000
+    case mbps4 = 4_000
+    case mbps2 = 2_000
+
+    /// Nil for Original.
+    public var maxBitrateKbps: Int? { self == .original ? nil : rawValue }
+
+    /// The largest picture at this quality, width by height; nil for Original.
+    public var frame: (width: Int, height: Int)? {
+        switch self {
+        case .original: nil
+        case .mbps20, .mbps12, .mbps8: (1920, 1080)
+        case .mbps4, .mbps2: (1280, 720)
+        }
+    }
+
+    /// "Original", "20 Mbps 1080p".
+    public var title: String {
+        guard let kbps = maxBitrateKbps, let frame else { return "Original" }
+        return "\(kbps / 1000) Mbps \(frame.height)p"
+    }
+}
+
+/// Plex Pass audio processing the server applies while it converts the audio. Either one needs the
+/// track's loudness analysed first (`AudioTrack.canNormalizeLoudness`).
+public struct AudioEnhancements: OptionSet, Sendable, Hashable, Codable {
+    public let rawValue: Int
+    public init(rawValue: Int) { self.rawValue = rawValue }
+
+    /// Clearer speech.
+    public static let boostDialog = AudioEnhancements(rawValue: 1)
+    /// Even loudness across the video.
+    public static let normalizeLoudness = AudioEnhancements(rawValue: 2)
 }
 
 /// Limits set in the player and in Settings.
@@ -115,24 +165,27 @@ public struct RouteLimits: Sendable, Hashable {
     public var serverReason: RouteReason?
     /// Settings force direct play: every file plays on the phone as it is, never through the server.
     public var phoneOnly: Bool
-    /// The picked quality in kbit/s; a source above it is transcoded down.
-    public var maxBitrateKbps: Int?
+    /// The picked quality; a source above its bitrate or picture size is converted down.
+    public var quality: VideoQuality
     /// The server is reached through a remote or relay address. A file that needs the remux then streams
     /// from the server: the remux reads the file's header, index and start point one request at a time,
     /// which took 11 s before the first picture over a 14 Mbit/s remote path. Direct play is unaffected.
     public var remoteConnection: Bool
     /// The link to the server as the last stream measured it, in kbit/s.
     public var linkKbps: Int?
+    /// Boost dialog or Normalize loudness is on: the server streams, copying the video when it can.
+    public var audioEnhancements: AudioEnhancements
 
     public init(
-        serverReason: RouteReason? = nil, phoneOnly: Bool = false, maxBitrateKbps: Int? = nil, remoteConnection: Bool = false,
-        linkKbps: Int? = nil
+        serverReason: RouteReason? = nil, phoneOnly: Bool = false, quality: VideoQuality = .original, remoteConnection: Bool = false,
+        linkKbps: Int? = nil, audioEnhancements: AudioEnhancements = []
     ) {
         self.serverReason = serverReason
         self.phoneOnly = phoneOnly
-        self.maxBitrateKbps = maxBitrateKbps
+        self.quality = quality
         self.remoteConnection = remoteConnection
         self.linkKbps = linkKbps
+        self.audioEnhancements = audioEnhancements
     }
 }
 
@@ -171,8 +224,10 @@ public enum PlaybackRouteDecider {
         var remuxReasons: [RouteReason] = []
 
         if let reason = limits.serverReason { serverReasons.append(reason) }
+        if !limits.audioEnhancements.isEmpty { serverReasons.append(.audioEnhancement) }
         if let video, let reason = undecodable(video, codec: codec, capabilities) { serverReasons.append(reason) }
-        if let cap = limits.maxBitrateKbps, let bitrate = media.bitrate, bitrate > cap { serverReasons.append(.bitrateLimit(kbps: cap)) }
+        let shrinks = exceeds(media, video, limits.quality.frame)
+        if let cap = limits.quality.maxBitrateKbps, shrinks || (media.bitrate ?? 0) > cap { serverReasons.append(.bitrateLimit(kbps: cap)) }
         if let link = limits.linkKbps, let bitrate = media.bitrate, link * 4 < bitrate * 5 { serverReasons.append(.slowLink(kbps: link)) }
 
         if !directContainers.contains(container) {
@@ -229,6 +284,11 @@ public enum PlaybackRouteDecider {
             kind = .serverTranscode
             reencodes = true
         }
+        // The same holds for a server stream picked for any other reason: profile 5 is tone-mapped, never copied.
+        if kind == .serverTranscode, !reencodes, dolbyVisionProfile == 5 {
+            serverReasons.append(.dolbyVision(profile: 5))
+            reencodes = true
+        }
 
         var delivery = SubtitleDelivery.none
         if let track = subtitle.track {
@@ -252,23 +312,30 @@ public enum PlaybackRouteDecider {
         }
 
         // A fifth of a slow link stays free for audio and the requests around the stream.
-        let cap = serverReasons.lazy.compactMap { reason -> Int? in
-            switch reason {
-            case .slowLink(let kbps): kbps * 4 / 5
-            case .bitrateLimit(let kbps): kbps
-            default: nil
-            }
-        }.min()
+        let slowLinkCap = serverReasons.lazy.compactMap { reason -> Int? in
+            if case .slowLink(let kbps) = reason { return kbps * 4 / 5 }
+            return nil
+        }.first
+        let converts = kind == .serverTranscode && reencodes
+        let frame = limits.quality.frame.map { "\($0.width)x\($0.height)" }
         return PlaybackRoute(
             kind: kind,
             reasons: kind == .directPlay ? [] : serverReasons + remuxReasons,
             audio: playedAudio,
             audioIsStandIn: audioIsStandIn,
             convertsAudio: kind == .remux && audioNeedsConversion,
-            reencodesVideo: kind == .serverTranscode && reencodes,
-            maxVideoBitrateKbps: kind == .serverTranscode && reencodes ? cap : nil,
+            reencodesVideo: converts,
+            maxVideoBitrateKbps: converts ? [limits.quality.maxBitrateKbps, slowLinkCap].compactMap(\.self).min() : nil,
+            videoResolution: converts && shrinks ? frame : nil,
+            audioEnhancements: kind == .serverTranscode ? limits.audioEnhancements : [],
             subtitle: delivery
         )
+    }
+
+    /// The file's picture is larger than `frame`.
+    private static func exceeds(_ media: PlexMedia, _ video: PlexStream?, _ frame: (width: Int, height: Int)?) -> Bool {
+        guard let frame, let width = video?.width ?? media.width, let height = video?.height ?? media.height else { return false }
+        return width > frame.width || height > frame.height
     }
 
     private static let directContainers: Set<String> = ["mp4", "m4v", "mov"]

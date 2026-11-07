@@ -5,14 +5,21 @@ import SwiftUI
 enum HomeRows {
     /// The Home hubs, then the hubs of the movie and TV libraries in `libraries` (every one when nil),
     /// in the server's order. No library is asked when `libraries` is empty, so a hidden row costs no
-    /// request. A library that does not answer leaves its rows out rather than failing Home.
-    static func load(from library: PlexLibrary, libraries: Set<String>?) async throws -> [HomeRow] {
+    /// request. A library that does not answer leaves its rows out rather than failing Home. Libraries in
+    /// `hidden` (switched off under Favorite Libraries) give no rows, and their titles leave the Home hubs.
+    static func load(from library: PlexLibrary, libraries: Set<String>?, hidden: Set<String> = []) async throws -> [HomeRow] {
         async let promoted = library.promotedHubs()
         var sections: [PlexLibrarySection] = []
-        if libraries?.isEmpty != true {
-            sections = try await library.sections().filter { section in
-                (section.type == .movie || section.type == .show)
-                    && libraries.map { $0.contains(HomeLayout.libraryID(section)) } ?? true
+        var hiddenKeys: Set<Int> = []
+        if libraries?.isEmpty != true || !hidden.isEmpty {
+            let all = try await library.sections()
+            hiddenKeys = Set(all.filter { hidden.contains(HomeLayout.libraryID($0)) }.compactMap { Int($0.key) })
+            if libraries?.isEmpty != true {
+                sections = all.filter { section in
+                    (section.type == .movie || section.type == .show)
+                        && !hidden.contains(HomeLayout.libraryID(section))
+                        && libraries.map { $0.contains(HomeLayout.libraryID(section)) } ?? true
+                }
             }
         }
         let hubs = await withTaskGroup(of: (Int, [PlexHub]).self) { group in
@@ -23,7 +30,13 @@ enum HomeRows {
             for await (index, answer) in group { hubs[index] = answer }
             return hubs
         }
-        return rows(try await promoted, library: nil)
+        let home = try await promoted.compactMap { hub -> PlexHub? in
+            guard !hiddenKeys.isEmpty else { return hub }
+            var hub = hub
+            hub.items.removeAll { $0.librarySectionID.map(hiddenKeys.contains) ?? false }
+            return hub.items.isEmpty ? nil : hub
+        }
+        return rows(home, library: nil)
             + zip(sections, hubs).flatMap { section, hubs in rows(hubs, library: section) }
     }
 

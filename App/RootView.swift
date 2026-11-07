@@ -53,6 +53,7 @@ struct RootView: View {
         .environment(\.theme, theme)
         // Here rather than on the tabs, so the sheets above resolve artwork too.
         .environment(\.plexLibrary, session.library)
+        .environment(\.posterLabels, session.settings.posterLabels)
         .tint(theme.accentText)
         .preferredColorScheme(scheme)
         .onChange(of: BarInputs(theme: theme, typeSize: typeSize, boldText: legibilityWeight == .bold), initial: true) { _, inputs in
@@ -113,7 +114,8 @@ private struct MainTabs: View {
         .environment(\.plexWatchlist, session.plexTV.map { PlexWatchlist(http: $0.http) })
         .environment(\.sessionActions, SessionActions(
             startPlayback: { item, index, fromStart in session.play(item: item, mediaIndex: index, fromStart: fromStart) },
-            signInAgain: { session.signOut() }
+            signInAgain: { session.signOut() },
+            canDeleteMedia: session.canDeleteMedia
         ))
     }
 }

@@ -15,15 +15,15 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 |---|---|---|---|
 | Library titles grid | Done | Movies/shows in a poster grid per library, from the title menu. | `/library/sections/{key}/all` [code] |
 | Library segments: All / Collections / Recommended | Done | Switch between all titles, the library's collections, and the server's picks. | `/library/sections/{key}/collections`, `/hubs/sections/{key}` [code] |
-| Sort | Partial | Sort by Title, Recently Added, Release Date, Recently Watched, Rating. Missing: Date added (as its own choice), Score, Audience score, Date viewed, Random. | `sort=` on section query [code] |
+| Sort | Done | Title, Recently Added, Release Date, Rating (score), Audience Rating, Recently Watched, Plays, Random; Order menu reverses any of them. | `sort=` on section query [code] |
 | Unwatched-only filter | Done | Shows only titles not yet watched. | `unwatched=1` [code] |
 | Genre filter | Done | Filter the grid by genre. | `/library/sections/{key}/genre` [code] |
 | A–Z jump rail | Done | Jump to a letter in the grid. | section alphabet index [code] |
-| Under-poster labels (Title on/off, Details: year, length, genre, video, age+score; Sort value shown) | Missing | Choose what is printed under each poster. | none; local setting |
+| Under-poster labels (Title on/off, Details: year, length, genre, video, age+score; Sort value shown) | Done | Settings › Under Posters, with a live preview; per profile. | none; local setting |
 | Watchlist | Done | Own tab, backed by plex.tv. | `discover.provider.plex.tv` watchlist; `/library/sections/watchlist/all` [code] |
 | Search | Done | Search titles. | `/hubs/search` [code] |
 | Collections / hubs (home rows) | Done | Home and hub rows; collection destinations. | `/hubs/*` [code] |
-| Person filmography | Missing | Tap a cast member to list their films. | `/library/people/{id}` or filter by actor [INFERENCE] |
+| Person filmography | Done | Tap a cast member (or a person in Search) for their titles in the libraries, newest first, with film and show counts. | `/library/people/{id}/media` |
 | Stats logging (opt-in) | Missing | Opt-in usage reporting, separate from Stats for Nerds. | none |
 
 ## 2. Detail actions
@@ -36,10 +36,10 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Remove from Continue Watching | Done | Removes a title from the continue row. | `/:/unscrobble` / on-deck [code] |
 | Cast shelf | Done | Circular photos with names. | `roles` in metadata [code] |
 | Related titles | Done | Related shelves on the detail page. | `/library/metadata/{key}/related` [code] |
-| Extras (bonus videos) | Missing | Shelf of trailers, deleted scenes, interviews. | `/library/metadata/{key}/extras` [INFERENCE] |
-| Trailer | Missing | Opens a trailer. | `/library/metadata/{key}/extras` filtered to trailers [INFERENCE] |
+| Extras (bonus videos) | Done | Movie and show pages: a shelf of 16:9 cards (kind and length); tapping one plays it. | `/library/metadata/{key}/extras` |
+| Trailer | Done | More menu › Play Trailer: the server's primary extra, else the first trailer. | `primaryExtraKey`, `/library/metadata/{key}/extras` |
 | Add to Watchlist | Done | Adds or removes from watchlist. | watchlist API [code] |
-| **Delete media** (remove the file from the server) | Missing | Removes a title or episode and its file from the Plex server, with confirmation. | `DELETE /library/metadata/{ratingKey}` [INFERENCE; check the server allows deletion] |
+| **Delete media** (remove the file from the server) | Done | More menu › Delete… on a movie, show, season or episode, and Delete This Version… for a title with several files. Shown only on the owner's server with Allow media deletion on; confirmation names the title, Cancel is the default; 401/403 explains the server setting. | `DELETE /library/metadata/{ratingKey}`, `…/media/{id}`; `allowMediaDeletion` on `/` |
 | Delete subtitle file (Wrong subtitles → remove) | Missing | Deletes the external subtitle from the server; asks twice; cannot be undone. | `DELETE /library/streams/{id}` [INFERENCE] |
 
 ## 3. Playback
@@ -52,10 +52,10 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Up Next card + countdown | Done | Next episode card with countdown. | play queue [code] |
 | Scrub speed (fine/half/quarter) | Done | Drag up or down to scrub slower. | local |
 | Scrub preview thumbnails | Done | Thumbnail while scrubbing. | BIF trickplay [code] |
-| Playback speed 0.5x–2x | Missing | Picker in More menu. | local (`AVPlayer.rate`) |
-| Quality picker in player | Partial | The route supports a bitrate cap (core) but no UI picker. | `maxVideoBitrate`, `videoQuality` on transcode [code] |
-| Default quality ceiling (Settings) | Missing | Default cap for the picker. | local setting |
-| Normalize loudness / Boost dialog (Plex Pass) | Missing | Toggle in Audio panel; shows reasons it is disabled. | `audioBoost` on transcode (currently fixed at 100) [code] |
+| Playback speed 0.5x–2x | Done | More menu › Playback Speed: 0.5×, 0.75×, Normal, 1.25×, 1.5×, 1.75×, 2×; back to Normal for each new item; pitch kept. | local (`AVPlayer.defaultRate`) |
+| Quality picker in player | Done | More menu › Quality (Original, 20, 12, 8, 4, 2 Mbps); "Original · Converted" while the server re-encodes. Picking one also sets the default. | `maxVideoBitrate`, `videoResolution` on transcode |
+| Default quality ceiling (Settings) | Done | Video & Playback › Default Quality; Forced Direct Play reads "original quality". | local setting |
+| Normalize loudness / Boost dialog (Plex Pass) | Done | Audio menu toggles, shown only for a Plex Pass server; each reason they cannot apply is shown. The server reworks the sound on a copy of the video; on-device processing is not used because AVPlayer gives no audio tap on HLS streams. | `boostDialog=1`, `normalizeLoudness=1` on transcode; `Stream.canNormalizeLoudness` |
 | Stats for Nerds | Done | Route, stream and bitrate overlay. | local [code] |
 | Playback Info sheet | Done | Route, subtitle track, bitrate, frame rate. | local [code] |
 | AirPlay / Picture in Picture | Done | PiP on phone; AirPlay stream handling. | AVKit [code] |
@@ -69,7 +69,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Audio track selector | Done | Pick track; wanted-language first; check on playing track. | streams [code] |
 | Preferred audio language | Done | Per-profile preference. | local [code] |
 | Follow-dub rule | Partial | Verify exact rule. | local [code] |
-| Normalize loudness / Boost | Missing | See Playback. | `audioBoost` [code] |
+| Normalize loudness / Boost | Done | See Playback. | `boostDialog`, `normalizeLoudness` |
 
 ## 5. Subtitles
 | Feature | Status | Behaviour | API |
@@ -111,9 +111,9 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Credits countdown | Done | Up Next delay. | local [code] |
 | Auto sign-in, interface resolution, language | Missing | Not found in the iPhone code. | local |
 | Trailers auto-play | Missing | Not found. | local |
-| Favourite libraries | Missing | Choose which libraries show first. | local |
+| Favourite libraries | Done | Settings › Favorite Libraries: switched-off libraries leave Home's shelves and the Library title menu; one always stays on. | local |
 | Privacy / consent (crash, product reports) | Missing | Opt-in reporting with its own explanation. | none (local) |
-| Delete all local data | Missing | Removes all data stored on the phone and signs out. | local |
+| Delete all local data | Done | Settings › Delete All Local Data, after a confirmation: signs out and removes Keychain items, preferences, themes, cached artwork and guide data; the sign-in screen says what happened. | local |
 | Appearance (theme picker) | Done | Themes. | local [code] |
 | Sign out | Done | Confirmation dialog. | local [code] |
 

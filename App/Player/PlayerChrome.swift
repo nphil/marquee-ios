@@ -402,10 +402,15 @@ struct TracksMenu: View {
     /// section's header, which left the audio and subtitle lists unnamed.
     @ViewBuilder
     private func menuContent(_ tracks: MediaTracks) -> some View {
-        if tracks.audio.count > 1 {
+        if tracks.audio.count > 1 || model.enhancements.offered {
             Section("Audio") {
-                ForEach(orderedAudio(tracks)) { track in
-                    choice(track.label, detail: detail(track.badges), value: Optional(track.id), selection: $model.audioPick)
+                if tracks.audio.count > 1 {
+                    ForEach(orderedAudio(tracks)) { track in
+                        choice(track.label, detail: detail(track.badges), value: Optional(track.id), selection: $model.audioPick)
+                    }
+                }
+                if model.enhancements.offered {
+                    enhancementRows(model.enhancements)
                 }
             }
         }
@@ -446,6 +451,22 @@ struct TracksMenu: View {
                 Text(problem)
             }
         }
+    }
+
+    /// Boost dialog and Normalize loudness, shown only for a Plex Pass server; the reason they cannot
+    /// apply to this video stands under them.
+    @ViewBuilder
+    private func enhancementRows(_ state: PlayerModel.EnhancementState) -> some View {
+        enhancementToggle("Boost dialog", .boostDialog, state)
+        enhancementToggle("Normalize loudness", .normalizeLoudness, state)
+        if let text = state.unavailable ?? state.note {
+            Text(text)
+        }
+    }
+
+    private func enhancementToggle(_ title: String, _ enhancement: AudioEnhancements, _ state: PlayerModel.EnhancementState) -> some View {
+        Toggle(title, isOn: Binding { state.asked.contains(enhancement) } set: { _ in model.toggleEnhancement(enhancement) })
+            .disabled(state.unavailable != nil)
     }
 
     /// A language with one track goes without a header: its row already starts with the language.
@@ -525,7 +546,7 @@ struct SubtitleGroup: Identifiable {
     }
 }
 
-/// Aspect, playback info and the stats overlay.
+/// Quality, speed, aspect, playback info and the stats overlay.
 struct MoreMenu: View {
     @Bindable var model: PlayerModel
 
@@ -545,6 +566,32 @@ struct MoreMenu: View {
             .onAppear { model.menuOpened() }
             .onDisappear { model.menuClosed() }
             Section {
+                Picker(selection: $model.qualityPick) {
+                    ForEach(VideoQuality.allCases, id: \.self) { quality in
+                        Text(quality.title).tag(quality)
+                    }
+                } label: {
+                    Label("Quality", systemImage: "dial.medium")
+                    Text(qualityValue)
+                }
+                .pickerStyle(.menu)
+                .disabled(model.forcesDirectPlay)
+                .accessibilityIdentifier("player.quality")
+                if model.quality == .original, model.isConverting {
+                    Text("Your Plex server is converting this video.")
+                }
+                Picker(selection: $model.speedPick) {
+                    ForEach(Self.speeds, id: \.self) { speed in
+                        Text(Self.title(of: speed)).tag(speed)
+                    }
+                } label: {
+                    Label("Playback Speed", systemImage: "gauge.with.dots.needle.67percent")
+                    Text(Self.title(of: model.speed))
+                }
+                .pickerStyle(.menu)
+                .accessibilityIdentifier("player.speed")
+            }
+            Section {
                 Button {
                     model.showsInfo = true
                 } label: {
@@ -561,5 +608,16 @@ struct MoreMenu: View {
         .buttonStyle(PlayerButtonStyle())
         .accessibilityLabel("More")
         .accessibilityIdentifier("player.more")
+    }
+
+    static let speeds: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+
+    static func title(of speed: Float) -> String {
+        speed == 1 ? "Normal" : speed.formatted(.number.precision(.fractionLength(0...2))) + "×"
+    }
+
+    private var qualityValue: String {
+        if model.forcesDirectPlay { return "Original" }
+        return model.quality == .original && model.isConverting ? "Original · Converted" : model.quality.title
     }
 }

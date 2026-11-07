@@ -8,6 +8,8 @@ import MarqueeCore
 @MainActor
 final class SessionStorage {
     let defaults: UserDefaults
+    /// The defaults domain Delete All Local Data empties: the app's own, or the UI tests' suite.
+    private let domain: String
     /// Nil for UI-test launches, which keep secrets in `memory` instead.
     private let keychain: KeychainStore?
     private var memory: [String: Data] = [:]
@@ -24,13 +26,14 @@ final class SessionStorage {
         static let tracksPrefix = "marquee."
     }
 
-    private init(defaults: UserDefaults, keychain: KeychainStore?) {
+    private init(defaults: UserDefaults, domain: String, keychain: KeychainStore?) {
         self.defaults = defaults
+        self.domain = domain
         self.keychain = keychain
     }
 
     static func live() -> SessionStorage {
-        SessionStorage(defaults: .standard, keychain: KeychainStore())
+        SessionStorage(defaults: .standard, domain: Bundle.main.bundleIdentifier ?? "", keychain: KeychainStore())
     }
 
     /// Settings saved by an earlier test must not leak into the next screenshot, so the suite is wiped.
@@ -39,7 +42,7 @@ final class SessionStorage {
         // Nil only for the app's own bundle identifier or the global domain.
         let defaults = UserDefaults(suiteName: suite)!
         defaults.removePersistentDomain(forName: suite)
-        return SessionStorage(defaults: defaults, keychain: nil)
+        return SessionStorage(defaults: defaults, domain: suite, keychain: nil)
     }
 
     var accountToken: String? {
@@ -109,6 +112,13 @@ final class SessionStorage {
         for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(Key.addressPrefix) {
             defaults.removeObject(forKey: key)
         }
+    }
+
+    /// Delete All Local Data: the Keychain items and every saved preference, including the client
+    /// identifier, each profile's settings, remembered tracks, themes and Live TV lists.
+    func eraseAll() {
+        clearSignIn()
+        defaults.removePersistentDomain(forName: domain)
     }
 
     private func secret(_ key: String) -> Data? {

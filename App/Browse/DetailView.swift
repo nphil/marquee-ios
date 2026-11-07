@@ -84,6 +84,10 @@ private struct DetailPage: View {
     @State private var version = 0
     @State private var showsTracks = false
     @State private var watchlisted: Bool? = nil
+    @State private var extras: [PlexMetadata] = []
+    @State private var deleting: DeleteTarget?
+    @Environment(\.plexLibrary) private var library
+    @Environment(\.dismiss) private var dismiss
     private let actions = ItemActions()
 
     /// A phone on its side: a full-width 16:9 hero would be taller than the screen, so the art becomes a
@@ -161,6 +165,9 @@ private struct DetailPage: View {
                     if !item.roles.isEmpty {
                         CastShelf(roles: item.roles)
                     }
+                    if !extras.isEmpty {
+                        ExtrasShelf(extras: extras)
+                    }
                     if isOnServer, item.type == .movie || item.type == .show {
                         RelatedShelves(ratingKey: item.ratingKey)
                     }
@@ -192,6 +199,14 @@ private struct DetailPage: View {
         }
         .task(id: item.guid) {
             watchlisted = await actions.isWatchlisted(item.guid)
+        }
+        // Movie and show pages only: the extras of seasons and episodes are not shown.
+        .task(id: item.ratingKey) {
+            guard isOnServer, item.type == .movie || item.type == .show, let library else { return }
+            extras = (try? await library.extras(of: item.ratingKey)) ?? []
+        }
+        .deleteConfirmation($deleting) { target in
+            if case .title = target { dismiss() }
         }
     }
 
@@ -333,6 +348,9 @@ private struct DetailPage: View {
                     session.play(target, mediaIndex: mediaIndex(for: target), fromStart: true)
                 }
             }
+            if let trailer = ExtrasShelf.trailer(in: extras, primaryKey: item.primaryExtraKey) {
+                Button("Play Trailer", systemImage: "film") { session.play(trailer) }
+            }
             if item.media.count > 1 {
                 Picker("Version", systemImage: "rectangle.stack", selection: $version) {
                     ForEach(item.media.indices, id: \.self) { Text(item.media[$0].versionLabel).tag($0) }
@@ -345,6 +363,19 @@ private struct DetailPage: View {
             if let url = shareURL {
                 ShareLink(item: url, subject: Text(item.title)) {
                     Label("Share", systemImage: "square.and.arrow.up")
+                }
+            }
+            if session.canDeleteMedia, item.type == .movie || item.type == .show || item.type == .season || item.type == .episode {
+                Section {
+                    if item.media.count > 1 {
+                        Button("Delete This Version…", systemImage: "trash", role: .destructive) {
+                            deleting = .version(item, mediaIndex: version)
+                        }
+                    }
+                    Button("Delete…", systemImage: "trash", role: .destructive) {
+                        deleting = .title(item)
+                    }
+                    .accessibilityIdentifier("detail.delete")
                 }
             }
         } label: {
@@ -885,28 +916,40 @@ private struct CastShelf: View {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: Space.s3) {
                     ForEach(Array(roles.prefix(30).enumerated()), id: \.offset) { _, role in
-                        VStack(spacing: Space.s1) {
-                            CastPhoto(role: role, size: Self.photo)
-                            Text(role.name)
-                                .textRole(.caption)
-                                .foregroundStyle(theme.ink)
-                                .lineLimit(2)
-                                .multilineTextAlignment(.center)
-                            if let character = role.character, !character.isEmpty {
-                                Text(character)
-                                    .textRole(.caption)
-                                    .foregroundStyle(theme.ink2)
-                                    .lineLimit(1)
+                        if let id = role.id {
+                            NavigationLink(value: Route.person(id: id, name: role.name, thumb: role.thumb)) {
+                                card(role)
                             }
+                            .buttonStyle(.press)
+                            .accessibilityHint("Shows their titles in your libraries")
+                        } else {
+                            card(role)
                         }
-                        .frame(width: Self.photo + Space.s5)
-                        .accessibilityElement(children: .combine)
                     }
                 }
             }
             .contentMargins(.horizontal, Space.inset, for: .scrollContent)
             .scrollIndicators(.hidden)
         }
+    }
+
+    private func card(_ role: PlexRole) -> some View {
+        VStack(spacing: Space.s1) {
+            CastPhoto(role: role, size: Self.photo)
+            Text(role.name)
+                .textRole(.caption)
+                .foregroundStyle(theme.ink)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+            if let character = role.character, !character.isEmpty {
+                Text(character)
+                    .textRole(.caption)
+                    .foregroundStyle(theme.ink2)
+                    .lineLimit(1)
+            }
+        }
+        .frame(width: Self.photo + Space.s5)
+        .accessibilityElement(children: .combine)
     }
 }
 

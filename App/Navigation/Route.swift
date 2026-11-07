@@ -10,11 +10,13 @@ enum Route: Hashable {
     case hub(key: String, title: String)
     /// A watchlist title, which may or may not be on the server.
     case watchlist(PlexMetadata, zoomID: String? = nil)
+    /// A cast or crew member's titles in the libraries.
+    case person(id: String, name: String, thumb: String?)
 
     var zoomID: String? {
         switch self {
         case .item(_, let zoomID), .watchlist(_, let zoomID): zoomID
-        case .hub: nil
+        case .hub, .person: nil
         }
     }
 

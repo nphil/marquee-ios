@@ -129,6 +129,14 @@ struct PlaybackRouteTests {
         #expect(Self.route(try dolbyVision(9, compatibility: 2, in: "mp4", codec: "h264")).reasons == [.dolbyVision(profile: 9)])
     }
 
+    @Test func dolbyVisionFiveIsNeverCopiedByTheServer() throws {
+        let p5mkv = try Self.file("mkv", video: Fixture.video("hevc", bitDepth: 10, dolbyVision: (5, 0)))
+
+        let remote = Self.route(p5mkv, limits: RouteLimits(remoteConnection: true))
+
+        #expect(remote.kind == .serverTranscode && remote.reencodesVideo && remote.reasons.contains(.dolbyVision(profile: 5)))
+    }
+
     @Test func hdrOnAnSDRScreenIsToneMappedOnlyWhenTheVideoIsCopiedToHLS() throws {
         let sdrScreen = DeviceCapabilities(hdrDisplay: false, canRemux: true)
         let hdr10 = Fixture.video("hevc", bitDepth: 10, colorTrc: "smpte2084")
@@ -235,13 +243,24 @@ struct PlaybackRouteTests {
 
     // MARK: Limits
 
-    @Test func qualityLimitAndServerReasonsGoToTheServer() throws {
-        let file = try Self.file("mp4", bitrate: 20_000)
+    @Test func aQualityBelowTheFileConvertsItToFit() throws {
+        let large = try Self.file("mp4", bitrate: 20_000)
+        let small = try Self.file("mp4", bitrate: 3_000)
 
-        let limited = Self.route(file, limits: RouteLimits(maxBitrateKbps: 8_000))
+        let limited = Self.route(large, limits: RouteLimits(quality: .mbps8))
+        let shrunk = Self.route(small, limits: RouteLimits(quality: .mbps4))
 
         #expect(limited.kind == .serverTranscode && limited.reencodesVideo && limited.reasons == [.bitrateLimit(kbps: 8_000)])
-        #expect(limited.maxVideoBitrateKbps == 8_000)
+        #expect(limited.maxVideoBitrateKbps == 8_000 && limited.videoResolution == nil)
+        // Within a 720p quality's rate, but a larger picture than it allows.
+        #expect(shrunk.reasons == [.bitrateLimit(kbps: 4_000)] && shrunk.videoResolution == "1280x720")
+        #expect(Self.route(small, limits: RouteLimits(quality: .mbps8)).kind == .directPlay)
+        #expect(Self.route(large, limits: RouteLimits(phoneOnly: true, quality: .mbps8)).kind == .directPlay)
+    }
+
+    @Test func serverReasonsStreamFromTheServerCopyingTheVideo() throws {
+        let file = try Self.file("mp4", bitrate: 20_000)
+
         for reason in [RouteReason.onDeviceFailed, .directPlayOff, .airPlay] {
             let route = Self.route(file, limits: RouteLimits(serverReason: reason))
             #expect(route.kind == .serverTranscode && !route.reencodesVideo && route.reasons == [reason])
@@ -268,6 +287,17 @@ struct PlaybackRouteTests {
         #expect(slow.kind == .serverTranscode && slow.reencodesVideo && slow.maxVideoBitrateKbps == 4_000)
         #expect(slow.reasons == [.slowLink(kbps: 5_000), .container("mkv")])
         #expect(fast.kind == .remux && fast.maxVideoBitrateKbps == nil)
+    }
+
+    @Test func audioEnhancementStreamsFromTheServerCopyingTheVideo() throws {
+        let mp4 = try Self.file("mp4")
+
+        let enhanced = Self.route(mp4, limits: RouteLimits(audioEnhancements: .boostDialog))
+        let forced = Self.route(mp4, limits: RouteLimits(phoneOnly: true, audioEnhancements: .boostDialog))
+
+        #expect(enhanced.kind == .serverTranscode && !enhanced.reencodesVideo && enhanced.reasons == [.audioEnhancement])
+        #expect(enhanced.audioEnhancements == .boostDialog)
+        #expect(forced.kind == .directPlay && forced.audioEnhancements.isEmpty)
     }
 
     @Test func forcedDirectPlayNeverUsesTheServer() throws {

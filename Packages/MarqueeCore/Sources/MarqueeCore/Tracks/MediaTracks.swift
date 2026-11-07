@@ -21,6 +21,8 @@ public struct AudioTrack: Sendable, Hashable, Identifiable {
     public var isDub: Bool
     public var isDefault: Bool
     public var isSelectedOnServer: Bool
+    /// The server has measured this track's loudness, which Boost dialog and Normalize loudness need.
+    public var canNormalizeLoudness: Bool
     /// Menu text, e.g. "English", "English (commentary)", "Spanish (Latin America)".
     public var label: String
     public var badges: [TrackBadge]
@@ -38,6 +40,7 @@ public struct AudioTrack: Sendable, Hashable, Identifiable {
         isDub = words.saysDub
         isDefault = stream.isDefault
         isSelectedOnServer = stream.isSelected
+        canNormalizeLoudness = stream.canNormalizeLoudness
         label = ""
         badges = isAudioDescription ? [.audioDescription] : []
     }

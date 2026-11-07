@@ -45,16 +45,21 @@ struct PosterBadge: View {
 }
 
 /// A poster in a shelf or grid: 2:3 art with its badge, a progress track when part-watched (kept as empty
-/// space otherwise, so titles line up), and a one-line Caption title (DESIGN §8.1).
+/// space otherwise, so titles line up), then the profile's labels (behaviour spec §1, "Under posters"): a
+/// one-line Caption title and a details or sort-value line (DESIGN §8.1).
 struct PosterCell: View {
     let item: PlexMetadata
     let width: CGFloat
     var zoomID: String?
 
     @Environment(\.theme) private var theme
+    @Environment(\.posterLabels) private var labels
+    @Environment(\.posterSort) private var sort
 
     var body: some View {
         let radius = width >= 96 ? Radius.tile : Radius.control
+        let reservesLine = labels.reservesLine(sort: sort)
+        let line = reservesLine ? item.posterLine(labels, sort: sort) : nil
         VStack(alignment: .leading, spacing: Space.s1) {
             PlexArtView(path: item.posterPath, size: Self.artSize(width: width), placeholder: placeholder)
                 .overlay(alignment: .topTrailing) { PosterBadge(item: item) }
@@ -62,15 +67,29 @@ struct PosterCell: View {
                 .zoomSource(zoomID, cornerRadius: radius)
             ProgressBar(value: item.progress ?? 0)
                 .opacity(item.progress == nil ? 0 : 1)
-            Text(item.posterTitle)
-                .textRole(.caption)
-                .foregroundStyle(theme.ink)
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 0) {
+                if labels.showsTitle {
+                    Text(item.posterTitle)
+                        .textRole(.caption)
+                        .fontWeight(reservesLine ? .semibold : nil)
+                        .foregroundStyle(theme.ink)
+                        .lineLimit(1)
+                }
+                if reservesLine {
+                    // Kept as empty space when this title has no value, so a grid row lines up.
+                    Text(line?.text ?? " ")
+                        .textRole(.caption)
+                        .monospacedDigit()
+                        .foregroundStyle(line?.isQuiet == true ? theme.ink3 : theme.ink2)
+                        .lineLimit(1)
+                }
+            }
         }
         .frame(width: width, alignment: .leading)
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(item.spokenSummary)
+        .accessibilityValue(line?.text ?? "")
         .accessibilityIdentifier("poster.\(item.ratingKey)")
     }
 

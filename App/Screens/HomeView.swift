@@ -39,7 +39,8 @@ struct HomeView: View {
         // A library's hubs are asked for only while one of its rows is shown, so showing one reloads.
         .task(id: LoadKey(library: library?.instance, attempt: rows.attempt, extra: Reload(
             revision: changes.revision,
-            libraries: session.settings.homeRows.shownLibraries
+            libraries: session.settings.homeRows.shownLibraries,
+            hidden: session.settings.hiddenLibraries
         ))) {
             await load()
         }
@@ -105,7 +106,8 @@ struct HomeView: View {
     private func load() async {
         guard let library else { return }
         let libraries = session.settings.homeRows.shownLibraries
-        await rows.load { try await HomeRows.load(from: library, libraries: libraries) }
+        let hidden = session.settings.hiddenLibraries
+        await rows.load { try await HomeRows.load(from: library, libraries: libraries, hidden: hidden) }
     }
 
     /// Hides a row from its title's long press, with Undo in the toast.
@@ -136,6 +138,7 @@ struct HomeView: View {
     private struct Reload: Hashable {
         let revision: Int
         let libraries: Set<String>
+        let hidden: Set<String>
     }
 }
 

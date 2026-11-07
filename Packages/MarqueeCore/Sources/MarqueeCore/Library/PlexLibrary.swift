@@ -65,6 +65,17 @@ public struct PlexLibrary: Sendable {
         return PlexPage(items: result.metadata, totalSize: result.totalSize ?? start + result.metadata.count)
     }
 
+    /// Everything a person appears in across every library, by the person's tag `id` (`PlexRole.id`).
+    public func titles(ofPerson id: String) async throws -> [PlexMetadata] {
+        try await container("/library/people/\(id)/media").metadata
+    }
+
+    /// A movie's or show's bonus videos (trailers, featurettes, deleted scenes) as `clip` rows that play
+    /// like any title.
+    public func extras(of ratingKey: String) async throws -> [PlexMetadata] {
+        try await container("/library/metadata/\(ratingKey)/extras").metadata
+    }
+
     /// Titles like `ratingKey`, as rows.
     public func related(to ratingKey: String) async throws -> [PlexHub] {
         try await container("/library/metadata/\(ratingKey)/related").hubs
@@ -95,6 +106,12 @@ public struct PlexLibrary: Sendable {
         try await container("/hubs/search", ["query": text, "limit": String(limit)]).hubs
     }
 
+    /// What the server's owner allows and pays for, from the server's root.
+    public func serverInfo() async throws -> PlexServerInfo {
+        let root = try await container("/")
+        return PlexServerInfo(allowsMediaDeletion: root.allowMediaDeletion, hasPlexPass: root.myPlexSubscription)
+    }
+
     // MARK: Watch state
 
     public func markWatched(_ ratingKey: String) async throws {
@@ -114,6 +131,19 @@ public struct PlexLibrary: Sendable {
         var headers: [String: String] = [:]
         if let session = update.sessionIdentifier { headers[PlexHeader.sessionIdentifier] = session }
         try await perform(.get, "/:/timeline", update.queryItems, headers: headers)
+    }
+
+    // MARK: Deleting
+
+    /// Deletes a movie, episode, season or show and its files from the server's disk. The server refuses
+    /// (401 or 403) unless its owner turned on deleting media from the apps.
+    public func delete(_ ratingKey: String) async throws {
+        try await perform(.delete, "/library/metadata/\(ratingKey)", [:])
+    }
+
+    /// Deletes one version of a title and its file from the server's disk, leaving the others.
+    public func deleteVersion(_ mediaID: Int, of ratingKey: String) async throws {
+        try await perform(.delete, "/library/metadata/\(ratingKey)/media/\(mediaID)", [:])
     }
 
     // MARK: Playback
@@ -262,5 +292,18 @@ public struct PlexLibrary: Sendable {
         guard let mark = key.firstIndex(of: "?") else { return (key, []) }
         let query = URLComponents(string: "?" + key[key.index(after: mark)...])?.queryItems ?? []
         return (String(key[..<mark]), query)
+    }
+}
+
+/// What a server's owner allows and pays for.
+public struct PlexServerInfo: Sendable, Hashable {
+    /// Apps may delete media (the server's "Allow media deletion" setting).
+    public var allowsMediaDeletion: Bool
+    /// The owner has Plex Pass, which Boost dialog and Normalize loudness need.
+    public var hasPlexPass: Bool
+
+    public init(allowsMediaDeletion: Bool = false, hasPlexPass: Bool = false) {
+        self.allowsMediaDeletion = allowsMediaDeletion
+        self.hasPlexPass = hasPlexPass
     }
 }

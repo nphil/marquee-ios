@@ -7,6 +7,8 @@ struct SessionActions {
     var startPlayback: @MainActor (_ item: PlexMetadata, _ mediaIndex: Int, _ fromStart: Bool) -> Void = { _, _, _ in }
     /// Leaves an expired sign-in for the sign-in screen.
     var signInAgain: @MainActor () -> Void = {}
+    /// The server lets this app delete titles from its disk.
+    var canDeleteMedia = false
 
     @MainActor
     func play(_ item: PlexMetadata, mediaIndex: Int = 0, fromStart: Bool = false) {

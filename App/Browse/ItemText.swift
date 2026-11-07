@@ -108,6 +108,33 @@ enum ItemText {
         guard let value, let date = try? parser.parse(value) else { return nil }
         return date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted, timeZone: .gmt))
     }
+
+    /// "Today", "Yesterday", or the date as the iPhone writes dates ("7 Mar 2024").
+    static func day(_ date: Date, now: Date = .now, calendar: Calendar = .current) -> String {
+        let days = calendar.dateComponents([.day], from: calendar.startOfDay(for: date), to: calendar.startOfDay(for: now)).day
+        switch days {
+        case 0: return "Today"
+        case 1: return "Yesterday"
+        default: return date.formatted(date: .abbreviated, time: .omitted)
+        }
+    }
+
+    /// Plex's "2024-03-07" as the start of that day here, so it compares with today.
+    static func releaseDay(_ value: String?, calendar: Calendar = .current) -> Date? {
+        let parts = value?.split(separator: "-").compactMap { Int($0) } ?? []
+        guard parts.count == 3 else { return nil }
+        return calendar.date(from: DateComponents(year: parts[0], month: parts[1], day: parts[2]))
+    }
+
+    /// A release date as `day(_:)` words it.
+    static func releaseDate(_ value: String?, now: Date = .now, calendar: Calendar = .current) -> String? {
+        releaseDay(value, calendar: calendar).map { day($0, now: now, calendar: calendar) }
+    }
+
+    /// A score out of 10 with one decimal: "7.8".
+    static func score(_ value: Double) -> String {
+        value.formatted(.number.precision(.fractionLength(1)))
+    }
 }
 
 extension PlexMedia {
@@ -120,16 +147,25 @@ extension PlexMedia {
         return chips
     }
 
+    /// "4K · HDR" under a poster: the resolution, then Dolby Vision or HDR where the server listed the streams.
+    var videoMarks: [String?] {
+        [resolution, dynamicRange]
+    }
+
     /// "4K HDR · 12 GB", naming one version in the Version menu.
     var versionLabel: String {
-        let resolution = videoResolution.map { value in
-            value.lowercased() == "4k" ? "4K" : (Int(value) != nil ? "\(value)p" : value.uppercased())
-        }
         let picture = [resolution, dynamicRange].compactMap(\.self).joined(separator: " ")
         let bytes = parts.compactMap(\.size).reduce(0, +)
         let size = bytes > 0 ? Int64(bytes).formatted(.byteCount(style: .file)) : nil
         let label = [picture.isEmpty ? nil : picture, size].compactMap(\.self).joined(separator: " · ")
         return label.isEmpty ? (container?.uppercased() ?? "Version") : label
+    }
+
+    /// "4K", "1080p", "SD".
+    private var resolution: String? {
+        videoResolution.map { value in
+            value.lowercased() == "4k" ? "4K" : (Int(value) != nil ? "\(value)p" : value.uppercased())
+        }
     }
 
     private var dynamicRange: String? {
@@ -191,10 +227,23 @@ extension SectionQuery.Sort {
     var title: String {
         switch self {
         case .title: "Title"
-        case .recentlyAdded: "Recently Added"
+        case .recentlyAdded: "Date Added"
         case .releaseDate: "Release Date"
-        case .recentlyWatched: "Recently Watched"
-        case .rating: "Rating"
+        case .rating: "Score"
+        case .audienceRating: "Audience Score"
+        case .recentlyWatched: "Date Viewed"
+        case .plays: "Plays"
+        case .random: "Random"
+        }
+    }
+
+    /// The View menu's two directions, first order then reversed; nil for Random, which has none.
+    var orders: (first: String, reversed: String)? {
+        switch self {
+        case .title: ("A–Z", "Z–A")
+        case .recentlyAdded, .releaseDate, .recentlyWatched: ("Newest First", "Oldest First")
+        case .rating, .audienceRating, .plays: ("Highest First", "Lowest First")
+        case .random: nil
         }
     }
 }

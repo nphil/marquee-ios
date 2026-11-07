@@ -21,6 +21,14 @@ struct ProfileSettings: Equatable, Sendable {
     var remembersTracks = true
     var subtitleStyle = SubtitleStyle()
     var homeRows = HomeLayout()
+    var posterLabels = PosterLabels()
+    /// The default quality; picking one in the player's More menu saves it too.
+    var quality = VideoQuality.original
+    /// Boost dialog and Normalize loudness, from the player's Audio menu.
+    var audioEnhancements: AudioEnhancements = []
+    /// Libraries switched off under Favorite Libraries, by `HomeLayout.libraryID`. Empty shows every library,
+    /// and one the server adds later shows until switched off.
+    var hiddenLibraries: Set<String> = []
 
     static let skipIntervals = [5, 10, 15, 30, 60]
     static let countdowns = [3, 5, 10, 15, 30]
@@ -30,6 +38,7 @@ extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
         case skipInterval, introSkipDelay, nextEpisodeDelay, directPlay, aspect, readsTunerDirectly
         case audioLanguage, subtitles, remembersTracks, subtitleStyle, homeRows
+        case posterLabels, quality, audioEnhancements, hiddenLibraries
     }
 
     init(from decoder: any Decoder) throws {
@@ -47,6 +56,10 @@ extension ProfileSettings: Codable {
         remembersTracks = value(.remembersTracks) ?? remembersTracks
         subtitleStyle = value(.subtitleStyle) ?? subtitleStyle
         homeRows = value(.homeRows) ?? homeRows
+        posterLabels = value(.posterLabels) ?? posterLabels
+        quality = value(.quality) ?? quality
+        audioEnhancements = value(.audioEnhancements) ?? audioEnhancements
+        hiddenLibraries = value(.hiddenLibraries) ?? hiddenLibraries
     }
 }
 

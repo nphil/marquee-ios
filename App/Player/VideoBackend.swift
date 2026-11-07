@@ -49,6 +49,8 @@ protocol VideoBackend: AnyObject {
     var itemDuration: TimeInterval? { get }
     /// Replaces the stream; nil unloads it.
     func load(_ item: AVPlayerItem?)
+    /// Playback speed, 1 for normal. Kept across loads, pauses and seeks.
+    var rate: Float { get set }
     func play()
     func pause()
     func seek(to itemTime: TimeInterval, precise: Bool) async -> Bool
@@ -93,8 +95,18 @@ final class AVPlayerBackend: VideoBackend {
         return seconds
     }
 
+    var rate: Float = 1 {
+        didSet {
+            // `play()` starts at the default rate; a playing stream changes at once.
+            avPlayer.defaultRate = rate
+            if avPlayer.timeControlStatus != .paused { avPlayer.rate = rate }
+        }
+    }
+
     func load(_ item: AVPlayerItem?) {
         clearItem()
+        // Keeps voices at their pitch away from normal speed.
+        item?.audioTimePitchAlgorithm = .spectral
         avPlayer.replaceCurrentItem(with: item)
         guard let item else { return }
         itemObservations = [

@@ -12,6 +12,7 @@ final class StillFrameBackend: VideoBackend {
     var onEvent: ((BackendEvent) -> Void)?
     private(set) var itemTime: TimeInterval = 0
     var itemDuration: TimeInterval? { nil }
+    var rate: Float = 1
     private var clock: Task<Void, Never>?
 
     init(root: URL) {
@@ -38,7 +39,7 @@ final class StillFrameBackend: VideoBackend {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(100))
                 guard let self, !Task.isCancelled else { return }
-                itemTime += 0.1
+                itemTime += 0.1 * Double(rate)
                 onEvent?(.time(itemTime))
             }
         }

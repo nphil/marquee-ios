@@ -56,6 +56,22 @@ struct SignInView: View {
 
     private var signInButtons: some View {
         VStack(spacing: Space.s4) {
+            if let notice = session.signedOutNotice {
+                VStack(spacing: Space.s2) {
+                    Text(notice.title)
+                        .textRole(.headline)
+                        .foregroundStyle(theme.ink)
+                    if let detail = notice.detail {
+                        Text(detail)
+                            .textRole(.body)
+                            .foregroundStyle(theme.ink2)
+                    }
+                }
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("signin.notice")
+            }
             Button {
                 session.signIn()
             } label: {

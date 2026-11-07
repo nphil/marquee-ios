@@ -18,11 +18,13 @@ public struct TranscodeRequest: Sendable, Hashable {
     public var maxVideoBitrateKbps: Int
     /// e.g. "1920x1080".
     public var videoResolution: String
+    /// The server converts the audio to apply them.
+    public var audioEnhancements: AudioEnhancements
 
     /// - Parameters:
     ///   - maxVideoBitrateKbps: The picked quality; defaults to the route's cap, else the source bitrate,
     ///     at least 8 Mbit/s.
-    ///   - videoResolution: The picked quality's size; defaults to the source size.
+    ///   - videoResolution: The picked quality's size; defaults to the route's, else the source size.
     public init(
         item: PlexMetadata,
         mediaIndex: Int = 0,
@@ -42,7 +44,8 @@ public struct TranscodeRequest: Sendable, Hashable {
         copiesVideo = !route.reencodesVideo
         burnsSubtitles = if case .burnedIn = route.subtitle { true } else { false }
         self.maxVideoBitrateKbps = maxVideoBitrateKbps ?? route.maxVideoBitrateKbps ?? max(media?.bitrate ?? 0, 8_000)
-        self.videoResolution = videoResolution ?? "\(media?.width ?? 1920)x\(media?.height ?? 1080)"
+        self.videoResolution = videoResolution ?? route.videoResolution ?? "\(media?.width ?? 1920)x\(media?.height ?? 1080)"
+        audioEnhancements = route.audioEnhancements
     }
 
     /// A channel the server tuned, named after the tune's session so the transcoder finds the stream.
@@ -62,6 +65,7 @@ public struct TranscodeRequest: Sendable, Hashable {
         burnsSubtitles = false
         self.maxVideoBitrateKbps = maxVideoBitrateKbps
         self.videoResolution = videoResolution
+        audioEnhancements = []
     }
 
     func queryItems(location: String) -> [URLQueryItem] {
@@ -74,7 +78,7 @@ public struct TranscodeRequest: Sendable, Hashable {
             ("fastSeek", "1"),
             ("directPlay", "0"),
             ("directStream", copiesVideo ? "1" : "0"),
-            ("directStreamAudio", "1"),
+            ("directStreamAudio", audioEnhancements.isEmpty ? "1" : "0"),
             ("subtitles", burnsSubtitles ? "burn" : "none"),
             ("subtitleSize", "100"),
             ("audioBoost", "100"),
@@ -89,5 +93,7 @@ public struct TranscodeRequest: Sendable, Hashable {
             ("copyts", "1"),
             ("mediaBufferSize", "102400"),
         ].map { URLQueryItem(name: $0.0, value: $0.1) }
+            + (audioEnhancements.contains(.boostDialog) ? [URLQueryItem(name: "boostDialog", value: "1")] : [])
+            + (audioEnhancements.contains(.normalizeLoudness) ? [URLQueryItem(name: "normalizeLoudness", value: "1")] : [])
     }
 }

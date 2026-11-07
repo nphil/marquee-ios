@@ -22,6 +22,10 @@ final class AppSession {
     /// The active profile: the account itself or the Home profile switched to.
     private(set) var user: PlexHomeUser?
     private(set) var server: PlexServer?
+    /// What the chosen server's owner allows and pays for; nothing until the server answers.
+    private(set) var serverInfo = PlexServerInfo()
+    /// Said on the sign-in screen after Delete All Local Data, until the next sign-in starts.
+    private(set) var signedOutNotice: SignedOutNotice?
     /// plex.tv with the active profile's token; set while signed in.
     private(set) var plexTV: PlexTV?
     /// The account's own servers and its Plex Home's; servers friends share are left out.
@@ -65,7 +69,8 @@ final class AppSession {
     private var speechDockOn = false
     private var speechDockText = ""
 
-    let identity: PlexClientIdentity
+    /// Made again by Delete All Local Data, which removes the stored client identifier.
+    private(set) var identity: PlexClientIdentity
     let transport: URLSessionTransport
     private let storage: SessionStorage
     @ObservationIgnored private var signInTask: Task<Void, Never>?
@@ -222,11 +227,50 @@ final class AppSession {
         plexTV = nil
         library = nil
         server = nil
+        serverInfo = PlexServerInfo()
         servers = []
         homeUsers = []
         linkCode = nil
         setUser(nil)
         state = .signedOut
+    }
+
+    /// Deleting a title from the server: the owner's own server, with "Allow media deletion" on in its
+    /// settings. Anyone else gets 401 or 403.
+    var canDeleteMedia: Bool {
+        serverInfo.allowsMediaDeletion && server?.isOwned == true
+    }
+
+    struct SignedOutNotice: Equatable {
+        var title: String
+        var detail: String?
+    }
+
+    /// Signs out and removes everything the app keeps on the iPhone: the Keychain items, every saved
+    /// preference (the client identifier among them, so the next sign-in is a new device), cached
+    /// artwork, the guide cache and URL caches. Themes are reset by the caller, which owns them.
+    func deleteAllLocalData() async {
+        signOut()
+        storage.eraseAll()
+        identity = Self.identity(defaults: storage.defaults)
+        URLCache.shared.removeAllCachedResponses()
+        HTTPCookieStorage.shared.removeCookies(since: .distantPast)
+        var removedAll = await ImagePipeline.shared.removeAll()
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let temporary = FileManager.default.temporaryDirectory
+        for folder in [caches, temporary] {
+            let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+            // The artwork folder stays for the pipeline to write into; its files went above.
+            for file in files where file.lastPathComponent != "Artwork" && (try? FileManager.default.removeItem(at: file)) == nil {
+                removedAll = false
+            }
+        }
+        signedOutNotice = removedAll
+            ? SignedOutNotice(title: "Local data deleted")
+            : SignedOutNotice(
+                title: "Signed out, and most local data deleted",
+                detail: "Some files could not be removed. Deleting the app removes the rest."
+            )
     }
 
     func play(item: PlexMetadata, mediaIndex: Int = 0, fromStart: Bool = false) {
@@ -313,6 +357,7 @@ final class AppSession {
         signInTask?.cancel()
         refreshTask?.cancel()
         linkCode = nil
+        signedOutNotice = nil
         state = .signingIn
         return makePlexTV(token: nil)
     }
@@ -408,9 +453,13 @@ final class AppSession {
         let library = PlexLibrary(server: server, identity: identity, transport: transport, rememberedURI: storage.address(for: server.id))
         self.server = server
         self.library = library
+        serverInfo = PlexServerInfo()
         state = .ready
         addressTask?.cancel()
-        addressTask = Task { await keepAddress(of: library.connection, reprobe: false) }
+        addressTask = Task {
+            await keepAddress(of: library.connection, reprobe: false)
+            await loadServerInfo(from: library)
+        }
         #if DEBUG
         playForUITest(library)
         #endif
@@ -446,6 +495,11 @@ final class AppSession {
         }
         guard let found, !Task.isCancelled else { return }
         storage.setAddress(found.uri, for: connection.server.id)
+    }
+
+    private func loadServerInfo(from library: PlexLibrary) async {
+        guard let info = try? await library.serverInfo(), !Task.isCancelled else { return }
+        serverInfo = info
     }
 
     /// Loads the profile's own settings along with it.

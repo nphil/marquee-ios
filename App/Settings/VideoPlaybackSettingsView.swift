@@ -1,3 +1,4 @@
+import MarqueeCore
 import SwiftUI
 
 /// Video & playback (DESIGN §8.7, behaviour spec §4), saved for the active profile.
@@ -58,6 +59,26 @@ struct VideoPlaybackSettingsView: View {
                 .accessibilityIdentifier("video.aspect")
             } footer: {
                 Text(Self.explanation(of: session.settings.directPlay))
+                    .foregroundStyle(theme.ink2)
+            }
+            .listRowBackground(theme.sheet)
+
+            Section {
+                if session.settings.directPlay == .force {
+                    LabeledContent("Default Quality", value: VideoQuality.original.title)
+                        .accessibilityIdentifier("video.quality")
+                } else {
+                    Picker("Default Quality", selection: $session.settings.quality) {
+                        ForEach(VideoQuality.allCases, id: \.self) { quality in
+                            Text(quality.title).tag(quality)
+                        }
+                    }
+                    .accessibilityIdentifier("video.quality")
+                }
+            } footer: {
+                Text(session.settings.directPlay == .force
+                    ? "Forced Direct Play: original quality."
+                    : "The highest quality a video plays at. Larger files are converted by your Plex server to fit. Also available in the player's More menu.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)

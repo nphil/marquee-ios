@@ -7,13 +7,16 @@ struct LibraryView: View {
     @Environment(\.plexLibrary) private var library
     @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(AppSession.self) private var session
     @State private var sections = Remote<[PlexLibrarySection]>()
     @AppStorage("library.section") private var chosenKey = ""
 
     var body: some View {
         WidthReader { width in
             RemoteContent(remote: sections) { sections in
-                let browsable = sections.filter { $0.type == .movie || $0.type == .show }
+                let movieAndTV = sections.filter { $0.type == .movie || $0.type == .show }
+                let favorites = movieAndTV.filter { !session.settings.hiddenLibraries.contains(HomeLayout.libraryID($0)) }
+                let browsable = favorites.isEmpty ? movieAndTV : favorites
                 if let section = browsable.first(where: { $0.key == chosenKey }) ?? browsable.first {
                     SectionBrowser(section: section, width: width)
                         .id(section.key)
@@ -62,6 +65,7 @@ private struct SectionBrowser: View {
     @Environment(LibraryChanges.self) private var changes
     @State private var segment = Segment.all
     @State private var sort = SectionQuery.Sort.title
+    @State private var reversed = false
     @State private var unwatchedOnly = false
     @State private var genre: PlexDirectory? = nil
     @State private var titles = PagedLoader<PlexMetadata>()
@@ -83,11 +87,11 @@ private struct SectionBrowser: View {
     }
 
     private var query: SectionQuery {
-        SectionQuery(type: section.type, sort: sort, unwatchedOnly: unwatchedOnly, genre: genre)
+        SectionQuery(type: section.type, sort: sort, reversed: reversed, unwatchedOnly: unwatchedOnly, genre: genre)
     }
 
     private var showsRail: Bool {
-        segment == .all && sort == .title && (letters.value?.count ?? 0) > 1 && !titles.items.isEmpty
+        segment == .all && query.isAlphabetical && (letters.value?.count ?? 0) > 1 && !titles.items.isEmpty
     }
 
     private var metrics: PosterGridMetrics {
@@ -147,8 +151,8 @@ private struct SectionBrowser: View {
                 try await library.items(in: key, query: query, start: start, size: size)
             }
         }
-        .task(id: query.sort == .title ? GridKey(library: library?.instance, query: query) : nil) {
-            guard let library, query.sort == .title else { return }
+        .task(id: query.isAlphabetical ? GridKey(library: library?.instance, query: query) : nil) {
+            guard let library, query.isAlphabetical else { return }
             await loadLetters(library)
         }
         .task(id: segment == .collections ? library?.instance : nil) {
@@ -198,10 +202,17 @@ private struct SectionBrowser: View {
 
     private var viewMenu: some View {
         Menu {
-            Picker("Sort By", selection: $sort) {
+            Picker("Sort By", selection: sortField) {
                 ForEach(SectionQuery.Sort.allCases, id: \.self) { Text($0.title).tag($0) }
             }
             .pickerStyle(.inline)
+            if let orders = sort.orders {
+                Picker("Order", selection: $reversed) {
+                    Text(orders.first).tag(false)
+                    Text(orders.reversed).tag(true)
+                }
+                .pickerStyle(.inline)
+            }
             if let genres = genres.value, !genres.isEmpty {
                 Picker("Genre", systemImage: "theatermasks", selection: $genre) {
                     Text("All Genres").tag(PlexDirectory?.none)
@@ -215,11 +226,22 @@ private struct SectionBrowser: View {
         }
     }
 
+    /// A new field starts in its first order: A–Z, newest first, highest first.
+    private var sortField: Binding<SectionQuery.Sort> {
+        Binding {
+            sort
+        } set: { field in
+            sort = field
+            reversed = false
+        }
+    }
+
     // MARK: Segments
 
     private var titlesGrid: some View {
         PagedContent(loader: titles, banner: false) {
             grid(titles, zoomPrefix: "grid")
+                .environment(\.posterSort, sort)
         } skeleton: {
             skeleton
         } empty: {
@@ -337,7 +359,7 @@ private struct SectionBrowser: View {
         switch segment {
         case .all:
             await titles.refresh()
-            if sort == .title { await loadLetters(library) }
+            if query.isAlphabetical { await loadLetters(library) }
         case .collections:
             await collections.refresh()
         case .recommended:

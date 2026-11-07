@@ -137,6 +137,20 @@ actor ImagePipeline {
         prefetchWorkers -= 1
     }
 
+    /// Delete All Local Data: every decoded bitmap and stored copy. Returns false when a file stayed.
+    func removeAll() -> Bool {
+        memory.removeAllObjects()
+        prefetchQueue.removeAll()
+        queuedKeys.removeAll()
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        var removedAll = true
+        for file in files where (try? FileManager.default.removeItem(at: file)) == nil {
+            removedAll = false
+        }
+        diskBytes = nil
+        return removedAll
+    }
+
     private func load(_ request: ArtRequest, key: String, library: PlexLibrary?) async throws -> UIImage {
         let file = location(of: key)
         if let stored = await ArtCoding.stored(at: file) {

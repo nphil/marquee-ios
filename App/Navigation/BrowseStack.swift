@@ -75,6 +75,8 @@ private struct RouteDestination: View {
             HubGridView(key: key, title: title)
         case .watchlist(let item, _):
             WatchlistDetailView(item: item)
+        case .person(let id, let name, let thumb):
+            PersonView(id: id, name: name, thumb: thumb)
         }
     }
 }

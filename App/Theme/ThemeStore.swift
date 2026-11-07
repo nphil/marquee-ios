@@ -63,6 +63,15 @@ final class ThemeStore {
         save()
     }
 
+    /// Back to the first-launch choice, after Delete All Local Data emptied the saved one.
+    func reset() {
+        let catalog = ThemeCatalog.bundled
+        matchSystem = true
+        light = catalog.theme(id: nil, mode: .light)
+        dark = catalog.theme(id: nil, mode: .dark)
+        fixedMode = .dark
+    }
+
     private func save() {
         let defaults = UserDefaults.standard
         defaults.set(matchSystem, forKey: Key.matchSystem)
