@@ -126,7 +126,9 @@ final class LiveCore: @unchecked Sendable {
     /// The time the clock starts from; sound before it is dropped.
     private var anchor: Double?
     private var audioEnd: Double?
-    private var audioArrivedAt: Double?
+    /// The first and last decode time of the pictures that came since the last sound, for telling sound that stopped
+    /// from data that stopped.
+    private var picturesSinceSound: (first: Double, last: Double)?
     private var audioMode = AudioMode.unknown
     private var stationKeyPending = false
     private var newestVideo: Double?
@@ -142,6 +144,8 @@ final class LiveCore: @unchecked Sendable {
     /// while the clock waits on it as the station's until sound tells which it is.
     private var slateAssumed = false
     private var diagnostics = LiveDiagnostics()
+    /// The rate last reported by a `servo` event, so a rate that creeps in small steps is still reported.
+    private var reportedRate = 1.0
     private var tracks: [LiveAudioTrack] = []
     private var videoSuspended = false
 
@@ -248,13 +252,17 @@ final class LiveCore: @unchecked Sendable {
             if anchor == nil, key, audioMode != .slate, phase == .opening || phase == .picture { anchor = pts }
             var parameters = newParameters
             if let dts, let last = lastVideoDTS, abs(dts - last) > ClockServo.reanchorError {
-                // A jump in the stream's clock: what waits belongs to the old timeline.
+                // A jump in the stream's clock: what waits belongs to the old timeline. Pictures carry the clock, so
+                // this is the jump's one reanchor; sound only follows them.
                 let dropped = dropQueued(queue.count)
                 parameters = parameters ?? dropped
                 newestVideo = nil
                 timelineJump = true
             }
-            if dts != nil { lastVideoDTS = dts }
+            if let dts {
+                lastVideoDTS = dts
+                picturesSinceSound = (picturesSinceSound?.first ?? dts, dts)
+            }
             if let pts { newestVideo = max(newestVideo ?? pts, pts) }
             queue.append(Queued(packet: owned, pts: pts, dts: dts, key: key, role: role, parameters: parameters))
             trimQueue()
@@ -279,7 +287,7 @@ final class LiveCore: @unchecked Sendable {
     }
 
     /// Decodes sound for the selected track, the first in the PMT. Returns true when the video side should look at
-    /// the clock: sound decides when a still starts moving.
+    /// the clock: sound decides when a still starts moving and when a stall ends.
     private func ingestAudio(
         _ packet: UnsafeMutablePointer<AVPacket>, stream: UnsafeMutablePointer<AVStream>,
         parameters: UnsafeMutablePointer<AVCodecParameters>, now: Double
@@ -301,11 +309,12 @@ final class LiveCore: @unchecked Sendable {
         let pts = seconds(packet.pointee.pts, base)
         var events: [LiveEvent] = []
         let accepting: Double? = lock.withLock {
-            audioPacketAt = now
             if let description { diagnostics.audio = description }
-            if let pts, let end = audioEnd, abs(pts - end) > ClockServo.reanchorError {
-                timelineJump = true
-            }
+            // Sound off the pictures' clock is from before a jump in it, or ahead of one the pictures have not made
+            // yet (a demuxer holds a picture until the next starts, so sound can show a jump first): it has no place
+            // on the clock. Not counting it as sound lets a picture start without it.
+            if let pts, let clock = lastVideoDTS, abs(pts - clock) > ClockServo.reanchorError { return nil }
+            audioPacketAt = now
             switch (audioMode, silence) {
             case (.slate, false):
                 audioMode = .station
@@ -348,10 +357,10 @@ final class LiveCore: @unchecked Sendable {
             output.enqueueAudio(samples, time: time)
             lock.withLock {
                 audioEnd = max(audioEnd ?? end, end)
-                audioArrivedAt = now
+                picturesSinceSound = nil
             }
         }
-        return lock.withLock { phase == .picture }
+        return lock.withLock { phase == .picture || phase == .stalled }
     }
 
     private func describeAudio(_ decoder: AudioDecoder) -> String {
@@ -406,13 +415,10 @@ final class LiveCore: @unchecked Sendable {
         control(now: now, events: &events)
         events.forEach(onEvent)
         return lock.withLock {
-            let start: Double? = switch phase {
-            case .playing, .stalled: clock
-            case .picture: anchor
-            case .opening, .slate: nil
-            }
-            guard let start, let next = queue.first?.dts else { return 0.1 }
-            return min(max(min(next, decodedUpTo ?? next) - Self.lead - start, 0.002), 0.1)
+            // Only a running clock brings pictures due. Standing still, before the start or in a stall, the side waits
+            // for sound, which wakes it as it comes.
+            guard phase == .playing, let next = queue.first?.dts else { return 0.1 }
+            return min(max(min(next, decodedUpTo ?? next) - Self.lead - clock, 0.002), 0.1)
         }
     }
 
@@ -551,6 +557,7 @@ final class LiveCore: @unchecked Sendable {
                 return
             }
             anchor = time
+            let was = phase
             phase = .picture
             if audioMode == .unknown, !tracks.isEmpty {
                 slateAssumed = true
@@ -558,7 +565,8 @@ final class LiveCore: @unchecked Sendable {
                 events.append(.phase(.slate))
             } else {
                 diagnostics.timings.picture = diagnostics.timings.picture ?? elapsed
-                events.append(.phase(.picture))
+                // A re-anchor reported the phase when it stopped the clock.
+                if was != .picture { events.append(.phase(.picture)) }
             }
         }
     }
@@ -577,8 +585,10 @@ final class LiveCore: @unchecked Sendable {
     private func control(now: Double, events: inout [LiveEvent]) {
         let clock = output.time
         lock.withLock {
-            let soundRecent = audioArrivedAt.map { now - $0 < 1 } ?? false
-            let newest = soundRecent ? audioEnd : (newestVideo ?? audioEnd)
+            // Sound sets the buffer's depth while there is any, since the clock runs on it. It counts as gone once a
+            // second of pictures came without it: while nothing comes at all, its buffer is what runs out.
+            let soundGone = audioEnd == nil || picturesSinceSound.map { $0.last - $0.first >= 1 } ?? false
+            let newest = soundGone ? (newestVideo ?? audioEnd) : audioEnd
             switch phase {
             case .opening, .slate:
                 break
@@ -595,6 +605,7 @@ final class LiveCore: @unchecked Sendable {
                 servo.reset()
                 phase = .playing
                 diagnostics.rate = 1
+                reportedRate = 1
                 diagnostics.timings.sound = diagnostics.timings.sound ?? now - startedAt
                 lastControl = now
                 events.append(.phase(.playing))
@@ -619,7 +630,11 @@ final class LiveCore: @unchecked Sendable {
                 case .keep: break
                 case .rate(let rate):
                     output.setRate(rate, time: nil)
-                    if abs(rate - diagnostics.rate) >= 0.005 { events.append(.servo(rate)) }
+                    // In the servo's 0.1 % steps, so the 0.5 % between 1 and its bound is not lost to rounding.
+                    if (abs(rate - reportedRate) * 1000).rounded() >= 5 {
+                        reportedRate = rate
+                        events.append(.servo(rate))
+                    }
                     diagnostics.rate = rate
                 case .reanchor:
                     reanchor(events: &events)
@@ -629,6 +644,7 @@ final class LiveCore: @unchecked Sendable {
                 guard let newest, newest - clock >= jitter.seconds else { break }
                 output.setRate(1, time: nil)
                 diagnostics.rate = 1
+                reportedRate = 1
                 phase = .playing
                 lastControl = now
                 events.append(.phase(.playing))

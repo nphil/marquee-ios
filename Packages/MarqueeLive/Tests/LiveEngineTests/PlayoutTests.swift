@@ -20,11 +20,13 @@ struct PlayoutTests {
         var servo = ClockServo()
         #expect(servo.update(buffered: 0.3, target: 0.3) == .keep)
         servo.reset()
-        #expect(servo.update(buffered: 0.7, target: 0.3) == .rate(1.004))
+        #expect(rate(servo.update(buffered: 0.35, target: 0.3)) == 1.0025)
         servo.reset()
-        #expect(servo.update(buffered: 1.8, target: 0.3) == .rate(1.02))
+        #expect(rate(servo.update(buffered: 0.7, target: 0.3)) == 1.005)
         servo.reset()
-        #expect(servo.update(buffered: 0.0, target: 0.3) == .rate(0.997))
+        #expect(rate(servo.update(buffered: 1.8, target: 0.3)) == 1.02)
+        servo.reset()
+        #expect(rate(servo.update(buffered: 0.0, target: 0.3)) == 0.995)
         servo.reset()
         #expect(servo.update(buffered: 2.5, target: 0.3) == .reanchor)
     }
@@ -36,4 +38,10 @@ struct PlayoutTests {
         #expect(servo.update(buffered: 0.35, target: 0.3) == .keep)
         #expect(abs((servo.buffered ?? 0) - 0.305) < 1e-9)
     }
+}
+
+/// The rate a decision sets, to a millionth.
+private func rate(_ decision: ClockServo.Decision) -> Double? {
+    guard case .rate(let rate) = decision else { return nil }
+    return (rate * 1_000_000).rounded() / 1_000_000
 }

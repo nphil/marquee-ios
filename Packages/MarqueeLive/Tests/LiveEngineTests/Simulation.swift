@@ -188,15 +188,28 @@ private final class EventLog: @unchecked Sendable {
     var events: [(time: Double, event: LiveEvent)] { lock.withLock { _events } }
 }
 
+/// Each segment list is generated once, by the first test that asks; tests asking for other lists generate theirs at
+/// the same time instead of queueing behind it.
 private final class FixtureCache: @unchecked Sendable {
+    private final class Entry: @unchecked Sendable {
+        let lock = NSLock()
+        var stream: Simulation.Stream?
+    }
+
     private let lock = NSLock()
-    private var streams: [String: Simulation.Stream] = [:]
+    private var entries: [String: Entry] = [:]
 
     func stream(for segments: [SyntheticTS.Segment]) throws -> Simulation.Stream {
         let key = segments.map { "\($0.kind) \($0.width)x\($0.height) \($0.interlaced) \($0.seconds) \($0.bitRate) \($0.jump)" }
             .joined(separator: "|")
-        return try lock.withLock {
-            if let stream = streams[key] { return stream }
+        let entry = lock.withLock {
+            if let entry = entries[key] { return entry }
+            let entry = Entry()
+            entries[key] = entry
+            return entry
+        }
+        return try entry.lock.withLock {
+            if let stream = entry.stream { return stream }
             let generator = try SyntheticTS(segments)
             var chunk = SyntheticTS.Chunk(bytes: Data(), marks: [])
             var splices: [Double] = []
@@ -206,7 +219,7 @@ private final class FixtureCache: @unchecked Sendable {
                 chunk.marks.append(contentsOf: next.marks)
             }
             let stream = Simulation.Stream(chunk: chunk, splices: splices)
-            streams[key] = stream
+            entry.stream = stream
             return stream
         }
     }

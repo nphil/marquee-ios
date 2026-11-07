@@ -28,7 +28,9 @@ public struct JitterTarget: Sendable, Equatable {
 }
 
 /// The playback rate that brings the buffer's depth to the target: within ±0.5 % while the error is under 0.5 s,
-/// within ±2 % beyond it. The audio renderer's time-pitch algorithm keeps voices natural at these rates.
+/// ±2 % beyond it. The audio renderer's time-pitch algorithm keeps voices natural at these rates. The small band
+/// reaches its bound at 0.1 s off, so a tuner running fast holds the buffer near the target (LT22: 0.2-0.5 s) instead
+/// of drifting half a second before the rate catches it; a crystal's 100 ppm settles 2 ms off.
 public struct ClockServo: Sendable, Equatable {
     /// More than this far off is not steered back: the player drops to the newest picture instead.
     public static let reanchorError = 2.0
@@ -52,7 +54,7 @@ public struct ClockServo: Sendable, Equatable {
         buffered = smoothed
         let error = smoothed - target
         if abs(error) > Self.reanchorError { return .reanchor }
-        let wanted = abs(error) <= 0.5 ? 1 + min(max(error * 0.01, -0.005), 0.005) : 1 + min(max(error * 0.04, -0.02), 0.02)
+        let wanted = abs(error) <= 0.5 ? 1 + min(max(error * 0.05, -0.005), 0.005) : 1 + (error > 0 ? 0.02 : -0.02)
         guard abs(wanted - rate) >= 0.001 else { return .keep }
         rate = wanted
         return .rate(wanted)
