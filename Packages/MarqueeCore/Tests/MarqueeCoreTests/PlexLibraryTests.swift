@@ -97,16 +97,41 @@ struct PlexLibraryTests {
         #expect(try await bare.serverInfo() == PlexServerInfo())
     }
 
-    @Test func deleteRemovesATitleOrOneVersionAndSurfacesARefusal() async throws {
-        let (library, transport) = Self.library { _ in json([String: Any]()) }
-        let (refusing, _) = Self.library { _ in json([String: Any](), status: 403) }
+    @Test func deleteRemovesATitleOrOneVersion() async {
+        let (library, transport) = Self.library { _ in json([String: Any](), status: 204) }
 
-        try await library.delete("12")
-        try await library.deleteVersion(5, of: "12")
-
+        #expect(await library.delete("12") == .deleted)
+        #expect(await library.deleteVersion(5, of: "12") == .deleted)
         #expect(await transport.requests(to: "/library/metadata/12").map(\.method) == [.delete])
         #expect(await transport.requests(to: "/library/metadata/12/media/5").map(\.method) == [.delete])
-        await #expect(throws: PlexError.server(status: 403, message: nil)) { try await refusing.delete("12") }
+    }
+
+    /// 404 means gone already; 401 and 403 mean deleting is off, asked once only; faults allow a Retry.
+    @Test func deleteOutcomeFollowsTheStatus() async {
+        let expected: [(Int, DeleteOutcome)] = [(200, .deleted), (404, .deleted), (401, .notAllowed), (403, .notAllowed), (500, .failed), (503, .failed)]
+        for (status, outcome) in expected {
+            let (library, transport) = Self.library { _ in json([String: Any](), status: status) }
+            #expect(await library.delete("12") == outcome, "status \(status)")
+            if outcome == .notAllowed {
+                #expect(await transport.requests(to: "/library/metadata/12").count == 1)
+            }
+        }
+        #expect(DeleteOutcome(PlexError.unreachable(.offline)) == .failed)
+    }
+
+    @Test func deletedTitlesLeaveListsWithTheirSeasonsAndEpisodes() throws {
+        let movie = try decode(PlexMetadata.self, ["ratingKey": "1", "type": "movie"])
+        let season = try decode(PlexMetadata.self, ["ratingKey": "21", "type": "season", "parentRatingKey": "20"])
+        let episode = try decode(PlexMetadata.self, ["ratingKey": "22", "type": "episode", "parentRatingKey": "21", "grandparentRatingKey": "20"])
+        let other = try decode(PlexMetadata.self, ["ratingKey": "3", "type": "movie"])
+        var deleted = DeletedTitles()
+        #expect(deleted.removing(from: [movie, season, episode, other]) == [movie, season, episode, other])
+
+        deleted.insert("1")
+        deleted.insert("20")
+
+        #expect(deleted.removing(from: [movie, season, episode, other]) == [other])
+        #expect(!deleted.contains(other))
     }
 
     @Test func listOfAServerKeyKeepsItsQueryAndPages() async throws {

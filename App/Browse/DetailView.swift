@@ -39,12 +39,13 @@ struct WatchlistDetailView: View {
 
     @Environment(\.plexLibrary) private var library
     @Environment(\.theme) private var theme
+    @Environment(LibraryChanges.self) private var changes
     @State private var match = Remote<PlexMetadata?>()
 
     var body: some View {
         WidthReader { width in
             RemoteContent(remote: match) { found in
-                if let found {
+                if let found, !changes.deleted.contains(found) {
                     DetailView(ratingKey: found.ratingKey)
                 } else {
                     DetailPage(item: item, width: width, isOnServer: false)
@@ -61,7 +62,8 @@ struct WatchlistDetailView: View {
                 await match.load { nil }
                 return
             }
-            await match.load { try await library.items(matchingGuid: guid).first }
+            let deleted = changes.deleted
+            await match.load { try await deleted.removing(from: library.items(matchingGuid: guid)).first }
         }
     }
 }
@@ -385,6 +387,7 @@ private struct DetailPage: View {
         .buttonStyle(.round)
         .contentShape(.contextMenuPreview, Circle())
         .accessibilityLabel("More")
+        .accessibilityIdentifier("detail.more")
     }
 
     private func versionMenu(_ media: PlexMedia) -> some View {
@@ -684,7 +687,8 @@ private struct SeasonsSection: View {
     @State private var chosen: String? = nil
 
     var body: some View {
-        RemoteContent(remote: seasons) { seasons in
+        RemoteContent(remote: seasons) { loaded in
+            let seasons = changes.shown(loaded)
             if let season = current(in: seasons) {
                 VStack(alignment: .leading, spacing: Space.s3) {
                     if seasons.count > 1 {
@@ -750,7 +754,7 @@ private struct EpisodeList: View {
     var body: some View {
         RemoteContent(remote: episodes) { episodes in
             LazyVStack(alignment: .leading, spacing: Space.s3) {
-                ForEach(episodes) { episode in
+                ForEach(changes.shown(episodes)) { episode in
                     EpisodeRow(episode: episode) { watched in
                         actions.setWatched(watched, episode) { shown in
                             withAnimation(Motion.label) {

@@ -17,7 +17,7 @@ struct HomeView: View {
     var body: some View {
         WidthReader { width in
             RemoteContent(remote: rows) { rows in
-                content(session.settings.homeRows.arrange(rows), width: width)
+                content(session.settings.homeRows.arrange(withoutDeleted(rows)), width: width)
             } skeleton: {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Space.s7) {
@@ -108,6 +108,15 @@ struct HomeView: View {
         let libraries = session.settings.homeRows.shownLibraries
         let hidden = session.settings.hiddenLibraries
         await rows.load { try await HomeRows.load(from: library, libraries: libraries, hidden: hidden) }
+    }
+
+    /// `rows` without the titles deleted this session; a row left empty is not shown.
+    private func withoutDeleted(_ rows: [HomeRow]) -> [HomeRow] {
+        rows.map { row in
+            var row = row
+            row.hub.items = changes.shown(row.hub.items)
+            return row
+        }
     }
 
     /// Hides a row from its title's long press, with Undo in the toast.

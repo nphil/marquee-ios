@@ -17,6 +17,8 @@ import Foundation
 /// - Images are files under the folder: `/photo/:/transcode` serves the path of its `url` item, and
 ///   any URL ending in an image extension serves its own path.
 /// - A write, or a path with `/:/` in it or under `/actions/`, without a fixture is answered 200 `{}`.
+///   A `DELETE` always is, and the title stays in the fixtures.
+/// - The server root `/` reads `pms/root.json`.
 /// - Every channel's tune reads `pms/livetv/tune.json`.
 /// - A fixture whose object has `"__anchor": T` has every `beginsAt` and `endsAt` in it moved by
 ///   `liveEvening` minus T, so the Live TV guide always airs around `liveNow`.
@@ -113,7 +115,11 @@ struct FakePlexRouter {
             return .success(image(at: path))
         }
 
-        let base = prefix(for: host) + path
+        // The fixtures keep a deleted title, as a server lists one until its trash is emptied.
+        if method == "DELETE" {
+            return .success(json([String: Any]()))
+        }
+        let base = prefix(for: host) + (path == "/" ? "/root" : path)
         if let found = fixture(base, query: query) ?? derived(base, query: query) {
             guard var object = found as? [String: Any] else { return .success(json(found)) }
             let status = object.removeValue(forKey: "__status") as? Int ?? 200

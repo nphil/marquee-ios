@@ -22,8 +22,8 @@ enum DeleteTarget: Identifiable, Hashable {
 }
 
 extension View {
-    /// Asks before deleting `target`, then deletes it and refreshes the screens showing it. Cancel is the
-    /// default. `onDeleted` runs after the server confirms.
+    /// Asks before deleting `target`, then deletes it and takes it out of every list. Cancel is the
+    /// default. `onDeleted` runs once the title is gone from the server.
     func deleteConfirmation(_ target: Binding<DeleteTarget?>, onDeleted: @escaping @MainActor (DeleteTarget) -> Void = { _ in }) -> some View {
         modifier(DeleteConfirmation(target: target, onDeleted: onDeleted))
     }
@@ -36,7 +36,12 @@ private struct DeleteConfirmation: ViewModifier {
     @Environment(\.plexLibrary) private var library
     @Environment(LibraryChanges.self) private var changes
     @Environment(ToastCenter.self) private var toasts
-    @State private var failure: String?
+    @State private var failure: Failure?
+
+    private struct Failure {
+        let target: DeleteTarget
+        let outcome: DeleteOutcome
+    }
 
     func body(content: Content) -> some View {
         content
@@ -52,10 +57,21 @@ private struct DeleteConfirmation: ViewModifier {
             } message: { target in
                 Text(Self.message(target))
             }
-            .alert("Couldn't Delete", isPresented: Binding { failure != nil } set: { if !$0 { failure = nil } }) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(failure ?? "")
+            .alert(
+                failure?.outcome == .notAllowed ? "Deleting Is Turned Off" : "Couldn't Delete",
+                isPresented: Binding { failure != nil } set: { if !$0 { failure = nil } },
+                presenting: failure
+            ) { failure in
+                if failure.outcome == .failed {
+                    Button("Retry") { perform(failure.target) }
+                    Button("Cancel", role: .cancel) {}
+                } else {
+                    Button("OK", role: .cancel) {}
+                }
+            } message: { failure in
+                Text(failure.outcome == .notAllowed
+                    ? "The server doesn't allow deleting media. Its owner can turn on Allow media deletion in the Plex server's Settings, under Library."
+                    : "“\(failure.target.item.title)” is still on the server. Check the connection, then try again.")
             }
     }
 
@@ -83,26 +99,24 @@ private struct DeleteConfirmation: ViewModifier {
         guard let library else { return }
         let item = target.item
         Task {
-            do {
-                switch target {
-                case .title:
-                    try await library.delete(item.ratingKey)
-                    toasts.show("Deleted “\(item.title)”")
-                case .version(_, let index):
-                    try await library.deleteVersion(item.media[index].id, of: item.ratingKey)
-                    toasts.show("Deleted the \(item.media[index].versionLabel) version")
-                }
-                changes.record(Set([item.ratingKey, item.parentRatingKey, item.grandparentRatingKey].compactMap(\.self)))
-                onDeleted(target)
-            } catch PlexError.unauthorized {
-                failure = Self.notAllowed
-            } catch PlexError.server(let status, _) where status == 403 {
-                failure = Self.notAllowed
-            } catch {
-                failure = "“\(item.title)” wasn't deleted. \(error.localizedDescription)"
+            let outcome: DeleteOutcome
+            switch target {
+            case .title: outcome = await library.delete(item.ratingKey)
+            case .version(_, let index): outcome = await library.deleteVersion(item.media[index].id, of: item.ratingKey)
             }
+            guard outcome == .deleted else {
+                failure = Failure(target: target, outcome: outcome)
+                return
+            }
+            switch target {
+            case .title:
+                changes.recordDeletion(of: item, server: library.server.id)
+                toasts.show("Deleted “\(item.title)”")
+            case .version(_, let index):
+                changes.record(Set([item.ratingKey, item.parentRatingKey, item.grandparentRatingKey].compactMap(\.self)))
+                toasts.show("Deleted the \(item.media[index].versionLabel) version")
+            }
+            onDeleted(target)
         }
     }
-
-    private static let notAllowed = "The Plex server doesn't allow deleting media. Turn on Allow media deletion in the server's Library settings, then try again."
 }

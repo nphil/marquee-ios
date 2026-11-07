@@ -308,7 +308,7 @@ private struct SectionBrowser: View {
     private func grid(_ loader: PagedLoader<PlexMetadata>, zoomPrefix: String) -> some View {
         let metrics = metrics
         return LazyVGrid(columns: metrics.gridItems, alignment: .leading, spacing: Space.s4) {
-            ForEach(loader.items) { item in
+            ForEach(changes.shown(loader.items)) { item in
                 let zoomID = "\(zoomPrefix)/\(item.ratingKey)"
                 NavigationLink(value: Route.to(item, zoomID: zoomID)) {
                     PosterCell(item: item, width: metrics.cellWidth, zoomID: zoomID)
@@ -371,7 +371,7 @@ private struct SectionBrowser: View {
     private func refreshTouched(after revision: Int) {
         guard let library else { return }
         let touched = changes.keys(after: revision)
-        let stale = titles.items.map(\.ratingKey).filter(touched.contains)
+        let stale = changes.shown(titles.items).map(\.ratingKey).filter(touched.contains)
         guard !stale.isEmpty else { return }
         let titles = titles
         Task {

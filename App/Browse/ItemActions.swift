@@ -38,10 +38,32 @@ final class LibraryChanges {
     /// The revision that last touched each title, its season and its show. Kept whole, so a screen that
     /// sees several revisions at once still learns every title they touched.
     @ObservationIgnored private var touched: [String: Int] = [:]
+    /// Titles deleted this session. Every list leaves them out at once and stays that way after
+    /// refetching, because the server lists a deleted title until its trash is emptied.
+    private(set) var deleted = DeletedTitles()
 
     func record(_ keys: Set<String>) {
         revision += 1
         for key in keys { touched[key] = revision }
+    }
+
+    /// Takes a deleted title out of every list and its artwork out of the caches; the screens showing
+    /// its season or show refetch their counts.
+    func recordDeletion(of item: PlexMetadata, server: String) {
+        deleted.insert(item.ratingKey)
+        record(Set([item.ratingKey, item.parentRatingKey, item.grandparentRatingKey].compactMap(\.self)))
+        let art = [item.thumb, item.art].compactMap(\.self)
+        Task { await ImagePipeline.shared.forget(art, server: server) }
+    }
+
+    /// `items` without the titles deleted this session.
+    func shown(_ items: [PlexMetadata]) -> [PlexMetadata] {
+        deleted.removing(from: items)
+    }
+
+    /// Rating keys name titles on one server only, so choosing another server starts afresh.
+    func forgetDeletions() {
+        deleted = DeletedTitles()
     }
 
     func recordWatchlist() {

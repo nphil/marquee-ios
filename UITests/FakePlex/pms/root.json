@@ -1,0 +1,8 @@
+{
+  "MediaContainer": {
+    "size": 0,
+    "friendlyName": "Living Room",
+    "machineIdentifier": "fake-server",
+    "allowMediaDeletion": true
+  }
+}

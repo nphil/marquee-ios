@@ -236,9 +236,16 @@ final class AppSession {
     }
 
     /// Deleting a title from the server: the owner's own server, with "Allow media deletion" on in its
-    /// settings. Anyone else gets 401 or 403.
+    /// settings, from the owner's profile. Anyone else gets 401 or 403.
     var canDeleteMedia: Bool {
-        serverInfo.allowsMediaDeletion && server?.isOwned == true
+        serverInfo.allowsMediaDeletion && server?.isOwned == true && isOwnerProfile
+    }
+
+    /// The signed-in account, or in a Plex Home its admin profile. An account without a Home may report
+    /// itself as no admin.
+    private var isOwnerProfile: Bool {
+        guard let user else { return true }
+        return user.isAdmin || !(homeUsers.contains(where: \.isAdmin) || user.isRestricted || user.isGuest)
     }
 
     struct SignedOutNotice: Equatable {

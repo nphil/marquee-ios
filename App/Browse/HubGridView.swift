@@ -10,6 +10,7 @@ struct HubGridView: View {
     @Environment(\.plexLibrary) private var library
     @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(LibraryChanges.self) private var changes
     @State private var titles = PagedLoader<PlexMetadata>()
     private let prefetch = ArtPrefetcher()
 
@@ -19,7 +20,7 @@ struct HubGridView: View {
             PagedContent(loader: titles) {
                 ScrollView {
                     LazyVGrid(columns: metrics.gridItems, alignment: .leading, spacing: Space.s4) {
-                        ForEach(titles.items) { item in
+                        ForEach(changes.shown(titles.items)) { item in
                             let zoomID = "all/\(item.ratingKey)"
                             NavigationLink(value: Route.to(item, zoomID: zoomID)) {
                                 PosterCell(item: item, width: metrics.cellWidth, zoomID: zoomID)

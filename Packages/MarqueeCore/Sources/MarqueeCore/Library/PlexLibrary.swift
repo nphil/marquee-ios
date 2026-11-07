@@ -137,13 +137,22 @@ public struct PlexLibrary: Sendable {
 
     /// Deletes a movie, episode, season or show and its files from the server's disk. The server refuses
     /// (401 or 403) unless its owner turned on deleting media from the apps.
-    public func delete(_ ratingKey: String) async throws {
-        try await perform(.delete, "/library/metadata/\(ratingKey)", [:])
+    public func delete(_ ratingKey: String) async -> DeleteOutcome {
+        await deleting("/library/metadata/\(ratingKey)")
     }
 
     /// Deletes one version of a title and its file from the server's disk, leaving the others.
-    public func deleteVersion(_ mediaID: Int, of ratingKey: String) async throws {
-        try await perform(.delete, "/library/metadata/\(ratingKey)/media/\(mediaID)", [:])
+    public func deleteVersion(_ mediaID: Int, of ratingKey: String) async -> DeleteOutcome {
+        await deleting("/library/metadata/\(ratingKey)/media/\(mediaID)")
+    }
+
+    private func deleting(_ path: String) async -> DeleteOutcome {
+        do {
+            try await perform(.delete, path, [:])
+            return .deleted
+        } catch {
+            return DeleteOutcome(error)
+        }
     }
 
     // MARK: Playback

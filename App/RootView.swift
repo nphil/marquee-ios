@@ -111,6 +111,7 @@ private struct MainTabs: View {
         .tabBarMinimizeBehavior(selection == .home || selection == .library ? .onScrollDown : .never)
         .environment(toasts)
         .environment(changes)
+        .onChange(of: session.server?.id) { changes.forgetDeletions() }
         .environment(\.plexWatchlist, session.plexTV.map { PlexWatchlist(http: $0.http) })
         .environment(\.sessionActions, SessionActions(
             startPlayback: { item, index, fromStart in session.play(item: item, mediaIndex: index, fromStart: fromStart) },

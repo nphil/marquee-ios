@@ -21,7 +21,12 @@ struct ArtRequest: Hashable, Sendable {
         pixelWidth = max(1, Int((pointSize.width * scale).rounded(.up)))
         pixelHeight = max(1, Int((pointSize.height * scale).rounded(.up)))
         self.server = absolute ? "" : server ?? ""
-        cacheKey = Self.hex(SHA256.hash(data: Data("\(self.server)|\(self.source)".utf8))) + "_\(pixelWidth)x\(pixelHeight)"
+        cacheKey = Self.keyPrefix(source: self.source, server: self.server) + "\(pixelWidth)x\(pixelHeight)"
+    }
+
+    /// The start of the cache key of every size of a Plex path's artwork.
+    static func keyPrefix(source: String, server: String) -> String {
+        hex(SHA256.hash(data: Data("\(server)|\(source)".utf8))) + "_"
     }
 
     var isAbsolute: Bool { Self.isAbsolute(source) }
@@ -149,6 +154,18 @@ actor ImagePipeline {
         }
         diskBytes = nil
         return removedAll
+    }
+
+    /// Drops every size of these Plex paths' artwork from memory and disk: a deleted title's.
+    func forget(_ sources: [String], server: String) {
+        let prefixes = sources.map { ArtRequest.keyPrefix(source: $0, server: server) }
+        guard !prefixes.isEmpty else { return }
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
+        for file in files where prefixes.contains(where: file.lastPathComponent.hasPrefix) {
+            memory.removeObject(forKey: file.lastPathComponent as NSString)
+            try? FileManager.default.removeItem(at: file)
+        }
+        diskBytes = nil
     }
 
     private func load(_ request: ArtRequest, key: String, library: PlexLibrary?) async throws -> UIImage {

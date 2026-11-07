@@ -9,6 +9,7 @@ struct SearchView: View {
     @Environment(\.theme) private var theme
     @Environment(\.openRoute) private var openRoute
     @Environment(\.sessionActions) private var session
+    @Environment(LibraryChanges.self) private var changes
     @State private var text = ""
     @State private var scope = SearchScope.all
     @State private var results = Remote<SearchResults>()
@@ -133,7 +134,7 @@ struct SearchView: View {
         let kinds = scope.kinds
         var groups: [ResultGroup] = []
         for (kind, title) in [("movie", "Movies"), ("show", "Shows"), ("episode", "Episodes")] where kinds.contains(kind) {
-            let items = hubs.filter { $0.type == kind }.flatMap(\.items)
+            let items = changes.shown(hubs.filter { $0.type == kind }.flatMap(\.items))
             guard !items.isEmpty else { continue }
             groups.append(ResultGroup(title: title, rows: items.map { ResultRow.Model(item: $0) }))
         }

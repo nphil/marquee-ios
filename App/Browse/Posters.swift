@@ -188,6 +188,7 @@ struct PosterShelf: View {
 
     @State private var appeared = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(LibraryChanges.self) private var changes
     private let prefetch = ArtPrefetcher()
 
     var body: some View {
@@ -195,7 +196,7 @@ struct PosterShelf: View {
             ShelfHeader(title: title, seeAll: seeAll, menu: menu)
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: Space.s3) {
-                    ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    ForEach(Array(changes.shown(items).enumerated()), id: \.element.id) { index, item in
                         let zoomID = "\(id)/\(item.ratingKey)"
                         NavigationLink(value: Route.to(item, zoomID: zoomID)) {
                             PosterCell(item: item, width: Size.gridMin, zoomID: zoomID)

@@ -11,6 +11,7 @@ struct PersonView: View {
     @Environment(\.plexLibrary) private var library
     @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(LibraryChanges.self) private var changes
     @State private var titles: [PlexMetadata]?
     @State private var failed = false
 
@@ -68,7 +69,7 @@ struct PersonView: View {
                 )
             } else {
                 LazyVGrid(columns: metrics.gridItems, alignment: .leading, spacing: Space.s4) {
-                    ForEach(titles) { item in
+                    ForEach(changes.shown(titles)) { item in
                         let zoomID = "person/\(item.ratingKey)"
                         NavigationLink(value: Route.to(item, zoomID: zoomID)) {
                             PosterCell(item: item, width: metrics.cellWidth, zoomID: zoomID)
