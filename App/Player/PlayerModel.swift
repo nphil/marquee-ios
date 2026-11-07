@@ -1,5 +1,4 @@
 import AVFoundation
-import LoopbackHLS
 import MarqueeCore
 import Observation
 import SwiftUI
@@ -717,7 +716,9 @@ final class PlayerModel: Identifiable {
         var options = RemuxOptions()
         if let audio = route.audio, let index = streamIndex(audio.id) { options.audio = AudioPolicy(preferredIndex: index) }
         if let vision = part.videoStream?.dolbyVision {
-            options.dolbyVisionFallback = DolbyVisionConfiguration(
+            // LoopbackHLS, which declares the record type, also has a SubtitleTrack; importing it would
+            // make MarqueeCore's ambiguous here.
+            options.dolbyVisionFallback = .init(
                 profile: vision.profile, level: vision.level ?? 0,
                 compatibilityID: vision.baseLayerCompatibility ?? 0, hasEnhancementLayer: vision.hasEnhancementLayer
             )
