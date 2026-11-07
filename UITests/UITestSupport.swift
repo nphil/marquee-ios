@@ -76,13 +76,20 @@ extension XCTestCase {
         app.navigationBars[title].buttons.element(boundBy: 0).tap()
     }
 
-    /// A tap on a toggle row's label does nothing, so this taps the switch at its trailing end.
+    /// A tap on a toggle row's label does nothing, so this taps the switch at its trailing end. A tap
+    /// while the page is still sliding in can miss, so it taps again until the value changes.
     @MainActor
     func flip(_ identifier: String, in app: XCUIApplication) {
         let row = element(identifier, in: app)
         XCTAssertTrue(row.waitForExistence(timeout: 10), "No element \(identifier)")
         let control = row.switches.firstMatch.exists ? row.switches.firstMatch : row
-        control.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        let before = control.value as? String ?? ""
+        for _ in 0..<3 {
+            control.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+            let flipped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value != %@", before), object: control)
+            if XCTWaiter().wait(for: [flipped], timeout: 2) == .completed { return }
+        }
+        XCTFail("\(identifier) did not flip")
     }
 
     @MainActor
