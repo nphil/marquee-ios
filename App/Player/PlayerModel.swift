@@ -1,4 +1,5 @@
 import AVFoundation
+import LoopbackHLS
 import MarqueeCore
 import Observation
 import SwiftUI
@@ -716,7 +717,7 @@ final class PlayerModel: Identifiable {
         var options = RemuxOptions()
         if let audio = route.audio, let index = streamIndex(audio.id) { options.audio = AudioPolicy(preferredIndex: index) }
         if let vision = part.videoStream?.dolbyVision {
-            options.setDolbyVisionFallback(
+            options.dolbyVisionFallback = DolbyVisionConfiguration(
                 profile: vision.profile, level: vision.level ?? 0,
                 compatibilityID: vision.baseLayerCompatibility ?? 0, hasEnhancementLayer: vision.hasEnhancementLayer
             )
