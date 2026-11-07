@@ -13,6 +13,8 @@ struct GuideRow: View {
     let canRecord: Bool
     let isFavourite: Bool
     let actions: GuideActions
+    /// The colour under the row, painted into it so the long-press preview is opaque.
+    var surface: Color = .clear
 
     @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -31,6 +33,10 @@ struct GuideRow: View {
         }
         .buttonStyle(RowPressStyle())
         .opacity(dimmed ? 0.55 : 1)
+        // The long-press preview is a snapshot of the row, and the screen behind the menu stays sharp: at
+        // accessibility sizes the preview sits over the next row, whose text showed through a clear one.
+        .background(surface)
+        .contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
         .contextMenu { menu }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(LiveText.spoken(channel, airing: airing, at: now, mark: mark))
