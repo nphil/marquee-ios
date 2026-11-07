@@ -490,6 +490,7 @@ struct WireSubscription: Decodable {
                 title: subject?.title ?? ownTitle,
                 airingsType: c.string(.airingsType),
                 librarySectionTitle: section,
+                targetLibrarySectionID: c.int(.targetLibrarySectionID),
                 thumb: subject?.thumb,
                 settings: settings.map(\.setting),
                 recordings: grabs.compactMap { $0.recording(rule: id) }

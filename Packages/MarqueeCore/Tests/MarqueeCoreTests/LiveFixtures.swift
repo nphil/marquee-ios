@@ -161,6 +161,7 @@ enum LiveFixtures {
 
     static var subscriptions: [String: Any] { ["size": 1, "MediaSubscription": [[
         "key": "31", "type": 2, "title": "All Episodes", "airingsType": "New Airings Only", "librarySectionTitle": "TV Shows",
+        "targetLibrarySectionID": 2,
         "Directory": ["title": "Evening News", "type": "show", "thumb": "https://metadata-static.plex.tv/show-news.jpg"],
         "Setting": [["id": "onlyNewAirings", "type": "int", "value": "1", "enumValues": "0:New and Repeat Airings|1:New Airings Only"]],
         "MediaGrabOperation": [grab("grab-2", rule: "31", status: "scheduled", from: 1440, to: 1470)],
