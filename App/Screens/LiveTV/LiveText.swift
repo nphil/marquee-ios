@@ -8,9 +8,14 @@ enum LiveText {
         date.formatted(date: .omitted, time: .shortened)
     }
 
-    /// "8:00 – 8:30 PM".
+    /// "8:00 – 8:30 PM", and "10:35 PM – 12:30 AM" across midnight, where the interval style would
+    /// print both dates.
     static func range(_ start: Date, _ end: Date) -> String {
-        (start..<max(end, start)).formatted(date: .omitted, time: .shortened)
+        let end = max(end, start)
+        guard Calendar.current.isDate(start, inSameDayAs: end) else {
+            return "\(time(start))\u{2009}–\u{2009}\(time(end))"
+        }
+        return (start..<end).formatted(date: .omitted, time: .shortened)
     }
 
     static func range(_ airing: LiveAiring) -> String {
