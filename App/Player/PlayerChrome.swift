@@ -333,29 +333,23 @@ struct TracksMenu: View {
         .accessibilityIdentifier("player.tracks")
     }
 
+    /// Sections hold toggles rather than inline pickers: an inline picker inside a section hides the
+    /// section's header, which left the audio and subtitle lists unnamed.
     @ViewBuilder
     private func menuContent(_ tracks: MediaTracks) -> some View {
         if tracks.audio.count > 1 {
             Section("Audio") {
-                Picker("Audio", selection: $model.audioPick) {
-                    ForEach(orderedAudio(tracks)) { track in
-                        Text(track.label).tag(Optional(track.id))
-                    }
+                ForEach(orderedAudio(tracks)) { track in
+                    choice(track.label, detail: detail(track.badges), value: Optional(track.id), selection: $model.audioPick)
                 }
-                .pickerStyle(.inline)
-                .labelsHidden()
             }
         }
         let groups = SubtitleGroup.make(tracks.visibleSubtitles, preferred: model.preferredSubtitleLanguage, audio: model.audio)
         Section("Subtitles") {
-            Picker("Subtitles", selection: $model.subtitlePick) {
-                Text("Off").tag(SubtitleChoice.off)
-                if tracks.visibleSubtitles.contains(where: { $0.kind == .onScreenText }) {
-                    Text("On-Screen Text Only").tag(SubtitleChoice.onScreenTextOnly)
-                }
+            choice("Off", value: SubtitleChoice.off, selection: $model.subtitlePick)
+            if tracks.visibleSubtitles.contains(where: { $0.kind == .onScreenText }) {
+                choice("On-Screen Text Only", value: SubtitleChoice.onScreenTextOnly, selection: $model.subtitlePick)
             }
-            .pickerStyle(.inline)
-            .labelsHidden()
         }
         // The one section every tracks menu has reports the menu opening and closing.
         .onAppear { model.menuOpened() }
@@ -391,14 +385,32 @@ struct TracksMenu: View {
 
     private func subtitleSection(_ group: SubtitleGroup) -> some View {
         Section(group.name) {
-            Picker(group.name, selection: $model.subtitlePick) {
-                ForEach(group.tracks) { track in
-                    Text(track.label).tag(SubtitleChoice.track(track.id))
-                }
+            ForEach(group.tracks) { track in
+                choice(
+                    track.label,
+                    detail: detail(track.badges, imageFormat: track.imageFormat),
+                    value: SubtitleChoice.track(track.id),
+                    selection: $model.subtitlePick
+                )
             }
-            .pickerStyle(.inline)
-            .labelsHidden()
         }
+    }
+
+    /// A menu row with a checkmark while `selection` holds `value`; choosing it again keeps it.
+    private func choice<Value: Equatable & Sendable>(
+        _ title: String, detail: String? = nil, value: Value, selection: Binding<Value>
+    ) -> some View {
+        Toggle(isOn: Binding { selection.wrappedValue == value } set: { if $0 { selection.wrappedValue = value } }) {
+            Text(title)
+            if let detail { Text(detail) }
+        }
+    }
+
+    /// The second line of a track row: "Captions", "Audio description", and the picture format of image
+    /// subtitles (behaviour spec §3), so two "English" rows read apart.
+    private func detail(_ badges: [TrackBadge], imageFormat: String? = nil) -> String? {
+        let words = badges.map(\.rawValue) + [imageFormat].compactMap { $0 }
+        return words.isEmpty ? nil : words.joined(separator: " · ")
     }
 
     /// Tracks in the wanted language first, then the file's order.
