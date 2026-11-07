@@ -41,6 +41,8 @@ struct RootView: View {
                 .preferredColorScheme(scheme)
         }
         .environment(\.theme, theme)
+        // Here rather than on the tabs, so the sheets above resolve artwork too.
+        .environment(\.plexLibrary, session.library)
         .tint(theme.accentText)
         .preferredColorScheme(scheme)
         .onChange(of: BarInputs(theme: theme, typeSize: typeSize, boldText: legibilityWeight == .bold), initial: true) { _, inputs in
