@@ -35,7 +35,8 @@ struct SampleBufferOutputTests {
         #expect(av_frame_get_buffer(picture, 0) >= 0)
 
         var pictures = PictureBuffers()
-        let sample = try #require(pictures.sampleBuffer(picture, time: 10, immediately: true))
+        let made = pictures.sampleBuffer(picture, time: 10, immediately: true)
+        let sample = try #require(made)
         #expect(sample.presentationTimeStamp == CMTime(value: 900_000, timescale: 90_000))
         let image = try #require(sample.imageBuffer)
         #expect(CVPixelBufferGetWidth(image) == 720 && CVPixelBufferGetHeight(image) == 480)
