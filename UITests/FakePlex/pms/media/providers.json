@@ -1,0 +1,53 @@
+{
+ "MediaContainer": {
+  "size": 2,
+  "MediaProvider": [
+   {
+    "identifier": "com.plexapp.plugins.library",
+    "Feature": [
+     {
+      "type": "content",
+      "key": "/library/sections"
+     }
+    ]
+   },
+   {
+    "identifier": "tv.plex.providers.epg.cloud",
+    "protocols": "livetv",
+    "epgSource": "Gracenote",
+    "Feature": [
+     {
+      "type": "content",
+      "key": "/tv.plex.providers.epg.cloud/sections"
+     },
+     {
+      "type": "grid",
+      "key": "/tv.plex.providers.epg.cloud/grid",
+      "GridChannelFilter": [
+       {
+        "key": "/tv.plex.providers.epg.cloud/lineups/dvr/channels?genre=genre_news",
+        "title": "News",
+        "genreRatingKey": "genre_news"
+       },
+       {
+        "key": "/tv.plex.providers.epg.cloud/lineups/dvr/channels?genre=genre_sports",
+        "title": "Sports",
+        "genreRatingKey": "genre_sports"
+       },
+       {
+        "key": "/tv.plex.providers.epg.cloud/lineups/dvr/channels?genre=genre_movies",
+        "title": "Movies",
+        "genreRatingKey": "genre_movies"
+       },
+       {
+        "key": "/tv.plex.providers.epg.cloud/lineups/dvr/channels?genre=genre_kids",
+        "title": "Kids",
+        "genreRatingKey": "genre_kids"
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

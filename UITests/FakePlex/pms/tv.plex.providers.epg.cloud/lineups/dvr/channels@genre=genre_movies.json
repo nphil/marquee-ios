@@ -1,0 +1,27 @@
+{
+ "MediaContainer": {
+  "size": 2,
+  "Channel": [
+   {
+    "id": "ch-0501",
+    "gridKey": "ch-0501",
+    "vcn": "5.1",
+    "isHd": "0",
+    "callSign": "WFLM",
+    "title": "Movies 5",
+    "language": "en",
+    "thumb": "https://provider-static.plex.tv/art/logos/wflm.png"
+   },
+   {
+    "id": "ch-1301",
+    "gridKey": "ch-1301",
+    "vcn": "13.1",
+    "isHd": "1",
+    "callSign": "WQXL",
+    "title": "Public 13",
+    "language": "en",
+    "thumb": "https://provider-static.plex.tv/art/logos/wqxl.png"
+   }
+  ]
+ }
+}

@@ -1,0 +1,86 @@
+{
+ "MediaContainer": {
+  "size": 8,
+  "Channel": [
+   {
+    "id": "ch-0201",
+    "gridKey": "ch-0201",
+    "vcn": "2.1",
+    "isHd": "1",
+    "callSign": "WMRQ",
+    "title": "Metro 2",
+    "language": "en",
+    "thumb": "https://provider-static.plex.tv/art/logos/wmrq.png"
+   },
+   {
+    "id": "ch-0401",
+    "gridKey": "ch-0401",
+    "vcn": "4.1",
+    "isHd": "1",
+    "callSign": "WBXT",
+    "title": "Bay 4",
+    "language": "en",
+    "thumb": "https://provider-static.plex.tv/art/logos/wbxt.png"
+   },
+   {
+    "id": "ch-0501",
+    "gridKey": "ch-0501",
+    "vcn": "5.1",
+    "isHd": "0",
+    "callSign": "WFLM",
+    "title": "Movies 5",
+    "language": "en",
+    "thumb": "https://provider-static.plex.tv/art/logos/wflm.png"
+   },
+   {
+    "id": "ch-0701",
+    "gridKey": "ch-0701",
+    "vcn": "7.1",
+    "isHd": "1",
+    "callSign": "WNWS",
+    "title": "News 7",
+    "language": "en",
+    "thumb": "https://provider-static.plex.tv/art/logos/wnws.png"
+   },
+   {
+    "id": "ch-0901",
+    "gridKey": "ch-0901",
+    "vcn": "9.1",
+    "isHd": "1",
+    "callSign": "WSPT",
+    "title": "Sports 9",
+    "language": "en",
+    "thumb": "https://provider-static.plex.tv/art/logos/wspt.png"
+   },
+   {
+    "id": "ch-1101",
+    "gridKey": "ch-1101",
+    "vcn": "11.1",
+    "isHd": "0",
+    "callSign": "WKID",
+    "title": "Kids 11",
+    "language": "en",
+    "thumb": "https://provider-static.plex.tv/art/logos/wkid.png"
+   },
+   {
+    "id": "ch-1301",
+    "gridKey": "ch-1301",
+    "vcn": "13.1",
+    "isHd": "1",
+    "callSign": "WQXL",
+    "title": "Public 13",
+    "language": "en",
+    "thumb": "https://provider-static.plex.tv/art/logos/wqxl.png"
+   },
+   {
+    "id": "ch-4601",
+    "gridKey": "ch-4601",
+    "vcn": "46.1",
+    "isHd": "0",
+    "callSign": "WMUS",
+    "title": "Music 46",
+    "language": "en"
+   }
+  ]
+ }
+}

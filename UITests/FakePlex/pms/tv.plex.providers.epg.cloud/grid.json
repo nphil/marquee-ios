@@ -1,0 +1,6277 @@
+{
+ "__anchor": 1800000000,
+ "MediaContainer": {
+  "size": 210,
+  "Metadata": [
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5001",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5001",
+    "guid": "plex://episode/ch-0201-5001",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Metro 2 News at 7",
+    "title": "Metro 2 News at 7",
+    "grandparentGuid": "plex://show/metro-2-news-at-7",
+    "Media": [
+     {
+      "id": 5001,
+      "beginsAt": 1799992800,
+      "endsAt": 1799994600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5023",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5023",
+    "guid": "plex://episode/ch-0401-5023",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Bay 4 at Seven",
+    "title": "Bay 4 at Seven",
+    "grandparentGuid": "plex://show/bay-4-at-seven",
+    "Media": [
+     {
+      "id": 5023,
+      "beginsAt": 1799992800,
+      "endsAt": 1799994600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5047",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5047",
+    "guid": "plex://movie/ch-0501-5047",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Romance"
+     }
+    ],
+    "title": "Paper Moons",
+    "year": 2004,
+    "Media": [
+     {
+      "id": 5047,
+      "beginsAt": 1799992800,
+      "endsAt": 1799998200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5063",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5063",
+    "guid": "plex://episode/ch-0701-5063",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "News 7 at Seven",
+    "title": "News 7 at Seven",
+    "grandparentGuid": "plex://show/news-7-at-seven",
+    "Media": [
+     {
+      "id": 5063,
+      "beginsAt": 1799992800,
+      "endsAt": 1799996400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5080",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5080",
+    "guid": "plex://episode/ch-0901-5080",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Sports Desk",
+    "title": "Sports Desk",
+    "grandparentGuid": "plex://show/sports-desk",
+    "Media": [
+     {
+      "id": 5080,
+      "beginsAt": 1799992800,
+      "endsAt": 1799994600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5107",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5107",
+    "guid": "plex://episode/ch-1101-5107",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "The Leaky Hull",
+    "parentIndex": 2,
+    "index": 3,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5107,
+      "beginsAt": 1799992800,
+      "endsAt": 1799994600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5163",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5163",
+    "guid": "plex://episode/ch-1301-5163",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Nature"
+     }
+    ],
+    "grandparentTitle": "Wild Coasts",
+    "title": "Cliffs",
+    "parentIndex": 1,
+    "index": 1,
+    "grandparentGuid": "plex://show/wild-coasts",
+    "Media": [
+     {
+      "id": 5163,
+      "beginsAt": 1799992800,
+      "endsAt": 1799996400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5197",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5197",
+    "guid": "plex://episode/ch-4601-5197",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     }
+    ],
+    "grandparentTitle": "Live from the Hall",
+    "title": "Evening Brass",
+    "parentIndex": 4,
+    "index": 6,
+    "grandparentGuid": "plex://show/live-from-the-hall",
+    "Media": [
+     {
+      "id": 5197,
+      "beginsAt": 1799992800,
+      "endsAt": 1800000000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5002",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5002",
+    "guid": "plex://episode/ch-0201-5002",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Game Show"
+     }
+    ],
+    "grandparentTitle": "Quiz Night",
+    "title": "Capitals",
+    "parentIndex": 4,
+    "index": 18,
+    "grandparentGuid": "plex://show/quiz-night",
+    "Media": [
+     {
+      "id": 5002,
+      "beginsAt": 1799994600,
+      "endsAt": 1799996400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5024",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5024",
+    "guid": "plex://episode/ch-0401-5024",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Home & Garden"
+     }
+    ],
+    "grandparentTitle": "Garden Rescue",
+    "title": "The Overgrown Allotment",
+    "parentIndex": 6,
+    "index": 12,
+    "grandparentGuid": "plex://show/garden-rescue",
+    "Media": [
+     {
+      "id": 5024,
+      "beginsAt": 1799994600,
+      "endsAt": 1799996400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5081",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5081",
+    "guid": "plex://episode/ch-0901-5081",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     },
+     {
+      "tag": "Soccer"
+     }
+    ],
+    "grandparentTitle": "Soccer",
+    "title": "Harbor City vs. Westfield",
+    "grandparentGuid": "plex://show/soccer",
+    "Media": [
+     {
+      "id": 5081,
+      "beginsAt": 1799994600,
+      "endsAt": 1800001800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5108",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5108",
+    "guid": "plex://episode/ch-1101-5108",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Comet Chase",
+    "parentIndex": 1,
+    "index": 8,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5108,
+      "beginsAt": 1799994600,
+      "endsAt": 1799996400,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5003",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5003",
+    "guid": "plex://episode/ch-0201-5003",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Drama"
+     }
+    ],
+    "grandparentTitle": "Harbour Lights",
+    "title": "The Long Tide",
+    "parentIndex": 2,
+    "index": 7,
+    "grandparentGuid": "plex://show/harbour-lights",
+    "Media": [
+     {
+      "id": 5003,
+      "beginsAt": 1799996400,
+      "endsAt": 1800000000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5025",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5025",
+    "guid": "plex://episode/ch-0401-5025",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Reality"
+     },
+     {
+      "tag": "Cooking"
+     }
+    ],
+    "grandparentTitle": "Kitchen Rivals",
+    "title": "Firestarters",
+    "parentIndex": 5,
+    "index": 3,
+    "grandparentGuid": "plex://show/kitchen-rivals",
+    "Media": [
+     {
+      "id": 5025,
+      "beginsAt": 1799996400,
+      "endsAt": 1800001800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5064",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5064",
+    "guid": "plex://episode/ch-0701-5064",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "The Evening Report",
+    "title": "The Evening Report",
+    "grandparentGuid": "plex://show/the-evening-report",
+    "Media": [
+     {
+      "id": 5064,
+      "beginsAt": 1799996400,
+      "endsAt": 1800000000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5109",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5109",
+    "guid": "plex://episode/ch-1101-5109",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Snow Day",
+    "parentIndex": 3,
+    "index": 1,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5109,
+      "beginsAt": 1799996400,
+      "endsAt": 1799998200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5164",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5164",
+    "guid": "plex://episode/ch-1301-5164",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Collectibles"
+     }
+    ],
+    "grandparentTitle": "Treasure Table",
+    "title": "Market Hall",
+    "parentIndex": 9,
+    "index": 14,
+    "grandparentGuid": "plex://show/treasure-table",
+    "Media": [
+     {
+      "id": 5164,
+      "beginsAt": 1799996400,
+      "endsAt": 1800000000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5048",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5048",
+    "guid": "plex://movie/ch-0501-5048",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Drama"
+     },
+     {
+      "tag": "Western"
+     }
+    ],
+    "title": "The Long Road",
+    "year": 1998,
+    "summary": "Two brothers drive a cattle herd across a drought-struck state to save the family ranch.",
+    "Media": [
+     {
+      "id": 5048,
+      "beginsAt": 1799998200,
+      "endsAt": 1800005700,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5110",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5110",
+    "guid": "plex://episode/ch-1101-5110",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Moonbeam Bakery",
+    "title": "Midnight Muffins",
+    "parentIndex": 1,
+    "index": 4,
+    "grandparentGuid": "plex://show/moonbeam-bakery",
+    "Media": [
+     {
+      "id": 5110,
+      "beginsAt": 1799998200,
+      "endsAt": 1800000000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5004",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5004",
+    "guid": "plex://episode/ch-0201-5004",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Drama"
+     }
+    ],
+    "grandparentTitle": "The Lighthouse Keepers",
+    "title": "Fog Season",
+    "parentIndex": 1,
+    "index": 4,
+    "grandparentGuid": "plex://show/the-lighthouse-keepers",
+    "summary": "A storm cuts the island off, and Mara finds the keeper's log has a missing week.",
+    "Media": [
+     {
+      "id": 5004,
+      "beginsAt": 1800000000,
+      "endsAt": 1800003600,
+      "premiere": true,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5065",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5065",
+    "guid": "plex://episode/ch-0701-5065",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "News 7 Tonight",
+    "title": "News 7 Tonight",
+    "grandparentGuid": "plex://show/news-7-tonight",
+    "summary": "The day's news, weather and sport from the News 7 desk.",
+    "Media": [
+     {
+      "id": 5065,
+      "beginsAt": 1800000000,
+      "endsAt": 1800003600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5111",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5111",
+    "guid": "plex://episode/ch-1101-5111",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Moonbeam Bakery",
+    "title": "The Giant Cake",
+    "parentIndex": 1,
+    "index": 5,
+    "grandparentGuid": "plex://show/moonbeam-bakery",
+    "Media": [
+     {
+      "id": 5111,
+      "beginsAt": 1800000000,
+      "endsAt": 1800001800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5165",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5165",
+    "guid": "plex://episode/ch-1301-5165",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Nature"
+     },
+     {
+      "tag": "Documentary"
+     }
+    ],
+    "grandparentTitle": "Wild Coasts",
+    "title": "Estuaries",
+    "parentIndex": 1,
+    "index": 2,
+    "grandparentGuid": "plex://show/wild-coasts",
+    "summary": "Where rivers meet the sea: the mudflats that feed a million birds each spring.",
+    "Media": [
+     {
+      "id": 5165,
+      "beginsAt": 1800000000,
+      "endsAt": 1800003600,
+      "premiere": true,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5198",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5198",
+    "guid": "plex://episode/ch-4601-5198",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     },
+     {
+      "tag": "Concert"
+     }
+    ],
+    "grandparentTitle": "Live from the Hall",
+    "title": "Strings and Brass",
+    "parentIndex": 4,
+    "index": 7,
+    "grandparentGuid": "plex://show/live-from-the-hall",
+    "summary": "The city orchestra and guests, recorded in the old corn exchange.",
+    "Media": [
+     {
+      "id": 5198,
+      "beginsAt": 1800000000,
+      "endsAt": 1800005400,
+      "premiere": true,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5026",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5026",
+    "guid": "plex://episode/ch-0401-5026",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Mystery"
+     }
+    ],
+    "grandparentTitle": "Mystery Lane",
+    "title": "The Empty Chair",
+    "parentIndex": 1,
+    "index": 2,
+    "grandparentGuid": "plex://show/mystery-lane",
+    "summary": "A retired detective reopens the case of a guest who vanished from a dinner party.",
+    "Media": [
+     {
+      "id": 5026,
+      "beginsAt": 1800001800,
+      "endsAt": 1800005400,
+      "premiere": true,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5082",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5082",
+    "guid": "plex://episode/ch-0901-5082",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     },
+     {
+      "tag": "Basketball"
+     }
+    ],
+    "grandparentTitle": "College Basketball",
+    "title": "Riverside at Northgate",
+    "grandparentGuid": "plex://show/college-basketball",
+    "summary": "Riverside visit Northgate with first place in the conference on the line.",
+    "Media": [
+     {
+      "id": 5082,
+      "beginsAt": 1800001800,
+      "endsAt": 1800009000,
+      "premiere": true,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5112",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5112",
+    "guid": "plex://episode/ch-1101-5112",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "The Big Splash",
+    "parentIndex": 2,
+    "index": 4,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5112,
+      "beginsAt": 1800001800,
+      "endsAt": 1800003600,
+      "premiere": true,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5005",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5005",
+    "guid": "plex://episode/ch-0201-5005",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Drama"
+     }
+    ],
+    "grandparentTitle": "City Desk",
+    "title": "Deadline",
+    "parentIndex": 3,
+    "index": 10,
+    "grandparentGuid": "plex://show/city-desk",
+    "summary": "The paper has six hours to confirm a leak that could bring down the mayor.",
+    "Media": [
+     {
+      "id": 5005,
+      "beginsAt": 1800003600,
+      "endsAt": 1800007200,
+      "premiere": true,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5066",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5066",
+    "guid": "plex://episode/ch-0701-5066",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "The World at Ten",
+    "title": "The World at Ten",
+    "grandparentGuid": "plex://show/the-world-at-ten",
+    "Media": [
+     {
+      "id": 5066,
+      "beginsAt": 1800003600,
+      "endsAt": 1800007200,
+      "premiere": true,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5113",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5113",
+    "guid": "plex://episode/ch-1101-5113",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Lost Signal",
+    "parentIndex": 1,
+    "index": 9,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5113,
+      "beginsAt": 1800003600,
+      "endsAt": 1800005400,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5166",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5166",
+    "guid": "plex://episode/ch-1301-5166",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Fantasy"
+     }
+    ],
+    "grandparentTitle": "Open Movie Night",
+    "title": "Sintel",
+    "parentIndex": 1,
+    "index": 3,
+    "grandparentGuid": "plex://show/open-movie-night",
+    "year": 2010,
+    "summary": "A girl crosses a frozen world to find the dragon she raised. Blender Foundation, 2010.",
+    "thumb": "https://metadata-static.plex.tv/art/sintel-backdrop.jpg",
+    "art": "https://metadata-static.plex.tv/art/sintel-backdrop.jpg",
+    "Media": [
+     {
+      "id": 5166,
+      "beginsAt": 1800003600,
+      "endsAt": 1800005400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5027",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5027",
+    "guid": "plex://episode/ch-0401-5027",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Food"
+     }
+    ],
+    "grandparentTitle": "Night Market",
+    "title": "Lanterns",
+    "parentIndex": 2,
+    "index": 5,
+    "grandparentGuid": "plex://show/night-market",
+    "Media": [
+     {
+      "id": 5027,
+      "beginsAt": 1800005400,
+      "endsAt": 1800007200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5114",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5114",
+    "guid": "plex://episode/ch-1101-5114",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Lanterns",
+    "parentIndex": 3,
+    "index": 2,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5114,
+      "beginsAt": 1800005400,
+      "endsAt": 1800007200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5167",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5167",
+    "guid": "plex://episode/ch-1301-5167",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Science Fiction"
+     }
+    ],
+    "grandparentTitle": "Open Movie Night",
+    "title": "Tears of Steel",
+    "parentIndex": 1,
+    "index": 4,
+    "grandparentGuid": "plex://show/open-movie-night",
+    "year": 2012,
+    "summary": "In a future Amsterdam, scientists try to save the world by replaying one moment. Blender Foundation, 2012.",
+    "thumb": "https://metadata-static.plex.tv/art/tears-of-steel-backdrop.jpg",
+    "art": "https://metadata-static.plex.tv/art/tears-of-steel-backdrop.jpg",
+    "Media": [
+     {
+      "id": 5167,
+      "beginsAt": 1800005400,
+      "endsAt": 1800007200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5199",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5199",
+    "guid": "plex://episode/ch-4601-5199",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     }
+    ],
+    "grandparentTitle": "Late Set",
+    "title": "Late Set",
+    "grandparentGuid": "plex://show/late-set",
+    "Media": [
+     {
+      "id": 5199,
+      "beginsAt": 1800005400,
+      "endsAt": 1800010800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5049",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5049",
+    "guid": "plex://movie/ch-0501-5049",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Drama"
+     }
+    ],
+    "title": "Northern Lights",
+    "year": 2011,
+    "Media": [
+     {
+      "id": 5049,
+      "beginsAt": 1800005700,
+      "endsAt": 1800012600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5006",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5006",
+    "guid": "plex://episode/ch-0201-5006",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Metro 2 News at 11",
+    "title": "Metro 2 News at 11",
+    "grandparentGuid": "plex://show/metro-2-news-at-11",
+    "Media": [
+     {
+      "id": 5006,
+      "beginsAt": 1800007200,
+      "endsAt": 1800009300,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5028",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5028",
+    "guid": "plex://episode/ch-0401-5028",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Bay 4 at Eleven",
+    "title": "Bay 4 at Eleven",
+    "grandparentGuid": "plex://show/bay-4-at-eleven",
+    "Media": [
+     {
+      "id": 5028,
+      "beginsAt": 1800007200,
+      "endsAt": 1800009000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5067",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5067",
+    "guid": "plex://episode/ch-0701-5067",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "News 7 Late",
+    "title": "News 7 Late",
+    "grandparentGuid": "plex://show/news-7-late",
+    "Media": [
+     {
+      "id": 5067,
+      "beginsAt": 1800007200,
+      "endsAt": 1800009000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5115",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5115",
+    "guid": "plex://episode/ch-1101-5115",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5115,
+      "beginsAt": 1800007200,
+      "endsAt": 1800009000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5168",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5168",
+    "guid": "plex://episode/ch-1301-5168",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Collectibles"
+     }
+    ],
+    "grandparentTitle": "Treasure Table",
+    "title": "Riverside",
+    "parentIndex": 9,
+    "index": 15,
+    "grandparentGuid": "plex://show/treasure-table",
+    "Media": [
+     {
+      "id": 5168,
+      "beginsAt": 1800007200,
+      "endsAt": 1800010800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5029",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5029",
+    "guid": "plex://episode/ch-0401-5029",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "grandparentTitle": "The Late Laugh",
+    "title": "Open Mic",
+    "parentIndex": 3,
+    "index": 22,
+    "grandparentGuid": "plex://show/the-late-laugh",
+    "Media": [
+     {
+      "id": 5029,
+      "beginsAt": 1800009000,
+      "endsAt": 1800012600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5068",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5068",
+    "guid": "plex://episode/ch-0701-5068",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Overnight News",
+    "title": "Overnight News",
+    "grandparentGuid": "plex://show/overnight-news",
+    "Media": [
+     {
+      "id": 5068,
+      "beginsAt": 1800009000,
+      "endsAt": 1800014400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5083",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5083",
+    "guid": "plex://episode/ch-0901-5083",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Sports Desk Late",
+    "title": "Sports Desk Late",
+    "grandparentGuid": "plex://show/sports-desk-late",
+    "Media": [
+     {
+      "id": 5083,
+      "beginsAt": 1800009000,
+      "endsAt": 1800010800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5116",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5116",
+    "guid": "plex://episode/ch-1101-5116",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5116,
+      "beginsAt": 1800009000,
+      "endsAt": 1800010800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5007",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5007",
+    "guid": "plex://episode/ch-0201-5007",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Talk Show"
+     }
+    ],
+    "grandparentTitle": "Late Talk with Ada Park",
+    "title": "Rosa Lind; The Weatherfolk",
+    "parentIndex": 2,
+    "index": 41,
+    "grandparentGuid": "plex://show/late-talk-with-ada-park",
+    "Media": [
+     {
+      "id": 5007,
+      "beginsAt": 1800009300,
+      "endsAt": 1800013020,
+      "premiere": true,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5084",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5084",
+    "guid": "plex://episode/ch-0901-5084",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Classic Matches",
+    "title": "1994 Cup Final",
+    "grandparentGuid": "plex://show/classic-matches",
+    "Media": [
+     {
+      "id": 5084,
+      "beginsAt": 1800010800,
+      "endsAt": 1800016200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5117",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5117",
+    "guid": "plex://episode/ch-1101-5117",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5117,
+      "beginsAt": 1800010800,
+      "endsAt": 1800012600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5169",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5169",
+    "guid": "plex://episode/ch-1301-5169",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Nature"
+     }
+    ],
+    "grandparentTitle": "Wild Coasts",
+    "title": "Dunes",
+    "parentIndex": 1,
+    "index": 3,
+    "grandparentGuid": "plex://show/wild-coasts",
+    "Media": [
+     {
+      "id": 5169,
+      "beginsAt": 1800010800,
+      "endsAt": 1800014400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5200",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5200",
+    "guid": "plex://episode/ch-4601-5200",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     }
+    ],
+    "grandparentTitle": "Late Set",
+    "title": "Late Set",
+    "grandparentGuid": "plex://show/late-set",
+    "Media": [
+     {
+      "id": 5200,
+      "beginsAt": 1800010800,
+      "endsAt": 1800016200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5030",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5030",
+    "guid": "plex://episode/ch-0401-5030",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Reality"
+     },
+     {
+      "tag": "Cooking"
+     }
+    ],
+    "grandparentTitle": "Kitchen Rivals",
+    "title": "Bake Off",
+    "parentIndex": 5,
+    "index": 2,
+    "grandparentGuid": "plex://show/kitchen-rivals",
+    "Media": [
+     {
+      "id": 5030,
+      "beginsAt": 1800012600,
+      "endsAt": 1800016200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5050",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5050",
+    "guid": "plex://movie/ch-0501-5050",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Adventure"
+     }
+    ],
+    "title": "Salt and Iron",
+    "year": 2016,
+    "Media": [
+     {
+      "id": 5050,
+      "beginsAt": 1800012600,
+      "endsAt": 1800019200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5118",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5118",
+    "guid": "plex://episode/ch-1101-5118",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5118,
+      "beginsAt": 1800012600,
+      "endsAt": 1800014400,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5008",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5008",
+    "guid": "plex://episode/ch-0201-5008",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "grandparentTitle": "After Hours",
+    "title": "Night Shift",
+    "parentIndex": 1,
+    "index": 9,
+    "grandparentGuid": "plex://show/after-hours",
+    "Media": [
+     {
+      "id": 5008,
+      "beginsAt": 1800013020,
+      "endsAt": 1800016800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5069",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5069",
+    "guid": "plex://episode/ch-0701-5069",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Morning News 7",
+    "title": "Morning News 7",
+    "grandparentGuid": "plex://show/morning-news-7",
+    "Media": [
+     {
+      "id": 5069,
+      "beginsAt": 1800014400,
+      "endsAt": 1800025200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5119",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5119",
+    "guid": "plex://episode/ch-1101-5119",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5119,
+      "beginsAt": 1800014400,
+      "endsAt": 1800016200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5170",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5170",
+    "guid": "plex://episode/ch-1301-5170",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Collectibles"
+     }
+    ],
+    "grandparentTitle": "Treasure Table",
+    "title": "Old Mill",
+    "parentIndex": 9,
+    "index": 13,
+    "grandparentGuid": "plex://show/treasure-table",
+    "Media": [
+     {
+      "id": 5170,
+      "beginsAt": 1800014400,
+      "endsAt": 1800018000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5031",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5031",
+    "guid": "plex://episode/ch-0401-5031",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Bay 4 Breakfast",
+    "title": "Bay 4 Breakfast",
+    "grandparentGuid": "plex://show/bay-4-breakfast",
+    "Media": [
+     {
+      "id": 5031,
+      "beginsAt": 1800016200,
+      "endsAt": 1800025200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5085",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5085",
+    "guid": "plex://episode/ch-0901-5085",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Sports Desk",
+    "title": "Sports Desk",
+    "grandparentGuid": "plex://show/sports-desk",
+    "Media": [
+     {
+      "id": 5085,
+      "beginsAt": 1800016200,
+      "endsAt": 1800018000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5120",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5120",
+    "guid": "plex://episode/ch-1101-5120",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5120,
+      "beginsAt": 1800016200,
+      "endsAt": 1800018000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5201",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5201",
+    "guid": "plex://episode/ch-4601-5201",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     }
+    ],
+    "grandparentTitle": "Morning Classics",
+    "title": "Morning Classics",
+    "grandparentGuid": "plex://show/morning-classics",
+    "Media": [
+     {
+      "id": 5201,
+      "beginsAt": 1800016200,
+      "endsAt": 1800027000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5009",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5009",
+    "guid": "plex://episode/ch-0201-5009",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Drama"
+     }
+    ],
+    "grandparentTitle": "Harbour Lights",
+    "title": "Spring Tide",
+    "parentIndex": 2,
+    "index": 6,
+    "grandparentGuid": "plex://show/harbour-lights",
+    "Media": [
+     {
+      "id": 5009,
+      "beginsAt": 1800016800,
+      "endsAt": 1800020400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5086",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5086",
+    "guid": "plex://episode/ch-0901-5086",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Classic Matches",
+    "title": "1987 Derby",
+    "grandparentGuid": "plex://show/classic-matches",
+    "Media": [
+     {
+      "id": 5086,
+      "beginsAt": 1800018000,
+      "endsAt": 1800023400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5121",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5121",
+    "guid": "plex://episode/ch-1101-5121",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5121,
+      "beginsAt": 1800018000,
+      "endsAt": 1800019800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5171",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5171",
+    "guid": "plex://episode/ch-1301-5171",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "grandparentTitle": "Open Movie Night",
+    "title": "Big Buck Bunny",
+    "parentIndex": 1,
+    "index": 1,
+    "grandparentGuid": "plex://show/open-movie-night",
+    "year": 2008,
+    "thumb": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "art": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "Media": [
+     {
+      "id": 5171,
+      "beginsAt": 1800018000,
+      "endsAt": 1800019800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5051",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5051",
+    "guid": "plex://movie/ch-0501-5051",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "title": "Summer at Sea",
+    "year": 1987,
+    "Media": [
+     {
+      "id": 5051,
+      "beginsAt": 1800019200,
+      "endsAt": 1800025500,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5122",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5122",
+    "guid": "plex://episode/ch-1101-5122",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5122,
+      "beginsAt": 1800019800,
+      "endsAt": 1800021600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5172",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5172",
+    "guid": "plex://episode/ch-1301-5172",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Nature"
+     }
+    ],
+    "grandparentTitle": "Wild Coasts",
+    "title": "Dunes",
+    "parentIndex": 1,
+    "index": 3,
+    "grandparentGuid": "plex://show/wild-coasts",
+    "Media": [
+     {
+      "id": 5172,
+      "beginsAt": 1800019800,
+      "endsAt": 1800023400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5010",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5010",
+    "guid": "plex://episode/ch-0201-5010",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Metro 2 Morning",
+    "title": "Metro 2 Morning",
+    "grandparentGuid": "plex://show/metro-2-morning",
+    "Media": [
+     {
+      "id": 5010,
+      "beginsAt": 1800020400,
+      "endsAt": 1800031200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5123",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5123",
+    "guid": "plex://episode/ch-1101-5123",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5123,
+      "beginsAt": 1800021600,
+      "endsAt": 1800023400,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5087",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5087",
+    "guid": "plex://episode/ch-0901-5087",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Training Ground",
+    "title": "Training Ground",
+    "grandparentGuid": "plex://show/training-ground",
+    "Media": [
+     {
+      "id": 5087,
+      "beginsAt": 1800023400,
+      "endsAt": 1800027000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5124",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5124",
+    "guid": "plex://episode/ch-1101-5124",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5124,
+      "beginsAt": 1800023400,
+      "endsAt": 1800025200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5173",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5173",
+    "guid": "plex://episode/ch-1301-5173",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Collectibles"
+     }
+    ],
+    "grandparentTitle": "Treasure Table",
+    "title": "Old Mill",
+    "parentIndex": 9,
+    "index": 13,
+    "grandparentGuid": "plex://show/treasure-table",
+    "Media": [
+     {
+      "id": 5173,
+      "beginsAt": 1800023400,
+      "endsAt": 1800027000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5032",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5032",
+    "guid": "plex://episode/ch-0401-5032",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Home & Garden"
+     }
+    ],
+    "grandparentTitle": "Garden Rescue",
+    "title": "Rooftop Beds",
+    "parentIndex": 6,
+    "index": 11,
+    "grandparentGuid": "plex://show/garden-rescue",
+    "Media": [
+     {
+      "id": 5032,
+      "beginsAt": 1800025200,
+      "endsAt": 1800027000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5070",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5070",
+    "guid": "plex://episode/ch-0701-5070",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "News 7 at Noon",
+    "title": "News 7 at Noon",
+    "grandparentGuid": "plex://show/news-7-at-noon",
+    "Media": [
+     {
+      "id": 5070,
+      "beginsAt": 1800025200,
+      "endsAt": 1800028800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5125",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5125",
+    "guid": "plex://episode/ch-1101-5125",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5125,
+      "beginsAt": 1800025200,
+      "endsAt": 1800027000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5052",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5052",
+    "guid": "plex://movie/ch-0501-5052",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Drama"
+     }
+    ],
+    "title": "The Clockmaker",
+    "year": 2009,
+    "Media": [
+     {
+      "id": 5052,
+      "beginsAt": 1800025500,
+      "endsAt": 1800032700,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5033",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5033",
+    "guid": "plex://episode/ch-0401-5033",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Reality"
+     },
+     {
+      "tag": "Cooking"
+     }
+    ],
+    "grandparentTitle": "Kitchen Rivals",
+    "title": "Bake Off",
+    "parentIndex": 5,
+    "index": 2,
+    "grandparentGuid": "plex://show/kitchen-rivals",
+    "Media": [
+     {
+      "id": 5033,
+      "beginsAt": 1800027000,
+      "endsAt": 1800030600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5088",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5088",
+    "guid": "plex://episode/ch-0901-5088",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Sports Desk",
+    "title": "Sports Desk",
+    "grandparentGuid": "plex://show/sports-desk",
+    "Media": [
+     {
+      "id": 5088,
+      "beginsAt": 1800027000,
+      "endsAt": 1800028800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5126",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5126",
+    "guid": "plex://episode/ch-1101-5126",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5126,
+      "beginsAt": 1800027000,
+      "endsAt": 1800028800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5174",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5174",
+    "guid": "plex://episode/ch-1301-5174",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "grandparentTitle": "Open Movie Night",
+    "title": "Big Buck Bunny",
+    "parentIndex": 1,
+    "index": 1,
+    "grandparentGuid": "plex://show/open-movie-night",
+    "year": 2008,
+    "thumb": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "art": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "Media": [
+     {
+      "id": 5174,
+      "beginsAt": 1800027000,
+      "endsAt": 1800028800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5202",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5202",
+    "guid": "plex://episode/ch-4601-5202",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     }
+    ],
+    "grandparentTitle": "Late Set",
+    "title": "Late Set",
+    "grandparentGuid": "plex://show/late-set",
+    "Media": [
+     {
+      "id": 5202,
+      "beginsAt": 1800027000,
+      "endsAt": 1800032400,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5071",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5071",
+    "guid": "plex://episode/ch-0701-5071",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "The Afternoon Report",
+    "title": "The Afternoon Report",
+    "grandparentGuid": "plex://show/the-afternoon-report",
+    "Media": [
+     {
+      "id": 5071,
+      "beginsAt": 1800028800,
+      "endsAt": 1800036000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5089",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5089",
+    "guid": "plex://episode/ch-0901-5089",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Classic Matches",
+    "title": "1987 Derby",
+    "grandparentGuid": "plex://show/classic-matches",
+    "Media": [
+     {
+      "id": 5089,
+      "beginsAt": 1800028800,
+      "endsAt": 1800034200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5127",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5127",
+    "guid": "plex://episode/ch-1101-5127",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5127,
+      "beginsAt": 1800028800,
+      "endsAt": 1800030600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5175",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5175",
+    "guid": "plex://episode/ch-1301-5175",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Nature"
+     }
+    ],
+    "grandparentTitle": "Wild Coasts",
+    "title": "Dunes",
+    "parentIndex": 1,
+    "index": 3,
+    "grandparentGuid": "plex://show/wild-coasts",
+    "Media": [
+     {
+      "id": 5175,
+      "beginsAt": 1800028800,
+      "endsAt": 1800032400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5034",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5034",
+    "guid": "plex://episode/ch-0401-5034",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Bay 4 Breakfast",
+    "title": "Bay 4 Breakfast",
+    "grandparentGuid": "plex://show/bay-4-breakfast",
+    "Media": [
+     {
+      "id": 5034,
+      "beginsAt": 1800030600,
+      "endsAt": 1800039600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5128",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5128",
+    "guid": "plex://episode/ch-1101-5128",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5128,
+      "beginsAt": 1800030600,
+      "endsAt": 1800032400,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5011",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5011",
+    "guid": "plex://episode/ch-0201-5011",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Talk Show"
+     }
+    ],
+    "grandparentTitle": "The Midday Show",
+    "title": "The Midday Show",
+    "grandparentGuid": "plex://show/the-midday-show",
+    "Media": [
+     {
+      "id": 5011,
+      "beginsAt": 1800031200,
+      "endsAt": 1800036600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5129",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5129",
+    "guid": "plex://episode/ch-1101-5129",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5129,
+      "beginsAt": 1800032400,
+      "endsAt": 1800034200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5176",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5176",
+    "guid": "plex://episode/ch-1301-5176",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Collectibles"
+     }
+    ],
+    "grandparentTitle": "Treasure Table",
+    "title": "Old Mill",
+    "parentIndex": 9,
+    "index": 13,
+    "grandparentGuid": "plex://show/treasure-table",
+    "Media": [
+     {
+      "id": 5176,
+      "beginsAt": 1800032400,
+      "endsAt": 1800036000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5203",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5203",
+    "guid": "plex://episode/ch-4601-5203",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     }
+    ],
+    "grandparentTitle": "Morning Classics",
+    "title": "Morning Classics",
+    "grandparentGuid": "plex://show/morning-classics",
+    "Media": [
+     {
+      "id": 5203,
+      "beginsAt": 1800032400,
+      "endsAt": 1800043200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5053",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5053",
+    "guid": "plex://movie/ch-0501-5053",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Thriller"
+     }
+    ],
+    "title": "Glass Houses",
+    "year": 2013,
+    "Media": [
+     {
+      "id": 5053,
+      "beginsAt": 1800032700,
+      "endsAt": 1800038700,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5090",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5090",
+    "guid": "plex://episode/ch-0901-5090",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Training Ground",
+    "title": "Training Ground",
+    "grandparentGuid": "plex://show/training-ground",
+    "Media": [
+     {
+      "id": 5090,
+      "beginsAt": 1800034200,
+      "endsAt": 1800037800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5130",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5130",
+    "guid": "plex://episode/ch-1101-5130",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5130,
+      "beginsAt": 1800034200,
+      "endsAt": 1800036000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5072",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5072",
+    "guid": "plex://episode/ch-0701-5072",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Morning News 7",
+    "title": "Morning News 7",
+    "grandparentGuid": "plex://show/morning-news-7",
+    "Media": [
+     {
+      "id": 5072,
+      "beginsAt": 1800036000,
+      "endsAt": 1800046800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5131",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5131",
+    "guid": "plex://episode/ch-1101-5131",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5131,
+      "beginsAt": 1800036000,
+      "endsAt": 1800037800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5177",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5177",
+    "guid": "plex://episode/ch-1301-5177",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "grandparentTitle": "Open Movie Night",
+    "title": "Big Buck Bunny",
+    "parentIndex": 1,
+    "index": 1,
+    "grandparentGuid": "plex://show/open-movie-night",
+    "year": 2008,
+    "thumb": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "art": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "Media": [
+     {
+      "id": 5177,
+      "beginsAt": 1800036000,
+      "endsAt": 1800037800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5012",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5012",
+    "guid": "plex://episode/ch-0201-5012",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Game Show"
+     }
+    ],
+    "grandparentTitle": "Quiz Night",
+    "title": "Rivers",
+    "parentIndex": 4,
+    "index": 17,
+    "grandparentGuid": "plex://show/quiz-night",
+    "Media": [
+     {
+      "id": 5012,
+      "beginsAt": 1800036600,
+      "endsAt": 1800038400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5091",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5091",
+    "guid": "plex://episode/ch-0901-5091",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Sports Desk",
+    "title": "Sports Desk",
+    "grandparentGuid": "plex://show/sports-desk",
+    "Media": [
+     {
+      "id": 5091,
+      "beginsAt": 1800037800,
+      "endsAt": 1800039600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5132",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5132",
+    "guid": "plex://episode/ch-1101-5132",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5132,
+      "beginsAt": 1800037800,
+      "endsAt": 1800039600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5178",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5178",
+    "guid": "plex://episode/ch-1301-5178",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Nature"
+     }
+    ],
+    "grandparentTitle": "Wild Coasts",
+    "title": "Dunes",
+    "parentIndex": 1,
+    "index": 3,
+    "grandparentGuid": "plex://show/wild-coasts",
+    "Media": [
+     {
+      "id": 5178,
+      "beginsAt": 1800037800,
+      "endsAt": 1800041400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5013",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5013",
+    "guid": "plex://episode/ch-0201-5013",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Drama"
+     }
+    ],
+    "grandparentTitle": "Harbour Lights",
+    "title": "Spring Tide",
+    "parentIndex": 2,
+    "index": 6,
+    "grandparentGuid": "plex://show/harbour-lights",
+    "Media": [
+     {
+      "id": 5013,
+      "beginsAt": 1800038400,
+      "endsAt": 1800042000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5054",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5054",
+    "guid": "plex://movie/ch-0501-5054",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "title": "Summer at Sea",
+    "year": 1987,
+    "Media": [
+     {
+      "id": 5054,
+      "beginsAt": 1800038700,
+      "endsAt": 1800045000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5035",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5035",
+    "guid": "plex://episode/ch-0401-5035",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Home & Garden"
+     }
+    ],
+    "grandparentTitle": "Garden Rescue",
+    "title": "Rooftop Beds",
+    "parentIndex": 6,
+    "index": 11,
+    "grandparentGuid": "plex://show/garden-rescue",
+    "Media": [
+     {
+      "id": 5035,
+      "beginsAt": 1800039600,
+      "endsAt": 1800041400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5092",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5092",
+    "guid": "plex://episode/ch-0901-5092",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Classic Matches",
+    "title": "1987 Derby",
+    "grandparentGuid": "plex://show/classic-matches",
+    "Media": [
+     {
+      "id": 5092,
+      "beginsAt": 1800039600,
+      "endsAt": 1800045000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5133",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5133",
+    "guid": "plex://episode/ch-1101-5133",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5133,
+      "beginsAt": 1800039600,
+      "endsAt": 1800041400,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5036",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5036",
+    "guid": "plex://episode/ch-0401-5036",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Reality"
+     },
+     {
+      "tag": "Cooking"
+     }
+    ],
+    "grandparentTitle": "Kitchen Rivals",
+    "title": "Bake Off",
+    "parentIndex": 5,
+    "index": 2,
+    "grandparentGuid": "plex://show/kitchen-rivals",
+    "Media": [
+     {
+      "id": 5036,
+      "beginsAt": 1800041400,
+      "endsAt": 1800045000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5134",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5134",
+    "guid": "plex://episode/ch-1101-5134",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5134,
+      "beginsAt": 1800041400,
+      "endsAt": 1800043200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5179",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5179",
+    "guid": "plex://episode/ch-1301-5179",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Collectibles"
+     }
+    ],
+    "grandparentTitle": "Treasure Table",
+    "title": "Old Mill",
+    "parentIndex": 9,
+    "index": 13,
+    "grandparentGuid": "plex://show/treasure-table",
+    "Media": [
+     {
+      "id": 5179,
+      "beginsAt": 1800041400,
+      "endsAt": 1800045000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5014",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5014",
+    "guid": "plex://episode/ch-0201-5014",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Metro 2 Morning",
+    "title": "Metro 2 Morning",
+    "grandparentGuid": "plex://show/metro-2-morning",
+    "Media": [
+     {
+      "id": 5014,
+      "beginsAt": 1800042000,
+      "endsAt": 1800052800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5135",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5135",
+    "guid": "plex://episode/ch-1101-5135",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5135,
+      "beginsAt": 1800043200,
+      "endsAt": 1800045000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5204",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5204",
+    "guid": "plex://episode/ch-4601-5204",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     }
+    ],
+    "grandparentTitle": "Late Set",
+    "title": "Late Set",
+    "grandparentGuid": "plex://show/late-set",
+    "Media": [
+     {
+      "id": 5204,
+      "beginsAt": 1800043200,
+      "endsAt": 1800048600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5037",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5037",
+    "guid": "plex://episode/ch-0401-5037",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Bay 4 Breakfast",
+    "title": "Bay 4 Breakfast",
+    "grandparentGuid": "plex://show/bay-4-breakfast",
+    "Media": [
+     {
+      "id": 5037,
+      "beginsAt": 1800045000,
+      "endsAt": 1800054000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5055",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5055",
+    "guid": "plex://movie/ch-0501-5055",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Drama"
+     }
+    ],
+    "title": "The Clockmaker",
+    "year": 2009,
+    "Media": [
+     {
+      "id": 5055,
+      "beginsAt": 1800045000,
+      "endsAt": 1800052200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5093",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5093",
+    "guid": "plex://episode/ch-0901-5093",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Training Ground",
+    "title": "Training Ground",
+    "grandparentGuid": "plex://show/training-ground",
+    "Media": [
+     {
+      "id": 5093,
+      "beginsAt": 1800045000,
+      "endsAt": 1800048600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5136",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5136",
+    "guid": "plex://episode/ch-1101-5136",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5136,
+      "beginsAt": 1800045000,
+      "endsAt": 1800046800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5180",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5180",
+    "guid": "plex://episode/ch-1301-5180",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "grandparentTitle": "Open Movie Night",
+    "title": "Big Buck Bunny",
+    "parentIndex": 1,
+    "index": 1,
+    "grandparentGuid": "plex://show/open-movie-night",
+    "year": 2008,
+    "thumb": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "art": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "Media": [
+     {
+      "id": 5180,
+      "beginsAt": 1800045000,
+      "endsAt": 1800046800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5073",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5073",
+    "guid": "plex://episode/ch-0701-5073",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "News 7 at Noon",
+    "title": "News 7 at Noon",
+    "grandparentGuid": "plex://show/news-7-at-noon",
+    "Media": [
+     {
+      "id": 5073,
+      "beginsAt": 1800046800,
+      "endsAt": 1800050400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5137",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5137",
+    "guid": "plex://episode/ch-1101-5137",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5137,
+      "beginsAt": 1800046800,
+      "endsAt": 1800048600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5181",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5181",
+    "guid": "plex://episode/ch-1301-5181",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Nature"
+     }
+    ],
+    "grandparentTitle": "Wild Coasts",
+    "title": "Dunes",
+    "parentIndex": 1,
+    "index": 3,
+    "grandparentGuid": "plex://show/wild-coasts",
+    "Media": [
+     {
+      "id": 5181,
+      "beginsAt": 1800046800,
+      "endsAt": 1800050400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5094",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5094",
+    "guid": "plex://episode/ch-0901-5094",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Sports Desk",
+    "title": "Sports Desk",
+    "grandparentGuid": "plex://show/sports-desk",
+    "Media": [
+     {
+      "id": 5094,
+      "beginsAt": 1800048600,
+      "endsAt": 1800050400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5138",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5138",
+    "guid": "plex://episode/ch-1101-5138",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5138,
+      "beginsAt": 1800048600,
+      "endsAt": 1800050400,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5205",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5205",
+    "guid": "plex://episode/ch-4601-5205",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     }
+    ],
+    "grandparentTitle": "Morning Classics",
+    "title": "Morning Classics",
+    "grandparentGuid": "plex://show/morning-classics",
+    "Media": [
+     {
+      "id": 5205,
+      "beginsAt": 1800048600,
+      "endsAt": 1800059400,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5074",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5074",
+    "guid": "plex://episode/ch-0701-5074",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "The Afternoon Report",
+    "title": "The Afternoon Report",
+    "grandparentGuid": "plex://show/the-afternoon-report",
+    "Media": [
+     {
+      "id": 5074,
+      "beginsAt": 1800050400,
+      "endsAt": 1800057600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5095",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5095",
+    "guid": "plex://episode/ch-0901-5095",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Classic Matches",
+    "title": "1987 Derby",
+    "grandparentGuid": "plex://show/classic-matches",
+    "Media": [
+     {
+      "id": 5095,
+      "beginsAt": 1800050400,
+      "endsAt": 1800055800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5139",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5139",
+    "guid": "plex://episode/ch-1101-5139",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5139,
+      "beginsAt": 1800050400,
+      "endsAt": 1800052200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5182",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5182",
+    "guid": "plex://episode/ch-1301-5182",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Collectibles"
+     }
+    ],
+    "grandparentTitle": "Treasure Table",
+    "title": "Old Mill",
+    "parentIndex": 9,
+    "index": 13,
+    "grandparentGuid": "plex://show/treasure-table",
+    "Media": [
+     {
+      "id": 5182,
+      "beginsAt": 1800050400,
+      "endsAt": 1800054000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5056",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5056",
+    "guid": "plex://movie/ch-0501-5056",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Thriller"
+     }
+    ],
+    "title": "Glass Houses",
+    "year": 2013,
+    "Media": [
+     {
+      "id": 5056,
+      "beginsAt": 1800052200,
+      "endsAt": 1800058200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5140",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5140",
+    "guid": "plex://episode/ch-1101-5140",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5140,
+      "beginsAt": 1800052200,
+      "endsAt": 1800054000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5015",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5015",
+    "guid": "plex://episode/ch-0201-5015",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Talk Show"
+     }
+    ],
+    "grandparentTitle": "The Midday Show",
+    "title": "The Midday Show",
+    "grandparentGuid": "plex://show/the-midday-show",
+    "Media": [
+     {
+      "id": 5015,
+      "beginsAt": 1800052800,
+      "endsAt": 1800058200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5038",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5038",
+    "guid": "plex://episode/ch-0401-5038",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Home & Garden"
+     }
+    ],
+    "grandparentTitle": "Garden Rescue",
+    "title": "Rooftop Beds",
+    "parentIndex": 6,
+    "index": 11,
+    "grandparentGuid": "plex://show/garden-rescue",
+    "Media": [
+     {
+      "id": 5038,
+      "beginsAt": 1800054000,
+      "endsAt": 1800055800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5141",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5141",
+    "guid": "plex://episode/ch-1101-5141",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5141,
+      "beginsAt": 1800054000,
+      "endsAt": 1800055800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5183",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5183",
+    "guid": "plex://episode/ch-1301-5183",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "grandparentTitle": "Open Movie Night",
+    "title": "Big Buck Bunny",
+    "parentIndex": 1,
+    "index": 1,
+    "grandparentGuid": "plex://show/open-movie-night",
+    "year": 2008,
+    "thumb": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "art": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "Media": [
+     {
+      "id": 5183,
+      "beginsAt": 1800054000,
+      "endsAt": 1800055800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5039",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5039",
+    "guid": "plex://episode/ch-0401-5039",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Reality"
+     },
+     {
+      "tag": "Cooking"
+     }
+    ],
+    "grandparentTitle": "Kitchen Rivals",
+    "title": "Bake Off",
+    "parentIndex": 5,
+    "index": 2,
+    "grandparentGuid": "plex://show/kitchen-rivals",
+    "Media": [
+     {
+      "id": 5039,
+      "beginsAt": 1800055800,
+      "endsAt": 1800059400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5096",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5096",
+    "guid": "plex://episode/ch-0901-5096",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Training Ground",
+    "title": "Training Ground",
+    "grandparentGuid": "plex://show/training-ground",
+    "Media": [
+     {
+      "id": 5096,
+      "beginsAt": 1800055800,
+      "endsAt": 1800059400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5142",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5142",
+    "guid": "plex://episode/ch-1101-5142",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5142,
+      "beginsAt": 1800055800,
+      "endsAt": 1800057600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5184",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5184",
+    "guid": "plex://episode/ch-1301-5184",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Nature"
+     }
+    ],
+    "grandparentTitle": "Wild Coasts",
+    "title": "Dunes",
+    "parentIndex": 1,
+    "index": 3,
+    "grandparentGuid": "plex://show/wild-coasts",
+    "Media": [
+     {
+      "id": 5184,
+      "beginsAt": 1800055800,
+      "endsAt": 1800059400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5075",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5075",
+    "guid": "plex://episode/ch-0701-5075",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Morning News 7",
+    "title": "Morning News 7",
+    "grandparentGuid": "plex://show/morning-news-7",
+    "Media": [
+     {
+      "id": 5075,
+      "beginsAt": 1800057600,
+      "endsAt": 1800068400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5143",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5143",
+    "guid": "plex://episode/ch-1101-5143",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5143,
+      "beginsAt": 1800057600,
+      "endsAt": 1800059400,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5016",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5016",
+    "guid": "plex://episode/ch-0201-5016",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Game Show"
+     }
+    ],
+    "grandparentTitle": "Quiz Night",
+    "title": "Rivers",
+    "parentIndex": 4,
+    "index": 17,
+    "grandparentGuid": "plex://show/quiz-night",
+    "Media": [
+     {
+      "id": 5016,
+      "beginsAt": 1800058200,
+      "endsAt": 1800060000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5057",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5057",
+    "guid": "plex://movie/ch-0501-5057",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "title": "Summer at Sea",
+    "year": 1987,
+    "Media": [
+     {
+      "id": 5057,
+      "beginsAt": 1800058200,
+      "endsAt": 1800064500,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5040",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5040",
+    "guid": "plex://episode/ch-0401-5040",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Bay 4 Breakfast",
+    "title": "Bay 4 Breakfast",
+    "grandparentGuid": "plex://show/bay-4-breakfast",
+    "Media": [
+     {
+      "id": 5040,
+      "beginsAt": 1800059400,
+      "endsAt": 1800068400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5097",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5097",
+    "guid": "plex://episode/ch-0901-5097",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Sports Desk",
+    "title": "Sports Desk",
+    "grandparentGuid": "plex://show/sports-desk",
+    "Media": [
+     {
+      "id": 5097,
+      "beginsAt": 1800059400,
+      "endsAt": 1800061200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5144",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5144",
+    "guid": "plex://episode/ch-1101-5144",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5144,
+      "beginsAt": 1800059400,
+      "endsAt": 1800061200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5185",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5185",
+    "guid": "plex://episode/ch-1301-5185",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Collectibles"
+     }
+    ],
+    "grandparentTitle": "Treasure Table",
+    "title": "Old Mill",
+    "parentIndex": 9,
+    "index": 13,
+    "grandparentGuid": "plex://show/treasure-table",
+    "Media": [
+     {
+      "id": 5185,
+      "beginsAt": 1800059400,
+      "endsAt": 1800063000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5206",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5206",
+    "guid": "plex://episode/ch-4601-5206",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     }
+    ],
+    "grandparentTitle": "Late Set",
+    "title": "Late Set",
+    "grandparentGuid": "plex://show/late-set",
+    "Media": [
+     {
+      "id": 5206,
+      "beginsAt": 1800059400,
+      "endsAt": 1800064800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5017",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5017",
+    "guid": "plex://episode/ch-0201-5017",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Drama"
+     }
+    ],
+    "grandparentTitle": "Harbour Lights",
+    "title": "Spring Tide",
+    "parentIndex": 2,
+    "index": 6,
+    "grandparentGuid": "plex://show/harbour-lights",
+    "Media": [
+     {
+      "id": 5017,
+      "beginsAt": 1800060000,
+      "endsAt": 1800063600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5098",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5098",
+    "guid": "plex://episode/ch-0901-5098",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Classic Matches",
+    "title": "1987 Derby",
+    "grandparentGuid": "plex://show/classic-matches",
+    "Media": [
+     {
+      "id": 5098,
+      "beginsAt": 1800061200,
+      "endsAt": 1800066600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5145",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5145",
+    "guid": "plex://episode/ch-1101-5145",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5145,
+      "beginsAt": 1800061200,
+      "endsAt": 1800063000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5146",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5146",
+    "guid": "plex://episode/ch-1101-5146",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5146,
+      "beginsAt": 1800063000,
+      "endsAt": 1800064800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5186",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5186",
+    "guid": "plex://episode/ch-1301-5186",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "grandparentTitle": "Open Movie Night",
+    "title": "Big Buck Bunny",
+    "parentIndex": 1,
+    "index": 1,
+    "grandparentGuid": "plex://show/open-movie-night",
+    "year": 2008,
+    "thumb": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "art": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "Media": [
+     {
+      "id": 5186,
+      "beginsAt": 1800063000,
+      "endsAt": 1800064800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5018",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5018",
+    "guid": "plex://episode/ch-0201-5018",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Metro 2 Morning",
+    "title": "Metro 2 Morning",
+    "grandparentGuid": "plex://show/metro-2-morning",
+    "Media": [
+     {
+      "id": 5018,
+      "beginsAt": 1800063600,
+      "endsAt": 1800074400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5058",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5058",
+    "guid": "plex://movie/ch-0501-5058",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Drama"
+     }
+    ],
+    "title": "The Clockmaker",
+    "year": 2009,
+    "Media": [
+     {
+      "id": 5058,
+      "beginsAt": 1800064500,
+      "endsAt": 1800071700,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5147",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5147",
+    "guid": "plex://episode/ch-1101-5147",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5147,
+      "beginsAt": 1800064800,
+      "endsAt": 1800066600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5187",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5187",
+    "guid": "plex://episode/ch-1301-5187",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Nature"
+     }
+    ],
+    "grandparentTitle": "Wild Coasts",
+    "title": "Dunes",
+    "parentIndex": 1,
+    "index": 3,
+    "grandparentGuid": "plex://show/wild-coasts",
+    "Media": [
+     {
+      "id": 5187,
+      "beginsAt": 1800064800,
+      "endsAt": 1800068400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5207",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5207",
+    "guid": "plex://episode/ch-4601-5207",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     }
+    ],
+    "grandparentTitle": "Morning Classics",
+    "title": "Morning Classics",
+    "grandparentGuid": "plex://show/morning-classics",
+    "Media": [
+     {
+      "id": 5207,
+      "beginsAt": 1800064800,
+      "endsAt": 1800075600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5099",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5099",
+    "guid": "plex://episode/ch-0901-5099",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Training Ground",
+    "title": "Training Ground",
+    "grandparentGuid": "plex://show/training-ground",
+    "Media": [
+     {
+      "id": 5099,
+      "beginsAt": 1800066600,
+      "endsAt": 1800070200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5148",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5148",
+    "guid": "plex://episode/ch-1101-5148",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5148,
+      "beginsAt": 1800066600,
+      "endsAt": 1800068400,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5041",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5041",
+    "guid": "plex://episode/ch-0401-5041",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Home & Garden"
+     }
+    ],
+    "grandparentTitle": "Garden Rescue",
+    "title": "Rooftop Beds",
+    "parentIndex": 6,
+    "index": 11,
+    "grandparentGuid": "plex://show/garden-rescue",
+    "Media": [
+     {
+      "id": 5041,
+      "beginsAt": 1800068400,
+      "endsAt": 1800070200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5076",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5076",
+    "guid": "plex://episode/ch-0701-5076",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "News 7 at Noon",
+    "title": "News 7 at Noon",
+    "grandparentGuid": "plex://show/news-7-at-noon",
+    "Media": [
+     {
+      "id": 5076,
+      "beginsAt": 1800068400,
+      "endsAt": 1800072000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5149",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5149",
+    "guid": "plex://episode/ch-1101-5149",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5149,
+      "beginsAt": 1800068400,
+      "endsAt": 1800070200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5188",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5188",
+    "guid": "plex://episode/ch-1301-5188",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Collectibles"
+     }
+    ],
+    "grandparentTitle": "Treasure Table",
+    "title": "Old Mill",
+    "parentIndex": 9,
+    "index": 13,
+    "grandparentGuid": "plex://show/treasure-table",
+    "Media": [
+     {
+      "id": 5188,
+      "beginsAt": 1800068400,
+      "endsAt": 1800072000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5042",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5042",
+    "guid": "plex://episode/ch-0401-5042",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Reality"
+     },
+     {
+      "tag": "Cooking"
+     }
+    ],
+    "grandparentTitle": "Kitchen Rivals",
+    "title": "Bake Off",
+    "parentIndex": 5,
+    "index": 2,
+    "grandparentGuid": "plex://show/kitchen-rivals",
+    "Media": [
+     {
+      "id": 5042,
+      "beginsAt": 1800070200,
+      "endsAt": 1800073800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5100",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5100",
+    "guid": "plex://episode/ch-0901-5100",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Sports Desk",
+    "title": "Sports Desk",
+    "grandparentGuid": "plex://show/sports-desk",
+    "Media": [
+     {
+      "id": 5100,
+      "beginsAt": 1800070200,
+      "endsAt": 1800072000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5150",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5150",
+    "guid": "plex://episode/ch-1101-5150",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5150,
+      "beginsAt": 1800070200,
+      "endsAt": 1800072000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5059",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5059",
+    "guid": "plex://movie/ch-0501-5059",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Thriller"
+     }
+    ],
+    "title": "Glass Houses",
+    "year": 2013,
+    "Media": [
+     {
+      "id": 5059,
+      "beginsAt": 1800071700,
+      "endsAt": 1800077700,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5077",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5077",
+    "guid": "plex://episode/ch-0701-5077",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "The Afternoon Report",
+    "title": "The Afternoon Report",
+    "grandparentGuid": "plex://show/the-afternoon-report",
+    "Media": [
+     {
+      "id": 5077,
+      "beginsAt": 1800072000,
+      "endsAt": 1800079200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5101",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5101",
+    "guid": "plex://episode/ch-0901-5101",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Classic Matches",
+    "title": "1987 Derby",
+    "grandparentGuid": "plex://show/classic-matches",
+    "Media": [
+     {
+      "id": 5101,
+      "beginsAt": 1800072000,
+      "endsAt": 1800077400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5151",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5151",
+    "guid": "plex://episode/ch-1101-5151",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5151,
+      "beginsAt": 1800072000,
+      "endsAt": 1800073800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5189",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5189",
+    "guid": "plex://episode/ch-1301-5189",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "grandparentTitle": "Open Movie Night",
+    "title": "Big Buck Bunny",
+    "parentIndex": 1,
+    "index": 1,
+    "grandparentGuid": "plex://show/open-movie-night",
+    "year": 2008,
+    "thumb": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "art": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "Media": [
+     {
+      "id": 5189,
+      "beginsAt": 1800072000,
+      "endsAt": 1800073800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5043",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5043",
+    "guid": "plex://episode/ch-0401-5043",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Bay 4 Breakfast",
+    "title": "Bay 4 Breakfast",
+    "grandparentGuid": "plex://show/bay-4-breakfast",
+    "Media": [
+     {
+      "id": 5043,
+      "beginsAt": 1800073800,
+      "endsAt": 1800082800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5152",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5152",
+    "guid": "plex://episode/ch-1101-5152",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5152,
+      "beginsAt": 1800073800,
+      "endsAt": 1800075600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5190",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5190",
+    "guid": "plex://episode/ch-1301-5190",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Nature"
+     }
+    ],
+    "grandparentTitle": "Wild Coasts",
+    "title": "Dunes",
+    "parentIndex": 1,
+    "index": 3,
+    "grandparentGuid": "plex://show/wild-coasts",
+    "Media": [
+     {
+      "id": 5190,
+      "beginsAt": 1800073800,
+      "endsAt": 1800077400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5019",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5019",
+    "guid": "plex://episode/ch-0201-5019",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Talk Show"
+     }
+    ],
+    "grandparentTitle": "The Midday Show",
+    "title": "The Midday Show",
+    "grandparentGuid": "plex://show/the-midday-show",
+    "Media": [
+     {
+      "id": 5019,
+      "beginsAt": 1800074400,
+      "endsAt": 1800079800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5153",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5153",
+    "guid": "plex://episode/ch-1101-5153",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5153,
+      "beginsAt": 1800075600,
+      "endsAt": 1800077400,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5208",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5208",
+    "guid": "plex://episode/ch-4601-5208",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     }
+    ],
+    "grandparentTitle": "Late Set",
+    "title": "Late Set",
+    "grandparentGuid": "plex://show/late-set",
+    "Media": [
+     {
+      "id": 5208,
+      "beginsAt": 1800075600,
+      "endsAt": 1800081000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5102",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5102",
+    "guid": "plex://episode/ch-0901-5102",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Training Ground",
+    "title": "Training Ground",
+    "grandparentGuid": "plex://show/training-ground",
+    "Media": [
+     {
+      "id": 5102,
+      "beginsAt": 1800077400,
+      "endsAt": 1800081000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5154",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5154",
+    "guid": "plex://episode/ch-1101-5154",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5154,
+      "beginsAt": 1800077400,
+      "endsAt": 1800079200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5191",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5191",
+    "guid": "plex://episode/ch-1301-5191",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Collectibles"
+     }
+    ],
+    "grandparentTitle": "Treasure Table",
+    "title": "Old Mill",
+    "parentIndex": 9,
+    "index": 13,
+    "grandparentGuid": "plex://show/treasure-table",
+    "Media": [
+     {
+      "id": 5191,
+      "beginsAt": 1800077400,
+      "endsAt": 1800081000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5060",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5060",
+    "guid": "plex://movie/ch-0501-5060",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "title": "Summer at Sea",
+    "year": 1987,
+    "Media": [
+     {
+      "id": 5060,
+      "beginsAt": 1800077700,
+      "endsAt": 1800084000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5078",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5078",
+    "guid": "plex://episode/ch-0701-5078",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Morning News 7",
+    "title": "Morning News 7",
+    "grandparentGuid": "plex://show/morning-news-7",
+    "Media": [
+     {
+      "id": 5078,
+      "beginsAt": 1800079200,
+      "endsAt": 1800090000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5155",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5155",
+    "guid": "plex://episode/ch-1101-5155",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5155,
+      "beginsAt": 1800079200,
+      "endsAt": 1800081000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5020",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5020",
+    "guid": "plex://episode/ch-0201-5020",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Game Show"
+     }
+    ],
+    "grandparentTitle": "Quiz Night",
+    "title": "Rivers",
+    "parentIndex": 4,
+    "index": 17,
+    "grandparentGuid": "plex://show/quiz-night",
+    "Media": [
+     {
+      "id": 5020,
+      "beginsAt": 1800079800,
+      "endsAt": 1800081600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5103",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5103",
+    "guid": "plex://episode/ch-0901-5103",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Sports Desk",
+    "title": "Sports Desk",
+    "grandparentGuid": "plex://show/sports-desk",
+    "Media": [
+     {
+      "id": 5103,
+      "beginsAt": 1800081000,
+      "endsAt": 1800082800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5156",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5156",
+    "guid": "plex://episode/ch-1101-5156",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5156,
+      "beginsAt": 1800081000,
+      "endsAt": 1800082800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5192",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5192",
+    "guid": "plex://episode/ch-1301-5192",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "grandparentTitle": "Open Movie Night",
+    "title": "Big Buck Bunny",
+    "parentIndex": 1,
+    "index": 1,
+    "grandparentGuid": "plex://show/open-movie-night",
+    "year": 2008,
+    "thumb": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "art": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "Media": [
+     {
+      "id": 5192,
+      "beginsAt": 1800081000,
+      "endsAt": 1800082800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5209",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5209",
+    "guid": "plex://episode/ch-4601-5209",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     }
+    ],
+    "grandparentTitle": "Morning Classics",
+    "title": "Morning Classics",
+    "grandparentGuid": "plex://show/morning-classics",
+    "Media": [
+     {
+      "id": 5209,
+      "beginsAt": 1800081000,
+      "endsAt": 1800091800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5021",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5021",
+    "guid": "plex://episode/ch-0201-5021",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Drama"
+     }
+    ],
+    "grandparentTitle": "Harbour Lights",
+    "title": "Spring Tide",
+    "parentIndex": 2,
+    "index": 6,
+    "grandparentGuid": "plex://show/harbour-lights",
+    "Media": [
+     {
+      "id": 5021,
+      "beginsAt": 1800081600,
+      "endsAt": 1800085200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5044",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5044",
+    "guid": "plex://episode/ch-0401-5044",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Home & Garden"
+     }
+    ],
+    "grandparentTitle": "Garden Rescue",
+    "title": "Rooftop Beds",
+    "parentIndex": 6,
+    "index": 11,
+    "grandparentGuid": "plex://show/garden-rescue",
+    "Media": [
+     {
+      "id": 5044,
+      "beginsAt": 1800082800,
+      "endsAt": 1800084600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5104",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5104",
+    "guid": "plex://episode/ch-0901-5104",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Classic Matches",
+    "title": "1987 Derby",
+    "grandparentGuid": "plex://show/classic-matches",
+    "Media": [
+     {
+      "id": 5104,
+      "beginsAt": 1800082800,
+      "endsAt": 1800088200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5157",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5157",
+    "guid": "plex://episode/ch-1101-5157",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5157,
+      "beginsAt": 1800082800,
+      "endsAt": 1800084600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5193",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5193",
+    "guid": "plex://episode/ch-1301-5193",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Nature"
+     }
+    ],
+    "grandparentTitle": "Wild Coasts",
+    "title": "Dunes",
+    "parentIndex": 1,
+    "index": 3,
+    "grandparentGuid": "plex://show/wild-coasts",
+    "Media": [
+     {
+      "id": 5193,
+      "beginsAt": 1800082800,
+      "endsAt": 1800086400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5061",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5061",
+    "guid": "plex://movie/ch-0501-5061",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Drama"
+     }
+    ],
+    "title": "The Clockmaker",
+    "year": 2009,
+    "Media": [
+     {
+      "id": 5061,
+      "beginsAt": 1800084000,
+      "endsAt": 1800091200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5045",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5045",
+    "guid": "plex://episode/ch-0401-5045",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Reality"
+     },
+     {
+      "tag": "Cooking"
+     }
+    ],
+    "grandparentTitle": "Kitchen Rivals",
+    "title": "Bake Off",
+    "parentIndex": 5,
+    "index": 2,
+    "grandparentGuid": "plex://show/kitchen-rivals",
+    "Media": [
+     {
+      "id": 5045,
+      "beginsAt": 1800084600,
+      "endsAt": 1800088200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5158",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5158",
+    "guid": "plex://episode/ch-1101-5158",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5158,
+      "beginsAt": 1800084600,
+      "endsAt": 1800086400,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0201-5022",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0201-5022",
+    "guid": "plex://episode/ch-0201-5022",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Metro 2 Morning",
+    "title": "Metro 2 Morning",
+    "grandparentGuid": "plex://show/metro-2-morning",
+    "Media": [
+     {
+      "id": 5022,
+      "beginsAt": 1800085200,
+      "endsAt": 1800096000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0201",
+      "channelVcn": "2.1",
+      "channelCallSign": "WMRQ",
+      "channelTitle": "2.1 WMRQ",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5159",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5159",
+    "guid": "plex://episode/ch-1101-5159",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5159,
+      "beginsAt": 1800086400,
+      "endsAt": 1800088200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5194",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5194",
+    "guid": "plex://episode/ch-1301-5194",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Collectibles"
+     }
+    ],
+    "grandparentTitle": "Treasure Table",
+    "title": "Old Mill",
+    "parentIndex": 9,
+    "index": 13,
+    "grandparentGuid": "plex://show/treasure-table",
+    "Media": [
+     {
+      "id": 5194,
+      "beginsAt": 1800086400,
+      "endsAt": 1800090000,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0401-5046",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0401-5046",
+    "guid": "plex://episode/ch-0401-5046",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "Bay 4 Breakfast",
+    "title": "Bay 4 Breakfast",
+    "grandparentGuid": "plex://show/bay-4-breakfast",
+    "Media": [
+     {
+      "id": 5046,
+      "beginsAt": 1800088200,
+      "endsAt": 1800097200,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0401",
+      "channelVcn": "4.1",
+      "channelCallSign": "WBXT",
+      "channelTitle": "4.1 WBXT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5105",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5105",
+    "guid": "plex://episode/ch-0901-5105",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Training Ground",
+    "title": "Training Ground",
+    "grandparentGuid": "plex://show/training-ground",
+    "Media": [
+     {
+      "id": 5105,
+      "beginsAt": 1800088200,
+      "endsAt": 1800091800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5160",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5160",
+    "guid": "plex://episode/ch-1101-5160",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     },
+     {
+      "tag": "Animation"
+     }
+    ],
+    "grandparentTitle": "Star Rangers",
+    "title": "Moon Base",
+    "parentIndex": 1,
+    "index": 7,
+    "grandparentGuid": "plex://show/star-rangers",
+    "Media": [
+     {
+      "id": 5160,
+      "beginsAt": 1800088200,
+      "endsAt": 1800090000,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0701-5079",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0701-5079",
+    "guid": "plex://episode/ch-0701-5079",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "News"
+     }
+    ],
+    "grandparentTitle": "News 7 at Noon",
+    "title": "News 7 at Noon",
+    "grandparentGuid": "plex://show/news-7-at-noon",
+    "Media": [
+     {
+      "id": 5079,
+      "beginsAt": 1800090000,
+      "endsAt": 1800093600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0701",
+      "channelVcn": "7.1",
+      "channelCallSign": "WNWS",
+      "channelTitle": "7.1 WNWS",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5161",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5161",
+    "guid": "plex://episode/ch-1101-5161",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "The Busy Burrow",
+    "title": "Picnic",
+    "parentIndex": 2,
+    "index": 12,
+    "grandparentGuid": "plex://show/the-busy-burrow",
+    "Media": [
+     {
+      "id": 5161,
+      "beginsAt": 1800090000,
+      "endsAt": 1800091800,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5195",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5195",
+    "guid": "plex://episode/ch-1301-5195",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "grandparentTitle": "Open Movie Night",
+    "title": "Big Buck Bunny",
+    "parentIndex": 1,
+    "index": 1,
+    "grandparentGuid": "plex://show/open-movie-night",
+    "year": 2008,
+    "thumb": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "art": "https://metadata-static.plex.tv/art/big-buck-bunny-backdrop.jpg",
+    "Media": [
+     {
+      "id": 5195,
+      "beginsAt": 1800090000,
+      "endsAt": 1800091800,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fmovie%2Fch-0501-5062",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0501-5062",
+    "guid": "plex://movie/ch-0501-5062",
+    "type": "movie",
+    "Genre": [
+     {
+      "tag": "Thriller"
+     }
+    ],
+    "title": "Glass Houses",
+    "year": 2013,
+    "Media": [
+     {
+      "id": 5062,
+      "beginsAt": 1800091200,
+      "endsAt": 1800097200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-0501",
+      "channelVcn": "5.1",
+      "channelCallSign": "WFLM",
+      "channelTitle": "5.1 WFLM",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-0901-5106",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-0901-5106",
+    "guid": "plex://episode/ch-0901-5106",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Sports"
+     }
+    ],
+    "grandparentTitle": "Sports Desk",
+    "title": "Sports Desk",
+    "grandparentGuid": "plex://show/sports-desk",
+    "Media": [
+     {
+      "id": 5106,
+      "beginsAt": 1800091800,
+      "endsAt": 1800093600,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-0901",
+      "channelVcn": "9.1",
+      "channelCallSign": "WSPT",
+      "channelTitle": "9.1 WSPT",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5162",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5162",
+    "guid": "plex://episode/ch-1101-5162",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Children"
+     }
+    ],
+    "grandparentTitle": "Pip and the Paper Boat",
+    "title": "Fog",
+    "parentIndex": 2,
+    "index": 2,
+    "grandparentGuid": "plex://show/pip-and-the-paper-boat",
+    "Media": [
+     {
+      "id": 5162,
+      "beginsAt": 1800091800,
+      "endsAt": 1800093600,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-1101",
+      "channelVcn": "11.1",
+      "channelCallSign": "WKID",
+      "channelTitle": "11.1 WKID",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1301-5196",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1301-5196",
+    "guid": "plex://episode/ch-1301-5196",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Nature"
+     }
+    ],
+    "grandparentTitle": "Wild Coasts",
+    "title": "Dunes",
+    "parentIndex": 1,
+    "index": 3,
+    "grandparentGuid": "plex://show/wild-coasts",
+    "Media": [
+     {
+      "id": 5196,
+      "beginsAt": 1800091800,
+      "endsAt": 1800095400,
+      "premiere": false,
+      "videoResolution": "1080",
+      "channelIdentifier": "ch-1301",
+      "channelVcn": "13.1",
+      "channelCallSign": "WQXL",
+      "channelTitle": "13.1 WQXL",
+      "protocol": "livetv"
+     }
+    ]
+   },
+   {
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-4601-5210",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-4601-5210",
+    "guid": "plex://episode/ch-4601-5210",
+    "type": "episode",
+    "Genre": [
+     {
+      "tag": "Music"
+     }
+    ],
+    "grandparentTitle": "Late Set",
+    "title": "Late Set",
+    "grandparentGuid": "plex://show/late-set",
+    "Media": [
+     {
+      "id": 5210,
+      "beginsAt": 1800091800,
+      "endsAt": 1800097200,
+      "premiere": false,
+      "videoResolution": "480",
+      "channelIdentifier": "ch-4601",
+      "channelVcn": "46.1",
+      "channelCallSign": "WMUS",
+      "channelTitle": "46.1 WMUS",
+      "protocol": "livetv"
+     }
+    ]
+   }
+  ]
+ }
+}

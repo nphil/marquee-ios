@@ -111,7 +111,7 @@ extension XCTestCase {
         waitFor("detail.notOnServer", in: app)
         try snap("browse-10-watchlist-title-\(suffix)")
         open(tab: "Live TV", title: "Live TV", in: app)
-        waitFor("livetv.placeholder", in: app)
+        waitFor("livetv.screen", in: app)
         try snap("browse-15-livetv-\(suffix)")
     }
 
