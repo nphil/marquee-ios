@@ -254,7 +254,8 @@ public final class SyntheticTS {
         context.pointee.rc_max_rate = Int64(segment.bitRate) * 2
         context.pointee.rc_buffer_size = Int32(segment.bitRate)
         if segment.interlaced {
-            context.pointee.flags |= Self.interlacedDCT | Self.interlacedME
+            // Interlaced DCT alone makes the stream interlaced; field motion search would double the encode time.
+            context.pointee.flags |= Self.interlacedDCT
             context.pointee.field_order = AV_FIELD_TT
         }
         guard avcodec_open2(context, codec, nil) >= 0 else { throw FixtureError.encoder("mpeg2video") }
@@ -404,7 +405,6 @@ public final class SyntheticTS {
     private static let tone = (0..<48_000).map { Float(0.2 * sin(2 * Double.pi * 440 * Double($0) / 48_000)) }
 
     private static let interlacedDCT: Int32 = 1 << 18
-    private static let interlacedME: Int32 = 1 << 29
     private static let frameInterlaced: Int32 = 1 << 3
     private static let frameTopFieldFirst: Int32 = 1 << 4
 }
