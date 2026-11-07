@@ -70,6 +70,12 @@ targets:
     platform: iOS
     sources:
       - path: UITests
+        excludes:
+          - FakePlex
+      # A folder reference keeps the fixture tree intact in the test bundle; the app reads it from there.
+      - path: UITests/FakePlex
+        type: folder
+        buildPhase: resources
     dependencies:
       - target: Marquee
     settings:

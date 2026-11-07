@@ -87,7 +87,8 @@ final class ScreenshotTests: XCTestCase {
 
     // MARK: - Steps
 
-    /// Launches with the theme settings given as launch arguments, which override the saved ones.
+    /// Launches with the theme settings given as launch arguments, which override the saved ones, and
+    /// with the fake Plex of `UITests/FakePlex` in place of plex.tv and the server.
     @MainActor
     private func launch(matchSystem: Bool, fixedMode: String, dark: String, light: String = "rose-pine-dawn") -> XCUIApplication {
         continueAfterFailure = false
@@ -98,6 +99,9 @@ final class ScreenshotTests: XCTestCase {
             "-marquee.theme.dark", dark,
             "-marquee.theme.light", light,
         ]
+        let fixtures = Bundle(for: ScreenshotTests.self).url(forResource: "FakePlex", withExtension: nil)
+        XCTAssertNotNil(fixtures, "The test bundle has no FakePlex fixtures")
+        app.launchEnvironment["MARQUEE_FAKE_PLEX"] = fixtures?.path
         app.launch()
         waitForBar("Home", in: app)
         return app
