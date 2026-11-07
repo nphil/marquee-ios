@@ -47,9 +47,10 @@
 - `PlexPage`: one page and the total behind it.
 - `AlphabetIndexEntry.entries(from:)`: jump-bar letters with the offset where each starts.
 - `PagedLoader` (`@MainActor`, `@Observable`): grid paging.
-  - `reload(using:)`: starts a new generation; pages from an older one are dropped.
+  - `reload(using:)`: starts a new generation; pages from an older one are dropped. A load cancelled because its screen went away records no failure.
+  - `refresh()`: the first page again with the last query; on failure the shown items stay, with `failure` set. `loadedAt` is when the first page last arrived.
   - `loadMoreIfNeeded(after:)`: fetches the next page three quarters of a page before the end.
-  - `ensureLoaded(through:)`: one request reaching a jump target.
+  - `ensureLoaded(through:)`: one request reaching a jump target, after any page already on its way.
   - `patch(_:)`: replaces a loaded item. Rows a shifted page repeats are skipped.
 - `PlexPlayQueue`: `item(after:)`, `item(before:)` for Up Next.
 - `PlexImageURL.transcoded(_:base:width:height:scale:)`: `/photo/:/transcode` at the view's pixel size, without a token, so the URL is the cache key.

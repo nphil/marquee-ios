@@ -11,6 +11,7 @@ struct PagedLoaderTests {
     /// A list of rows numbered from 0 that records every page request.
     actor Server {
         private(set) var requests: [[Int]] = []
+        private(set) var isDown = false
         private var rows: [Int]
 
         init(total: Int) {
@@ -19,6 +20,10 @@ struct PagedLoaderTests {
 
         func insertAtFront(_ id: Int) {
             rows.insert(id, at: 0)
+        }
+
+        func goDown() {
+            isDown = true
         }
 
         func page(_ start: Int, _ size: Int) -> PlexPage<Row> {
@@ -77,6 +82,42 @@ struct PagedLoaderTests {
         #expect(!loader.isLoading)
     }
 
+    @Test func cancelledLoadIsNoFailure() async {
+        let loader = PagedLoader<Row>(pageSize: 4)
+        let started = Gate()
+        let release = Gate()
+        let load = Task {
+            await loader.reload { _, _ in
+                await started.open()
+                await release.wait()
+                try Task.checkCancellation()
+                return PlexPage(items: [Row(id: 1)], totalSize: 1)
+            }
+        }
+        await started.wait()
+        load.cancel()
+        await release.open()
+        await load.value
+
+        #expect(loader.failure == nil)
+        #expect(!loader.isLoading)
+    }
+
+    @Test func failedRefreshKeepsTheListShown() async {
+        let server = Server(total: 6)
+        let loader = PagedLoader<Row>(pageSize: 4)
+        await loader.reload { start, size in
+            if await server.isDown { throw PlexError.unreachable(.offline) }
+            return await server.page(start, size)
+        }
+        await server.goDown()
+        await loader.refresh()
+
+        #expect(loader.items.map(\.id) == [0, 1, 2, 3])
+        #expect(loader.failure as? PlexError == .unreachable(.offline))
+        #expect(loader.loadedAt != nil)
+    }
+
     @Test func jumpLoadsThroughTheTargetInOneRequest() async {
         let server = Server(total: 40)
         let loader = PagedLoader<Row>(pageSize: 4)
@@ -87,5 +128,31 @@ struct PagedLoaderTests {
 
         #expect(loader.items.count == 17)
         #expect(await server.requests == [[0, 4], [4, 13]])
+    }
+
+    @Test func jumpWaitsForThePageOnItsWay() async {
+        let server = Server(total: 40)
+        let loader = PagedLoader<Row>(pageSize: 4)
+        let started = Gate()
+        let release = Gate()
+        await loader.reload { start, size in
+            if start == 4 {
+                await started.open()
+                await release.wait()
+            }
+            return await server.page(start, size)
+        }
+
+        let scrolling = Task { await loader.loadMoreIfNeeded(after: 3) }
+        await started.wait()
+        let jump = Task { await loader.ensureLoaded(through: 20) }
+        // Lets the jump reach the page in flight before that page arrives.
+        await Task.yield()
+        await release.open()
+        await scrolling.value
+        await jump.value
+
+        #expect(loader.items.count == 24)
+        #expect(await server.requests == [[0, 4], [4, 4], [8, 16]])
     }
 }

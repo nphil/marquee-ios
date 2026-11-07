@@ -21,6 +21,8 @@ public final class PagedLoader<Item: Identifiable & Sendable> {
     public private(set) var totalSize: Int?
     /// Bumped whenever `items` is replaced or extended.
     public private(set) var contentRevision = 0
+    /// When the first page last arrived.
+    public private(set) var loadedAt: Date?
 
     public let pageSize: Int
     @ObservationIgnored private var fetch: Fetch?
@@ -28,6 +30,8 @@ public final class PagedLoader<Item: Identifiable & Sendable> {
     @ObservationIgnored private var nextStart = 0
     @ObservationIgnored private var hasMore = false
     @ObservationIgnored private var nextPageGeneration: Int?
+    /// The page on its way, so a jump can wait for it rather than give up.
+    @ObservationIgnored private var nextPage: Task<Void, Never>?
     @ObservationIgnored private var generation = 0
 
     public init(pageSize: Int = 60) {
@@ -38,11 +42,22 @@ public final class PagedLoader<Item: Identifiable & Sendable> {
     /// the new page replaces them.
     public func reload(using fetch: @escaping Fetch) async {
         self.fetch = fetch
+        await loadFirstPage(keepingItemsOnFailure: false)
+    }
+
+    /// Loads the first page again with the last query. When that fails, the items already shown stay, with
+    /// `failure` set, so a refresh while offline keeps the last good list on screen.
+    public func refresh() async {
+        await loadFirstPage(keepingItemsOnFailure: true)
+    }
+
+    private func loadFirstPage(keepingItemsOnFailure: Bool) async {
+        guard let fetch else { return }
         generation += 1
         let current = generation
         nextPageGeneration = nil
         isLoading = true
-        failure = nil
+        if !keepingItemsOnFailure { failure = nil }
         do {
             let page = try await fetch(0, pageSize)
             guard current == generation else { return }
@@ -50,14 +65,22 @@ public final class PagedLoader<Item: Identifiable & Sendable> {
             totalSize = page.totalSize
             nextStart = page.items.count
             hasMore = nextStart < page.totalSize && !page.items.isEmpty
+            failure = nil
+            loadedAt = .now
             contentRevision &+= 1
         } catch {
             guard current == generation else { return }
-            items = []
-            totalSize = nil
-            hasMore = false
-            failure = error
-            contentRevision &+= 1
+            // A load cancelled because its screen went away is not a failure; the screen loads again when
+            // it returns.
+            if !Task.isCancelled {
+                if !keepingItemsOnFailure {
+                    items = []
+                    totalSize = nil
+                    hasMore = false
+                    contentRevision &+= 1
+                }
+                failure = error
+            }
         }
         isLoading = false
     }
@@ -68,8 +91,12 @@ public final class PagedLoader<Item: Identifiable & Sendable> {
         await loadNext(size: pageSize)
     }
 
-    /// Loads as far as `index` in one request, e.g. for an A–Z jump to a letter further down.
+    /// Loads as far as `index` in one request, e.g. for an A–Z jump to a letter further down. A page already
+    /// on its way is waited for first, since a second request cannot start beside it.
     public func ensureLoaded(through index: Int) async {
+        if nextPageGeneration != nil, let nextPage {
+            await nextPage.value
+        }
         guard canLoadMore, index >= nextStart else { return }
         await loadNext(size: index - nextStart + pageSize)
     }
@@ -90,20 +117,26 @@ public final class PagedLoader<Item: Identifiable & Sendable> {
     private func loadNext(size: Int) async {
         guard let fetch else { return }
         let current = generation
+        let start = nextStart
         nextPageGeneration = current
-        defer { if nextPageGeneration == current { nextPageGeneration = nil } }
-        do {
-            let page = try await fetch(nextStart, size)
-            guard current == generation else { return }
-            var seen = Set(items.map(\.id))
-            items.append(contentsOf: page.items.filter { seen.insert($0.id).inserted })
-            totalSize = page.totalSize
-            nextStart += page.items.count
-            hasMore = nextStart < page.totalSize && !page.items.isEmpty
-            contentRevision &+= 1
-        } catch {
-            guard current == generation else { return }
-            failure = error
+        // A task of its own, so the page lands even when the cell that asked for it scrolls away.
+        let page = Task {
+            defer { if nextPageGeneration == current { nextPageGeneration = nil } }
+            do {
+                let page = try await fetch(start, size)
+                guard current == generation else { return }
+                var seen = Set(items.map(\.id))
+                items.append(contentsOf: page.items.filter { seen.insert($0.id).inserted })
+                totalSize = page.totalSize
+                nextStart += page.items.count
+                hasMore = nextStart < page.totalSize && !page.items.isEmpty
+                contentRevision &+= 1
+            } catch {
+                guard current == generation else { return }
+                failure = error
+            }
         }
+        nextPage = page
+        await page.value
     }
 }
