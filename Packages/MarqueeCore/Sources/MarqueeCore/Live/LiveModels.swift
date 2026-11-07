@@ -288,6 +288,17 @@ public enum LiveError: Error, Sendable, Hashable {
     case server(status: Int, message: String?)
 }
 
+extension LiveError {
+    /// The tuner is taken: the device's 805 ("TV is busy") or a 503 from it or from Plex.
+    public var isTunerBusy: Bool {
+        switch self {
+        case .refused(let code, _): code == 805
+        case .server(let status, _): status == 503
+        default: false
+        }
+    }
+}
+
 extension LiveError: CustomStringConvertible {
     public var description: String {
         switch self {

@@ -78,7 +78,8 @@ final class DirectLiveSource: LiveVideoSource {
     static func error(_ failure: LiveStreamPlayer.Failure) -> LiveError {
         switch failure {
         case .refused(let refusal) where refusal.isProtected: .protectedChannel
-        case .refused(let refusal): .refused(code: refusal.code, message: refusal.text)
+        // A bare 503 is the tuner's busy answer without its 805 code.
+        case .refused(let refusal): .refused(code: refusal.code ?? (refusal.isBusy ? 805 : nil), message: refusal.text)
         case .noPicture: .noData
         case .lost(let message): .network(message)
         case .unreadable(let message): .unsupported(message)

@@ -291,8 +291,8 @@ private struct LiveChrome: View {
     @ViewBuilder
     private var centre: some View {
         if case .failed(let error) = model.state, model.surfing == nil {
-            if let holder = model.tunerHolder {
-                TunerHeldCard(model: model, recording: holder, close: close)
+            if model.tunerHolder != nil || error.isTunerBusy {
+                TunerBusyCard(model: model, recording: model.tunerHolder, close: close)
             } else {
                 FailureCard(message: error.description, close: close, retry: model.retry)
             }

@@ -376,6 +376,13 @@ struct StopRecordingTests {
         #expect(sent == ["/media/grabbers/operations/grab-1", "/media/subscriptions/31"])
     }
 
+    @Test func aBusyTunerIsA805OrA503() {
+        #expect(LiveError.refused(code: 805, message: "TV is busy").isTunerBusy)
+        #expect(LiveError.server(status: 503, message: nil).isTunerBusy)
+        #expect(!LiveError.refused(code: 806, message: "No signal").isTunerBusy)
+        #expect(!LiveError.noData.isTunerBusy)
+    }
+
     @Test func aRecordingHoldsTheTunerOnlyWhenItTakesTheLastOne() {
         let other = LiveChannel(id: "aaa-0701", dvrKey: "12", number: "7.1", callSign: "WGGG", title: "G", logo: nil, isHD: true, device: RouteCase.luma)
         var dvr = RouteCase.dvr
