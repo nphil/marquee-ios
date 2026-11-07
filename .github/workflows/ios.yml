@@ -228,6 +228,9 @@ jobs:
           xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
 
+      # A failed test runs once more: the xcode-27 preview simulator sometimes stalls UI queries or app
+      # launch for 30+ s under load (2026-11-07: testProfiles launch timeout, testProfilesDawn query
+      # timeout), which red-flagged releases whose code passed elsewhere. A real failure fails twice.
       - name: UI tests and screenshots
         env:
           UDID: ${{ steps.simulator.outputs.udid }}
@@ -241,6 +244,7 @@ jobs:
             -derivedDataPath build/DD-sim \
             -clonedSourcePackagesDirPath build/SourcePackages \
             -resultBundlePath build/UITests.xcresult \
+            -retry-tests-on-failure -test-iterations 2 \
             -skip-testing:MarqueeUITests/ScreenshotTests/testAccessibilitySettings \
             -skip-testing:MarqueeUITests/AccountAccessibilityScreenshots \
             -skip-testing:MarqueeUITests/BrowseAccessibilityScreenshots \
@@ -269,6 +273,7 @@ jobs:
             -derivedDataPath build/DD-sim \
             -clonedSourcePackagesDirPath build/SourcePackages \
             -resultBundlePath build/UITests-accessibility.xcresult \
+            -retry-tests-on-failure -test-iterations 2 \
             -only-testing:MarqueeUITests/ScreenshotTests/testAccessibilitySettings \
             -only-testing:MarqueeUITests/AccountAccessibilityScreenshots \
             -only-testing:MarqueeUITests/BrowseAccessibilityScreenshots \
