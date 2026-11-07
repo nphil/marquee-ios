@@ -12,16 +12,19 @@ public struct PlexPage<Item: Sendable>: Sendable {
     }
 }
 
-/// What a library grid lists: the item type, a sort, and the Unwatched filter.
+/// What a library grid lists: the item type, a sort, the Unwatched filter and a genre.
 public struct SectionQuery: Sendable, Hashable {
     public var type: PlexMediaType
     public var sort: Sort
     public var unwatchedOnly: Bool
+    /// An entry of `PlexLibrary.genres(in:)`.
+    public var genre: PlexDirectory?
 
-    public init(type: PlexMediaType, sort: Sort = .title, unwatchedOnly: Bool = false) {
+    public init(type: PlexMediaType, sort: Sort = .title, unwatchedOnly: Bool = false, genre: PlexDirectory? = nil) {
         self.type = type
         self.sort = sort
         self.unwatchedOnly = unwatchedOnly
+        self.genre = genre
     }
 
     public enum Sort: String, Sendable, Hashable, CaseIterable {
@@ -41,6 +44,7 @@ public struct SectionQuery: Sendable, Hashable {
         if unwatchedOnly {
             items.append(URLQueryItem(name: type == .show ? "unwatchedLeaves" : "unwatched", value: "1"))
         }
+        if let genre { items.append(URLQueryItem(name: "genre", value: genre.key)) }
         return items
     }
 }

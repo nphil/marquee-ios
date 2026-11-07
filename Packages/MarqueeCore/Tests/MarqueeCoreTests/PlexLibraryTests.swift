@@ -50,6 +50,44 @@ struct PlexLibraryTests {
         #expect(request.url.query("unwatched") == "1" && request.url.query("type") == "1")
     }
 
+    @Test func genreFilterIsSentAsTheGenreKey() throws {
+        let comedy = try decode(PlexDirectory.self, ["key": "27", "title": "Comedy"])
+
+        let items = SectionQuery(type: .movie, genre: comedy).queryItems
+
+        #expect(items.contains(URLQueryItem(name: "genre", value: "27")))
+    }
+
+    @Test func listOfAServerKeyKeepsItsQueryAndPages() async throws {
+        let (library, transport) = Self.library { _ in
+            container(["size": 1, "totalSize": 75, "Metadata": [["ratingKey": "9"]]])
+        }
+
+        let page = try await library.list("/hubs/home/recentlyAdded?type=2&personal=1", start: 60)
+
+        #expect(page.totalSize == 75 && page.items.map(\.ratingKey) == ["9"])
+        let request = try #require(await transport.requests(to: "/hubs/home/recentlyAdded").first)
+        #expect(request.url.query("type") == "2" && request.url.query("personal") == "1")
+        #expect(request.headers[PlexHeader.containerStart] == "60")
+    }
+
+    @Test func showDetailCarriesTheEpisodeToPlayNext() async throws {
+        let (library, transport) = Self.library { _ in
+            container(["Metadata": [[
+                "ratingKey": "5", "type": "show", "subtype": "show",
+                "OnDeck": ["Metadata": ["ratingKey": "51", "type": "episode", "viewOffset": 1000]],
+            ]]])
+        }
+
+        let show = try await library.metadata("5")
+
+        #expect(show.onDeck?.ratingKey == "51" && show.onDeck?.viewOffset == 1000)
+        let request = try #require(await transport.requests(to: "/library/metadata/5").first)
+        #expect(request.url.query("includeOnDeck") == "1")
+        let movie = try decode(PlexMetadata.self, ["ratingKey": "6", "type": "movie"])
+        #expect(movie.onDeck == nil)
+    }
+
     @Test func episodeQueueContinuesThroughTheShow() async throws {
         let (library, transport) = Self.library { _ in
             container([

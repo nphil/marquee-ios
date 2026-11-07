@@ -41,9 +41,44 @@ public struct PlexLibrary: Sendable {
         return AlphabetIndexEntry.entries(from: result.directories)
     }
 
-    /// Full details of an item, with its streams, markers and chapters.
+    /// The genres of a library's titles, for the grid filter.
+    public func genres(in sectionKey: String) async throws -> [PlexDirectory] {
+        try await container("/library/sections/\(sectionKey)/genre").directories
+    }
+
+    /// One page of a library's collections.
+    public func collections(in sectionKey: String, start: Int, size: Int = 60) async throws -> PlexPage<PlexMetadata> {
+        try await list("/library/sections/\(sectionKey)/collections", start: start, size: size)
+    }
+
+    /// The Recommended rows of one library.
+    public func recommendedHubs(in sectionKey: String, count: Int = 12) async throws -> [PlexHub] {
+        try await container("/hubs/sections/\(sectionKey)", ["count": String(count)]).hubs
+    }
+
+    /// One page of the list behind a key the server handed out: a row's "see all", a collection's titles,
+    /// a person's titles. The key may carry a query of its own.
+    public func list(_ key: String, start: Int, size: Int = 60) async throws -> PlexPage<PlexMetadata> {
+        let (path, query) = Self.split(key)
+        let paging = [PlexHeader.containerStart: String(start), PlexHeader.containerSize: String(size)]
+        let result = try await container(path, query, headers: paging)
+        return PlexPage(items: result.metadata, totalSize: result.totalSize ?? start + result.metadata.count)
+    }
+
+    /// Titles like `ratingKey`, as rows.
+    public func related(to ratingKey: String) async throws -> [PlexHub] {
+        try await container("/library/metadata/\(ratingKey)/related").hubs
+    }
+
+    /// This server's copies of a catalogue title, found by its `plex://` guid, e.g. for a watchlist entry.
+    public func items(matchingGuid guid: String) async throws -> [PlexMetadata] {
+        try await container("/library/all", ["guid": guid]).metadata
+    }
+
+    /// Full details of an item, with its streams, markers and chapters, and for a show the episode to
+    /// play next.
     public func metadata(_ ratingKey: String) async throws -> PlexMetadata {
-        let query = ["includeMarkers": "1", "includeChapters": "1"]
+        let query = ["includeMarkers": "1", "includeChapters": "1", "includeOnDeck": "1"]
         guard let item = try await container("/library/metadata/\(ratingKey)", query).metadata.first else {
             throw PlexError.server(status: 404, message: nil)
         }
@@ -68,6 +103,11 @@ public struct PlexLibrary: Sendable {
 
     public func markUnwatched(_ ratingKey: String) async throws {
         try await perform(.get, "/:/unscrobble", ["identifier": "com.plexapp.plugins.library", "key": ratingKey])
+    }
+
+    /// Takes an item off Continue Watching and leaves its watched state and resume point alone.
+    public func removeFromContinueWatching(_ ratingKey: String) async throws {
+        try await perform(.put, "/actions/removeFromContinueWatching", ["ratingKey": ratingKey])
     }
 
     public func reportTimeline(_ update: TimelineUpdate) async throws {
@@ -215,5 +255,12 @@ public struct PlexLibrary: Sendable {
 
     private static func items(_ query: [String: String]) -> [URLQueryItem] {
         query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
+    }
+
+    /// `/hubs/home/recentlyAdded?type=1` as a path and its query items.
+    private static func split(_ key: String) -> (path: String, query: [URLQueryItem]) {
+        guard let mark = key.firstIndex(of: "?") else { return (key, []) }
+        let query = URLComponents(string: "?" + key[key.index(after: mark)...])?.queryItems ?? []
+        return (String(key[..<mark]), query)
     }
 }

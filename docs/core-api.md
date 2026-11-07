@@ -13,13 +13,14 @@
 - `PlexHTTPClient` (actor): adds identity and token headers. `send` retries a read once after a dropped connection, never a write or a timeout; `decode` parses JSON off the actor; `setToken` after a profile switch.
 - `PlexError`: `unauthorized` (401), `unreachable(NetworkFailure)`, `server(status:message:)`, `decoding`, `pinExpired`, `profilePINRejected`, `noConnections`. Carries no token or URL, so it is safe to log.
 - `PlexMediaContainer`, `PlexMetadata`, `PlexMedia`, `PlexPart`, `PlexStream`, `PlexMarker`, `PlexChapter`, `PlexRole`, `PlexHub`, `PlexDirectory`, `PlexLibrarySection`, `PlexMediaType`: Plex JSON. Every field is optional and read whether Plex sends `"1"`, `1` or `true`; a bad field never drops its item.
-- `PlexMetadata.markers(_:)`: intro, credits or commercial markers in playback order.
+- `PlexMetadata.markers(_:)`: intro, credits or commercial markers in playback order. `onDeck`: the episode to play next on a show's details.
 - `KeychainStore`, `KeychainError`: the account token and server list, readable after first unlock.
 - `PlexTV`: the plex.tv account API.
   - `createPIN(strong:)`, `authURL(for:forwardURL:)`, `checkPIN(_:)`, `waitForToken(_:every:now:sleep:)`: PIN sign-in. A strong PIN is for the browser; a 4-character one is typed at plex.tv/link.
   - `servers()`: servers with this user's token for each.
   - `homeUsers()`, `switchHomeUser(_:pin:)`: Plex Home profiles; a switch returns that profile's token.
 - `PlexPIN`, `PlexHomeUser`: sign-in code and profile.
+- `PlexWatchlist`: the profile's watchlist on discover.provider.plex.tv, with the account token. `items(start:size:)`, `contains(guid:)`, `add(guid:)`, `remove(guid:)`. `catalogueKey(guid:)` is nil for titles matched by an older agent, which cannot be watchlisted.
 
 ## Server address (`Connection/`)
 
@@ -32,13 +33,16 @@
 
 - `PlexLibrary`: one server's library through its chosen address. Reads move to another address once when the chosen one stops answering; writes are never repeated.
   - `promotedHubs(count:)`, `sections()`, `search(_:limit:)`: home rows, libraries, search groups.
-  - `items(in:query:start:size:)`, `alphabetIndex(in:query:)`: one grid page (60 by default) and its A–Z jump bar.
-  - `metadata(_:)`, `children(of:)`: details with streams, markers and chapters; seasons and episodes.
-  - `markWatched(_:)`, `markUnwatched(_:)`, `reportTimeline(_:)`: watched state and progress.
+  - `items(in:query:start:size:)`, `alphabetIndex(in:query:)`, `genres(in:)`: one grid page (60 by default), its A–Z jump bar and the genres to filter by.
+  - `collections(in:start:size:)`, `recommendedHubs(in:count:)`: a library's Collections and Recommended.
+  - `list(_:start:size:)`: one page behind a key the server handed out (a row's "see all", a collection, a person); the key keeps its own query.
+  - `metadata(_:)`, `children(of:)`, `related(to:)`: details with streams, markers, chapters and the next episode; seasons and episodes; similar titles.
+  - `items(matchingGuid:)`: this server's copies of a catalogue title, e.g. a watchlist entry.
+  - `markWatched(_:)`, `markUnwatched(_:)`, `removeFromContinueWatching(_:)`, `reportTimeline(_:)`: watched state and progress.
   - `createPlayQueue(for:)`, `playQueue(_:)`: a queue that continues through the show for episodes.
   - `selectStreams(partID:audioStreamID:subtitleStreamID:)`, `playbackURL(path:query:)`, `transcodeURL(_:)`, `stopTranscode(session:)`: playback. These URLs carry the token because the player cannot send headers; they are never logged or cached.
   - `imageURL(_:width:height:scale:)`, `authorizationHeaders()`: artwork and headers for the image loader and the remux.
-- `SectionQuery`: item type, sort and Unwatched filter for a grid.
+- `SectionQuery`: item type, sort, Unwatched filter and genre for a grid.
 - `PlexPage`: one page and the total behind it.
 - `AlphabetIndexEntry.entries(from:)`: jump-bar letters with the offset where each starts.
 - `PagedLoader` (`@MainActor`, `@Observable`): grid paging.
@@ -78,7 +82,7 @@ Tracks titled Signs or Songs count as on-screen text, as the spec's forced-word 
 ## Not yet checked against a live server
 
 - The shape of `/api/v2/home/users` and the status codes for a wrong profile PIN.
-- What `/hubs/promoted` returns, and `firstCharacter` with type and Unwatched filters.
+- The watchlist add and remove calls and `removeFromContinueWatching`, which have not been sent to a live account.
 - The universal transcode parameters, including identity sent as query items and the offset format.
 - The Keychain store, which has no tests.
 - Dolby Vision, HEVC level and HDR limits, and CEA-608 captions on the actual phone.

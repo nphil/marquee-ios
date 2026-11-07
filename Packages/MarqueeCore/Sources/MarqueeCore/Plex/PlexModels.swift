@@ -68,7 +68,7 @@ public enum PlexMediaType: String, Sendable, Hashable, Codable {
     }
 }
 
-/// A movie, show, season or episode.
+/// A movie, show, season, episode or collection.
 public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
     public var id: String { ratingKey }
     public var ratingKey: String
@@ -76,6 +76,8 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
     public var key: String
     public var guid: String?
     public var type: PlexMediaType
+    /// What a collection holds: `movie` or `show`.
+    public var subtype: String?
     public var title: String
     public var titleSort: String?
     public var originalTitle: String?
@@ -125,16 +127,20 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
     public var directors: [String]
     public var writers: [String]
     public var images: [PlexImage]
+    /// The episode to play next, on a show read with `PlexLibrary.metadata(_:)`.
+    public var onDeck: PlexMetadata? { onDeckItems.first }
+    /// An array, because a struct cannot hold an optional of itself.
+    private var onDeckItems: [PlexMetadata]
 
     enum CodingKeys: String, CodingKey {
-        case ratingKey, key, guid, type, title, titleSort, originalTitle, summary, tagline, year, index, parentIndex
+        case ratingKey, key, guid, type, subtype, title, titleSort, originalTitle, summary, tagline, year, index, parentIndex
         case parentRatingKey, parentTitle, grandparentRatingKey, grandparentTitle
         case thumb, art, parentThumb, grandparentThumb, grandparentArt
         case duration, viewOffset, viewCount, leafCount, viewedLeafCount, childCount
         case addedAt, lastViewedAt, originallyAvailableAt, contentRating, studio, rating, audienceRating
         case librarySectionID, librarySectionTitle, playQueueItemID
         case media = "Media", markers = "Marker", chapters = "Chapter", roles = "Role"
-        case genres = "Genre", directors = "Director", writers = "Writer", images = "Image"
+        case genres = "Genre", directors = "Director", writers = "Writer", images = "Image", onDeck = "OnDeck"
     }
 
     public init(from decoder: any Decoder) throws {
@@ -143,6 +149,7 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
         key = c.string(.key) ?? ""
         guid = c.string(.guid)
         type = PlexMediaType(plex: c.string(.type))
+        subtype = c.string(.subtype)
         title = c.string(.title) ?? ""
         titleSort = c.string(.titleSort)
         originalTitle = c.string(.originalTitle)
@@ -184,6 +191,7 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
         directors = c.tags(.directors)
         writers = c.tags(.writers)
         images = c.list(.images)
+        onDeckItems = (try? c.decodeIfPresent(OnDeck.self, forKey: .onDeck))?.items ?? []
     }
 
     /// Watched: a played movie or episode, or a show or season with no episode left to watch.
@@ -210,6 +218,22 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
     /// Markers of one kind in playback order; Plex sends them unsorted.
     public func markers(_ kind: PlexMarker.Kind) -> [PlexMarker] {
         markers.filter { $0.kind == kind }.sorted { $0.start < $1.start }
+    }
+}
+
+/// `"OnDeck": {"Metadata": {...}}`: one episode, sent as an object rather than a list.
+private struct OnDeck: Decodable {
+    let items: [PlexMetadata]
+
+    enum CodingKeys: String, CodingKey { case metadata = "Metadata" }
+
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        if let item = try? c.decode(PlexMetadata.self, forKey: .metadata) {
+            items = [item]
+        } else {
+            items = c.list(.metadata)
+        }
     }
 }
 
