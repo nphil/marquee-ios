@@ -233,7 +233,9 @@ public struct LiveAiring: Identifiable, Hashable, Sendable, Codable {
     }
 
     /// "S2 E5", "S2", "E5" or nil.
-    public var episodeCode: String? {
+    public var episodeCode: String? { Self.episodeCode(season: season, episode: episode) }
+
+    static func episodeCode(season: Int?, episode: Int?) -> String? {
         switch (season, episode) {
         case let (season?, episode?): "S\(season) E\(episode)"
         case let (season?, nil): "S\(season)"

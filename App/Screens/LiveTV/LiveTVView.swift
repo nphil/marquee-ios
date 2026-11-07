@@ -54,6 +54,8 @@ private struct LiveGuideScreen: View {
     /// Bumped to bring the grid back to now.
     @State private var anchor = 0
     @State private var nowVisible = true
+    @State private var details: ProgrammeSelection?
+    @State private var showsRecordings = false
 
     /// The grid on its side and at regular width; the list in portrait and at accessibility sizes
     /// (docs/LIVE-TV.md §6.3).
@@ -64,6 +66,18 @@ private struct LiveGuideScreen: View {
     var body: some View {
         content
             .navigationBarTitleDisplayMode(usesGrid ? .inline : .large)
+            .toolbar {
+                if store.canRecord {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Recordings", systemImage: "record.circle") { showsRecordings = true }
+                            .accessibilityIdentifier("livetv.recordings")
+                    }
+                }
+            }
+            .navigationDestination(isPresented: $showsRecordings) { RecordingsView(store: store) }
+            .sheet(item: $details) { selection in
+                ProgrammeSheet(store: store, selection: selection)
+            }
             .onAppear { backToNow() }
             .onChange(of: scenePhase) { _, phase in
                 guard phase == .active else { return }
@@ -147,7 +161,7 @@ private struct LiveGuideScreen: View {
                     next: store.guide.next(on: channel.id, after: airing?.end ?? at),
                     now: store.now,
                     mark: airing.flatMap { store.mark(for: $0) },
-                    canRecord: false,
+                    canRecord: store.canRecord,
                     isFavourite: store.isFavourite(channel),
                     actions: actions
                 )
@@ -170,7 +184,7 @@ private struct LiveGuideScreen: View {
                     guide: store.guide,
                     now: store.now,
                     recordings: store.recordings,
-                    canRecord: false,
+                    canRecord: store.canRecord,
                     favourites: store.favourites,
                     theme: theme,
                     anchor: anchor,
@@ -240,7 +254,8 @@ private struct LiveGuideScreen: View {
     private var actions: GuideActions {
         GuideActions(
             play: { _ in toasts.show("Watching live TV comes in the next update") },
-            open: { _, _ in toasts.show("Programme details come in the next update") },
+            open: { airing, channel in details = ProgrammeSelection(airing: airing, channel: channel) },
+            record: { airing, channel in quickRecord(airing, channel) },
             toggleFavourite: { channel in
                 Haptics.selection()
                 let adding = !store.isFavourite(channel)
@@ -248,6 +263,26 @@ private struct LiveGuideScreen: View {
                 toasts.show(adding ? "Added \(channel.label) to Favourites" : "Removed \(channel.label) from Favourites")
             }
         )
+    }
+
+    /// Record from the guide's menu takes this episode, or the movie, with the server's settings. A
+    /// programme offered only as a whole show opens its sheet to choose.
+    private func quickRecord(_ airing: LiveAiring, _ channel: LiveChannel) {
+        Task {
+            do {
+                let options = try await store.recordOptions(for: airing)
+                guard let option = options.first(where: { $0.kind == .episode }) ?? options.first(where: { $0.kind == .movie }) else {
+                    details = ProgrammeSelection(airing: airing, channel: channel)
+                    return
+                }
+                try await store.record(option, values: [:], airing: airing)
+                Haptics.success()
+                toasts.show(airing.isOn(at: store.now) ? "Recording \(airing.title)" : "\(airing.title) will record")
+            } catch {
+                Haptics.error()
+                toasts.show(LiveText.recordingProblem(error, server: store.serverName))
+            }
+        }
     }
 
     private func backToNow() {

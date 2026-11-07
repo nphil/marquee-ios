@@ -1,8 +1,31 @@
 {
  "__anchor": 1800000000,
  "MediaContainer": {
-  "size": 3,
+  "size": 7,
   "MediaGrabOperation": [
+   {
+    "id": "grab-40",
+    "mediaSubscriptionID": 44,
+    "status": "error",
+    "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+    "Metadata": {
+     "type": "episode",
+     "title": "The Long Tide",
+     "guid": "plex://episode/ch-0201-5003",
+     "grandparentTitle": "Harbour Lights",
+     "parentIndex": 2,
+     "index": 7,
+     "Media": [
+      {
+       "beginsAt": 1799996400,
+       "endsAt": 1800000000,
+       "channelIdentifier": "ch-0201",
+       "channelVcn": "2.1",
+       "channelCallSign": "WMRQ"
+      }
+     ]
+    }
+   },
    {
     "id": "grab-41",
     "mediaSubscriptionID": 41,
@@ -67,6 +90,75 @@
        "channelIdentifier": "ch-1301",
        "channelVcn": "13.1",
        "channelCallSign": "WQXL"
+      }
+     ]
+    }
+   },
+   {
+    "id": "grab-44",
+    "mediaSubscriptionID": 42,
+    "status": "scheduled",
+    "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+    "Metadata": {
+     "type": "episode",
+     "title": "Sources",
+     "grandparentTitle": "City Desk",
+     "parentIndex": 3,
+     "index": 11,
+     "guid": "plex://episode/city-desk-s3e11",
+     "Media": [
+      {
+       "beginsAt": 1800176400,
+       "endsAt": 1800180000,
+       "channelIdentifier": "ch-0201",
+       "channelVcn": "2.1",
+       "channelCallSign": "WMRQ"
+      }
+     ]
+    }
+   },
+   {
+    "id": "grab-45",
+    "mediaSubscriptionID": 45,
+    "status": "scheduled",
+    "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+    "Metadata": {
+     "type": "episode",
+     "title": "Reefs",
+     "grandparentTitle": "Wild Coasts",
+     "parentIndex": 1,
+     "index": 4,
+     "guid": "plex://episode/wild-coasts-s1e4",
+     "Media": [
+      {
+       "beginsAt": 1800259200,
+       "endsAt": 1800262800,
+       "channelIdentifier": "ch-1301",
+       "channelVcn": "13.1",
+       "channelCallSign": "WQXL"
+      }
+     ]
+    }
+   },
+   {
+    "id": "grab-46",
+    "mediaSubscriptionID": 42,
+    "status": "scheduled",
+    "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+    "Metadata": {
+     "type": "episode",
+     "title": "Late Edition",
+     "grandparentTitle": "City Desk",
+     "parentIndex": 3,
+     "index": 12,
+     "guid": "plex://episode/city-desk-s3e12",
+     "Media": [
+      {
+       "beginsAt": 1800781200,
+       "endsAt": 1800784800,
+       "channelIdentifier": "ch-0201",
+       "channelVcn": "2.1",
+       "channelCallSign": "WMRQ"
       }
      ]
     }

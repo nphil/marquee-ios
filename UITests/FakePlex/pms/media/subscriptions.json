@@ -1,7 +1,7 @@
 {
  "__anchor": 1800000000,
  "MediaContainer": {
-  "size": 3,
+  "size": 5,
   "MediaSubscription": [
    {
     "key": "41",
@@ -14,7 +14,29 @@
      "title": "News 7 Tonight",
      "grandparentTitle": "News 7 Tonight"
     },
-    "Setting": [],
+    "Setting": [
+     {
+      "id": "startOffsetMinutes",
+      "label": "Start recording",
+      "type": "int",
+      "value": "1",
+      "hidden": false
+     },
+     {
+      "id": "endOffsetMinutes",
+      "label": "Stop recording",
+      "type": "int",
+      "value": "2",
+      "hidden": false
+     },
+     {
+      "id": "oneShot",
+      "label": "",
+      "type": "bool",
+      "value": "true",
+      "hidden": true
+     }
+    ],
     "MediaGrabOperation": [
      {
       "id": "grab-41",
@@ -52,10 +74,41 @@
     },
     "Setting": [
      {
+      "id": "startOffsetMinutes",
+      "label": "Start recording",
+      "type": "int",
+      "value": "0",
+      "hidden": false
+     },
+     {
+      "id": "endOffsetMinutes",
+      "label": "Stop recording",
+      "type": "int",
+      "value": "5",
+      "hidden": false
+     },
+     {
       "id": "onlyNewAirings",
+      "label": "Airings",
       "type": "int",
       "value": "1",
+      "hidden": false,
       "enumValues": "0:New and Repeat Airings|1:New Airings Only"
+     },
+     {
+      "id": "minVideoQuality",
+      "label": "Resolution",
+      "type": "int",
+      "value": "0",
+      "hidden": false,
+      "enumValues": "0:Prefer HD|720:HD Only|1080:Full HD Only"
+     },
+     {
+      "id": "oneShot",
+      "label": "",
+      "type": "bool",
+      "value": "false",
+      "hidden": true
      }
     ],
     "MediaGrabOperation": [
@@ -81,6 +134,52 @@
         }
        ]
       }
+     },
+     {
+      "id": "grab-44",
+      "mediaSubscriptionID": 42,
+      "status": "scheduled",
+      "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+      "Metadata": {
+       "type": "episode",
+       "title": "Sources",
+       "grandparentTitle": "City Desk",
+       "parentIndex": 3,
+       "index": 11,
+       "guid": "plex://episode/city-desk-s3e11",
+       "Media": [
+        {
+         "beginsAt": 1800176400,
+         "endsAt": 1800180000,
+         "channelIdentifier": "ch-0201",
+         "channelVcn": "2.1",
+         "channelCallSign": "WMRQ"
+        }
+       ]
+      }
+     },
+     {
+      "id": "grab-46",
+      "mediaSubscriptionID": 42,
+      "status": "scheduled",
+      "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+      "Metadata": {
+       "type": "episode",
+       "title": "Late Edition",
+       "grandparentTitle": "City Desk",
+       "parentIndex": 3,
+       "index": 12,
+       "guid": "plex://episode/city-desk-s3e12",
+       "Media": [
+        {
+         "beginsAt": 1800781200,
+         "endsAt": 1800784800,
+         "channelIdentifier": "ch-0201",
+         "channelVcn": "2.1",
+         "channelCallSign": "WMRQ"
+        }
+       ]
+      }
      }
     ]
    },
@@ -95,7 +194,29 @@
      "title": "Sintel",
      "grandparentTitle": "Open Movie Night"
     },
-    "Setting": [],
+    "Setting": [
+     {
+      "id": "startOffsetMinutes",
+      "label": "Start recording",
+      "type": "int",
+      "value": "1",
+      "hidden": false
+     },
+     {
+      "id": "endOffsetMinutes",
+      "label": "Stop recording",
+      "type": "int",
+      "value": "2",
+      "hidden": false
+     },
+     {
+      "id": "oneShot",
+      "label": "",
+      "type": "bool",
+      "value": "true",
+      "hidden": true
+     }
+    ],
     "MediaGrabOperation": [
      {
       "id": "grab-43",
@@ -114,6 +235,143 @@
         {
          "beginsAt": 1800003600,
          "endsAt": 1800005400,
+         "channelIdentifier": "ch-1301",
+         "channelVcn": "13.1",
+         "channelCallSign": "WQXL"
+        }
+       ]
+      }
+     }
+    ]
+   },
+   {
+    "key": "44",
+    "type": 4,
+    "title": "This Episode",
+    "librarySectionTitle": "TV Shows",
+    "targetLibrarySectionID": 2,
+    "Video": {
+     "type": "episode",
+     "title": "The Long Tide",
+     "grandparentTitle": "Harbour Lights"
+    },
+    "Setting": [
+     {
+      "id": "startOffsetMinutes",
+      "label": "Start recording",
+      "type": "int",
+      "value": "1",
+      "hidden": false
+     },
+     {
+      "id": "endOffsetMinutes",
+      "label": "Stop recording",
+      "type": "int",
+      "value": "2",
+      "hidden": false
+     },
+     {
+      "id": "oneShot",
+      "label": "",
+      "type": "bool",
+      "value": "true",
+      "hidden": true
+     }
+    ],
+    "MediaGrabOperation": [
+     {
+      "id": "grab-40",
+      "mediaSubscriptionID": 44,
+      "status": "error",
+      "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+      "Metadata": {
+       "type": "episode",
+       "title": "The Long Tide",
+       "guid": "plex://episode/ch-0201-5003",
+       "grandparentTitle": "Harbour Lights",
+       "parentIndex": 2,
+       "index": 7,
+       "Media": [
+        {
+         "beginsAt": 1799996400,
+         "endsAt": 1800000000,
+         "channelIdentifier": "ch-0201",
+         "channelVcn": "2.1",
+         "channelCallSign": "WMRQ"
+        }
+       ]
+      }
+     }
+    ]
+   },
+   {
+    "key": "45",
+    "type": 2,
+    "title": "All Episodes",
+    "airingsType": "New and Repeat Airings",
+    "librarySectionTitle": "TV Shows",
+    "targetLibrarySectionID": 2,
+    "Directory": {
+     "type": "show",
+     "title": "Wild Coasts",
+     "thumb": "https://metadata-static.plex.tv/art/spring-poster.jpg"
+    },
+    "Setting": [
+     {
+      "id": "startOffsetMinutes",
+      "label": "Start recording",
+      "type": "int",
+      "value": "0",
+      "hidden": false
+     },
+     {
+      "id": "endOffsetMinutes",
+      "label": "Stop recording",
+      "type": "int",
+      "value": "5",
+      "hidden": false
+     },
+     {
+      "id": "onlyNewAirings",
+      "label": "Airings",
+      "type": "int",
+      "value": "0",
+      "hidden": false,
+      "enumValues": "0:New and Repeat Airings|1:New Airings Only"
+     },
+     {
+      "id": "minVideoQuality",
+      "label": "Resolution",
+      "type": "int",
+      "value": "0",
+      "hidden": false,
+      "enumValues": "0:Prefer HD|720:HD Only|1080:Full HD Only"
+     },
+     {
+      "id": "oneShot",
+      "label": "",
+      "type": "bool",
+      "value": "false",
+      "hidden": true
+     }
+    ],
+    "MediaGrabOperation": [
+     {
+      "id": "grab-45",
+      "mediaSubscriptionID": 45,
+      "status": "scheduled",
+      "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+      "Metadata": {
+       "type": "episode",
+       "title": "Reefs",
+       "grandparentTitle": "Wild Coasts",
+       "parentIndex": 1,
+       "index": 4,
+       "guid": "plex://episode/wild-coasts-s1e4",
+       "Media": [
+        {
+         "beginsAt": 1800259200,
+         "endsAt": 1800262800,
          "channelIdentifier": "ch-1301",
          "channelVcn": "13.1",
          "channelCallSign": "WQXL"

@@ -277,6 +277,37 @@ final class LiveTVStore {
         await loadRecordings()
     }
 
+    func update(_ rule: RecordingRule, values: [String: String]) async throws {
+        try await live.update(rule, values: values)
+        await loadRecordings()
+    }
+
+    /// Takes `airing` off the schedule.
+    func unschedule(_ airing: LiveAiring) async throws {
+        guard let recording = recordings.recording(of: airing) else { return }
+        try await unschedule(recording)
+    }
+
+    /// A one-off rule is deleted, since a skipped airing comes back when the server restarts; under a
+    /// series the airing alone is skipped; an airing under way stops.
+    func unschedule(_ recording: ScheduledRecording) async throws {
+        if recording.status != .inprogress, let rule = recordings.rule(recording.ruleID), !rule.isSeries {
+            try await delete(rule)
+        } else {
+            try await cancel(recording)
+        }
+    }
+
+    /// The series rules, by title.
+    var seriesRules: [RecordingRule] {
+        recordings.rules.filter(\.isSeries).sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
+    /// Airings due to record, recording now, or that failed, soonest first.
+    var upcoming: [ScheduledRecording] {
+        recordings.scheduled.filter { $0.isUpcoming || $0.status == .error }
+    }
+
     /// The newest items of the libraries the DVR records into, newest first.
     func recorded() async throws -> [PlexMetadata] {
         let sections = Set(recordings.rules.compactMap(\.targetLibrarySectionID))

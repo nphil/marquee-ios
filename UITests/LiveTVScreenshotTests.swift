@@ -21,6 +21,16 @@ final class LiveTVScreenshotTests: XCTestCase {
     func testGridDawn() throws {
         try gridFlow(mode: "light", suffix: "dawn")
     }
+
+    @MainActor
+    func testRecordingsRosePine() throws {
+        try recordingsFlow(mode: "dark", suffix: "rose-pine")
+    }
+
+    @MainActor
+    func testRecordingsDawn() throws {
+        try recordingsFlow(mode: "light", suffix: "dawn")
+    }
 }
 
 /// The list with Increase Contrast on and the text at accessibility size 2; CI runs this class in its
@@ -70,5 +80,53 @@ extension XCTestCase {
         element("livetv.grid", in: app).swipeLeft(velocity: .slow)
         waitFor("livetv.jumpToNow", in: app)
         try snap("livetv-06-grid-later-\(suffix)")
+    }
+
+    /// The programme sheet of a series airing, of an airing not set to record with its options at full
+    /// height, and of a single recording with art; then Recordings: the schedule, a series' settings and
+    /// what was recorded.
+    @MainActor
+    func recordingsFlow(mode: String, suffix: String) throws {
+        let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine")
+        open(tab: "Live TV", title: "Live TV", in: app)
+        waitFor("livetv.row.ch-0201", in: app)
+        let sheet = element("livetv.programme", in: app)
+
+        tap("livetv.slot.1", in: app)
+        tap("livetv.row.ch-0201", in: app)
+        waitFor("livetv.programme.status", in: app)
+        try snap("livetv-07-series-\(suffix)")
+        tap("livetv.programme.close", in: app)
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 5), "The programme sheet stayed open")
+
+        tap("livetv.slot.2", in: app)
+        tap("livetv.row.ch-0401", in: app)
+        tap("livetv.programme.options", in: app)
+        waitFor("livetv.setting.startOffsetMinutes", in: app)
+        sheet.swipeUp(velocity: .slow)
+        try snap("livetv-08-record-\(suffix)")
+        tap("livetv.programme.close", in: app)
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 5), "The programme sheet stayed open")
+
+        tap("livetv.slot.1", in: app)
+        reveal("livetv.row.ch-1301", in: app).tap()
+        waitFor("livetv.programme.unschedule", in: app)
+        try snap("livetv-09-single-\(suffix)")
+        tap("livetv.programme.close", in: app)
+        XCTAssertTrue(sheet.waitForNonExistence(timeout: 5), "The programme sheet stayed open")
+
+        tap("livetv.recordings", in: app)
+        waitFor("livetv.scheduled.grab-42", in: app)
+        try snap("livetv-10-scheduled-\(suffix)")
+        tap("livetv.rule.42", in: app)
+        waitFor("livetv.rule.delete", in: app)
+        try snap("livetv-11-series-\(suffix)")
+        tap("livetv.rule.cancel", in: app)
+        XCTAssertTrue(element("livetv.rule.delete", in: app).waitForNonExistence(timeout: 5), "The series sheet stayed open")
+        let recorded = app.buttons["Recorded"].firstMatch
+        XCTAssertTrue(recorded.waitForExistence(timeout: 5), "No Recorded page")
+        recorded.tap()
+        waitFor("livetv.recorded.2102", in: app)
+        try snap("livetv-12-recorded-\(suffix)")
     }
 }

@@ -48,6 +48,11 @@ public struct RecordSetting: Identifiable, Hashable, Sendable {
     public struct Choice: Hashable, Sendable {
         public var value: String
         public var label: String
+
+        public init(value: String, label: String) {
+            self.value = value
+            self.label = label
+        }
     }
 
     public var id: String
@@ -179,6 +184,9 @@ public struct ScheduledRecording: Identifiable, Hashable, Sendable {
         [.inactive, .scheduled, .inprogress, .paused].contains(status)
     }
 
+    /// "S2 E5", as the guide writes it.
+    public var episodeCode: String? { LiveAiring.episodeCode(season: season, episode: episode) }
+
     public func covers(_ airing: LiveAiring) -> Bool {
         guard let channelKey else { return false }
         return channelKey == airing.channelKey && abs(start.timeIntervalSince(airing.start)) < 60
@@ -207,15 +215,17 @@ public struct LiveRecordings: Sendable, Hashable {
     }
 
     public func mark(for airing: LiveAiring) -> RecordingMark? {
-        guard let recording = scheduled.first(where: { $0.covers(airing) && $0.status != .cancelled }) else { return nil }
+        scheduled.first { $0.covers(airing) && $0.status != .cancelled }.flatMap(mark(of:))
+    }
+
+    /// How one scheduled airing is marked, in the guide and under Recordings.
+    public func mark(of recording: ScheduledRecording) -> RecordingMark? {
         switch recording.status {
-        case .inprogress, .postprocessing: return .recording
-        case .error: return .failed
-        case .complete: return .recorded
-        case .cancelled: return nil
-        case .inactive, .scheduled, .paused, .unknown:
-            let rule = rules.first { $0.id == recording.ruleID }
-            return rule?.isSeries == true ? .series : .scheduled
+        case .inprogress, .postprocessing: .recording
+        case .error: .failed
+        case .complete: .recorded
+        case .cancelled: nil
+        case .inactive, .scheduled, .paused, .unknown: rule(recording.ruleID)?.isSeries == true ? .series : .scheduled
         }
     }
 

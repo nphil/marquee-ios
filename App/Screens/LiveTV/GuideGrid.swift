@@ -372,7 +372,7 @@ final class GuideGridView: UIView, UICollectionViewDataSource, UICollectionViewD
                 return true
             })
         }
-        if content.canRecord, airing.end > content.now {
+        if content.canRecord, airing.end > content.now, content.recordings.mark(for: airing) == nil {
             list.append(UIAccessibilityCustomAction(name: "Record") { [weak self] _ in
                 self?.actions.record(airing, channel)
                 return true
@@ -437,7 +437,7 @@ final class GuideGridView: UIView, UICollectionViewDataSource, UICollectionViewD
         guard let indexPath = indexPaths.first, case .airing(let airing) = rows[indexPath.section][indexPath.item] else { return nil }
         let channel = content.channels[indexPath.section]
         let now = content.now
-        let canRecord = content.canRecord && airing.end > now
+        let canRecord = content.canRecord && airing.end > now && content.recordings.mark(for: airing) == nil
         let favourite = content.favourites.contains(channel.id)
         return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { [weak self] _ in
             var items: [UIMenuElement] = []

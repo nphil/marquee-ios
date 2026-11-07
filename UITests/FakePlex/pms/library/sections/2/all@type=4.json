@@ -1,0 +1,79 @@
+{
+ "MediaContainer": {
+  "size": 5,
+  "Metadata": [
+   {
+    "ratingKey": "2101",
+    "key": "/library/metadata/2101",
+    "type": "episode",
+    "title": "News 7 Tonight",
+    "grandparentTitle": "News 7 Tonight",
+    "librarySectionID": 2,
+    "librarySectionTitle": "TV Shows",
+    "duration": 3600000,
+    "addedAt": 1799922240,
+    "summary": ""
+   },
+   {
+    "ratingKey": "2102",
+    "key": "/library/metadata/2102",
+    "type": "episode",
+    "title": "Big Buck Bunny",
+    "grandparentTitle": "Open Movie Night",
+    "librarySectionID": 2,
+    "librarySectionTitle": "TV Shows",
+    "duration": 600000,
+    "addedAt": 1799917920,
+    "summary": "",
+    "parentIndex": 1,
+    "index": 1,
+    "thumb": "/art/big-buck-bunny-backdrop.jpg",
+    "viewOffset": 240000
+   },
+   {
+    "ratingKey": "2103",
+    "key": "/library/metadata/2103",
+    "type": "episode",
+    "title": "Late Copy",
+    "grandparentTitle": "City Desk",
+    "librarySectionID": 2,
+    "librarySectionTitle": "TV Shows",
+    "duration": 3480000,
+    "addedAt": 1799749440,
+    "summary": "",
+    "parentIndex": 3,
+    "index": 9
+   },
+   {
+    "ratingKey": "2104",
+    "key": "/library/metadata/2104",
+    "type": "episode",
+    "title": "Cliffs",
+    "grandparentTitle": "Wild Coasts",
+    "librarySectionID": 2,
+    "librarySectionTitle": "TV Shows",
+    "duration": 3600000,
+    "addedAt": 1799663040,
+    "summary": "",
+    "parentIndex": 1,
+    "index": 1,
+    "thumb": "/art/caminandes-3-still.jpg"
+   },
+   {
+    "ratingKey": "2105",
+    "key": "/library/metadata/2105",
+    "type": "episode",
+    "title": "Spring",
+    "grandparentTitle": "Open Movie Night",
+    "librarySectionID": 2,
+    "librarySectionTitle": "TV Shows",
+    "duration": 480000,
+    "addedAt": 1799403840,
+    "summary": "",
+    "parentIndex": 1,
+    "index": 2,
+    "thumb": "/art/spring-backdrop.jpg"
+   }
+  ]
+ }
+}
