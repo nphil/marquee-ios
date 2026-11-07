@@ -5,15 +5,13 @@ import LiveFixtures
 import MarqueeLive
 #endif
 
-/// A stand-in tuner for the UI tests. When they launch the app with `MARQUEE_FAKE_TUNER` set, every channel plays on
-/// the direct path from a synthetic stream (a slate, then a moving picture with a tone) and nothing reaches the
-/// network. Release builds never activate it.
+/// A stand-in tuner for the UI tests. When they launch the app with `-marquee.uitest.fakeTuner YES`, every channel
+/// plays on the direct path from a synthetic stream (a slate, then a moving picture with a tone) and nothing reaches
+/// the tuner's address. Release builds never activate it.
 enum FakeTuner {
-    static let environmentKey = "MARQUEE_FAKE_TUNER"
-
     static let isActive: Bool = {
         #if DEBUG
-        ProcessInfo.processInfo.environment[environmentKey] != nil
+        UserDefaults.standard.bool(forKey: "marquee.uitest.fakeTuner")
         #else
         false
         #endif

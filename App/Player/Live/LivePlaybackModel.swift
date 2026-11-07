@@ -12,7 +12,8 @@ final class LivePlaybackModel: Identifiable {
     private(set) var previous: LiveChannel?
     /// Where surfing has got to; it tunes once the surfing settles.
     private(set) var surfing: LiveChannel?
-    private(set) var source: any LiveVideoSource
+    /// Plays each tune from the tuner itself or through Plex, whichever §2.2 picks.
+    let source: LiveRouter
     /// Stop was pressed: the tuner is free and the last picture stays.
     private(set) var isStopped = false
     private(set) var chromeVisible = true
@@ -22,7 +23,6 @@ final class LivePlaybackModel: Identifiable {
     /// VoiceOver or Switch Control is on: the controls stay up.
     private(set) var keepsChrome = false
 
-    @ObservationIgnored private let plex: PlexLiveSource
     @ObservationIgnored private let audio = AudioSession()
     @ObservationIgnored private var surfCommit: Task<Void, Never>?
     @ObservationIgnored private var chromeTimer: Task<Void, Never>?
@@ -37,8 +37,7 @@ final class LivePlaybackModel: Identifiable {
     init(store: LiveTVStore, channel: LiveChannel) {
         self.store = store
         self.channel = channel
-        plex = PlexLiveSource(live: store.live)
-        source = plex
+        source = LiveRouter(live: store.live, plex: PlexLiveSource(live: store.live))
     }
 
     var state: LiveState { source.state }
@@ -94,20 +93,9 @@ final class LivePlaybackModel: Identifiable {
         }
         isStopped = false
         store.noteWatched(next)
-        let wanted = makeSource(for: next)
-        if wanted !== source {
-            source.stop()
-            source = wanted
-        }
         let source = source
         Task { await source.play(next) }
         showChrome()
-    }
-
-    /// The source for a tune. Plex is the only path so far; the phone's own path to the tuner chooses
-    /// here per channel (docs/LIVE-TV.md §2.2).
-    private func makeSource(for channel: LiveChannel) -> any LiveVideoSource {
-        plex
     }
 
     /// The channel `steps` along the lineup from `origin`, wrapping at either end.
