@@ -1,0 +1,33 @@
+name: iOS
+
+on:
+  push:
+  workflow_dispatch:
+
+# One queue per ref: a second push waits for the first run instead of racing it.
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Pinned: the image also carries a 27.2 release candidate, which a newest-first pick would choose.
+  DEVELOPER_DIR: /Applications/Xcode_27.1.app/Contents/Developer
+
+jobs:
+  core:
+    name: Core
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Theme contrast and distinctness
+        run: python3 -B tools/check_themes.py Resources/themes.json
+
+      - name: MarqueeCore tests
+        run: swift test --package-path Packages/MarqueeCore
