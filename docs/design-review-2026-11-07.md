@@ -13,12 +13,11 @@ A second pass over the iPhone build against DESIGN.md and the reference apps, fr
 
 Grey art tiles in the screenshots are the trackOff fill of art still loading when the shot was taken (§11), not missing art. Sign-in, the PIN pad, server and profile lists, Settings and its pages, empty Search and the Watchlist title that is not on the server hold up against §8 and the reference apps.
 
-Findings in the player and Live TV went to their owners. The first five have commits on the owners' branches (`player`, `live-preview`), which were not on main at the time of writing; the last two were raised on `player-stats` (c3fe610) and are open:
+Findings in the player and Live TV went to their owners, whose branches (`player`, `player-stats`, `live-preview`) carry commits for each; those were not on main at the time of writing:
 
 - **Player, medium:** the paused chrome's scrims were too faint to hold white time codes on a bright frame; now .59 black under the control rows.
 - **Player, medium:** intro and credits ranges were drawn as a second short line under the scrubber, which read as an artifact; the track itself is now cut at those ranges.
+- **Player, medium:** with the chrome shown, the Up Next card sat over the centre row and hid pause and skip forward; the transport now leaves while the card shows.
 - **Player, low:** "Skip Intro" wrapped to two lines in its pill; player pills now stay on one line at standard sizes.
 - **Live TV, medium:** a programme crossing midnight showed full dates in its guide cell; ranges are now times only.
 - **Live TV, low:** sliver cells at the guide's left edge showed a lone ellipsis, and the time strip read as a second row of filter chips; slivers are now bare and the time strip is underlined.
-- **Player, medium:** with the chrome shown, the Up Next card sits over the centre row and hides pause and skip forward; the pause button peeks out above the card.
-- **Player, low:** the tracks menu heads a lone "English" subtitle with an "English" section.
