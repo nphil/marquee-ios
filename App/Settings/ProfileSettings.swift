@@ -7,7 +7,7 @@ struct ProfileSettings: Equatable, Sendable {
     /// Seconds for both skip directions.
     var skipInterval = 10
     /// Seconds before an intro skips itself; 0 skips only when asked.
-    var introSkipDelay = 0
+    var introSkipDelay = 5
     /// Seconds of countdown at the credits before the next episode; 0 turns auto-next off.
     var nextEpisodeDelay = 5
     var directPlay = DirectPlayMode.auto
