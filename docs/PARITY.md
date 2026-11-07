@@ -40,7 +40,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Trailer | Done | More menu › Play Trailer: the server's primary extra, else the first trailer. | `primaryExtraKey`, `/library/metadata/{key}/extras` |
 | Add to Watchlist | Done | Adds or removes from watchlist. | watchlist API [code] |
 | **Delete media** (remove the file from the server) | Done | More menu › Delete… on a movie, show, season or episode, and Delete This Version… for a title with several files. Shown only on the owner's server, from the owner's profile, with Allow media deletion on; confirmation names the title, Cancel is the default. A deleted title leaves every list at once (Home, Continue Watching, library grids, search, seasons and episodes, a watchlist title's server copy) and its artwork leaves the caches; the server still lists it until its trash is emptied, so refetched lists keep it out for the session. 404 counts as deleted; 401/403 explains the server setting with no retry; a fault or no answer offers Retry. | `DELETE /library/metadata/{ratingKey}`, `…/media/{id}`; `allowMediaDeletion` on `/` |
-| Delete subtitle file (Wrong subtitles → remove) | Missing | Deletes the external subtitle from the server; asks twice; cannot be undone. | `DELETE /library/streams/{id}` [INFERENCE] |
+| Delete subtitle file (Wrong subtitles → remove) | Done | Removes a separate subtitle file from Plex after a confirmation that it cannot be undone; a track inside the video says it can't be removed. | `DELETE /library/streams/{id}` [code] |
 
 ## 3. Playback
 | Feature | Status | Behaviour | API |
@@ -76,17 +76,18 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 |---|---|---|---|
 | Off / On-Screen Text Only | Done | Forced subtitles only, or none. | streams [code] |
 | One group per language, ranked Full / SDH / Forced / Commentary | Done | Ranked list per language. | streams [code] |
-| Other languages submenu | Partial | Languages not in the wanted set; behaviour not confirmed. | streams [code] |
+| Other languages submenu | Done | Languages outside the wanted set, A to Z. | streams [code] |
 | Sidecar (external) subtitle download | Done | Downloads an external subtitle file and reads it. | `/library/streams/{id}` [code] |
 | Image subtitles (PGS, DVB, VOBSUB) | Done | Drawn as bitmaps. | streams [code] |
 | Image-subtitle badges and no-restyle rule | Partial | Image subtitles cannot be restyled; the reason row. | local |
-| Subtitle style (size, position, colour, background, presets, live preview) | Partial | Style sheet exists; presets (Blend, Apple TV, Classic, Netflix, Outline, Large print, High contrast, Marquee), rounded corners, padding, edge distance, line spacing, reveal-as-spoken and file styling Keep/My look are not confirmed. | local [code] |
-| Subtitle timing (offset) | Missing | Shift subtitles earlier or later. | local offset |
-| Wrong subtitles? flow | Missing | Entry under subtitle menu for downloaded subtitles; remove or search Bazarr. | Plex refresh `/library/metadata/{id}/refresh` [INFERENCE] |
-| Search subtitles (Bazarr) | Missing | Search Bazarr by score, language, provider, hearing-impaired flag; download; Plex refreshes; new track selected. | Bazarr REST API, `X-API-KEY` header [INFERENCE: check Bazarr's API docs]: episode/movie search and download endpoints |
-| Check Plex again | Missing | Refreshes metadata only, never downloads twice. | `/library/metadata/{id}/refresh` [INFERENCE] |
-| Downloaded-twin rules (don't offer a second download when one already exists) | Missing | Rules for when a downloaded subtitle duplicates one on the server. | streams [code/INFERENCE] |
-| SpeechDock: reveal as spoken (word timing) | Missing | Subtitles appear word by word using timing from SpeechDock. | SpeechDock HTTP(S) origin, owner's own service [INFERENCE: check the service's API] |
+| Subtitle style (size, position, colour, background, presets, live preview) | Partial | The TV's presets, fonts, edges, boxes, rounded corners, padding, edge distance, line spacing and file styling Keep/My Look, with a live preview over sample scenes. Reveal as spoken is not built. | local [code] |
+| Subtitle timing (offset) | Done | Shifts subtitles earlier or later for the playing item. | local offset [code] |
+| Wrong subtitles? flow | Done | In the subtitle menu: remove a separate file from Plex, or search Bazarr for another. | Plex refresh `/library/metadata/{id}/refresh` [code] |
+| Search subtitles (Bazarr) | Done | Bazarr's results by score with provider and language; a download is shown once Plex lists it. | Bazarr REST API, `X-API-KEY` header [code] |
+| Check Plex again | Done | Refreshes metadata only, never downloads twice. | `/library/metadata/{id}/refresh` [code] |
+| Downloaded-twin rules (don't offer a second download when one already exists) | Partial | A finished download is not fetched again; the TV's other duplicate rules are not built. | streams [code/INFERENCE] |
+| Plex agent subtitle search | Missing | Asks Plex's own agents for subtitles, besides Bazarr. | Plex subtitle search [INFERENCE] |
+| SpeechDock: reveal as spoken (word timing) | Missing | Subtitles appear word by word using timing from SpeechDock. | SpeechDock `POST /api/alignment/windows`, protocol 1 [code: the service's source] |
 | SpeechDock: address and on/off | Partial | Toggle plus address validation; no request is made. | local [code] |
 
 ## 6. Live TV
@@ -126,7 +127,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 ## 9. Integrations
 | Feature | Status | Behaviour | API |
 |---|---|---|---|
-| Bazarr settings page (address, API key, Test connection, Forget key) | Missing | Connection to Bazarr. | Bazarr REST API `GET /api/system/status` [INFERENCE] |
+| Bazarr settings page (address, API key, Test connection, Forget key) | Done | Connection to Bazarr; the key is kept in the Keychain. | Bazarr REST API `GET /api/system/status` [code] |
 | Sonarr / Radarr linked | Missing | Shown on Bazarr page. | Bazarr config [INFERENCE] |
 | SpeechDock page | Partial | Toggle and address (no service calls yet). | local [code] |
 
@@ -140,4 +141,4 @@ Count the status column: `grep -c '| Done |' docs/PARITY.md` (likewise `Partial`
 ## Gaps
 - The TV's docs/ folder, CHANGELOG and player-submenus doc were not read. Rows rest on the locale strings and the iPhone's own spec. Mark rows as Unverified until those are read.
 - The Plex and Bazarr endpoints marked [INFERENCE] are not confirmed against their API docs. Check them before build work.
-- SpeechDock's own API is not known from the material read.
+- SpeechDock's API is read from the service's own source: `POST /api/alignment/windows`, protocol 1.

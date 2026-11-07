@@ -107,7 +107,6 @@ struct SubtitleStyleView: View {
                 }
                 .tint(theme.accent)
                 .accessibilityIdentifier("style.blend")
-                picker("Reveal as Spoken", "reveal", $session.settings.subtitleStyle.reveal, SubtitleLook.Reveal.allCases, \.title)
                 picker("File Styling", "fileStyling", $session.settings.subtitleStyle.keepsFileStyling, [true, false]) { keeps in
                     keeps ? "Keep" : "My Look"
                 }
@@ -367,14 +366,4 @@ extension SubtitleLook.BoxColour {
 
 extension SubtitleLook.Anchor {
     var title: String { self == .bottom ? "Bottom" : "Top" }
-}
-
-extension SubtitleLook.Reveal {
-    var title: String {
-        switch self {
-        case .off: "Off"
-        case .word: "Word by Word"
-        case .line: "Line by Line"
-        }
-    }
 }
