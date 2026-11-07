@@ -1,17 +1,20 @@
 import SwiftUI
 
 /// A solid chip (DESIGN §5.2, §12): canvas fill with an ink2 outline, never glass, so it reads the same
-/// over a faded hero or a plain canvas. Its words carry the meaning, never its colour.
+/// over a faded hero or a plain canvas. Its words carry the meaning, never its colour. It states a fact
+/// (4K, Atmos, SDH), so it is small and quiet in Caption and ink2: at the Label size in ink it reads as one
+/// more tappable pill beside the Version and Season menus.
 struct Chip: View {
     let title: String
     @Environment(\.theme) private var theme
 
     var body: some View {
         Text(title)
-            .textRole(.label)
-            .foregroundStyle(theme.ink)
-            .padding(.horizontal, Space.s3)
-            .padding(.vertical, Space.s1)
+            .fontWeight(.semibold)
+            .textRole(.caption)
+            .foregroundStyle(theme.ink2)
+            .padding(.horizontal, Space.s2)
+            .padding(.vertical, Space.s1 / 2)
             .background(theme.canvas, in: Capsule())
             .overlay { Capsule().strokeBorder(theme.ink2, lineWidth: 1) }
     }

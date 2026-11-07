@@ -114,8 +114,8 @@ Manrope for display and titles; the system font (SF) for everything else (`L:111
 | title | 24 | 24 | Title 2 | Manrope SemiBold, tracking −0.01 em, line 1.25 | shelf headers, sheet and page titles, empty-state titles |
 | headline | none | 17 | Headline | SF Semibold | row titles, button labels |
 | body | 16 | 17 | Body | SF Regular, line 1.45 | synopsis, descriptions |
-| label | 14 | 15 | Subheadline | SF Medium, line 1.3 | meta lines, chips |
-| caption | 12 | 12 | Caption 1 | SF Regular, line 1.3 | poster titles, badges, time stamps (floor 11, `I:26`) |
+| label | 14 | 15 | Subheadline | SF Medium, line 1.3 | meta lines |
+| caption | 12 | 12 | Caption 1 | SF Regular, line 1.3 | poster titles, badges and format chips (Semibold), time stamps (floor 11, `I:26`) |
 
 - Line heights and tracking follow Lucent (`L:113`); a hero title that wraps may need 1.1 [INFERENCE].
 - Body and label take Apple's 17 and 15 so every Dynamic Type step matches the system. Apple's defaults at Large: Large Title 34, Title 2 22, Headline 17, Body 17, Subheadline 15, Caption 1 12; Body at accessibility 2 is 33, about 200% (HIG Typography).
@@ -318,13 +318,13 @@ The phone sign-in mechanism is not confirmed (`B:§0`), so only the screen is sp
 +--------------------------------+
 ```
 
-1. **Hero:** the backdrop at its natural 16:9 ratio, full width, bleeding to the top edge under the status bar, fading to canvas over its lower 45% or so (§5.3). No portrait crop, so faces are not cut. Where the art is narrower than the screen (iPad width, folded), `backgroundExtensionEffect` fills the sides (`W25-323`). With no backdrop: the poster, blurred, as the fallback [INFERENCE]. In landscape a full-width hero would be taller than the screen, so the backdrop becomes a rounded 16:9 card on the leading half with the title block and actions beside it, and Play stays on the first screen.
-2. **Title block** on the faded part: the title (display; wraps up to 3 lines), a meta line (year, runtime, content rating), solid format chips (4K, HDR, Atmos) and a star glyph with the rating in ink2.
+1. **Hero:** the backdrop at its natural 16:9 ratio, full width, starting under the navigation bar so the bars hide none of it, fading to canvas over its lower half on an eased ramp that reaches 85% where the title starts (§5.3). Above it the art runs on to the top edge as a blurred mirror of its top rows, the `backgroundExtensionEffect` look (`W25-323`), so the page still bleeds under the status bar. No portrait crop, so faces are not cut. With no backdrop: the poster, blurred, as the fallback [INFERENCE]. In landscape a full-width hero would be taller than the screen, so the backdrop becomes a rounded 16:9 card on the leading half with the title block and actions beside it, and Play stays on the first screen.
+2. **Title block** on the faded part: the title (display; wraps up to 3 lines), a meta line in ink2 (year, runtime, content rating, then a star glyph and the rating), and solid format chips (4K, HDR, Atmos) as small Caption badges in ink2, so they never read as the Version or Season menus.
 3. **Action row, one size (48):** a full-width **Play** pill in accent ("Play", or "Resume · 42 min left"; for a show "Play S1 · E1" or "Resume S2 · E5"), then round icon buttons: watchlist (`bookmark`), watched (`checkmark.circle`), More (`ellipsis`: Play from beginning, Version, Tracks, Share). Watched and watchlist apply at once with a toast and Undo (`L:365`).
 4. **Version** menu ("4K HDR · 12 GB" with a chevron) only when the title has more than one version.
 5. **Synopsis:** Body, 3 lines, then a `chevron.down` to expand; capped near 70 characters per line.
 6. **Tracks** row opens a sheet with the full audio and subtitle list in technical terms: codec, channels, PCM and Dolby chips, and image-format chips (PGS, VOBSUB) only on image subtitles (`B:§3`).
-7. **Cast** (circular photos, 72 pt, Caption names) and **Related** (poster shelf), when the server provides them.
+7. **Cast** (circular photos, 72 pt, Caption names; the person's initials where the server has no photo) and **Related** (poster shelf), when the server provides them.
 8. The navigation bar is transparent at rest and gains glass as the page scrolls under it (`scrollEdgeEffectStyle`, `W25-323`).
 9. **Watchlist** items that are not on the user's server open this same screen with no Play pill and one line, "Not on your servers" [INFERENCE: not in `B:`].
 

@@ -79,6 +79,8 @@ private struct DetailPage: View {
     @Environment(\.openRoute) private var openRoute
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @State private var showsBarTitle = false
+    /// The status and navigation bars' height over the top of the page, which the hero reaches up under.
+    @State private var barInset: CGFloat = 0
     @State private var version = 0
     @State private var showsTracks = false
     @State private var watchlisted: Bool? = nil
@@ -90,6 +92,7 @@ private struct DetailPage: View {
         verticalSizeClass == .compact
     }
 
+    /// The backdrop's height at its natural 16:9, uncropped (DESIGN §8.3).
     private var heroHeight: CGFloat {
         (max(width, 1) * 9 / 16).rounded()
     }
@@ -100,9 +103,10 @@ private struct DetailPage: View {
         return CGSize(width: cardWidth, height: (cardWidth * 9 / 16).rounded())
     }
 
-    /// How far the page scrolls before the title moves into the bar.
+    /// How far the page scrolls before the title moves into the bar: as the large title, which overlaps the
+    /// backdrop's foot by `Space.s7`, slides under it.
     private var barTitlePoint: CGFloat {
-        isLandscape ? Space.s8 : heroHeight * 0.6
+        isLandscape ? Space.s8 : heroHeight - Space.s7
     }
 
     private var media: PlexMedia? {
@@ -144,7 +148,7 @@ private struct DetailPage: View {
                     .padding(.horizontal, Space.inset)
                     .padding(.top, Space.s6)
                 } else {
-                    DetailHero(item: item, size: CGSize(width: width, height: heroHeight))
+                    DetailHero(item: item, size: CGSize(width: width, height: heroHeight), reach: barInset)
                     VStack(alignment: .leading, spacing: Space.s5) {
                         titleBlock
                         actionBlock
@@ -164,6 +168,12 @@ private struct DetailPage: View {
                 .padding(.top, Space.s7)
             }
             .padding(.bottom, Space.s7)
+        }
+        // Read inside the edge the page ignores, so the top inset is the bars' height.
+        .onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.safeAreaInsets.top
+        } action: { top in
+            barInset = top.isFinite ? max(top, 0) : 0
         }
         .ignoresSafeArea(.container, edges: isLandscape ? [] : .top)
         .scrollEdgeEffectStyle(.soft, for: .top)
@@ -225,27 +235,40 @@ private struct DetailPage: View {
                 .lineLimit(3)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("detail.title")
-            if let meta = item.metaLine {
-                Text(meta)
+            if let meta = metaText {
+                meta
                     .textRole(.label)
                     .foregroundStyle(theme.ink2)
                     .monospacedDigit()
+                    .accessibilityLabel(spokenMetaLine)
             }
             let chips = media?.formatChips ?? []
-            let rating = item.audienceRating ?? item.rating
-            if !chips.isEmpty || rating != nil {
+            if !chips.isEmpty {
                 ChipFlow {
                     ForEach(chips, id: \.self) { Chip(title: $0) }
-                    if let rating {
-                        Label(rating.formatted(.number.precision(.fractionLength(1))), systemImage: "star.fill")
-                            .textRole(.label)
-                            .foregroundStyle(theme.ink2)
-                            .padding(.vertical, Space.s1)
-                            .accessibilityLabel("Rated \(rating.formatted(.number.precision(.fractionLength(1)))) out of 10")
-                    }
                 }
             }
         }
+    }
+
+    private var ratingText: String? {
+        (item.audienceRating ?? item.rating).map { $0.formatted(.number.precision(.fractionLength(1))) }
+    }
+
+    /// "2010 · 15 min · PG-13 · ★ 7.6": the rating ends the meta line, its star in ink2 like the words
+    /// (DESIGN §5.2), rather than standing alone on a line of its own when a title has no format chips.
+    private var metaText: Text? {
+        let star = Image(systemName: "star.fill")
+        switch (item.metaLine, ratingText) {
+        case let (meta?, rating?): return Text("\(meta) · \(star) \(rating)")
+        case let (meta?, nil): return Text(meta)
+        case let (nil, rating?): return Text("\(star) \(rating)")
+        case (nil, nil): return nil
+        }
+    }
+
+    private var spokenMetaLine: String {
+        [item.metaLine, ratingText.map { "rated \($0) out of 10" }].compactMap(\.self).joined(separator: ", ")
     }
 
     // MARK: Actions
@@ -369,36 +392,55 @@ private struct DetailPage: View {
     }
 }
 
-/// The backdrop at 16:9, full width under the status bar, fading into the canvas over its lower part
-/// (DESIGN §8.3); with `bleeds` off, a rounded card beside the title (landscape). Without a backdrop the
-/// poster stands in, blurred.
+/// The backdrop at its natural 16:9, full width and uncropped, fading into the canvas over its lower part
+/// (DESIGN §8.3). Above it, under the status and navigation bars, the art runs on as a blurred mirror of its
+/// top edge, so it bleeds to the top of the screen without the bars hiding a third of it. With `bleeds`
+/// off, a rounded card beside the title (landscape). Without a backdrop the poster stands in, blurred.
 private struct DetailHero: View {
     let item: PlexMetadata
     let size: CGSize
+    /// The bars' height above the backdrop.
+    var reach: CGFloat = 0
     var bleeds = true
 
     @Environment(\.theme) private var theme
 
     var body: some View {
         if bleeds {
-            art
-                .backgroundExtensionEffect()
-                .overlay {
-                    LinearGradient(
-                        stops: [
-                            .init(color: theme.canvas.opacity(0), location: 0.55),
-                            .init(color: theme.canvas, location: 1),
-                        ],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
+            VStack(spacing: 0) {
+                if reach > 0 {
+                    art
+                        .scaleEffect(x: 1, y: -1)
+                        .frame(height: min(reach, size.height), alignment: .bottom)
+                        .clipped()
+                        .blur(radius: Space.s6, opaque: true)
                 }
-                .accessibilityHidden(true)
+                art
+                    .overlay { fade }
+            }
+            .accessibilityHidden(true)
         } else {
             art
                 .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
                 .accessibilityHidden(true)
         }
+    }
+
+    /// Eased, so the art keeps its colour longer than a straight ramp, and at 85% canvas where the title
+    /// starts, `Space.s7` above the foot (DESIGN §5.3).
+    private var fade: some View {
+        let title = 1 - Space.s7 / max(size.height, 1)
+        return LinearGradient(
+            stops: [
+                .init(color: theme.canvas.opacity(0), location: title - 0.45),
+                .init(color: theme.canvas.opacity(0.2), location: title - 0.3),
+                .init(color: theme.canvas.opacity(0.55), location: title - 0.15),
+                .init(color: theme.canvas.opacity(0.85), location: title),
+                .init(color: theme.canvas, location: 1),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+        )
     }
 
     private var art: some View {
@@ -830,7 +872,7 @@ private struct EpisodeRow: View {
 
 // MARK: Cast and related
 
-/// Circular photos at 72 pt with Caption names (DESIGN §8.3 item 7).
+/// Circular photos at 72 pt with Caption names (DESIGN §8.3 item 7); initials where the server has no photo.
 private struct CastShelf: View {
     let roles: [PlexRole]
 
@@ -844,8 +886,7 @@ private struct CastShelf: View {
                 LazyHStack(alignment: .top, spacing: Space.s3) {
                     ForEach(Array(roles.prefix(30).enumerated()), id: \.offset) { _, role in
                         VStack(spacing: Space.s1) {
-                            PlexArtView(path: role.thumb, size: CGSize(width: Self.photo, height: Self.photo), placeholder: "person.fill")
-                                .clipShape(Circle())
+                            CastPhoto(role: role, size: Self.photo)
                             Text(role.name)
                                 .textRole(.caption)
                                 .foregroundStyle(theme.ink)
@@ -866,6 +907,36 @@ private struct CastShelf: View {
             .contentMargins(.horizontal, Space.inset, for: .scrollContent)
             .scrollIndicators(.hidden)
         }
+    }
+}
+
+/// A cast photo, or the person's initials on the placeholder fill, as Contacts and the TV app show someone
+/// without one: a row of identical silhouettes says nothing.
+private struct CastPhoto: View {
+    let role: PlexRole
+    let size: CGFloat
+
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        if let thumb = role.thumb, !thumb.isEmpty {
+            PlexArtView(path: thumb, size: CGSize(width: size, height: size), placeholder: "person.fill")
+                .clipShape(Circle())
+        } else {
+            Text(initials)
+                .font(.custom(Manrope.semiBold.rawValue, fixedSize: size * 0.36))
+                .foregroundStyle(theme.ink2)
+                .frame(width: size, height: size)
+                .background(theme.trackOff, in: Circle())
+                .accessibilityHidden(true)
+        }
+    }
+
+    /// "HR" for Halina Reijn: the first letters of the first and last names.
+    private var initials: String {
+        let names = role.name.split(separator: " ")
+        let letters = [names.first?.first, names.count > 1 ? names.last?.first : nil].compactMap(\.self)
+        return String(letters).uppercased()
     }
 }
 
