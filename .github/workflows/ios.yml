@@ -36,6 +36,73 @@ jobs:
       - name: MarqueeCore tests
         run: swift test --package-path Packages/MarqueeCore
 
+  live:
+    name: Live engine
+    runs-on: xcode-27
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: Packages/MarqueeLive
+    steps:
+      - uses: actions/checkout@v5
+
+      # The engine's FFmpeg has iOS slices only, so the package tests run on a simulator. Tests
+      # launched right after the simulator booted stalled for 5-40 s on this runner image
+      # (stashy-videoengine, 2026-11); booting first lets the boot overlap resolution and the build,
+      # and the tests start at least two minutes after it.
+      - name: Boot simulator
+        id: simulator
+        run: |
+          UDID=$(xcrun simctl list -j devices available | python3 -c '
+          import json, sys
+          for runtime, devices in json.load(sys.stdin)["devices"].items():
+              if runtime.endswith("iOS-27-0"):
+                  for device in devices:
+                      if device["name"] == "iPhone 18 Pro":
+                          print(device["udid"])
+                          raise SystemExit
+          raise SystemExit("No iPhone 18 Pro simulator on iOS 27.0")
+          ')
+          xcrun simctl boot "$UDID"
+          date +%s > "$RUNNER_TEMP/booted-at"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      # Listing the schemes resolves the package graph, so it shares the retry with resolution. Xcode
+      # names the scheme that builds every target after the package, or <package>-Package.
+      - name: Resolve Swift packages
+        id: scheme
+        run: |
+          for attempt in 1 2 3; do
+            if SCHEMES=$(xcodebuild -list -json) \
+               && SCHEME=$(echo "$SCHEMES" | python3 -c '
+          import json, sys
+          info = json.load(sys.stdin)
+          schemes = (info.get("workspace") or info.get("project") or {}).get("schemes", [])
+          print(next(name for name in ("MarqueeLive-Package", "MarqueeLive") if name in schemes))
+          ') \
+               && xcodebuild -resolvePackageDependencies -scheme "$SCHEME"; then
+              echo "scheme=$SCHEME" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            echo "Package resolution failed (attempt $attempt of 3)."
+            sleep $((attempt * 20))
+          done
+          exit 1
+
+      - name: MarqueeLive tests
+        env:
+          UDID: ${{ steps.simulator.outputs.udid }}
+          SCHEME: ${{ steps.scheme.outputs.scheme }}
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing -scheme "$SCHEME" -destination "id=$UDID" 2>&1 | xcbeautify
+          xcrun simctl bootstatus "$UDID" -b
+          SETTLE=$(( $(cat "$RUNNER_TEMP/booted-at") + 120 - $(date +%s) ))
+          if [ "$SETTLE" -gt 0 ]; then sleep "$SETTLE"; fi
+          # Naming each test target fails the run if the scheme leaves one out.
+          xcodebuild test-without-building -scheme "$SCHEME" -destination "id=$UDID" \
+            -only-testing:LiveEngineTests -only-testing:MarqueeLiveTests 2>&1 | xcbeautify
+
   app:
     name: App
     runs-on: xcode-27
@@ -223,7 +290,7 @@ jobs:
 
   release:
     name: Release
-    needs: [core, app]
+    needs: [core, live, app]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
