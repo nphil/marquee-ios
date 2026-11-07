@@ -1,0 +1,182 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "108",
+    "key": "/library/metadata/108",
+    "guid": "plex://movie/62a1b2c3d4e5f60718000108",
+    "type": "movie",
+    "title": "Sintel",
+    "summary": "A young woman crosses wild lands in search of the baby dragon she once rescued and raised.",
+    "year": 2010,
+    "duration": 888000,
+    "contentRating": "PG-13",
+    "audienceRating": 7.6,
+    "originallyAvailableAt": "2010-06-01",
+    "addedAt": 1756112000,
+    "thumb": "/art/sintel-poster.jpg",
+    "art": "/art/sintel-backdrop.jpg",
+    "librarySectionID": 1,
+    "librarySectionTitle": "Movies",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Fantasy"
+     }
+    ],
+    "viewOffset": 355000,
+    "lastViewedAt": 1759913600,
+    "Media": [
+     {
+      "id": 1081,
+      "duration": 888000,
+      "bitrate": 24000,
+      "width": 3840,
+      "height": 1636,
+      "videoResolution": "4k",
+      "videoCodec": "hevc",
+      "audioCodec": "truehd",
+      "container": "mkv",
+      "videoProfile": "main 10",
+      "Part": [
+       {
+        "id": 2081,
+        "key": "/library/parts/2081/file.mkv",
+        "duration": 888000,
+        "file": "/media/movies/Sintel (2010)/Sintel 2160p.mkv",
+        "size": 4200000000,
+        "container": "mkv",
+        "Stream": [
+         {
+          "id": 30811,
+          "streamType": 1,
+          "codec": "hevc",
+          "default": true,
+          "colorTrc": "smpte2084",
+          "DOVIPresent": true,
+          "DOVIProfile": 8,
+          "DOVILevel": 6,
+          "DOVIBLCompatID": 1,
+          "displayTitle": "4K DoVi/HDR10 (HEVC Main 10)"
+         },
+         {
+          "id": 30812,
+          "streamType": 2,
+          "codec": "truehd",
+          "channels": 8,
+          "default": true,
+          "selected": true,
+          "title": "Dolby Atmos",
+          "language": "English",
+          "languageCode": "eng",
+          "displayTitle": "English (TrueHD 7.1)",
+          "extendedDisplayTitle": "Dolby Atmos (English TrueHD 7.1)"
+         },
+         {
+          "id": 30813,
+          "streamType": 2,
+          "codec": "ac3",
+          "channels": 6,
+          "language": "English",
+          "languageCode": "eng",
+          "displayTitle": "English (AC3 5.1)",
+          "extendedDisplayTitle": "English (AC3 5.1)"
+         },
+         {
+          "id": 30814,
+          "streamType": 3,
+          "codec": "srt",
+          "language": "English",
+          "languageCode": "eng",
+          "displayTitle": "English (SRT)",
+          "extendedDisplayTitle": "English (SRT)"
+         },
+         {
+          "id": 30815,
+          "streamType": 3,
+          "codec": "pgs",
+          "language": "English",
+          "languageCode": "eng",
+          "hearingImpaired": true,
+          "title": "SDH",
+          "displayTitle": "English SDH (PGS)",
+          "extendedDisplayTitle": "SDH (English PGS)"
+         },
+         {
+          "id": 30816,
+          "streamType": 3,
+          "codec": "srt",
+          "language": "Español",
+          "languageCode": "spa",
+          "displayTitle": "Español (SRT)",
+          "extendedDisplayTitle": "Español (SRT)"
+         }
+        ]
+       }
+      ]
+     },
+     {
+      "id": 1082,
+      "duration": 888000,
+      "bitrate": 8000,
+      "width": 1920,
+      "height": 818,
+      "videoResolution": "1080",
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "container": "mp4",
+      "Part": [
+       {
+        "id": 2082,
+        "key": "/library/parts/2082/file.mp4",
+        "duration": 888000,
+        "file": "/media/movies/Sintel (2010)/Sintel 1080p.mp4",
+        "size": 1400000000,
+        "container": "mp4",
+        "Stream": [
+         {
+          "id": 30821,
+          "streamType": 1,
+          "codec": "h264",
+          "default": true,
+          "displayTitle": "1080p (H.264)"
+         },
+         {
+          "id": 30822,
+          "streamType": 2,
+          "codec": "aac",
+          "channels": 2,
+          "default": true,
+          "selected": true,
+          "language": "English",
+          "languageCode": "eng",
+          "displayTitle": "English (AAC Stereo)",
+          "extendedDisplayTitle": "English (AAC Stereo)"
+         }
+        ]
+       }
+      ]
+     }
+    ],
+    "Role": [
+     {
+      "tag": "Halina Reijn",
+      "role": "Sintel"
+     },
+     {
+      "tag": "Thom Hoffman",
+      "role": "Shaman"
+     }
+    ],
+    "Director": [
+     {
+      "tag": "Colin Levy"
+     }
+    ]
+   }
+  ]
+ }
+}

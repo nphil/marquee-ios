@@ -176,6 +176,7 @@ jobs:
             -resultBundlePath build/UITests.xcresult \
             -skip-testing:MarqueeUITests/ScreenshotTests/testAccessibilitySettings \
             -skip-testing:MarqueeUITests/AccountAccessibilityScreenshots \
+            -skip-testing:MarqueeUITests/BrowseAccessibilityScreenshots \
             2>&1 | tee xcodebuild-test.log | xcbeautify
           STATUS=${PIPESTATUS[0]}
           set -e
@@ -203,6 +204,7 @@ jobs:
             -resultBundlePath build/UITests-accessibility.xcresult \
             -only-testing:MarqueeUITests/ScreenshotTests/testAccessibilitySettings \
             -only-testing:MarqueeUITests/AccountAccessibilityScreenshots \
+            -only-testing:MarqueeUITests/BrowseAccessibilityScreenshots \
             2>&1 | xcbeautify
 
       - uses: actions/upload-artifact@v7

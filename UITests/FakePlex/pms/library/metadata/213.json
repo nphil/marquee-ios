@@ -1,0 +1,76 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "213",
+    "key": "/library/metadata/213",
+    "guid": "plex://episode/62a1b2c3d4e5f60718000213",
+    "type": "episode",
+    "title": "Llamigos",
+    "index": 3,
+    "parentIndex": 1,
+    "year": 2016,
+    "parentRatingKey": "202",
+    "parentTitle": "Season 1",
+    "grandparentRatingKey": "201",
+    "grandparentTitle": "Caminandes",
+    "grandparentGuid": "plex://show/62a1b2c3d4e5f60718000201",
+    "summary": "Winter brings Koro a penguin called Oti, and one berry starts a feud.",
+    "duration": 150000,
+    "originallyAvailableAt": "2016-09-10",
+    "contentRating": "TV-G",
+    "thumb": "/art/caminandes-3-still.jpg",
+    "parentThumb": "/art/caminandes-poster.jpg",
+    "grandparentThumb": "/art/caminandes-poster.jpg",
+    "grandparentArt": "/art/caminandes-backdrop.jpg",
+    "addedAt": 1759568000,
+    "librarySectionID": 2,
+    "Media": [
+     {
+      "id": 2130,
+      "duration": 150000,
+      "bitrate": 8000,
+      "width": 1920,
+      "height": 1080,
+      "videoResolution": "1080",
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "container": "mp4",
+      "Part": [
+       {
+        "id": 2131,
+        "key": "/library/parts/2131/file.mp4",
+        "duration": 150000,
+        "file": "/media/movies/Caminandes - s01e03.mp4",
+        "size": 150000000,
+        "container": "mp4",
+        "Stream": [
+         {
+          "id": 21311,
+          "streamType": 1,
+          "codec": "h264",
+          "default": true,
+          "displayTitle": "1080p (H.264)"
+         },
+         {
+          "id": 21312,
+          "streamType": 2,
+          "codec": "aac",
+          "channels": 2,
+          "default": true,
+          "selected": true,
+          "language": "English",
+          "languageCode": "eng",
+          "displayTitle": "English (AAC Stereo)",
+          "extendedDisplayTitle": "English (AAC Stereo)"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

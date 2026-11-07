@@ -1,0 +1,120 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Hub": [
+   {
+    "hubIdentifier": "external.similar",
+    "title": "More Like This",
+    "type": "movie",
+    "size": 4,
+    "more": false,
+    "Metadata": [
+     {
+      "ratingKey": "109",
+      "key": "/library/metadata/109",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000109",
+      "type": "movie",
+      "title": "Spring",
+      "summary": "A shepherd girl and her dog face ancient spirits to bring the spring back to the mountains.",
+      "year": 2019,
+      "duration": 464000,
+      "contentRating": "PG",
+      "audienceRating": 7.9,
+      "originallyAvailableAt": "2019-06-01",
+      "addedAt": 1759308800,
+      "thumb": "/art/spring-poster.jpg",
+      "art": "/art/spring-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Fantasy"
+       }
+      ]
+     },
+     {
+      "ratingKey": "104",
+      "key": "/library/metadata/104",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000104",
+      "type": "movie",
+      "title": "Cosmos Laundromat",
+      "summary": "On a bleak island, a weary sheep meets a salesman who offers him a new life, one world at a time.",
+      "year": 2015,
+      "duration": 731000,
+      "contentRating": "PG-13",
+      "audienceRating": 7.7,
+      "originallyAvailableAt": "2015-06-01",
+      "addedAt": 1758790400,
+      "thumb": "/art/cosmos-laundromat-poster.jpg",
+      "art": "/art/cosmos-laundromat-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Fantasy"
+       }
+      ]
+     },
+     {
+      "ratingKey": "110",
+      "key": "/library/metadata/110",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000110",
+      "type": "movie",
+      "title": "Sprite Fright",
+      "summary": "Rowdy teenagers on a woodland trip meet the mushroom folk who live there.",
+      "year": 2021,
+      "duration": 630000,
+      "contentRating": "PG-13",
+      "audienceRating": 7.5,
+      "originallyAvailableAt": "2021-06-01",
+      "addedAt": 1759740800,
+      "thumb": "/art/sprite-fright-poster.jpg",
+      "art": "/art/sprite-fright-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Comedy"
+       }
+      ]
+     },
+     {
+      "ratingKey": "103",
+      "key": "/library/metadata/103",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000103",
+      "type": "movie",
+      "title": "Coffee Run",
+      "summary": "A young woman runs through a flood of memories, kept going by one more cup of coffee.",
+      "year": 2020,
+      "duration": 185000,
+      "contentRating": "PG",
+      "audienceRating": 7.4,
+      "originallyAvailableAt": "2020-06-01",
+      "addedAt": 1759654400,
+      "thumb": "/art/coffee-run-poster.jpg",
+      "art": "/art/coffee-run-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Fantasy"
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

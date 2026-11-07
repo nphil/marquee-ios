@@ -1,0 +1,77 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "106",
+    "key": "/library/metadata/106",
+    "guid": "plex://movie/62a1b2c3d4e5f60718000106",
+    "type": "movie",
+    "title": "Glass Half",
+    "summary": "Two critics in a gallery argue about what makes art worth looking at.",
+    "year": 2015,
+    "duration": 193000,
+    "contentRating": "G",
+    "audienceRating": 7.2,
+    "originallyAvailableAt": "2015-06-01",
+    "addedAt": 1757408000,
+    "thumb": "/art/glass-half-poster.jpg",
+    "art": "/art/glass-half-backdrop.jpg",
+    "librarySectionID": 1,
+    "librarySectionTitle": "Movies",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "Media": [
+     {
+      "id": 1060,
+      "duration": 193000,
+      "bitrate": 8000,
+      "width": 1920,
+      "height": 1080,
+      "videoResolution": "1080",
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "container": "mp4",
+      "Part": [
+       {
+        "id": 1061,
+        "key": "/library/parts/1061/file.mp4",
+        "duration": 193000,
+        "file": "/media/movies/Glass Half.mp4",
+        "size": 193000000,
+        "container": "mp4",
+        "Stream": [
+         {
+          "id": 10611,
+          "streamType": 1,
+          "codec": "h264",
+          "default": true,
+          "displayTitle": "1080p (H.264)"
+         },
+         {
+          "id": 10612,
+          "streamType": 2,
+          "codec": "aac",
+          "channels": 2,
+          "default": true,
+          "selected": true,
+          "language": "English",
+          "languageCode": "eng",
+          "displayTitle": "English (AAC Stereo)",
+          "extendedDisplayTitle": "English (AAC Stereo)"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

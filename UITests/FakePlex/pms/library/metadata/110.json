@@ -1,0 +1,77 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "110",
+    "key": "/library/metadata/110",
+    "guid": "plex://movie/62a1b2c3d4e5f60718000110",
+    "type": "movie",
+    "title": "Sprite Fright",
+    "summary": "Rowdy teenagers on a woodland trip meet the mushroom folk who live there.",
+    "year": 2021,
+    "duration": 630000,
+    "contentRating": "PG-13",
+    "audienceRating": 7.5,
+    "originallyAvailableAt": "2021-06-01",
+    "addedAt": 1759740800,
+    "thumb": "/art/sprite-fright-poster.jpg",
+    "art": "/art/sprite-fright-backdrop.jpg",
+    "librarySectionID": 1,
+    "librarySectionTitle": "Movies",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "Media": [
+     {
+      "id": 1100,
+      "duration": 630000,
+      "bitrate": 8000,
+      "width": 1920,
+      "height": 1080,
+      "videoResolution": "1080",
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "container": "mp4",
+      "Part": [
+       {
+        "id": 1101,
+        "key": "/library/parts/1101/file.mp4",
+        "duration": 630000,
+        "file": "/media/movies/Sprite Fright.mp4",
+        "size": 630000000,
+        "container": "mp4",
+        "Stream": [
+         {
+          "id": 11011,
+          "streamType": 1,
+          "codec": "h264",
+          "default": true,
+          "displayTitle": "1080p (H.264)"
+         },
+         {
+          "id": 11012,
+          "streamType": 2,
+          "codec": "aac",
+          "channels": 2,
+          "default": true,
+          "selected": true,
+          "language": "English",
+          "languageCode": "eng",
+          "displayTitle": "English (AAC Stereo)",
+          "extendedDisplayTitle": "English (AAC Stereo)"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

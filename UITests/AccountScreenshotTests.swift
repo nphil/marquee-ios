@@ -104,7 +104,7 @@ extension XCTestCase {
     @MainActor
     func settingsFlow(mode: String, suffix: String, turned: Bool = false) throws {
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine")
-        open(tab: "Settings", title: "Settings", in: app)
+        openSettings(in: app)
         try snap("acct-04-settings-\(suffix)", turned: turned)
 
         reveal("settings.video", in: app).tap()
@@ -167,7 +167,7 @@ extension XCTestCase {
     @MainActor
     func profileFlow(mode: String, suffix: String) throws {
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine")
-        open(tab: "Settings", title: "Settings", in: app)
+        openSettings(in: app)
         tap("settings.profile", in: app)
         waitForBar("Profiles", in: app)
         try snap("acct-13-profiles-\(suffix)")

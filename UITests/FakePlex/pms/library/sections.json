@@ -1,0 +1,21 @@
+{
+ "MediaContainer": {
+  "size": 2,
+  "Directory": [
+   {
+    "key": "1",
+    "title": "Movies",
+    "type": "movie",
+    "uuid": "fake-movies",
+    "thumb": "/art/sintel-poster.jpg"
+   },
+   {
+    "key": "2",
+    "title": "TV Shows",
+    "type": "show",
+    "uuid": "fake-shows",
+    "thumb": "/art/caminandes-poster.jpg"
+   }
+  ]
+ }
+}

@@ -1,0 +1,36 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "totalSize": 1,
+  "Metadata": [
+   {
+    "ratingKey": "108",
+    "key": "/library/metadata/108",
+    "guid": "plex://movie/62a1b2c3d4e5f60718000108",
+    "type": "movie",
+    "title": "Sintel",
+    "summary": "A young woman crosses wild lands in search of the baby dragon she once rescued and raised.",
+    "year": 2010,
+    "duration": 888000,
+    "contentRating": "PG-13",
+    "audienceRating": 7.6,
+    "originallyAvailableAt": "2010-06-01",
+    "addedAt": 1756112000,
+    "thumb": "/art/sintel-poster.jpg",
+    "art": "/art/sintel-backdrop.jpg",
+    "librarySectionID": 1,
+    "librarySectionTitle": "Movies",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Fantasy"
+     }
+    ],
+    "viewOffset": 355000,
+    "lastViewedAt": 1759913600
+   }
+  ]
+ }
+}

@@ -7,13 +7,14 @@ final class ScreenshotTests: XCTestCase {
     func testRosePineAndLiveSwitch() throws {
         let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine")
         try snap("01-home-rose-pine")
-        open(tab: "Library", title: "Library", in: app)
+        open(tab: "Library", title: "Movies", in: app)
         try snap("02-library-rose-pine")
         open(tab: "Watchlist", title: "Watchlist", in: app)
         try snap("03-watchlist-rose-pine")
         open(tab: "Search", title: "Search", in: app)
         try snap("04-search-rose-pine")
-        open(tab: "Settings", title: "Settings", in: app)
+        open(tab: "Home", title: "Home", in: app)
+        openSettings(in: app)
         try snap("05-settings-rose-pine")
 
         tap("settings.theme", in: app)
@@ -32,7 +33,8 @@ final class ScreenshotTests: XCTestCase {
         app.navigationBars["Appearance"].buttons.element(boundBy: 0).tap()
         waitForBar("Settings", in: app)
         try snap("09-settings-paper")
-        open(tab: "Home", title: "Home", in: app)
+        tap("settings.done", in: app)
+        waitForBar("Home", in: app)
         try snap("10-home-paper")
     }
 
@@ -40,7 +42,7 @@ final class ScreenshotTests: XCTestCase {
     func testEmber() throws {
         let app = launch(matchSystem: false, fixedMode: "dark", dark: "ember")
         try snap("11-home-ember")
-        open(tab: "Settings", title: "Settings", in: app)
+        openSettings(in: app)
         try snap("12-settings-ember")
         tap("settings.theme", in: app)
         waitForBar("Appearance", in: app)
@@ -52,7 +54,7 @@ final class ScreenshotTests: XCTestCase {
     func testMatchSystemSlots() throws {
         let app = launch(matchSystem: true, fixedMode: "dark", dark: "rose-pine")
         try snap("14-home-dawn")
-        open(tab: "Settings", title: "Settings", in: app)
+        openSettings(in: app)
         try snap("15-settings-dawn")
         tap("settings.theme", in: app)
         waitForBar("Appearance", in: app)
@@ -75,7 +77,7 @@ final class ScreenshotTests: XCTestCase {
     func testAccessibilitySettings() throws {
         let app = launch(matchSystem: false, fixedMode: "light", dark: "rose-pine")
         try snap("19-ax-home-dawn")
-        open(tab: "Settings", title: "Settings", in: app)
+        openSettings(in: app)
         try snap("20-ax-settings-dawn")
         tap("settings.theme", in: app)
         waitForBar("Appearance", in: app)

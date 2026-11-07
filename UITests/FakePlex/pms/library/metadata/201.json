@@ -1,0 +1,64 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "201",
+    "key": "/library/metadata/201/children",
+    "guid": "plex://show/62a1b2c3d4e5f60718000201",
+    "type": "show",
+    "title": "Caminandes",
+    "year": 2013,
+    "contentRating": "TV-G",
+    "audienceRating": 8.0,
+    "summary": "Koro the llama keeps finding new ways across the roads, fences and snowfields of Patagonia.",
+    "thumb": "/art/caminandes-poster.jpg",
+    "art": "/art/caminandes-backdrop.jpg",
+    "childCount": 1,
+    "leafCount": 3,
+    "viewedLeafCount": 1,
+    "addedAt": 1759568000,
+    "originallyAvailableAt": "2013-01-10",
+    "librarySectionID": 2,
+    "librarySectionTitle": "TV Shows",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "OnDeck": {
+     "Metadata": {
+      "ratingKey": "212",
+      "key": "/library/metadata/212",
+      "guid": "plex://episode/62a1b2c3d4e5f60718000212",
+      "type": "episode",
+      "title": "Gran Dillama",
+      "index": 2,
+      "parentIndex": 1,
+      "year": 2013,
+      "parentRatingKey": "202",
+      "parentTitle": "Season 1",
+      "grandparentRatingKey": "201",
+      "grandparentTitle": "Caminandes",
+      "grandparentGuid": "plex://show/62a1b2c3d4e5f60718000201",
+      "summary": "An electric fence stands between Koro and the grass on the far side.",
+      "duration": 146000,
+      "originallyAvailableAt": "2013-11-10",
+      "contentRating": "TV-G",
+      "thumb": "/art/caminandes-2-still.jpg",
+      "parentThumb": "/art/caminandes-poster.jpg",
+      "grandparentThumb": "/art/caminandes-poster.jpg",
+      "grandparentArt": "/art/caminandes-backdrop.jpg",
+      "addedAt": 1759568000,
+      "librarySectionID": 2,
+      "viewOffset": 61000,
+      "lastViewedAt": 1759913600
+     }
+    }
+   }
+  ]
+ }
+}

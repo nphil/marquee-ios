@@ -1,0 +1,112 @@
+{
+ "MediaContainer": {
+  "size": 5,
+  "totalSize": 5,
+  "Metadata": [
+   {
+    "ratingKey": "62a1b2c3d4e5f60718000112",
+    "key": "/library/metadata/62a1b2c3d4e5f60718000112",
+    "guid": "plex://movie/62a1b2c3d4e5f60718000112",
+    "type": "movie",
+    "title": "Wing It!",
+    "year": 2023,
+    "summary": "A cat and a dog build a rocket out of junk and hope for the best.",
+    "duration": 238000,
+    "contentRating": "G",
+    "audienceRating": 7.8,
+    "originallyAvailableAt": "2023-06-01",
+    "thumb": "https://metadata-static.plex.tv/art/wing-it-poster.jpg",
+    "art": "https://metadata-static.plex.tv/art/wing-it-backdrop.jpg",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ]
+   },
+   {
+    "ratingKey": "62a1b2c3d4e5f60718000109",
+    "key": "/library/metadata/62a1b2c3d4e5f60718000109",
+    "guid": "plex://movie/62a1b2c3d4e5f60718000109",
+    "type": "movie",
+    "title": "Spring",
+    "year": 2019,
+    "summary": "A shepherd girl and her dog face ancient spirits to bring the spring back to the mountains.",
+    "duration": 464000,
+    "contentRating": "PG",
+    "audienceRating": 7.9,
+    "originallyAvailableAt": "2019-06-01",
+    "thumb": "https://metadata-static.plex.tv/art/spring-poster.jpg",
+    "art": "https://metadata-static.plex.tv/art/spring-backdrop.jpg",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Fantasy"
+     }
+    ]
+   },
+   {
+    "ratingKey": "62a1b2c3d4e5f60718000201",
+    "key": "/library/metadata/62a1b2c3d4e5f60718000201",
+    "guid": "plex://show/62a1b2c3d4e5f60718000201",
+    "type": "show",
+    "title": "Caminandes",
+    "year": 2013,
+    "summary": "Koro the llama keeps finding new ways across the roads, fences and snowfields of Patagonia.",
+    "contentRating": "TV-G",
+    "thumb": "https://metadata-static.plex.tv/art/caminandes-poster.jpg",
+    "art": "https://metadata-static.plex.tv/art/caminandes-backdrop.jpg"
+   },
+   {
+    "ratingKey": "62a1b2c3d4e5f60718000104",
+    "key": "/library/metadata/62a1b2c3d4e5f60718000104",
+    "guid": "plex://movie/62a1b2c3d4e5f60718000104",
+    "type": "movie",
+    "title": "Cosmos Laundromat",
+    "year": 2015,
+    "summary": "On a bleak island, a weary sheep meets a salesman who offers him a new life, one world at a time.",
+    "duration": 731000,
+    "contentRating": "PG-13",
+    "audienceRating": 7.7,
+    "originallyAvailableAt": "2015-06-01",
+    "thumb": "https://metadata-static.plex.tv/art/cosmos-laundromat-poster.jpg",
+    "art": "https://metadata-static.plex.tv/art/cosmos-laundromat-backdrop.jpg",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Fantasy"
+     }
+    ]
+   },
+   {
+    "ratingKey": "62a1b2c3d4e5f60718000105",
+    "key": "/library/metadata/62a1b2c3d4e5f60718000105",
+    "guid": "plex://movie/62a1b2c3d4e5f60718000105",
+    "type": "movie",
+    "title": "Elephants Dream",
+    "year": 2006,
+    "summary": "Two men wander an endless machine of a world and cannot agree on what it is for.",
+    "duration": 654000,
+    "contentRating": "PG",
+    "audienceRating": 6.9,
+    "originallyAvailableAt": "2006-06-01",
+    "thumb": "https://metadata-static.plex.tv/art/elephants-dream-poster.jpg",
+    "art": "https://metadata-static.plex.tv/art/elephants-dream-backdrop.jpg",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Science Fiction"
+     }
+    ]
+   }
+  ]
+ }
+}

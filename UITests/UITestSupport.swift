@@ -42,6 +42,13 @@ extension XCTestCase {
         waitForBar(title, in: app)
     }
 
+    /// Settings opens in a sheet from the profile button on Home.
+    @MainActor
+    func openSettings(in app: XCUIApplication) {
+        tap("profile.button", in: app)
+        waitForBar("Settings", in: app)
+    }
+
     @MainActor
     func element(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         app.descendants(matching: .any).matching(identifier: identifier).firstMatch

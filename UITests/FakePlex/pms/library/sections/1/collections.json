@@ -1,0 +1,18 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "totalSize": 1,
+  "Metadata": [
+   {
+    "ratingKey": "301",
+    "key": "/library/collections/301/children",
+    "type": "collection",
+    "title": "Blender Open Movies",
+    "summary": "Every open movie from the Blender Studio on this server.",
+    "thumb": "/art/big-buck-bunny-poster.jpg",
+    "childCount": 11,
+    "addedAt": 1759136000
+   }
+  ]
+ }
+}

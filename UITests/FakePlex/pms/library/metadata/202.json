@@ -1,0 +1,23 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "202",
+    "key": "/library/metadata/202/children",
+    "parentRatingKey": "201",
+    "type": "season",
+    "title": "Season 1",
+    "index": 1,
+    "parentTitle": "Caminandes",
+    "summary": "",
+    "thumb": "/art/caminandes-poster.jpg",
+    "art": "/art/caminandes-backdrop.jpg",
+    "parentThumb": "/art/caminandes-poster.jpg",
+    "leafCount": 3,
+    "viewedLeafCount": 1,
+    "addedAt": 1759568000
+   }
+  ]
+ }
+}

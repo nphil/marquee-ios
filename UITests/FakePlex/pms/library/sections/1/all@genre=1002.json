@@ -1,0 +1,88 @@
+{
+ "MediaContainer": {
+  "size": 3,
+  "totalSize": 3,
+  "Metadata": [
+   {
+    "ratingKey": "101",
+    "key": "/library/metadata/101",
+    "guid": "plex://movie/62a1b2c3d4e5f60718000101",
+    "type": "movie",
+    "title": "Big Buck Bunny",
+    "summary": "A gentle giant of a rabbit finally loses his patience with three rodents who bully the forest.",
+    "year": 2008,
+    "duration": 596000,
+    "contentRating": "G",
+    "audienceRating": 8.1,
+    "originallyAvailableAt": "2008-06-01",
+    "addedAt": 1754816000,
+    "thumb": "/art/big-buck-bunny-poster.jpg",
+    "art": "/art/big-buck-bunny-backdrop.jpg",
+    "librarySectionID": 1,
+    "librarySectionTitle": "Movies",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ],
+    "viewCount": 1,
+    "lastViewedAt": 1758272000
+   },
+   {
+    "ratingKey": "106",
+    "key": "/library/metadata/106",
+    "guid": "plex://movie/62a1b2c3d4e5f60718000106",
+    "type": "movie",
+    "title": "Glass Half",
+    "summary": "Two critics in a gallery argue about what makes art worth looking at.",
+    "year": 2015,
+    "duration": 193000,
+    "contentRating": "G",
+    "audienceRating": 7.2,
+    "originallyAvailableAt": "2015-06-01",
+    "addedAt": 1757408000,
+    "thumb": "/art/glass-half-poster.jpg",
+    "art": "/art/glass-half-backdrop.jpg",
+    "librarySectionID": 1,
+    "librarySectionTitle": "Movies",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ]
+   },
+   {
+    "ratingKey": "110",
+    "key": "/library/metadata/110",
+    "guid": "plex://movie/62a1b2c3d4e5f60718000110",
+    "type": "movie",
+    "title": "Sprite Fright",
+    "summary": "Rowdy teenagers on a woodland trip meet the mushroom folk who live there.",
+    "year": 2021,
+    "duration": 630000,
+    "contentRating": "PG-13",
+    "audienceRating": 7.5,
+    "originallyAvailableAt": "2021-06-01",
+    "addedAt": 1759740800,
+    "thumb": "/art/sprite-fright-poster.jpg",
+    "art": "/art/sprite-fright-backdrop.jpg",
+    "librarySectionID": 1,
+    "librarySectionTitle": "Movies",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Comedy"
+     }
+    ]
+   }
+  ]
+ }
+}

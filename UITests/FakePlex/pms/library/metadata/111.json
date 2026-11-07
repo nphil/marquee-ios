@@ -1,0 +1,76 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "111",
+    "key": "/library/metadata/111",
+    "guid": "plex://movie/62a1b2c3d4e5f60718000111",
+    "type": "movie",
+    "title": "Tears of Steel",
+    "summary": "In a ruined Amsterdam, a band of scientists stage a desperate experiment to stop an army of robots.",
+    "year": 2012,
+    "duration": 734000,
+    "contentRating": "PG-13",
+    "audienceRating": 6.8,
+    "originallyAvailableAt": "2012-06-01",
+    "addedAt": 1753952000,
+    "thumb": "/art/tears-of-steel-poster.jpg",
+    "art": "/art/tears-of-steel-backdrop.jpg",
+    "librarySectionID": 1,
+    "librarySectionTitle": "Movies",
+    "Genre": [
+     {
+      "tag": "Science Fiction"
+     }
+    ],
+    "viewOffset": 514000,
+    "lastViewedAt": 1759740800,
+    "Media": [
+     {
+      "id": 1110,
+      "duration": 734000,
+      "bitrate": 8000,
+      "width": 1920,
+      "height": 1080,
+      "videoResolution": "1080",
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "container": "mp4",
+      "Part": [
+       {
+        "id": 1111,
+        "key": "/library/parts/1111/file.mp4",
+        "duration": 734000,
+        "file": "/media/movies/Tears of Steel.mp4",
+        "size": 734000000,
+        "container": "mp4",
+        "Stream": [
+         {
+          "id": 11111,
+          "streamType": 1,
+          "codec": "h264",
+          "default": true,
+          "displayTitle": "1080p (H.264)"
+         },
+         {
+          "id": 11112,
+          "streamType": 2,
+          "codec": "aac",
+          "channels": 2,
+          "default": true,
+          "selected": true,
+          "language": "English",
+          "languageCode": "eng",
+          "displayTitle": "English (AAC Stereo)",
+          "extendedDisplayTitle": "English (AAC Stereo)"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

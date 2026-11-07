@@ -1,0 +1,455 @@
+{
+ "MediaContainer": {
+  "size": 4,
+  "Hub": [
+   {
+    "hubIdentifier": "movie",
+    "title": "Movies",
+    "type": "movie",
+    "size": 11,
+    "Metadata": [
+     {
+      "ratingKey": "101",
+      "key": "/library/metadata/101",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000101",
+      "type": "movie",
+      "title": "Big Buck Bunny",
+      "summary": "A gentle giant of a rabbit finally loses his patience with three rodents who bully the forest.",
+      "year": 2008,
+      "duration": 596000,
+      "contentRating": "G",
+      "audienceRating": 8.1,
+      "originallyAvailableAt": "2008-06-01",
+      "addedAt": 1754816000,
+      "thumb": "/art/big-buck-bunny-poster.jpg",
+      "art": "/art/big-buck-bunny-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Comedy"
+       }
+      ],
+      "viewCount": 1,
+      "lastViewedAt": 1758272000
+     },
+     {
+      "ratingKey": "102",
+      "key": "/library/metadata/102",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000102",
+      "type": "movie",
+      "title": "Charge",
+      "summary": "In a frozen future, an old man breaks into a guarded power plant to steal one last charge.",
+      "year": 2022,
+      "duration": 263000,
+      "contentRating": "PG-13",
+      "audienceRating": 7.3,
+      "originallyAvailableAt": "2022-06-01",
+      "addedAt": 1759827200,
+      "thumb": "/art/charge-poster.jpg",
+      "art": "/art/charge-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Science Fiction"
+       }
+      ]
+     },
+     {
+      "ratingKey": "103",
+      "key": "/library/metadata/103",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000103",
+      "type": "movie",
+      "title": "Coffee Run",
+      "summary": "A young woman runs through a flood of memories, kept going by one more cup of coffee.",
+      "year": 2020,
+      "duration": 185000,
+      "contentRating": "PG",
+      "audienceRating": 7.4,
+      "originallyAvailableAt": "2020-06-01",
+      "addedAt": 1759654400,
+      "thumb": "/art/coffee-run-poster.jpg",
+      "art": "/art/coffee-run-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Fantasy"
+       }
+      ]
+     },
+     {
+      "ratingKey": "104",
+      "key": "/library/metadata/104",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000104",
+      "type": "movie",
+      "title": "Cosmos Laundromat",
+      "summary": "On a bleak island, a weary sheep meets a salesman who offers him a new life, one world at a time.",
+      "year": 2015,
+      "duration": 731000,
+      "contentRating": "PG-13",
+      "audienceRating": 7.7,
+      "originallyAvailableAt": "2015-06-01",
+      "addedAt": 1758790400,
+      "thumb": "/art/cosmos-laundromat-poster.jpg",
+      "art": "/art/cosmos-laundromat-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Fantasy"
+       }
+      ]
+     },
+     {
+      "ratingKey": "105",
+      "key": "/library/metadata/105",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000105",
+      "type": "movie",
+      "title": "Elephants Dream",
+      "summary": "Two men wander an endless machine of a world and cannot agree on what it is for.",
+      "year": 2006,
+      "duration": 654000,
+      "contentRating": "PG",
+      "audienceRating": 6.9,
+      "originallyAvailableAt": "2006-06-01",
+      "addedAt": 1752224000,
+      "thumb": "/art/elephants-dream-poster.jpg",
+      "art": "/art/elephants-dream-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Science Fiction"
+       }
+      ],
+      "viewCount": 1,
+      "lastViewedAt": 1756544000
+     },
+     {
+      "ratingKey": "106",
+      "key": "/library/metadata/106",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000106",
+      "type": "movie",
+      "title": "Glass Half",
+      "summary": "Two critics in a gallery argue about what makes art worth looking at.",
+      "year": 2015,
+      "duration": 193000,
+      "contentRating": "G",
+      "audienceRating": 7.2,
+      "originallyAvailableAt": "2015-06-01",
+      "addedAt": 1757408000,
+      "thumb": "/art/glass-half-poster.jpg",
+      "art": "/art/glass-half-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Comedy"
+       }
+      ]
+     },
+     {
+      "ratingKey": "107",
+      "key": "/library/metadata/107",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000107",
+      "type": "movie",
+      "title": "Hero",
+      "summary": "A lone hero's desperate fight, drawn frame by frame in Grease Pencil.",
+      "year": 2018,
+      "duration": 237000,
+      "contentRating": "PG",
+      "audienceRating": 7.0,
+      "originallyAvailableAt": "2018-06-01",
+      "addedAt": 1759481600,
+      "thumb": "/art/hero-poster.jpg",
+      "art": "/art/hero-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Fantasy"
+       }
+      ]
+     },
+     {
+      "ratingKey": "108",
+      "key": "/library/metadata/108",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000108",
+      "type": "movie",
+      "title": "Sintel",
+      "summary": "A young woman crosses wild lands in search of the baby dragon she once rescued and raised.",
+      "year": 2010,
+      "duration": 888000,
+      "contentRating": "PG-13",
+      "audienceRating": 7.6,
+      "originallyAvailableAt": "2010-06-01",
+      "addedAt": 1756112000,
+      "thumb": "/art/sintel-poster.jpg",
+      "art": "/art/sintel-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Fantasy"
+       }
+      ],
+      "viewOffset": 355000,
+      "lastViewedAt": 1759913600
+     },
+     {
+      "ratingKey": "109",
+      "key": "/library/metadata/109",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000109",
+      "type": "movie",
+      "title": "Spring",
+      "summary": "A shepherd girl and her dog face ancient spirits to bring the spring back to the mountains.",
+      "year": 2019,
+      "duration": 464000,
+      "contentRating": "PG",
+      "audienceRating": 7.9,
+      "originallyAvailableAt": "2019-06-01",
+      "addedAt": 1759308800,
+      "thumb": "/art/spring-poster.jpg",
+      "art": "/art/spring-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Fantasy"
+       }
+      ]
+     },
+     {
+      "ratingKey": "110",
+      "key": "/library/metadata/110",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000110",
+      "type": "movie",
+      "title": "Sprite Fright",
+      "summary": "Rowdy teenagers on a woodland trip meet the mushroom folk who live there.",
+      "year": 2021,
+      "duration": 630000,
+      "contentRating": "PG-13",
+      "audienceRating": 7.5,
+      "originallyAvailableAt": "2021-06-01",
+      "addedAt": 1759740800,
+      "thumb": "/art/sprite-fright-poster.jpg",
+      "art": "/art/sprite-fright-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Comedy"
+       }
+      ]
+     },
+     {
+      "ratingKey": "111",
+      "key": "/library/metadata/111",
+      "guid": "plex://movie/62a1b2c3d4e5f60718000111",
+      "type": "movie",
+      "title": "Tears of Steel",
+      "summary": "In a ruined Amsterdam, a band of scientists stage a desperate experiment to stop an army of robots.",
+      "year": 2012,
+      "duration": 734000,
+      "contentRating": "PG-13",
+      "audienceRating": 6.8,
+      "originallyAvailableAt": "2012-06-01",
+      "addedAt": 1753952000,
+      "thumb": "/art/tears-of-steel-poster.jpg",
+      "art": "/art/tears-of-steel-backdrop.jpg",
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies",
+      "Genre": [
+       {
+        "tag": "Science Fiction"
+       }
+      ],
+      "viewOffset": 514000,
+      "lastViewedAt": 1759740800
+     }
+    ]
+   },
+   {
+    "hubIdentifier": "show",
+    "title": "Shows",
+    "type": "show",
+    "size": 1,
+    "Metadata": [
+     {
+      "ratingKey": "201",
+      "key": "/library/metadata/201/children",
+      "guid": "plex://show/62a1b2c3d4e5f60718000201",
+      "type": "show",
+      "title": "Caminandes",
+      "year": 2013,
+      "contentRating": "TV-G",
+      "audienceRating": 8.0,
+      "summary": "Koro the llama keeps finding new ways across the roads, fences and snowfields of Patagonia.",
+      "thumb": "/art/caminandes-poster.jpg",
+      "art": "/art/caminandes-backdrop.jpg",
+      "childCount": 1,
+      "leafCount": 3,
+      "viewedLeafCount": 1,
+      "addedAt": 1759568000,
+      "originallyAvailableAt": "2013-01-10",
+      "librarySectionID": 2,
+      "librarySectionTitle": "TV Shows",
+      "Genre": [
+       {
+        "tag": "Animation"
+       },
+       {
+        "tag": "Comedy"
+       }
+      ]
+     }
+    ]
+   },
+   {
+    "hubIdentifier": "episode",
+    "title": "Episodes",
+    "type": "episode",
+    "size": 3,
+    "Metadata": [
+     {
+      "ratingKey": "211",
+      "key": "/library/metadata/211",
+      "guid": "plex://episode/62a1b2c3d4e5f60718000211",
+      "type": "episode",
+      "title": "Llama Drama",
+      "index": 1,
+      "parentIndex": 1,
+      "year": 2013,
+      "parentRatingKey": "202",
+      "parentTitle": "Season 1",
+      "grandparentRatingKey": "201",
+      "grandparentTitle": "Caminandes",
+      "grandparentGuid": "plex://show/62a1b2c3d4e5f60718000201",
+      "summary": "Koro wants to cross the road. The road has other ideas.",
+      "duration": 90000,
+      "originallyAvailableAt": "2013-01-10",
+      "contentRating": "TV-G",
+      "thumb": "/art/caminandes-1-still.jpg",
+      "parentThumb": "/art/caminandes-poster.jpg",
+      "grandparentThumb": "/art/caminandes-poster.jpg",
+      "grandparentArt": "/art/caminandes-backdrop.jpg",
+      "addedAt": 1759568000,
+      "librarySectionID": 2,
+      "viewCount": 1,
+      "lastViewedAt": 1759827200
+     },
+     {
+      "ratingKey": "212",
+      "key": "/library/metadata/212",
+      "guid": "plex://episode/62a1b2c3d4e5f60718000212",
+      "type": "episode",
+      "title": "Gran Dillama",
+      "index": 2,
+      "parentIndex": 1,
+      "year": 2013,
+      "parentRatingKey": "202",
+      "parentTitle": "Season 1",
+      "grandparentRatingKey": "201",
+      "grandparentTitle": "Caminandes",
+      "grandparentGuid": "plex://show/62a1b2c3d4e5f60718000201",
+      "summary": "An electric fence stands between Koro and the grass on the far side.",
+      "duration": 146000,
+      "originallyAvailableAt": "2013-11-10",
+      "contentRating": "TV-G",
+      "thumb": "/art/caminandes-2-still.jpg",
+      "parentThumb": "/art/caminandes-poster.jpg",
+      "grandparentThumb": "/art/caminandes-poster.jpg",
+      "grandparentArt": "/art/caminandes-backdrop.jpg",
+      "addedAt": 1759568000,
+      "librarySectionID": 2,
+      "viewOffset": 61000,
+      "lastViewedAt": 1759913600
+     },
+     {
+      "ratingKey": "213",
+      "key": "/library/metadata/213",
+      "guid": "plex://episode/62a1b2c3d4e5f60718000213",
+      "type": "episode",
+      "title": "Llamigos",
+      "index": 3,
+      "parentIndex": 1,
+      "year": 2016,
+      "parentRatingKey": "202",
+      "parentTitle": "Season 1",
+      "grandparentRatingKey": "201",
+      "grandparentTitle": "Caminandes",
+      "grandparentGuid": "plex://show/62a1b2c3d4e5f60718000201",
+      "summary": "Winter brings Koro a penguin called Oti, and one berry starts a feud.",
+      "duration": 150000,
+      "originallyAvailableAt": "2016-09-10",
+      "contentRating": "TV-G",
+      "thumb": "/art/caminandes-3-still.jpg",
+      "parentThumb": "/art/caminandes-poster.jpg",
+      "grandparentThumb": "/art/caminandes-poster.jpg",
+      "grandparentArt": "/art/caminandes-backdrop.jpg",
+      "addedAt": 1759568000,
+      "librarySectionID": 2
+     }
+    ]
+   },
+   {
+    "hubIdentifier": "actor",
+    "title": "Actors",
+    "type": "actor",
+    "size": 2,
+    "Directory": [
+     {
+      "id": 3001,
+      "tag": "Halina Reijn",
+      "key": "/library/sections/1/all?actor=3001",
+      "type": "tag",
+      "tagType": 6,
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies"
+     },
+     {
+      "id": 3002,
+      "tag": "Thom Hoffman",
+      "key": "/library/sections/1/all?actor=3002",
+      "type": "tag",
+      "tagType": 6,
+      "librarySectionID": 1,
+      "librarySectionTitle": "Movies"
+     }
+    ]
+   }
+  ]
+ }
+}

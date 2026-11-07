@@ -16,3 +16,25 @@ The UI tests launch the app with `MARQUEE_FAKE_PLEX` set to this folder. `App/Te
 The fake server is "Living Room", `fake-server`, at `http://192.0.2.10:32400`.
 
 plex.tv lists four servers of the account and its Home: Living Room (reached locally), Cabin (remote only), Office (relay only) and Studio (Alex's, offline), plus a friend's server the app leaves out. The browser sign-in code is approved at once; the plex.tv/link code never is. The Home has three profiles: Jordan (the account), Alex (PIN 1234) and Kids (restricted). Their photos, `users/<uuid>/avatar.png`, are generated silhouettes.
+
+Living Room has two libraries. Movies holds eleven Blender open movies: Sintel is half watched and has two versions (4K Dolby Vision with Atmos, and 1080p) and a full set of tracks, Tears of Steel is part watched, Big Buck Bunny and Elephants Dream are watched. TV Shows holds Caminandes, one season of three episodes with the second in progress. One collection, Blender Open Movies, gathers the films. The watchlist on plex.tv holds Wing It! (not on the server), Spring, Caminandes, Cosmos Laundromat and Elephants Dream. Titles, years and credits are real; summaries, dates, ratings, files and watch state are invented.
+
+## Artwork
+
+`art/` holds frames from the films, cropped and resized to posters (400 × 600), backdrops (960 × 540) and episode stills (640 × 360). Each film's licence applies to its frames; the frames from the two CC BY-SA films are shared under CC BY-SA 3.0 as well. The source videos are on Wikimedia Commons.
+
+- Big Buck Bunny (2008), Blender Foundation, CC BY 3.0. `File:Big_Buck_Bunny_4K.webm`
+- Elephants Dream (2006), Orange Open Movie Team, Blender Foundation, CC BY 2.5. `File:Elephants_Dream_(2006).webm`
+- Sintel (2010), Durian Open Movie Team, Blender Foundation, CC BY 3.0. `File:Sintel_movie_4K.webm`
+- Tears of Steel (2012), Mango Open Movie Team, Blender Foundation, CC BY 3.0. `File:Tears_of_Steel_in_4k_-_Official_Blender_Foundation_release.webm`
+- Cosmos Laundromat: First Cycle (2015), Gooseberry Open Movie Team, Blender Foundation, CC BY-SA 3.0. `File:Cosmos_Laundromat_-_First_Cycle_-_Official_Blender_Foundation_release.webm`
+- Glass Half (2015), Blender Foundation, CC BY 4.0. `File:Glass_Half_-_Blender_Open_Movie-full_movie.webm`
+- Caminandes: Llama Drama (2013), Pablo Vazquez, Beorn Leonard and Francesco Siddi, CC BY 3.0. `File:Caminandes-_Llama_Drama_-_Short_Movie.ogv`
+- Caminandes: Gran Dillama (2013), Pablo Vazquez, Beorn Leonard and Francesco Siddi, Blender Foundation, CC BY-SA 3.0. `File:Caminandes_-_Gran_Dillama_-_Blender_Foundation's_new_Open_Movie.webm`
+- Caminandes: Llamigos (2016), Blender Foundation, CC BY 3.0. `File:Caminandes_3_-_Llamigos_-_Blender_Animated_Short.webm`
+- Hero (2018), Blender Foundation, CC BY 4.0. `File:HERO_-_Blender_Open_Movie-full_movie.webm`
+- Spring (2019), Andy Goralczyk, Blender Foundation, CC BY 4.0. `File:Spring_-_Blender_Open_Movie.webm`
+- Coffee Run (2020), Blender Foundation, CC BY 4.0. `File:Coffee_Run_-_Blender_Open_Movie-full_movie.webm`
+- Sprite Fright (2021), Blender Studio, CC BY 4.0. `File:Sprite_Fright_-_Blender_Open_Movie-full_movie.webm`
+- Charge (2022), Blender Studio, CC BY 4.0. `File:Charge_-_Blender_Open_Movie-full_movie.webm`
+- Wing It! (2023), Blender Studio, CC BY 4.0. `File:WING_IT!_-_Blender_Open_Movie-full_movie.webm`

@@ -1,0 +1,77 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "103",
+    "key": "/library/metadata/103",
+    "guid": "plex://movie/62a1b2c3d4e5f60718000103",
+    "type": "movie",
+    "title": "Coffee Run",
+    "summary": "A young woman runs through a flood of memories, kept going by one more cup of coffee.",
+    "year": 2020,
+    "duration": 185000,
+    "contentRating": "PG",
+    "audienceRating": 7.4,
+    "originallyAvailableAt": "2020-06-01",
+    "addedAt": 1759654400,
+    "thumb": "/art/coffee-run-poster.jpg",
+    "art": "/art/coffee-run-backdrop.jpg",
+    "librarySectionID": 1,
+    "librarySectionTitle": "Movies",
+    "Genre": [
+     {
+      "tag": "Animation"
+     },
+     {
+      "tag": "Fantasy"
+     }
+    ],
+    "Media": [
+     {
+      "id": 1030,
+      "duration": 185000,
+      "bitrate": 8000,
+      "width": 1920,
+      "height": 1080,
+      "videoResolution": "1080",
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "container": "mp4",
+      "Part": [
+       {
+        "id": 1031,
+        "key": "/library/parts/1031/file.mp4",
+        "duration": 185000,
+        "file": "/media/movies/Coffee Run.mp4",
+        "size": 185000000,
+        "container": "mp4",
+        "Stream": [
+         {
+          "id": 10311,
+          "streamType": 1,
+          "codec": "h264",
+          "default": true,
+          "displayTitle": "1080p (H.264)"
+         },
+         {
+          "id": 10312,
+          "streamType": 2,
+          "codec": "aac",
+          "channels": 2,
+          "default": true,
+          "selected": true,
+          "language": "English",
+          "languageCode": "eng",
+          "displayTitle": "English (AAC Stereo)",
+          "extendedDisplayTitle": "English (AAC Stereo)"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}
