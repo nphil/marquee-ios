@@ -73,15 +73,16 @@ private extension XCTestCase {
         dismissMenu(in: app)
 
         tap("player.more", in: app)
-        XCTAssertTrue(app.buttons["Playback Info"].waitForExistence(timeout: 5), "No More menu")
+        let aspect = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Aspect'")).firstMatch
+        XCTAssertTrue(aspect.waitForExistence(timeout: 5), "No More menu")
         try snap("player-03-more-menu-\(suffix)")
         dismissMenu(in: app)
 
         try panels(in: app, suffix: suffix)
 
         tap("player.more", in: app)
-        let stats = app.buttons["Stats for Nerds"]
-        XCTAssertTrue(stats.waitForExistence(timeout: 5), "No Stats for Nerds item")
+        let stats = moreMenuItem("Stats for Nerds", in: app)
+        XCTAssertTrue(stats.exists && stats.isHittable, "No Stats for Nerds item")
         stats.tap()
         waitFor("player.stats", in: app)
         let copy = app.buttons["player.stats.copy"]
@@ -102,8 +103,8 @@ private extension XCTestCase {
     @MainActor
     func panels(in app: XCUIApplication, suffix: String) throws {
         tap("player.more", in: app)
-        let info = app.buttons["Playback Info"]
-        XCTAssertTrue(info.waitForExistence(timeout: 5), "No More menu")
+        let info = moreMenuItem("Playback Info", in: app)
+        XCTAssertTrue(info.exists && info.isHittable, "No Playback Info item")
         info.tap()
         waitFor("player.info", in: app)
         try snap("player-04-playback-info-\(suffix)")
@@ -195,5 +196,21 @@ private extension XCTestCase {
     func dismissMenu(in app: XCUIApplication) {
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
         Thread.sleep(forTimeInterval: 0.5)
+    }
+
+    /// An item of the More menu, which scrolls at accessibility sizes. The menu opens upward with
+    /// its first item nearest the button, so the last items start above its top edge; drags down
+    /// the menu bring them in.
+    @MainActor
+    func moreMenuItem(_ label: String, in app: XCUIApplication) -> XCUIElement {
+        let item = app.buttons[label]
+        _ = item.waitForExistence(timeout: 3)
+        var drags = 0
+        while !(item.exists && item.isHittable), drags < 4 {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.25))
+                .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.85)))
+            drags += 1
+        }
+        return item
     }
 }
