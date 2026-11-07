@@ -90,14 +90,14 @@ Marquee's own path on 2.1 (720p60 MPEG-2, AC-3 stereo; 2026-11-07, O): tune 0.77
 
 `LiveRouteDecider` runs before every tune. First match wins:
 
-1. Settings › Live TV › Playback is "Through Plex" → Plex.
+1. Settings › Video & Playback › Read the Tuner Directly (on by default) is off → Plex.
 2. The phone is not on the home network (`NetworkPath`), or `GET <uri>/discover.json` fails within 0.5 s (cached 60 s) → Plex.
 3. The device's grabber is not HDHomeRun (`Device.uuid` does not start with `device://tv.plex.grabbers.hdhomerun/`) → Plex. Real HDHomeRuns, LumaTuner and the HDHomeRun-emulating IPTV proxies (xTeVe, Threadfin and similar) all pass.
 4. AirPlay video is the chosen output → Plex.
 5. The lineup says a codec the phone cannot decode (`VideoCodec` not MPEG2/H264/HEVC, or `AudioCodec` not AC3/EAC3/AAC/MPEG) → Plex. LumaTuner sends no codec fields today (T docs.rs:103-111; R3), so absence means "try direct".
 6. The lineup marks the channel `DRM=1` → show "Protected channel" (neither path can play it) [INFERENCE for Plex].
 7. A Plex recording uses this device now, or starts on it within 2 min and the device has fewer tuners than recordings plus one → Plex.
-8. Otherwise → Direct. If Direct fails before the first picture with a network error, no data for 5 s, or a stream the phone cannot decode, the app retries once through Plex and says so in the status line. Tuner refusals do not fall back (§2.3).
+8. Otherwise → Direct. If Direct fails, before the first picture or while it plays, with a network error, no data for 5 s, an ended stream, or a stream the phone cannot decode, the app carries on once through Plex and says so in the status line. Tuner refusals do not fall back (§2.3).
 
 ### 2.3 One-tuner rules (LumaTuner)
 
