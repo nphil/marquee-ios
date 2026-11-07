@@ -131,6 +131,7 @@ struct LiveTVTests {
         let elsewhere = LiveAiring(id: "906", channelKey: "aaa-0401", title: "Evening News", start: Self.at(1440), end: Self.at(1470))
 
         #expect(recordings.rules.map(\.title) == ["Evening News"] && recordings.rules[0].isSeries)
+        #expect(recordings.rules[0].targetLibrarySectionID == 2)
         #expect(recordings.rules[0].recordings.map(\.id) == ["grab-2"])
         #expect(recordings.scheduled.map(\.id) == ["grab-1", "grab-2"])
         #expect(recordings.scheduled[0].episodeTitle == "Storm Watch" && recordings.scheduled[0].ruleID == "31")
