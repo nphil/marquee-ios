@@ -60,8 +60,9 @@ struct Scrubber: View {
         let fraction = model.duration > 0 ? min(1, max(0, shown / model.duration)) : 0
         let x = width * fraction
         return ZStack(alignment: .leading) {
+            // The readable track (DESIGN §5.1): trackOff all but vanished over a bright picture.
             Capsule()
-                .fill(theme.trackOff)
+                .fill(theme.ink.opacity(0.6))
                 .frame(height: Self.trackHeight)
             Capsule()
                 .fill(theme.ink)
