@@ -88,7 +88,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Downloaded-twin rules (don't offer a second download when one already exists) | Done | A finished download is not fetched again, a Plex result the item already lists is not offered again, and a file fetched again replaces its earlier copy in the menu. | streams, release name and language [docs] |
 | Plex agent subtitle search | Done | Search Subtitles › Plex and Find Another with Plex: the server's own agents in one language at a time (the subtitle language by default), best match first; a tap adds the file and shows it once Plex lists it. | `GET`/`PUT /library/metadata/{id}/subtitles` [docs] |
 | SpeechDock: reveal as spoken (word timing) | Missing | Subtitles appear word by word using timing from SpeechDock. | SpeechDock `POST /api/alignment/windows`, protocol 1 [code: the service's source] |
-| SpeechDock: address and on/off | Partial | Toggle plus address validation; no request is made. | local [code] |
+| SpeechDock: address and on/off | Done | A valid address turns it on and an empty one off, as on the TV; plain http:// only on the home network. | SpeechDock `GET /health` [code] |
 
 ## 6. Live TV
 | Feature | Status | Behaviour | API |
@@ -129,7 +129,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 |---|---|---|---|
 | Bazarr settings page (address, API key, Test connection, Forget key) | Done | Connection to Bazarr; the key is kept in the Keychain. | Bazarr REST API `GET /api/system/status` [code] |
 | Sonarr / Radarr linked | Done | The Bazarr page's connection test names the linked Sonarr and Radarr versions. | Bazarr `/api/system/status` |
-| SpeechDock page | Partial | Toggle and address (no service calls yet). | local [code] |
+| SpeechDock page | Done | Address with its checks, and Test Connection naming the service's version. | SpeechDock `GET /health` [code] |
 
 ## 10. Not on a phone
 - TV remote focus and D-pad navigation: N/A.

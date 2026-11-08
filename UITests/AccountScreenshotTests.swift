@@ -98,12 +98,13 @@ extension XCTestCase {
         waitForBar("Home", in: app)
     }
 
-    /// Each Settings page in list order, an invalid SpeechDock address, Bazarr's connection test, a
-    /// licence and the sign-out confirmation; `turned` takes each shot in landscape.
+    /// Each Settings page in list order, SpeechDock's and Bazarr's connection tests, a licence and the
+    /// sign-out confirmation; `turned` takes each shot in landscape.
     @MainActor
     func settingsFlow(mode: String, suffix: String, turned: Bool = false) throws {
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", arguments: [
             "-marquee.fakeSignedIn", "YES", "-marquee.uitest.bazarr", "http://bazarr.local:6767",
+            "-marquee.uitest.speechDock", "http://speechdock.local:8765",
         ])
         openSettings(in: app)
         try snap("acct-04-settings-\(suffix)", turned: turned)
@@ -133,10 +134,9 @@ extension XCTestCase {
 
         reveal("settings.speechDock", in: app).tap()
         waitForBar("SpeechDock", in: app)
-        flip("speechDock.enabled", in: app)
-        tap("speechDock.address", in: app)
-        element("speechDock.address", in: app).typeText("speechdock.local\n")
-        waitFor("speechDock.invalid", in: app)
+        tap("speechDock.test", in: app)
+        let connected = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Connected · SpeechDock 1.0.0'")).firstMatch
+        XCTAssertTrue(connected.waitForExistence(timeout: 10), "No SpeechDock version after the connection test")
         try snap("acct-09-speechdock-\(suffix)", turned: turned)
         goBack(from: "SpeechDock", in: app)
 

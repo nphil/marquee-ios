@@ -46,4 +46,13 @@ struct SubtitleLookTests {
         #expect(SubtitleReveal.estimate("One two", duration: 2, by: .off).isEmpty)
         #expect(SubtitleReveal.estimate("東京へ", duration: 1, by: .word).count == 3)
     }
+
+    @Test func measuredWordsTakeSpeechDocksTimesOnlyForTheSameWords() throws {
+        let words = try #require(SubtitleReveal.measured("Run, now.\nWhere?", starts: [0.1, 0.6, 1.4], by: .word))
+        #expect(words.map(\.offset) == [0, 5, 10] && words.map(\.start) == [0.1, 0.6, 1.4])
+        #expect(SubtitleReveal.measured("One two\nthree", starts: [0.2, 0.5, 1.1], by: .line)?.map(\.start) == [0.2, 0.2, 1.1])
+        #expect(SubtitleReveal.measured("Run, now.", starts: [0.1], by: .word) == nil)
+        // Five syllables a second: "Hello" is two, "there." one and a full stop's pause.
+        #expect(abs(SubtitleReveal.spoken("Hello there.") - (2.25 + 1.25 + 1) / 5) < 1e-9)
+    }
 }

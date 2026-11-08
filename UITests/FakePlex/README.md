@@ -4,7 +4,7 @@ The UI tests launch the app with `MARQUEE_FAKE_PLEX` set to this folder. `App/Te
 
 ## Rules
 
-- A request reads `<prefix>/<path>.json`: prefix `plextv` for plex.tv, `discover` for discover.provider.plex.tv, `bazarr` for a host starting with `bazarr`, `pms` for any other host. `GET /library/metadata/12` on the fake server reads `pms/library/metadata/12.json`.
+- A request reads `<prefix>/<path>.json`: prefix `plextv` for plex.tv, `discover` for discover.provider.plex.tv, `bazarr` for a host starting with `bazarr`, `speechdock` for a host starting with `speechdock`, `pms` for any other host. `GET /library/metadata/12` on the fake server reads `pms/library/metadata/12.json`.
 - `<path>@<name>=<value>.json` wins over `<path>.json` when the request has that query item, e.g. `plextv/api/v2/home/users/<uuid>/switch@pin=1234.json`.
 - After a write (any method but GET) to `/a/b`, `<path>@after=a_b.json` wins over every other fixture of the path; of several, the one for the latest write. `pms/library/metadata/212@after=api_providers_episodes.json` is the episode once Bazarr has downloaded a subtitle for it.
 - A GET without a JSON fixture serves `<path>.srt` as text when that file exists, as `pms/library/streams/21217.srt` does for an external subtitle.
@@ -31,6 +31,8 @@ Living Room has an antenna DVR with one four-tuner HDHomeRun and eight channels,
 The player tests play Caminandes episode 2, Gran Dillama (`212`): an intro from 0:05 to 0:35, final credits from 2:10, Spanish audio beside the English, and English, English SDH and Spanish subtitles. `pms/playQueues@continuous=1.json` queues the season around it.
 
 Bazarr, at `http://bazarr.local:6767` when a test passes `-marquee.uitest.bazarr`, knows the Caminandes series and its episodes, and offers three English subtitles and a Spanish one for episode 2. Downloading one adds it to the episode in Plex as an external English subtitle (`21217`); removing that brings the episode back to its own tracks.
+
+SpeechDock, at `http://speechdock.local:8765` when a test passes `-marquee.uitest.speechDock`, answers its health check as version 1.0.0.
 
 ## Artwork
 

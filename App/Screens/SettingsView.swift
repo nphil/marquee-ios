@@ -123,7 +123,7 @@ struct SettingsView: View {
                     SpeechDockView()
                 } label: {
                     LabeledContent("SpeechDock") {
-                        Text(session.speechDockEnabled && SpeechDockView.isValid(session.speechDockAddress) ? "On" : "Off")
+                        Text(session.speechDock.origin == nil ? "Off" : "On")
                             .foregroundStyle(theme.ink2)
                     }
                 }

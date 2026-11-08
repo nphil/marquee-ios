@@ -28,6 +28,7 @@
 
 - `PlexServer`, `PlexConnection`: a server with this user's token and its addresses. Codable, for the Keychain only. `PlexConnection.displayAddress` is the address as a person reads it: the IP a plex.direct name spells, and the port when it is not 32400.
 - `ConnectionRanking.ordered(_:httpsRequired:)`: local, then remote, then relay; https before http, IPv4 before IPv6; duplicates dropped.
+- `HomeNetwork.contains(_:)`: the hosts the app's transport security lets through without TLS (private, link-local and tailnet addresses, `.local` and single-label names); integrations allow plain http only to these.
 - `ConnectionRanking.pick(_:graceExpired:)`: `use`, `wait` or `noneReachable` from probe outcomes so far.
 - `ConnectionRanking.triesAlone(_:)`: only a remembered local address skips the probe. `upgrades(from:in:)`: the addresses in a better tier than the one in use.
 - `PlexServerConnection` (actor): probes every address at once with `/identity` (no token; an answer from another machine counts as a failure). A remembered local address is tried alone first; a remembered remote one is not, since it may have won only while iOS asked for Local Network access or a VPN was on. Better-ranked addresses get 750 ms after the first answer. `connection()`, `currentConnection`, `reportFailure(of:)`, `refresh()` (after a network change), `preferLocal()` (on foreground: while a remote or relay address is in use, probes the better ones and moves to the best that answers).
@@ -110,9 +111,11 @@ The endpoints and the route rules are in `docs/LIVE-TV.md`.
 
 - `BazarrConfig.parse(address:key:)`: checks a typed address and key; plain http only for home-network addresses.
 - `BazarrClient`: `status()` (Bazarr, Sonarr and Radarr versions), `find(_:)` (a `BazarrLookup` by external id, then file name, then title and year, to a `BazarrTarget`), `search(_:)` (`BazarrSubtitle`s, best score first), `download(_:for:)`.
+- `SpeechDock.origin(_:)`: checks a typed service address (an http(s) origin alone; plain http only on the home network). `identity(server:ratingKey:media:audio:subtitle:)`: the choice SpeechDock can time (English sidecar text and English audio in a one-part file), or nil. `cues(_:)`, `alignable(_:)`, `window(_:asked:due:offset:ahead:)`: the file as the service reads it, the cues it times and the next window to ask about.
+- `SpeechDockClient`: `health()` (the service's version), `align(_:)` (a `SpeechDock.Request` window to a `SpeechDock.Answer`: measured word starts by cue ordinal, or busy, or refused).
 - `SubtitleLook`: the subtitle style: the TV's presets, font, size, colour, edge, box, position, line spacing, blending with the video and file styling. `init(preset:)`, `isCustom`.
 - `SubtitleTiming`: a subtitle offset in 0.1 s steps, up to 60 s either way.
-- `SubtitleReveal.estimate(_:duration:by:)`, `visibility(of:at:)`: Reveal as Spoken timing estimated from a cue's text and length.
+- `SubtitleReveal.estimate(_:duration:by:)`, `visibility(of:at:)`: Reveal as Spoken timing estimated from a cue's text and length. `measured(_:starts:by:)` takes SpeechDock's word starts instead; `spoken(_:)` is about how long a text takes to say.
 
 ## Not yet checked against a live server
 

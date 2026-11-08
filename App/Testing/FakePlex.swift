@@ -7,7 +7,8 @@ import Synchronization
 ///
 /// Fixture rules (`UITests/FakePlex/README.md` has them with examples):
 /// - `plex.tv` reads `plextv/<path>.json`, `discover.provider.plex.tv` reads `discover/<path>.json`, a
-///   host starting with `bazarr` reads `bazarr/<path>.json`, any other host `pms/<path>.json`.
+///   host starting with `bazarr` reads `bazarr/<path>.json`, one starting with `speechdock`
+///   `speechdock/<path>.json`, any other host `pms/<path>.json`.
 ///   `<path>@<name>=<value>.json` wins for a request with that query item.
 /// - After a write (any method but GET) to `/a/b`, `<path>@after=a_b.json` wins over every other
 ///   fixture of the path; of several, the one for the latest write.
@@ -176,6 +177,7 @@ struct FakePlexRouter {
         case "plex.tv": "plextv"
         case "discover.provider.plex.tv": "discover"
         case _ where host.hasPrefix("bazarr"): "bazarr"
+        case _ where host.hasPrefix("speechdock"): "speechdock"
         default: "pms"
         }
     }

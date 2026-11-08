@@ -27,12 +27,12 @@ Read first: `docs/ARCHITECTURE.md` (layers and why), then the file for the area 
 | Folder | Holds |
 |---|---|
 | `Plex/` | `PlexHTTPClient` (actor) and `PlexTransport`, request building, lenient models, `PlexTV` (sign-in PIN, servers, Home profiles), `PlexWatchlist`, client identity, `KeychainStore` |
-| `Connection/` | `PlexServerConnection`: probe all addresses, `ConnectionRanking` (local > remote > relay, https > http) |
+| `Connection/` | `PlexServerConnection`: probe all addresses, `ConnectionRanking` (local > remote > relay, https > http), `HomeNetwork` (hosts allowed plain http) |
 | `Library/` | `PlexLibrary` (browse, search, metadata, timeline, mark watched, delete), `PagedLoader`, `SectionQuery`, `HomeLayout`, play queues, transcode sessions, `Deletion` |
 | `Playback/` | `PlaybackRouteDecider` (direct, remux, transcode and why), `DeviceCapabilities`, `TranscodeRequest` |
 | `Tracks/` | `AudioPicker`, `SubtitlePicker`, `TrackMemory`, language and track-label rules |
 | `Live/` | Plex Live TV and DVR (`PlexLiveTV`), guide models and `GuideCache`, recordings, `LiveRouteDecider`, `HDHomeRunClient` for the direct tuner path |
-| `Subtitles/` | `Bazarr` client (search, download), `SubtitleLook` (presets, fonts, edges, boxes, position), `SubtitleTiming` (offset), `SubtitleReveal` (Reveal as Spoken modes) |
+| `Subtitles/` | `Bazarr` client (search, download), `SpeechDock` (word timing: the file as the service reads it, request windows, client), `SubtitleLook` (presets, fonts, edges, boxes, position), `SubtitleTiming` (offset), `SubtitleReveal` (Reveal as Spoken modes) |
 
 SpeechDock word timing for Reveal as Spoken is being built on branch `parity-speechdock`. Remote server content in the App is `App/Browse/Remote.swift`.
 

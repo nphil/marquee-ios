@@ -49,26 +49,11 @@ final class AppSession {
             storage.setSettings(newValue, for: user?.uuid)
         }
     }
-    /// SpeechDock (DESIGN §8.7 Integrations), off until enabled. A service address is not a viewing
-    /// preference, so it is kept per iPhone rather than per profile.
-    var speechDockEnabled: Bool {
-        get { speechDockOn }
-        set {
-            speechDockOn = newValue
-            storage.speechDockEnabled = newValue
-        }
-    }
-    var speechDockAddress: String {
-        get { speechDockText }
-        set {
-            speechDockText = newValue
-            storage.speechDockAddress = newValue
-        }
-    }
+    /// SpeechDock (DESIGN §8.7 Integrations). A service address is not a viewing preference, so it is
+    /// kept per iPhone rather than per profile, like Bazarr's.
+    let speechDock: SpeechDockSettings
     private var profileSettings = ProfileSettings()
-    private var speechDockOn = false
-    private var speechDockText = ""
-    /// Bazarr (DESIGN §8.7 Integrations), kept per iPhone like SpeechDock.
+    /// Bazarr (DESIGN §8.7 Integrations), kept per iPhone.
     let bazarr: BazarrSettings
 
     /// Made again by Delete All Local Data, which removes the stored client identifier.
@@ -93,8 +78,7 @@ final class AppSession {
         FakePlex.install(into: configuration)
         transport = URLSessionTransport(session: URLSession(configuration: configuration))
         bazarr = BazarrSettings(storage: storage, transport: transport)
-        speechDockOn = storage.speechDockEnabled
-        speechDockText = storage.speechDockAddress
+        speechDock = SpeechDockSettings(storage: storage, transport: transport)
         restore()
         watchNetwork()
         watchForeground()
@@ -344,11 +328,15 @@ final class AppSession {
 
     /// UI-test launches start signed out unless `-marquee.fakeSignedIn YES` (open on the first server)
     /// or `-marquee.fakeServerList YES` (open on the server list) is passed. `-marquee.uitest.bazarr`
-    /// with an address saves a Bazarr there, answered by the fake Plex's `bazarr` fixtures.
+    /// with an address saves a Bazarr there, answered by the fake Plex's `bazarr` fixtures;
+    /// `-marquee.uitest.speechDock` does the same for SpeechDock and its `speechdock` fixtures.
     private func restoreUITest() {
         let arguments = UserDefaults.standard
         if let address = arguments.string(forKey: "marquee.uitest.bazarr").flatMap(URL.init(string:)) {
             bazarr.save(BazarrConfig(address: address, apiKey: "fake"))
+        }
+        if let origin = arguments.string(forKey: "marquee.uitest.speechDock").flatMap({ try? SpeechDock.origin($0).get() }) {
+            speechDock.save(origin)
         }
         let pick: ServerPick
         if arguments.bool(forKey: "marquee.fakeSignedIn") {

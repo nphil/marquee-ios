@@ -28,19 +28,42 @@ public enum SubtitleReveal {
         let total = words.reduce(0) { $0 + $1.weight + $1.pause }
         var elapsed = 0.0
         var timed: [Word] = []
-        var lineStart: TimeInterval?
         for token in words {
-            let start = total > 0 ? span * elapsed / total : 0
-            if reveal == .line {
-                // Every word of a line appears with the line's first.
-                if lineStart == nil || token.startsLine { lineStart = start }
-                timed.append(Word(offset: token.offset, length: token.length, start: lineStart ?? start))
-            } else {
-                timed.append(Word(offset: token.offset, length: token.length, start: start))
-            }
+            timed.append(Word(offset: token.offset, length: token.length, start: total > 0 ? span * elapsed / total : 0))
             elapsed += token.weight + token.pause
         }
-        return timed
+        return reveal == .line ? byLine(timed, in: text) : timed
+    }
+
+    /// Words timed by SpeechDock: `starts` holds when each word of `text` starts, in seconds after the cue
+    /// shows. Nil when `text` has another number of words, so another file's timing is never applied.
+    public static func measured(_ text: String, starts: [TimeInterval], by reveal: SubtitleLook.Reveal) -> [Word]? {
+        guard reveal != .off else { return [] }
+        let words = tokens(text)
+        guard words.count == starts.count else { return nil }
+        let timed = zip(words, starts).map { Word(offset: $0.offset, length: $0.length, start: $1) }
+        return reveal == .line ? byLine(timed, in: text) : timed
+    }
+
+    /// About how long `text` takes to say, for a line whose end is not known yet. Five syllables a second
+    /// is brisk speech, so a word shows by the time it is said rather than after its line has gone.
+    public static func spoken(_ text: String) -> TimeInterval {
+        tokens(text).reduce(0) { $0 + $1.weight + $1.pause } / 5
+    }
+
+    /// Every word of a line appears with the line's first. `words` are in text order.
+    public static func byLine(_ words: [Word], in text: String) -> [Word] {
+        let breaks = text.enumerated().compactMap { $0.element.isNewline ? $0.offset : nil }
+        var line = -1
+        var lineStart: TimeInterval = 0
+        return words.map { word in
+            let index = breaks.firstIndex { $0 > word.offset } ?? breaks.count
+            if index != line {
+                line = index
+                lineStart = word.start
+            }
+            return Word(offset: word.offset, length: word.length, start: lineStart)
+        }
     }
 
     /// How much of a word shows `elapsed` seconds into its cue, 0 to 1.
@@ -53,21 +76,18 @@ public enum SubtitleReveal {
         var length: Int
         var weight: Double
         var pause: Double
-        var startsLine: Bool
     }
 
     private static func tokens(_ text: String) -> [Token] {
         var tokens: [Token] = []
         var current: (offset: Int, characters: [Character])?
-        var newline = true
         func close() {
             guard let word = current else { return }
             current = nil
             tokens.append(Token(
                 offset: word.offset, length: word.characters.count,
-                weight: weight(word.characters), pause: pause(after: word.characters.last), startsLine: newline
+                weight: weight(word.characters), pause: pause(after: word.characters.last)
             ))
-            newline = false
         }
         for (offset, character) in text.enumerated() {
             if character.isNewline {
@@ -76,7 +96,6 @@ public enum SubtitleReveal {
                     last.pause = max(last.pause, 0.8)
                     tokens.append(last)
                 }
-                newline = true
             } else if character.isWhitespace {
                 close()
             } else if isIdeograph(character) {

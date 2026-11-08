@@ -17,7 +17,7 @@ public struct BazarrConfig: Sendable, Hashable, Codable {
               scheme == "https" || scheme == "http" else { return .failure(.scheme) }
         guard let host = components.host, !host.isEmpty, !host.contains(" "), components.user == nil,
               components.query == nil, components.fragment == nil, let url = components.url else { return .failure(.host) }
-        if scheme == "http", !isHomeNetwork(host) { return .failure(.plaintext) }
+        if scheme == "http", !HomeNetwork.contains(host) { return .failure(.plaintext) }
         let key = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard (16...64).contains(key.count), key.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) }) else {
             return .failure(.key)
@@ -32,26 +32,6 @@ public struct BazarrConfig: Sendable, Hashable, Codable {
         /// Plain http:// to a host outside the home network.
         case plaintext
         case key
-    }
-
-    /// Plain http is allowed to private, link-local and tailnet addresses, `.local` names and single-label
-    /// names: the hosts the app's transport security lets through without TLS.
-    static func isHomeNetwork(_ host: String) -> Bool {
-        let host = host.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
-        if host.contains(":") {
-            return host == "::1" || host.hasPrefix("fe80:") || host.hasPrefix("fc") || host.hasPrefix("fd")
-        }
-        if !host.contains(".") || host.hasSuffix(".local") { return true }
-        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
-        let octets = parts.compactMap { UInt8($0) }
-        guard parts.count == 4, octets.count == 4 else { return false }
-        switch (octets[0], octets[1]) {
-        case (10, _), (127, _), (192, 168), (169, 254): return true
-        case (172, 16...31): return true
-        // Carrier-grade NAT, which Tailscale uses for its addresses.
-        case (100, 64...127): return true
-        default: return false
-        }
     }
 }
 

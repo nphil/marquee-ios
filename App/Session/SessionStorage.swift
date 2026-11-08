@@ -21,7 +21,6 @@ final class SessionStorage {
         static let profile = "marquee.profile"
         static let addressPrefix = "marquee.server.address."
         static let settingsPrefix = "marquee.settings."
-        static let speechDockEnabled = "marquee.speechDock.enabled"
         static let speechDockAddress = "marquee.speechDock.address"
         static let bazarrAddress = "marquee.bazarr.address"
         static let bazarrKey = "marquee.bazarr.key"
@@ -93,11 +92,6 @@ final class SessionStorage {
 
     func setTrackMemory(_ memory: TrackMemory, forKey key: String) {
         defaults.set(try? JSONEncoder().encode(memory), forKey: Key.tracksPrefix + key)
-    }
-
-    var speechDockEnabled: Bool {
-        get { defaults.bool(forKey: Key.speechDockEnabled) }
-        set { defaults.set(newValue, forKey: Key.speechDockEnabled) }
     }
 
     var speechDockAddress: String {
