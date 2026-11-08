@@ -106,18 +106,15 @@ struct Scrubber: View {
         .frame(width: width, height: Self.hitHeight)
         .contentShape(Rectangle())
         .gesture(drag(width: width))
-        .overlay(alignment: .leading) {
-            // The thumb's frame, handed up as an anchor for the chrome to place the preview by. It sits at
-            // the thumb's own offset in this track, so the two cannot drift apart, and it moves without
-            // animation: the preview shows at the touch, not on its way there.
-            Color.clear
-                .frame(width: thumbSize, height: thumbSize)
-                .offset(x: x - thumbSize / 2)
-                .anchorPreference(key: SeekPreviewKey.self, value: .bounds) { thumb in
-                    content.map { SeekPreviewState(thumb: thumb, image: $0.image, hasFrames: $0.hasFrames, time: $0.time, speed: $0.speed) }
-                }
-                .transaction(value: model.isScrubbing) { $0.animation = nil }
-                .allowsHitTesting(false)
+        .anchorPreference(key: SeekPreviewKey.self, value: .bounds) { track in
+            // The track's frame, handed up for the chrome to place the preview by: the thumb is `x` points
+            // into it. An anchor on the offset thumb reported its layout frame, at the track's start.
+            content.map {
+                SeekPreviewState(
+                    track: track, thumbX: x, thumbSize: thumbSize,
+                    image: $0.image, hasFrames: $0.hasFrames, time: $0.time, speed: $0.speed
+                )
+            }
         }
     }
 
@@ -240,11 +237,14 @@ enum ScrubSpeed: Equatable {
     }
 }
 
-/// What the scrubber hands up to be drawn above everything else: the thumb's frame, as an anchor the
+/// What the scrubber hands up to be drawn above everything else: the track's frame, as an anchor the
 /// chrome resolves in its own coordinate space, and the preview's content. The chrome draws the
 /// preview, so it is placed in the space the track lives in and clamped against the safe area it fills.
 struct SeekPreviewState {
-    let thumb: Anchor<CGRect>
+    /// The track's frame, with the thumb's centre `thumbX` points into it.
+    let track: Anchor<CGRect>
+    let thumbX: CGFloat
+    let thumbSize: CGFloat
     let image: UIImage?
     /// Whether scene thumbnails exist for this item, so the frame is reserved while one decodes.
     let hasFrames: Bool
@@ -272,7 +272,11 @@ struct SeekPreviewLayer: View {
     var body: some View {
         GeometryReader { proxy in
             if let state {
-                let thumb = proxy[state.thumb]
+                let track = proxy[state.track]
+                let thumb = CGRect(
+                    x: track.minX + state.thumbX - state.thumbSize / 2, y: track.midY - state.thumbSize / 2,
+                    width: state.thumbSize, height: state.thumbSize
+                )
                 let half = SeekPreview.width / 2
                 let lowest = Space.inset + half
                 let centre = min(max(thumb.midX, lowest), max(lowest, proxy.size.width - lowest))
