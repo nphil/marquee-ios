@@ -2,8 +2,8 @@ import MarqueeCore
 import Observation
 
 /// "Wrong Subtitles?" for one item (DESIGN §8.6): removing the subtitle file on screen from Plex, and
-/// finding another with Bazarr. It lasts as long as the item plays, so a search and its downloads are
-/// where they were when the sheet opens again.
+/// finding another with Plex's own agents or with Bazarr. It lasts as long as the item plays, so a search
+/// and its downloads are where they were when the sheet opens again.
 @MainActor @Observable
 final class SubtitleFix {
     enum Removal: Equatable {
@@ -19,12 +19,19 @@ final class SubtitleFix {
         case failed(BazarrError)
     }
 
-    /// Where one download stands. Bazarr reports no progress, so every state is a step the app saw
-    /// happen.
+    /// Plex's agents search one language at a time.
+    enum PlexSearch: Equatable {
+        case searching
+        case found([PlexSubtitleCandidate])
+        case failed(unreachable: Bool)
+    }
+
+    /// Where one download stands. Neither Bazarr nor Plex reports progress, so every state is a step the
+    /// app saw happen.
     enum Download: Equatable {
         case requesting
-        /// Plex is asked to read the item's files again: after Bazarr took the request, or for Check
-        /// Plex Again.
+        /// Waiting for Plex to list the file: after Bazarr or Plex took the request, or for Check Plex
+        /// Again.
         case waiting(afterBazarr: Bool)
         case notVisible
         case checkFailed
@@ -33,6 +40,8 @@ final class SubtitleFix {
         case listed(track: Int)
         case playerFailed(track: Int)
         case failed(BazarrError)
+        /// Plex would not add a file its agents found, or could not be reached.
+        case notAdded(unreachable: Bool)
 
         var isBusy: Bool {
             switch self {
@@ -61,17 +70,24 @@ final class SubtitleFix {
     let ratingKey: String
     private(set) var removal: Removal?
     private(set) var search: Search?
-    /// The language results are listed in.
+    /// The language Bazarr's results are listed in.
     var language: TrackLanguage
     private(set) var downloads: [BazarrSubtitle.ID: Download] = [:]
+    private(set) var plexSearch: PlexSearch?
+    /// The language Plex's agents search in: one with a two-letter code, the only kind the server takes.
+    private(set) var plexLanguage: TrackLanguage
+    /// By candidate key, which is good only for the search that found it.
+    private(set) var plexDownloads: [PlexSubtitleCandidate.ID: Download] = [:]
 
     @ObservationIgnored private weak var model: PlayerModel?
     @ObservationIgnored private var target: BazarrTarget?
     /// The track ids Plex listed before each download, so the file it adds can be told apart.
     @ObservationIgnored private var before: [BazarrSubtitle.ID: Set<Int>] = [:]
+    @ObservationIgnored private var plexBefore: [PlexSubtitleCandidate.ID: Set<Int>] = [:]
     @ObservationIgnored private var removeTask: Task<Void, Never>?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
+    @ObservationIgnored private var plexSearchTask: Task<Void, Never>?
 
     /// Seconds between reads of the item while Plex finds a downloaded file: 19 s in all.
     private static let plexWaits: [Double] = [1, 2, 3, 5, 8]
@@ -80,6 +96,7 @@ final class SubtitleFix {
         self.model = model
         ratingKey = model.item.ratingKey
         self.language = TrackLanguage(code: language.code)
+        plexLanguage = TrackLanguage.all.first { $0.matches(language) } ?? .english
     }
 
     /// The sheet opened again: an old removal's outcome is no longer news.
@@ -88,7 +105,12 @@ final class SubtitleFix {
     }
 
     func cancel() {
-        for task in [removeTask, searchTask, downloadTask] { task?.cancel() }
+        for task in [removeTask, searchTask, downloadTask, plexSearchTask] { task?.cancel() }
+    }
+
+    /// One download at a time, from either search: each finds its file by what Plex lists anew.
+    var isDownloading: Bool {
+        downloads.values.contains(where: \.isBusy) || plexDownloads.values.contains(where: \.isBusy)
     }
 
     // MARK: Remove
@@ -103,11 +125,7 @@ final class SubtitleFix {
             } catch {
                 guard !Task.isCancelled else { return }
                 Haptics.error()
-                let unreachable: Bool = switch error as? PlexError {
-                case .unreachable?, .noConnections?: true
-                default: false
-                }
-                self?.removal = unreachable ? .unreachable : .refused
+                self?.removal = Self.isUnreachable(error) ? .unreachable : .refused
                 return
             }
             Haptics.success()
@@ -115,11 +133,12 @@ final class SubtitleFix {
             removal = .removed
             // A downloaded file that was just removed is no longer in Plex; its result can be had again.
             downloads = downloads.filter { $0.value.track != track.id }
+            plexDownloads = plexDownloads.filter { $0.value.track != track.id }
             await model.removed(track)
         }
     }
 
-    // MARK: Search
+    // MARK: Bazarr
 
     func searchIfNeeded() {
         if search == nil { searchAgain() }
@@ -159,11 +178,9 @@ final class SubtitleFix {
         return results.filter { $0.trackLanguage.matches(language) }
     }
 
-    // MARK: Download
-
-    /// One download at a time, and never one result twice.
+    /// Never one result twice.
     func canDownload(_ result: BazarrSubtitle) -> Bool {
-        downloads[result.id] == nil && !downloads.values.contains(where: \.isBusy) && target != nil
+        downloads[result.id] == nil && !isDownloading && target != nil
     }
 
     func download(_ result: BazarrSubtitle) {
@@ -186,7 +203,7 @@ final class SubtitleFix {
 
     /// Asks Plex to look at the item again; never downloads again.
     func checkPlexAgain(_ result: BazarrSubtitle) {
-        guard downloads[result.id]?.canCheckPlex == true, !downloads.values.contains(where: \.isBusy) else { return }
+        guard downloads[result.id]?.canCheckPlex == true, !isDownloading else { return }
         downloads[result.id] = .waiting(afterBazarr: false)
         downloadTask = Task { [weak self] in await self?.waitForPlex(result) }
     }
@@ -202,6 +219,83 @@ final class SubtitleFix {
             downloads[result.id] = .checkFailed
             return
         }
+        let before = self.before[result.id] ?? []
+        await show { $0.arrived(result.trackLanguage, kind: result.kind, since: before) } report: {
+            downloads[result.id] = $0
+        }
+    }
+
+    // MARK: Plex
+
+    func searchPlexIfNeeded() {
+        if plexSearch == nil { searchPlex(in: plexLanguage) }
+    }
+
+    /// Searches in `language`. An earlier search's keys download nothing, so their downloads are dropped.
+    func searchPlex(in language: TrackLanguage) {
+        guard let model, let code = language.code, !isDownloading else { return }
+        plexLanguage = language
+        plexDownloads = [:]
+        plexBefore = [:]
+        plexSearchTask?.cancel()
+        plexSearch = .searching
+        let key = ratingKey
+        plexSearchTask = Task { [weak self] in
+            let outcome: PlexSearch
+            do {
+                outcome = .found(try await model.library.searchSubtitles(key, language: code))
+            } catch {
+                outcome = .failed(unreachable: Self.isUnreachable(error))
+            }
+            guard !Task.isCancelled else { return }
+            self?.plexSearch = outcome
+        }
+    }
+
+    /// Never one result twice, nor a file the item already lists.
+    func canAdd(_ candidate: PlexSubtitleCandidate) -> Bool {
+        plexDownloads[candidate.id] == nil && !isDownloading && model?.tracks?.listed(candidate) == nil
+    }
+
+    func add(_ candidate: PlexSubtitleCandidate) {
+        guard canAdd(candidate), let model else { return }
+        plexBefore[candidate.id] = Set(model.tracks?.subtitles.map(\.id) ?? [])
+        plexDownloads[candidate.id] = .requesting
+        let key = ratingKey
+        downloadTask = Task { [weak self] in
+            do {
+                try await model.library.addSubtitle(key, candidate: candidate)
+            } catch {
+                guard !Task.isCancelled else { return }
+                Haptics.error()
+                self?.plexDownloads[candidate.id] = .notAdded(unreachable: Self.isUnreachable(error))
+                return
+            }
+            self?.plexDownloads[candidate.id] = .waiting(afterBazarr: false)
+            await self?.waitForPlex(candidate)
+        }
+    }
+
+    /// Reads the item again; never adds the file again.
+    func checkPlexAgain(_ candidate: PlexSubtitleCandidate) {
+        guard plexDownloads[candidate.id]?.canCheckPlex == true, !isDownloading else { return }
+        plexDownloads[candidate.id] = .waiting(afterBazarr: false)
+        downloadTask = Task { [weak self] in await self?.waitForPlex(candidate) }
+    }
+
+    /// Plex answers an add at once and lists the file a little later, under a new id and the release name.
+    private func waitForPlex(_ candidate: PlexSubtitleCandidate) async {
+        let before = plexBefore[candidate.id] ?? []
+        await show { $0.landed(candidate, since: before) } report: {
+            plexDownloads[candidate.id] = $0
+        }
+    }
+
+    // MARK: Showing a download
+
+    /// Reads the item until `find` picks the downloaded file out of it, then shows that file.
+    private func show(_ find: (MediaTracks) -> SubtitleTrack?, report: (Download) -> Void) async {
+        guard let model else { return }
         for wait in Self.plexWaits {
             try? await Task.sleep(for: .seconds(wait))
             guard !Task.isCancelled else { return }
@@ -210,18 +304,25 @@ final class SubtitleFix {
                 tracks = try await model.reloadTracks()
             } catch {
                 guard !Task.isCancelled else { return }
-                downloads[result.id] = .checkFailed
+                report(.checkFailed)
                 return
             }
             guard let tracks else { break }
-            if let track = tracks.arrived(result.trackLanguage, kind: result.kind, since: before[result.id] ?? []) {
-                downloads[result.id] = .loading(track: track.id)
+            if let track = find(tracks) {
+                report(.loading(track: track.id))
                 let shows = await model.show(track)
                 if shows { Haptics.success() } else { Haptics.error() }
-                downloads[result.id] = shows ? .listed(track: track.id) : .playerFailed(track: track.id)
+                report(shows ? .listed(track: track.id) : .playerFailed(track: track.id))
                 return
             }
         }
-        downloads[result.id] = .notVisible
+        report(.notVisible)
+    }
+
+    private static func isUnreachable(_ error: any Error) -> Bool {
+        switch error as? PlexError {
+        case .unreachable?, .noConnections?: true
+        default: false
+        }
     }
 }

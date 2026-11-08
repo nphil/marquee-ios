@@ -85,8 +85,8 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Wrong subtitles? flow | Done | In the subtitle menu: remove a separate file from Plex, or search Bazarr for another. | Plex refresh `/library/metadata/{id}/refresh` [code] |
 | Search subtitles (Bazarr) | Done | Bazarr's results by score with provider and language; a download is shown once Plex lists it. | Bazarr REST API, `X-API-KEY` header [code] |
 | Check Plex again | Done | Refreshes metadata only, never downloads twice. | `/library/metadata/{id}/refresh` [code] |
-| Downloaded-twin rules (don't offer a second download when one already exists) | Partial | A finished download is not fetched again; the TV's other duplicate rules are not built. | streams [code/INFERENCE] |
-| Plex agent subtitle search | Missing | Asks Plex's own agents for subtitles, besides Bazarr. | Plex subtitle search [INFERENCE] |
+| Downloaded-twin rules (don't offer a second download when one already exists) | Done | A finished download is not fetched again, a Plex result the item already lists is not offered again, and a file fetched again replaces its earlier copy in the menu. | streams, release name and language [docs] |
+| Plex agent subtitle search | Done | Search Subtitles › Plex and Find Another with Plex: the server's own agents in one language at a time (the subtitle language by default), best match first; a tap adds the file and shows it once Plex lists it. | `GET`/`PUT /library/metadata/{id}/subtitles` [docs] |
 | SpeechDock: reveal as spoken (word timing) | Missing | Subtitles appear word by word using timing from SpeechDock. | SpeechDock `POST /api/alignment/windows`, protocol 1 [code: the service's source] |
 | SpeechDock: address and on/off | Partial | Toggle plus address validation; no request is made. | local [code] |
 

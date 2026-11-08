@@ -98,6 +98,23 @@ struct MediaTracksTests {
         #expect(tracks.arrived(TrackLanguage(tag: "fr"), kind: .full, since: [1, 2, 3]) == nil)
     }
 
+    @Test func aFileDownloadedAgainReplacesItsEarlierCopy() throws {
+        let release = "Alive.2020.1080p.WEBRip"
+        let tracks = try Fixture.tracks([
+            Fixture.subtitle(1, "eng"),
+            Fixture.subtitle(7, "eng", title: release, external: true),
+            Fixture.subtitle(8, "dut", title: release, external: true),
+            Fixture.subtitle(9, "eng", title: release, external: true),
+        ])
+
+        #expect(tracks.subtitles.map(\.replacedBy) == [9, 9, nil, nil])
+        #expect(tracks.visibleSubtitles.map(\.id) == [8, 9])
+        let added = PlexSubtitleCandidate(key: "/library/streams/40", title: release, language: TrackLanguage(tag: "nl"), provider: nil, score: nil)
+        let other = PlexSubtitleCandidate(key: "/library/streams/41", title: "Alive.2020.720p", language: .english, provider: nil, score: nil)
+        #expect(tracks.listed(added)?.id == 8 && tracks.listed(other) == nil)
+        #expect(tracks.landed(added, since: [1, 7, 9])?.id == 8 && tracks.landed(added, since: [1, 7, 8, 9]) == nil)
+    }
+
     @Test func viewersLanguagesStayOnTheMenuAndTheRestGoAToZ() throws {
         let tracks = try Fixture.tracks([
             Fixture.subtitle(1, "spa"),

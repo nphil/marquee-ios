@@ -521,25 +521,29 @@ struct TracksMenu: View {
             .disabled(state.unavailable != nil)
     }
 
-    /// Bazarr's search once it is set up, and the way out of a subtitle that doesn't match the video.
-    @ViewBuilder
+    /// Searches for another subtitle, with Plex's own agents and with Bazarr once it is set up, and the
+    /// way out of a subtitle that doesn't match the video.
     private var subtitleFixes: some View {
-        let showing = model.subtitle?.track != nil
-        if showing || model.bazarr != nil {
-            Section {
-                if model.bazarr != nil {
-                    Button {
-                        model.openSubtitleFix(.search)
-                    } label: {
-                        Text("Search Subtitles")
-                        Text("Bazarr")
-                    }
-                    .accessibilityIdentifier("player.tracks.search")
+        Section {
+            Button {
+                model.openSubtitleFix(.plex)
+            } label: {
+                Text("Search Subtitles")
+                Text("Plex")
+            }
+            .accessibilityIdentifier("player.tracks.searchPlex")
+            if model.bazarr != nil {
+                Button {
+                    model.openSubtitleFix(.bazarr)
+                } label: {
+                    Text("Search Subtitles")
+                    Text("Bazarr")
                 }
-                if showing {
-                    Button("Wrong Subtitles?") { model.openSubtitleFix(.wrong) }
-                        .accessibilityIdentifier("player.tracks.wrong")
-                }
+                .accessibilityIdentifier("player.tracks.search")
+            }
+            if model.subtitle?.track != nil {
+                Button("Wrong Subtitles?") { model.openSubtitleFix(.wrong) }
+                    .accessibilityIdentifier("player.tracks.wrong")
             }
         }
     }

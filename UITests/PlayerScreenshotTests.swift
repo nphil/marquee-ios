@@ -207,7 +207,7 @@ private extension XCTestCase {
     }
 
     /// "Wrong Subtitles?" on the episode's own English track, Bazarr's results, a download that Plex
-    /// lists and the player shows, then that file removed from Plex again.
+    /// lists and the player shows, that file removed from Plex again, then one Plex's own agents add.
     @MainActor
     func subtitleFixFlow(mode: String, suffix: String) throws {
         let app = launchPlayer(at: 61, paused: true, mode: mode, bazarr: true)
@@ -260,6 +260,17 @@ private extension XCTestCase {
         goBack(from: "Bazarr", in: app)
         XCTAssertTrue(removal.wait(for: \.label, toEqual: "Removed from Plex.", timeout: 5), "No word that the file was removed: \(removal.label)")
         try snap("player-18-subtitle-removed-\(suffix)")
+
+        scrollList(app.collectionViews["subtitleFix.wrong"], to: element("subtitleFix.searchPlex", in: app)).tap()
+        let plexResult = element("plex.result", in: app)
+        XCTAssertTrue(plexResult.waitForExistence(timeout: 10), "No Plex results")
+        try snap("player-19-plex-results-\(suffix)")
+
+        scrollList(app.collectionViews["subtitleFix.plex"], to: plexResult).tap()
+        let plexState = element("plex.state", in: app)
+        XCTAssertTrue(plexState.waitForExistence(timeout: 5), "The Plex download did not start")
+        XCTAssertTrue(plexState.wait(for: \.label, toEqual: "Active in player", timeout: 20), "The Plex download did not show: \(plexState.label)")
+        try snap("player-20-plex-added-\(suffix)")
     }
 
     @MainActor

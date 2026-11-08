@@ -136,12 +136,13 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 - "Track N" tells apart identical rows.
 - The audio menu uses plain-words labels in eleven languages.
 
-**Subtitles menu** (`docs/player-submenus.md` 1–203): Off, Forced only ("On-screen text only"), one section per language, "Other languages N", Timing, Style (size, position, colour), and Search subtitles when Bazarr is set up. Per-language pages rank Full, SDH, Forced, Commentary. Image-format badges (PGS, VOBSUB, DVB) show only on image subtitles.
+**Subtitles menu** (`docs/player-submenus.md` 1–203): Off, Forced only ("On-screen text only"), one section per language, "Other languages N", Timing, Style (size, position, colour), and Search subtitles: Plex's own agents always, Bazarr when it is set up. Per-language pages rank Full, SDH, Forced, Commentary. Image-format badges (PGS, VOBSUB, DVB) show only on image subtitles.
 
 **"Wrong subtitles?" flow (Bazarr):**
 - Remove an external subtitle from Plex, or search Bazarr by score, language, provider and hearing-impaired flag. Download, then Plex refreshes and the new track is selected.
 - States: queued, Plex track found, loading, Active, or a named error.
 - "Check Plex again" refreshes metadata only and never downloads twice.
+- Plex's agent search (`pms-api.md` §8) asks in one two-letter language, the subtitle language by default; a result the item already lists is not offered again, and an added file replaces an earlier copy with the same release name.
 
 **Subtitle look** (per profile): presets, font, size, colour, opacity, bold, edge, background box, position, line spacing, "Blend with video", "Reveal as spoken", and "My look" file styling. Native ASS/SSA keeps its own styles.
 

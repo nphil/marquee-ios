@@ -46,6 +46,7 @@
   - `selectStreams(partID:audioStreamID:subtitleStreamID:)`, `playbackURL(path:query:)`, `transcodeURL(_:)`, `stopTranscode(session:)`: playback. These URLs carry the token because the player cannot send headers; they are never logged or cached.
   - `transcodeSession(_:)`: the server's `PlexTranscodeSession` for a `TranscodeRequest.session` (speed, throttling, decisions, hardware), nil once it has ended; for the player's stats.
   - `removeSubtitle(streamID:)`, `refresh(_:)`, `externalIDs(_:)`: deletes a separate subtitle file (the video stays), asks the server to re-read an item so a new file is listed, and an item's IMDb, TMDB and TVDB ids for Bazarr.
+  - `searchSubtitles(_:language:)`, `addSubtitle(_:candidate:)`: the server's own subtitle agents for an item in one two-letter language, best match first, as `PlexSubtitleCandidate`s, and adding one. A candidate's key is good only for the search that found it; the server lists the added file a little later as a new selected stream named after the release.
   - `imageURL(_:width:height:scale:)`, `authorizationHeaders()`: artwork and headers for the image loader and the remux.
 - `HomeRow`, `HomeLayout`: a profile's Home rows. A row is a Home hub or a library hub (id prefixed with the library's uuid). `arrange(_:)` orders rows by the saved placements, then unplaced ones in server order with their default visibility (library rows hidden); `save(_:)` keeps placements of rows the server did not send this time; `shownLibraries` names the libraries worth asking.
 - `SectionQuery`: item type, sort, Unwatched filter and genre for a grid.
@@ -65,8 +66,8 @@
 
 - `TrackLanguage`: `eng`, `en` and `en-US` compare as English. `matches(_:)`, `name`, `variantName`, `.english`; `all` lists every two-letter language by English name, for language pickers.
 - `AudioTrack`, `SubtitleTrack`, `TrackBadge`: tracks with plain menu labels ("English – 7.1", "English (on-screen text)", "Spanish (Latin America)") and Captions or Audio description badges. `SubtitleTrack.Kind` is full, captions, on-screen text or commentary.
-- `MediaTracks(part:)`: one part's tracks, separate files last. An embedded subtitle with an exact separate-file twin is hidden behind the file (`visibleSubtitles`, `visible(_:)`).
-- `MediaTracks.arrived(_:kind:since:)`: a separate file in a language that was not listed before, such as a Bazarr download once Plex lists it.
+- `MediaTracks(part:)`: one part's tracks, separate files last. An embedded subtitle with an exact separate-file twin, and an earlier copy of a file downloaded again (same release name and language), are hidden behind the newer file (`visibleSubtitles`, `visible(_:)`).
+- `MediaTracks.arrived(_:kind:since:)`: a separate file in a language that was not listed before, such as a Bazarr download once Plex lists it. `listed(_:)` and `landed(_:since:)` find a Plex search result already in the menu and the file an added one became.
 - `SubtitleLanguages`: the tracks menu's groups, the preferred languages first and the rest A to Z behind Other Languages.
 - `SubtitlePicker.decide(tracks:audio:handPick:remembered:settings:canDrawImageSubtitles:)`: `SubtitleDecision` with its source. Order: hand pick, server selection, remembered choice, file default, setting. Automatic picks take only tracks the app can draw and follow the audio: the dub transcript for audio in the preferred language, the full translation for other audio.
 - `SubtitlePicker.onScreenText(for:in:)`: the on-screen-text track in the audio's language.
@@ -121,4 +122,4 @@ The endpoints and the route rules are in `docs/LIVE-TV.md`.
 - The Keychain store, which has no tests.
 - Dolby Vision, HEVC level and HDR limits, and CEA-608 captions on the actual phone.
 - The live endpoints: fixtures follow the server's API spec and the shapes recorded in `docs/LIVE-TV.md` §1, not a captured response.
-- `removeSubtitle(streamID:)`, which only FakePlex has answered, and the Bazarr client, which follows Bazarr's API source rather than a captured response.
+- `removeSubtitle(streamID:)` and the subtitle search and add, which only FakePlex has answered (their shapes follow the TV's measured notes), and the Bazarr client, which follows Bazarr's API source rather than a captured response.

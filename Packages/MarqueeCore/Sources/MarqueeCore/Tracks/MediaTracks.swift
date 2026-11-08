@@ -91,7 +91,8 @@ public struct SubtitleTrack: Sendable, Hashable, Identifiable {
     public var imageFormat: String?
     public var isDefault: Bool
     public var isSelectedOnServer: Bool
-    /// The separate file that stands in for this embedded track. Such a track is left out of menus.
+    /// The track that stands in for this one, which is left out of menus: a separate file for an embedded
+    /// twin, or a later download of the same separate file.
     public var replacedBy: Int?
     /// Menu text, e.g. "English", "English (on-screen text)", "English (dub)".
     public var label: String
@@ -134,6 +135,12 @@ public struct SubtitleTrack: Sendable, Hashable, Identifiable {
         language == other.language && language.isKnown && kind == other.kind && isDub == other.isDub
     }
 
+    /// The same downloaded file: a separate one with the same release name and language. The server gives
+    /// a file fetched again a new id, so the name is all that tells it is the same.
+    func isSameFile(as other: SubtitleTrack) -> Bool {
+        isExternal && other.isExternal && title?.isEmpty == false && title == other.title && language == other.language
+    }
+
     private static let imageFormats = [
         "pgs": "PGS", "hdmv_pgs_subtitle": "PGS",
         "vobsub": "VOBSUB", "dvd_subtitle": "VOBSUB", "dvdsub": "VOBSUB",
@@ -156,8 +163,13 @@ public struct MediaTracks: Sendable, Hashable {
         audio = streams.filter { $0.kind == .audio }.map(AudioTrack.init)
         let all = streams.filter { $0.kind == .subtitle }.map(SubtitleTrack.init)
         var subtitles = all.filter { !$0.isExternal } + all.filter(\.isExternal)
+        // Ids rise as files are added, so the newest copy of a downloaded file is the one kept.
+        for index in subtitles.indices where subtitles[index].isExternal {
+            subtitles[index].replacedBy = subtitles.filter { $0.id > subtitles[index].id && $0.isSameFile(as: subtitles[index]) }
+                .map(\.id).max()
+        }
         for index in subtitles.indices where !subtitles[index].isExternal {
-            subtitles[index].replacedBy = subtitles.first { $0.isExternal && $0.isTwin(of: subtitles[index]) }?.id
+            subtitles[index].replacedBy = subtitles.first { $0.isExternal && !$0.isHidden && $0.isTwin(of: subtitles[index]) }?.id
         }
         self.subtitles = subtitles
         Labeler.label(&self.audio)
@@ -181,6 +193,19 @@ public struct MediaTracks: Sendable, Hashable {
     public func arrived(_ language: TrackLanguage, kind: SubtitleTrack.Kind, since before: Set<Int>) -> SubtitleTrack? {
         let new = subtitles.filter { $0.isExternal && !before.contains($0.id) && $0.language.matches(language) }
         return new.first { $0.kind == kind } ?? new.first
+    }
+
+    /// The file a search result already is in the menu, so adding it would list it twice.
+    public func listed(_ candidate: PlexSubtitleCandidate) -> SubtitleTrack? {
+        guard let title = candidate.title, !title.isEmpty else { return nil }
+        return visibleSubtitles.first { $0.isExternal && $0.title == title && $0.language == candidate.language }
+    }
+
+    /// The file an added search result became: a new separate one with its release name and language.
+    public func landed(_ candidate: PlexSubtitleCandidate, since before: Set<Int>) -> SubtitleTrack? {
+        subtitles.first {
+            $0.isExternal && !before.contains($0.id) && $0.title == candidate.title && $0.language == candidate.language
+        }
     }
 }
 

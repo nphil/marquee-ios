@@ -62,10 +62,11 @@ final class PlayerModel: Identifiable {
         var serial: Int
     }
 
-    /// The sheets "Wrong Subtitles?" and "Search Subtitles" open.
+    /// The sheets "Wrong Subtitles?" and the two "Search Subtitles" open.
     enum SubtitleSheet: Identifiable {
         case wrong
-        case search
+        case plex
+        case bazarr
 
         var id: Self { self }
     }

@@ -1,8 +1,8 @@
 import MarqueeCore
 import SwiftUI
 
-/// What "Wrong Subtitles?" and "Search Subtitles" open (DESIGN §8.6). Bazarr's search is a page pushed
-/// inside the sheet, as long tasks are (DESIGN §7).
+/// What "Wrong Subtitles?" and "Search Subtitles" open (DESIGN §8.6). A search is a page pushed inside the
+/// sheet, as long tasks are (DESIGN §7).
 struct SubtitleFixSheet: View {
     let model: PlayerModel
     let fix: SubtitleFix
@@ -14,21 +14,26 @@ struct SubtitleFixSheet: View {
             Group {
                 switch start {
                 case .wrong: WrongSubtitlesView(model: model, fix: fix) { path = [.bazarr] }
-                case .search: BazarrSearchView(model: model, fix: fix)
+                case .plex: PlexSearchView(model: model, fix: fix)
+                case .bazarr: BazarrSearchView(model: model, fix: fix)
                 }
             }
-            .navigationDestination(for: SubtitleFixPage.self) { _ in
-                BazarrSearchView(model: model, fix: fix)
+            .navigationDestination(for: SubtitleFixPage.self) { page in
+                switch page {
+                case .plex: PlexSearchView(model: model, fix: fix)
+                case .bazarr: BazarrSearchView(model: model, fix: fix)
+                }
             }
         }
     }
 }
 
 enum SubtitleFixPage: Hashable {
+    case plex
     case bazarr
 }
 
-/// The subtitle on screen, removing its file from Plex, and Bazarr for another.
+/// The subtitle on screen, removing its file from Plex, and a search for another.
 struct WrongSubtitlesView: View {
     let model: PlayerModel
     let fix: SubtitleFix
@@ -68,6 +73,8 @@ struct WrongSubtitlesView: View {
             .listRowBackground(theme.sheet)
 
             Section {
+                NavigationLink("Find Another with Plex", value: SubtitleFixPage.plex)
+                    .accessibilityIdentifier("subtitleFix.searchPlex")
                 NavigationLink("Find Another with Bazarr", value: SubtitleFixPage.bazarr)
                     .disabled(model.bazarr == nil)
                     .accessibilityIdentifier("subtitleFix.findAnother")
@@ -130,6 +137,119 @@ struct WrongSubtitlesView: View {
             }
             .foregroundStyle(theme.ink2)
         }
+    }
+}
+
+/// Plex's own subtitle agents (OpenSubtitles and the like) for the playing item, one language per search,
+/// best match first. A tap adds one to Plex; once Plex lists it, it shows.
+struct PlexSearchView: View {
+    let model: PlayerModel
+    let fix: SubtitleFix
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        List {
+            Section {
+                NavigationLink {
+                    LanguagePickerView(title: "Language", noneTitle: nil, selection: language)
+                } label: {
+                    LabeledContent("Language") {
+                        Text(fix.plexLanguage.name ?? "")
+                            .foregroundStyle(theme.ink2)
+                    }
+                }
+                .disabled(fix.isDownloading)
+                .accessibilityIdentifier("plex.language")
+            }
+            .listRowBackground(theme.sheet)
+
+            results
+                .listRowBackground(theme.sheet)
+        }
+        .themedList(theme)
+        .navigationTitle("Plex")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { SubtitleFixDone(model: model) }
+        .onAppear { fix.searchPlexIfNeeded() }
+        .accessibilityIdentifier("subtitleFix.plex")
+    }
+
+    private var language: Binding<TrackLanguage?> {
+        Binding { fix.plexLanguage } set: { if let language = $0 { fix.searchPlex(in: language) } }
+    }
+
+    @ViewBuilder
+    private var results: some View {
+        switch fix.plexSearch {
+        case nil, .searching?:
+            Section {
+                HStack(spacing: Space.s2) {
+                    ProgressView()
+                    Text("Searching Plex…")
+                        .foregroundStyle(theme.ink2)
+                }
+                .accessibilityElement(children: .combine)
+            } footer: {
+                Text("Plex asks its subtitle agents, such as OpenSubtitles.")
+                    .foregroundStyle(theme.ink2)
+            }
+        case .failed(let unreachable)?:
+            Section {
+                ProblemLine(text: unreachable ? "Couldn't reach the server." : "The server couldn't search for subtitles.")
+                Button("Try Again") { fix.searchPlex(in: fix.plexLanguage) }
+                    .accessibilityIdentifier("plex.retry")
+            }
+        case .found(let candidates)?:
+            Section {
+                if candidates.isEmpty {
+                    Text("Plex found nothing in \(fix.plexLanguage.name ?? "this language").")
+                        .foregroundStyle(theme.ink2)
+                }
+                ForEach(candidates) { candidate in
+                    row(candidate)
+                }
+            } header: {
+                Text(candidates.count == 1 ? "1 Result" : "\(candidates.count) Results")
+            } footer: {
+                if !candidates.isEmpty {
+                    Text("Best match first. Plex adds the file to this video, then it shows here.")
+                        .foregroundStyle(theme.ink2)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ candidate: PlexSubtitleCandidate) -> some View {
+        let listed = model.tracks?.listed(candidate).map { SubtitleFix.Download.listed(track: $0.id) }
+        if let download = fix.plexDownloads[candidate.id] ?? listed {
+            VStack(alignment: .leading, spacing: Space.s2) {
+                label(candidate)
+                DownloadStatus(model: model, download: download, source: "plex") { fix.checkPlexAgain(candidate) }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("plex.result")
+        } else {
+            Button { fix.add(candidate) } label: {
+                label(candidate)
+            }
+            .disabled(!fix.canAdd(candidate))
+            .accessibilityHint("Adds it to Plex, then shows it.")
+            .accessibilityIdentifier("plex.result")
+        }
+    }
+
+    private func label(_ candidate: PlexSubtitleCandidate) -> some View {
+        VStack(alignment: .leading, spacing: Space.s1) {
+            Text(candidate.title ?? candidate.language.name ?? "Subtitle")
+                .foregroundStyle(theme.ink)
+                .lineLimit(3)
+            Text([candidate.provider, candidate.language.name].compactMap { $0 }.joined(separator: " · "))
+                .foregroundStyle(theme.ink2)
+        }
+        .padding(.vertical, Space.s1)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -205,7 +325,7 @@ struct BazarrSearchView: View {
         if let download = fix.downloads[result.id] {
             VStack(alignment: .leading, spacing: Space.s2) {
                 label(result)
-                state(download, of: result)
+                DownloadStatus(model: model, download: download, source: "bazarr") { fix.checkPlexAgain(result) }
             }
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("bazarr.result")
@@ -246,48 +366,6 @@ struct BazarrSearchView: View {
         .accessibilityElement(children: .combine)
     }
 
-    @ViewBuilder
-    private func state(_ download: SubtitleFix.Download, of result: BazarrSubtitle) -> some View {
-        Group {
-            switch download {
-            case .requesting:
-                progress("Requesting download…")
-            case .waiting(let afterBazarr):
-                progress(afterBazarr ? "Waiting for Bazarr and Plex…" : "Waiting for Plex…")
-            case .loading:
-                progress("Loading in player…")
-            case .notVisible:
-                StatusLine(symbol: "clock", tint: theme.ink2, text: "Not yet visible in Plex.")
-            case .checkFailed:
-                ProblemLine(text: "Could not check Plex.")
-            case .listed(let track) where model.subtitle?.track?.id == track:
-                StatusLine(symbol: "checkmark.circle.fill", tint: theme.positive, text: "Active in player")
-            case .listed:
-                StatusLine(symbol: "checkmark.circle", tint: theme.ink2, text: "Available in Plex")
-            case .playerFailed:
-                ProblemLine(text: "The player could not load this subtitle. Try another.")
-            case .failed(let error):
-                ProblemLine(text: Self.text(for: error))
-            }
-        }
-        .accessibilityIdentifier("bazarr.state")
-        if download.canCheckPlex {
-            Button("Check Plex Again") { fix.checkPlexAgain(result) }
-                .buttonStyle(.borderless)
-                .disabled(fix.downloads.values.contains(where: \.isBusy))
-                .accessibilityIdentifier("bazarr.checkPlex")
-        }
-    }
-
-    private func progress(_ text: String) -> some View {
-        HStack(spacing: Space.s2) {
-            ProgressView()
-            Text(text)
-                .foregroundStyle(theme.ink2)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
     private func failure(_ error: BazarrError) -> some View {
         let retry = EmptyState.Action(title: "Try Again", systemImage: "arrow.clockwise") { fix.searchAgain() }
         return switch error {
@@ -322,6 +400,59 @@ struct BazarrSearchView: View {
                 systemImage: "exclamationmark.triangle", action: retry
             )
         }
+    }
+}
+
+/// Where one download stands, with Check Plex Again while Plex may hold the file already. `source`
+/// prefixes the accessibility identifiers.
+private struct DownloadStatus: View {
+    let model: PlayerModel
+    let download: SubtitleFix.Download
+    let source: String
+    let checkPlexAgain: @MainActor () -> Void
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Group {
+            switch download {
+            case .requesting:
+                progress("Requesting download…")
+            case .waiting(let afterBazarr):
+                progress(afterBazarr ? "Waiting for Bazarr and Plex…" : "Waiting for Plex…")
+            case .loading:
+                progress("Loading in player…")
+            case .notVisible:
+                StatusLine(symbol: "clock", tint: theme.ink2, text: "Not yet visible in Plex.")
+            case .checkFailed:
+                ProblemLine(text: "Could not check Plex.")
+            case .listed(let track) where model.subtitle?.track?.id == track:
+                StatusLine(symbol: "checkmark.circle.fill", tint: theme.positive, text: "Active in player")
+            case .listed:
+                StatusLine(symbol: "checkmark.circle", tint: theme.ink2, text: "Available in Plex")
+            case .playerFailed:
+                ProblemLine(text: "The player could not load this subtitle. Try another.")
+            case .failed(let error):
+                ProblemLine(text: Self.text(for: error))
+            case .notAdded(let unreachable):
+                ProblemLine(text: unreachable ? "Couldn't reach the server." : "The server would not add it.")
+            }
+        }
+        .accessibilityIdentifier("\(source).state")
+        if download.canCheckPlex {
+            Button("Check Plex Again", action: checkPlexAgain)
+                .buttonStyle(.borderless)
+                .disabled(model.subtitleFix?.isDownloading == true)
+                .accessibilityIdentifier("\(source).checkPlex")
+        }
+    }
+
+    private func progress(_ text: String) -> some View {
+        HStack(spacing: Space.s2) {
+            ProgressView()
+            Text(text)
+                .foregroundStyle(theme.ink2)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     static func text(for error: BazarrError) -> String {

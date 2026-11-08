@@ -1,0 +1,59 @@
+{
+ "MediaContainer": {
+  "size": 3,
+  "identifier": "com.plexapp.plugins.library",
+  "Stream": [
+   {
+    "id": 40201,
+    "key": "/library/streams/40201",
+    "streamType": 3,
+    "codec": "srt",
+    "format": "srt",
+    "canAutoSync": false,
+    "language": "English",
+    "languageCode": "eng",
+    "languageTag": "en",
+    "providerTitle": "OpenSubtitles",
+    "score": "1870",
+    "sourceKey": "/library/streams/40001",
+    "title": "Caminandes.2.Gran.Dillama.2013.720p.BluRay",
+    "displayTitle": "English",
+    "extendedDisplayTitle": "Caminandes.2.Gran.Dillama.2013.720p.BluRay (English SRT OpenSubtitles)"
+   },
+   {
+    "id": 40202,
+    "key": "/library/streams/40202",
+    "streamType": 3,
+    "codec": "srt",
+    "format": "srt",
+    "canAutoSync": false,
+    "language": "English",
+    "languageCode": "eng",
+    "languageTag": "en",
+    "providerTitle": "OpenSubtitles",
+    "score": "2301",
+    "sourceKey": "/library/streams/40002",
+    "title": "Caminandes.S01E02.Gran.Dillama.1080p.WEB.x264-GRASS",
+    "displayTitle": "English",
+    "extendedDisplayTitle": "Caminandes.S01E02.Gran.Dillama.1080p.WEB.x264-GRASS (English SRT OpenSubtitles)"
+   },
+   {
+    "id": 40203,
+    "key": "/library/streams/40203",
+    "streamType": 3,
+    "codec": "srt",
+    "format": "srt",
+    "canAutoSync": false,
+    "language": "English",
+    "languageCode": "eng",
+    "languageTag": "en",
+    "providerTitle": "OpenSubtitles",
+    "score": "940",
+    "sourceKey": "/library/streams/40003",
+    "title": "Caminandes Gran Dillama (2013) DVDRip",
+    "displayTitle": "English",
+    "extendedDisplayTitle": "Caminandes Gran Dillama (2013) DVDRip (English SRT OpenSubtitles)"
+   }
+  ]
+ }
+}
