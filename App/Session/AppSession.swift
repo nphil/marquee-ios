@@ -85,8 +85,6 @@ final class AppSession {
     @ObservationIgnored private var foregroundObserver: (any NSObjectProtocol)?
     @ObservationIgnored private let localNetwork = LocalNetworkAccess()
 
-    private static let forwardURL = URL(string: "marquee://signed-in")!
-
     init() {
         let storage: SessionStorage = FakePlex.isActive ? .uiTest() : .live()
         self.storage = storage
@@ -115,7 +113,7 @@ final class AppSession {
                 let pin = try await tv.createPIN(strong: true)
                 // The UI tests' fake plex.tv approves every code, and no browser can run there.
                 if FakePlex.isActive { return try await tv.waitForToken(pin) }
-                let url = tv.authURL(for: pin, forwardURL: Self.forwardURL)
+                let url = tv.authURL(for: pin)
                 self.signInPage = url
                 self.signInBrowser.open(url)
                 defer {

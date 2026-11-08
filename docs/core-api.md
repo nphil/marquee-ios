@@ -16,7 +16,7 @@
 - `PlexMetadata.markers(_:)`: intro, credits or commercial markers in playback order. `onDeck`: the episode to play next on a show's details. `PlexPart.hasSceneThumbnails`: the server has scrubber thumbnails at `/library/parts/<id>/indexes/sd`.
 - `KeychainStore`, `KeychainError`: the account token and server list, readable after first unlock.
 - `PlexTV`: the plex.tv account API.
-  - `createPIN(strong:)`, `authURL(for:forwardURL:)`, `checkPIN(_:)`, `waitForToken(_:every:now:sleep:)`: PIN sign-in. A strong PIN is for the browser; a 4-character one is typed at plex.tv/link.
+  - `createPIN(strong:)`, `authURL(for:)`, `checkPIN(_:)`, `waitForToken(_:every:now:sleep:)`: PIN sign-in. A strong PIN is for the browser sheet, which the app closes once polling sees the approval; a 4-character one is typed at plex.tv/link.
   - `servers()`: servers with this user's token for each.
   - `homeUsers()`, `switchHomeUser(_:pin:)`: Plex Home profiles; a switch returns that profile's token.
   - `account()`: the user a token belongs to (`/api/v2/user`), the account or the profile switched to.

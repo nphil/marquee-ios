@@ -91,15 +91,13 @@ public struct PlexTV: Sendable {
         try await http.decode(PlexPIN.self, from: request(.post, "/api/v2/pins", ["strong": strong ? "true" : "false"]))
     }
 
-    /// The plex.tv page that approves `pin`, for an `ASWebAuthenticationSession`. With `forwardURL`, plex.tv
-    /// sends the browser there once the user approved, which lets the session close itself.
-    public func authURL(for pin: PlexPIN, forwardURL: URL? = nil) -> URL {
-        var parameters = [
+    /// The plex.tv page that approves `pin`, opened in a browser sheet while the app polls the code.
+    public func authURL(for pin: PlexPIN) -> URL {
+        let parameters = [
             ("clientID", http.identity.clientIdentifier),
             ("code", pin.code),
             ("context[device][product]", http.identity.product),
         ]
-        if let forwardURL { parameters.append(("forwardUrl", forwardURL.absoluteString)) }
         let fragment = parameters.map { PlexURL.encode($0.0) + "=" + PlexURL.encode($0.1) }.joined(separator: "&")
         return URL(string: "https://app.plex.tv/auth#?" + fragment)!
     }
