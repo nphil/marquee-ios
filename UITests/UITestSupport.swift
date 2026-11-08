@@ -85,7 +85,8 @@ extension XCTestCase {
     }
 
     /// A tap on a toggle row's label does nothing, so this taps the switch at its trailing end. A tap
-    /// while the page is still sliding in can miss, so it taps again until the value changes.
+    /// while the page is still sliding in can miss, so it taps again until the value changes. A busy
+    /// test machine has taken over two seconds to read the new value back.
     @MainActor
     func flip(_ identifier: String, in app: XCUIApplication) {
         let row = element(identifier, in: app)
@@ -95,7 +96,7 @@ extension XCTestCase {
         for _ in 0..<3 {
             control.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
             let flipped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value != %@", before), object: control)
-            if XCTWaiter().wait(for: [flipped], timeout: 2) == .completed { return }
+            if XCTWaiter().wait(for: [flipped], timeout: 5) == .completed { return }
         }
         XCTFail("\(identifier) did not flip")
     }
