@@ -17,7 +17,7 @@ struct ServerListView: View {
             if session.servers.isEmpty {
                 EmptyState(
                     title: "No servers found",
-                    message: "Servers on this Plex account and its Home show here.",
+                    message: "Servers on this Plex account, its Home and those shared with it show here.",
                     systemImage: "server.rack",
                     action: .init(title: "Retry", systemImage: "arrow.clockwise") {
                         Task { await session.reloadServers() }
@@ -123,8 +123,8 @@ private struct ServerRow: View {
 
     private var owner: String {
         if server.isOwned { return "Yours" }
-        if let name = server.ownerName { return "Plex Home · \(name)" }
-        return "Plex Home"
+        if server.isHome { return server.ownerName.map { "Plex Home · \($0)" } ?? "Plex Home" }
+        return server.ownerName.map { "Shared by \($0)" } ?? "Shared with you"
     }
 }
 

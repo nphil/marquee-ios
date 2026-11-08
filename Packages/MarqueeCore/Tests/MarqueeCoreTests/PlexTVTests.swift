@@ -77,6 +77,20 @@ struct PlexTVTests {
         #expect(await transport.requests(to: "/api/v2/user").count == 1)
     }
 
+    @Test func serversIncludeSharedOnesAfterOwnAndHome() async throws {
+        func server(_ id: String, owned: Bool, home: Bool) -> [String: Any] {
+            ["provides": "server", "clientIdentifier": id, "owned": owned, "home": home, "connections": [[String: Any]]()]
+        }
+        let body = json([
+            server("friend", owned: false, home: false), server("home", owned: false, home: true),
+            ["provides": "player", "clientIdentifier": "phone"], server("own", owned: true, home: false),
+        ])
+
+        let servers = try await plexTV(FakeTransport { _, _ in body }).servers()
+
+        #expect(servers.map(\.id) == ["own", "home", "friend"])
+    }
+
     @Test func homeUserSurvivesEncoding() throws {
         let kid = try decode(PlexHomeUser.self, ["id": 9, "uuid": "u9", "title": "Kid", "thumb": "https://plex.tv/a.png", "protected": "1", "restricted": true])
 

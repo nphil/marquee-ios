@@ -137,10 +137,14 @@ public struct PlexTV: Sendable {
         try await http.decode(PlexHomeUser.self, from: request(.get, "/api/v2/user"))
     }
 
-    /// Servers the account can use, with this user's token for each.
+    /// Servers the account can use, with this user's token for each: its own, its Plex Home's and
+    /// those friends share, in that order and otherwise as plex.tv lists them.
     public func servers() async throws -> [PlexServer] {
         let query = ["includeHttps": "1", "includeRelay": "1", "includeIPv6": "1"]
-        return try await http.decode([PlexResource].self, from: request(.get, "/api/v2/resources", query)).compactMap(\.server)
+        let servers = try await http.decode([PlexResource].self, from: request(.get, "/api/v2/resources", query)).compactMap(\.server)
+        return servers.enumerated()
+            .sorted { ($0.element.listOrder, $0.offset) < ($1.element.listOrder, $1.offset) }
+            .map(\.element)
     }
 
     /// Profiles in the user's Plex Home; empty for an account without a Home.

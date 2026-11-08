@@ -45,8 +45,8 @@ public struct PlexServer: Sendable, Hashable, Identifiable, Codable {
         self.connections = connections
     }
 
-    /// The user's own server or the Plex Home's, as opposed to one a friend shared.
-    public var isOwnOrHome: Bool { isOwned || isHome }
+    /// The user's own servers first, then the Plex Home's, then those friends share.
+    var listOrder: Int { isOwned ? 0 : isHome ? 1 : 2 }
 }
 
 /// One address of a server.

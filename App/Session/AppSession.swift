@@ -28,7 +28,7 @@ final class AppSession {
     private(set) var signedOutNotice: SignedOutNotice?
     /// plex.tv with the active profile's token; set while signed in.
     private(set) var plexTV: PlexTV?
-    /// The account's own servers and its Plex Home's; servers friends share are left out.
+    /// The account's own servers, its Plex Home's and those friends share.
     private(set) var servers: [PlexServer] = []
     private(set) var homeUsers: [PlexHomeUser] = []
     /// The code to type at plex.tv/link while the code sign-in waits.
@@ -178,7 +178,7 @@ final class AppSession {
     func reloadServers() async {
         guard let tv = plexTV else { return }
         do {
-            let found = try await tv.servers().filter(\.isOwnOrHome)
+            let found = try await tv.servers()
             storage.servers = found
             servers = found
             if case .choosingServer = state { state = .choosingServer(found) }
@@ -203,7 +203,7 @@ final class AppSession {
         let token = try await tv.switchHomeUser(profile, pin: pin)
         player.stopAll()
         let profileTV = makePlexTV(token: token)
-        let found = try await profileTV.servers().filter(\.isOwnOrHome)
+        let found = try await profileTV.servers()
         storage.accountToken = token
         storage.servers = found
         plexTV = profileTV
@@ -396,7 +396,7 @@ final class AppSession {
 
     private func completeSignIn(token: String, tv: PlexTV, pick: ServerPick) async {
         do {
-            let found = try await tv.servers().filter(\.isOwnOrHome)
+            let found = try await tv.servers()
             let account = try? await tv.account()
             let profiles = (try? await tv.homeUsers()) ?? []
             guard !Task.isCancelled else { return }
@@ -422,7 +422,7 @@ final class AppSession {
     /// Brings a kept sign-in up to date: the servers (their tokens can change), the profile and the Home.
     private func refreshAccount(_ tv: PlexTV) async {
         do {
-            let found = try await tv.servers().filter(\.isOwnOrHome)
+            let found = try await tv.servers()
             let account = try? await tv.account()
             let profiles = try? await tv.homeUsers()
             guard !Task.isCancelled else { return }

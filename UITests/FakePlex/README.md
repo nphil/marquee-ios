@@ -22,7 +22,7 @@ The UI tests launch the app with `MARQUEE_FAKE_PLEX` set to this folder. `App/Te
 
 The fake server is "Living Room", `fake-server`, at `http://192.0.2.10:32400`.
 
-plex.tv lists four servers of the account and its Home: Living Room (reached locally), Cabin (remote only), Office (relay only) and Studio (Alex's, offline), plus a friend's server the app leaves out. The browser sign-in code is approved at once; the plex.tv/link code never is. The Home has three profiles: Jordan (the account), Alex (PIN 1234) and Kids (restricted). Their photos, `users/<uuid>/avatar.png`, are generated silhouettes.
+plex.tv lists four servers of the account and its Home: Living Room (reached locally), Cabin (remote only), Office (relay only) and Studio (Alex's, offline), then Sam's server shared with the account. The browser sign-in code is approved at once; the plex.tv/link code never is. The Home has three profiles: Jordan (the account), Alex (PIN 1234) and Kids (restricted). Their photos, `users/<uuid>/avatar.png`, are generated silhouettes.
 
 Living Room has two libraries. Movies holds eleven Blender open movies: Sintel is half watched and has two versions (4K Dolby Vision with Atmos, and 1080p) and a full set of tracks, Tears of Steel is part watched, Big Buck Bunny and Elephants Dream are watched. TV Shows holds Caminandes, one season of three episodes with the second in progress. One collection, Blender Open Movies, gathers the films. The watchlist on plex.tv holds Wing It! (not on the server), Spring, Caminandes, Cosmos Laundromat and Elephants Dream. Titles, years and credits are real; summaries, dates, ratings, files and watch state are invented.
 
