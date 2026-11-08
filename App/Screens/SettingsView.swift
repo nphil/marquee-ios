@@ -192,6 +192,7 @@ struct SettingsView: View {
         }
         .themedList(theme)
         .navigationTitle("Settings")
+        .toolbarTitleDisplayMode(.inlineLarge)
         .sheet(isPresented: $session.showsProfileSwitcher) {
             ProfileSwitcher()
                 .preferredColorScheme(store.presentationScheme(for: theme))
@@ -200,13 +201,15 @@ struct SettingsView: View {
 }
 
 extension View {
-    /// A system inset-grouped list on the theme's canvas, rows 56 pt minimum. A partial sheet passes
-    /// `onCanvas: false` to keep the system glass behind it (DESIGN §6).
+    /// A system inset-grouped list on the theme's canvas, rows 56 pt minimum, under the chosen header style.
+    /// A partial sheet passes `onCanvas: false` to keep the system glass behind it (DESIGN §6) and the soft
+    /// edge with it.
     func themedList(_ theme: Theme, onCanvas: Bool = true) -> some View {
         listStyle(.insetGrouped)
             .scrollContentBackground(.hidden)
             .background(onCanvas ? theme.canvas : .clear)
             .foregroundStyle(theme.ink, theme.ink2)
             .environment(\.defaultMinListRowHeight, Size.rowMin)
+            .scrollHeader(band: onCanvas)
     }
 }

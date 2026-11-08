@@ -2,11 +2,13 @@ import MarqueeCore
 import SwiftUI
 
 /// A browse tab's navigation stack (DESIGN §7): its own path, the namespace its artwork zooms in, every
-/// page a browse screen can push, and the toast overlay above the tab bar.
+/// page a browse screen can push, the toast overlay above the tab bar and, under Hide on Scroll, whether
+/// the tab bar is away.
 struct BrowseStack<Root: View>: View {
     private let root: Root
 
     @State private var path: [Route] = []
+    @State private var tabBar = TabBarScroll()
     @Namespace private var zoom
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -21,12 +23,14 @@ struct BrowseStack<Root: View>: View {
         NavigationStack(path: $path) {
             root
                 .zoomReturnGate(depth: path.count, enabled: !reduceMotion)
-                .modifier(StackChrome(zoom: zoom, open: open))
+                .modifier(StackChrome(zoom: zoom, open: open, tabBar: tabBar))
                 .navigationDestination(for: Route.self) { route in
                     RouteDestination(route: route)
-                        .modifier(StackChrome(zoom: zoom, open: open))
+                        .modifier(StackChrome(zoom: zoom, open: open, tabBar: tabBar))
                         .modifier(RouteTransition(zoomID: reduceMotion ? nil : route.zoomID, namespace: zoom))
                 }
+                // The page arriving after a push or a pop shows the tab bar, as a page at its top does.
+                .onChange(of: path.count) { tabBar.show(reduceMotion: reduceMotion) }
         }
     }
 
@@ -35,17 +39,20 @@ struct BrowseStack<Root: View>: View {
     }
 }
 
-/// What every page of a browse stack carries: the zoom namespace, the push action, and toasts above the
-/// tab bar.
+/// What every page of a browse stack carries: the zoom namespace, the push action, toasts above the tab
+/// bar and the stack's Hide on Scroll state.
 private struct StackChrome: ViewModifier {
     let zoom: Namespace.ID
     let open: OpenRouteAction
+    let tabBar: TabBarScroll
 
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .bottom) { ToastOverlay() }
             .environment(\.zoomNamespace, zoom)
             .environment(\.openRoute, open)
+            .environment(tabBar)
+            .toolbarVisibility(tabBar.hidden ? .hidden : .automatic, for: .tabBar)
     }
 }
 

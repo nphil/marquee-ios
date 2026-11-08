@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// The theme picker (DESIGN §8.7). Matching the system shows a Light and a Dark slot, each opening
-/// its mode's grid; with matching off one grid shows under a Dark | Light switch.
+/// The theme picker (DESIGN §8.7), the header style (§7.1) and the tab bar's scroll behaviour (§7).
+/// Matching the system shows a Light and a Dark slot, each opening its mode's grid; with matching off one
+/// grid shows under a Dark | Light switch.
 struct AppearanceView: View {
     @Environment(ThemeStore.self) private var store
     @Environment(\.theme) private var theme
@@ -57,6 +58,46 @@ struct AppearanceView: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             }
+
+            Section {
+                Picker("Header Style", selection: Binding(
+                    get: { store.headerStyle },
+                    set: { store.setHeaderStyle($0) }
+                )) {
+                    ForEach(HeaderStyle.allCases) { style in
+                        Text(style.name).tag(style)
+                            .accessibilityIdentifier("appearance.header.\(style.rawValue)")
+                    }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            } header: {
+                Text("Header Style")
+            } footer: {
+                Text("How the bar at the top meets the page scrolling under it: Soft fades the page out, Hard draws a line under the bar, Blur frosts it.")
+                    .foregroundStyle(theme.ink2)
+            }
+            .listRowBackground(theme.sheet)
+
+            Section {
+                Picker("Tab Bar", selection: Binding(
+                    get: { store.tabBar },
+                    set: { store.setTabBar($0) }
+                )) {
+                    ForEach(TabBarBehavior.allCases) { behavior in
+                        Text(behavior.name).tag(behavior)
+                            .accessibilityIdentifier("appearance.tabBar.\(behavior.rawValue)")
+                    }
+                }
+                .pickerStyle(.inline)
+                .labelsHidden()
+            } header: {
+                Text("Tab Bar")
+            } footer: {
+                Text("While a page scrolls down, Hide on Scroll slides the tab bar away and Minimise on Scroll shrinks it to the current tab. Scrolling back up or reaching the top brings it back.")
+                    .foregroundStyle(theme.ink2)
+            }
+            .listRowBackground(theme.sheet)
         }
         .themedList(theme)
         .navigationTitle("Appearance")
@@ -127,6 +168,7 @@ struct ThemeGridPage: View {
             ThemeGrid(mode: mode)
                 .padding(Space.inset)
         }
+        .scrollHeader()
         .background(theme.canvas)
         .navigationTitle(mode == .dark ? "Dark Themes" : "Light Themes")
         .navigationBarTitleDisplayMode(.inline)

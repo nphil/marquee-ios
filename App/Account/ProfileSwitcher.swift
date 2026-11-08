@@ -1,19 +1,30 @@
 import MarqueeCore
 import SwiftUI
 
-/// Home's profile button (DESIGN §8.1): the profile's photo, opening Settings, whose Account row switches
-/// profiles, as in the Apple TV app.
+/// Home's profile button (DESIGN §8.1): the profile's photo in an accent ring, opening Settings, whose
+/// Account row switches profiles, as in the Apple TV app. It stands on its own, without the bar's glass
+/// capsule (HomeView), so the ring reads as the edge.
 struct ProfileButton: View {
     @Environment(AppSession.self) private var session
+    @Environment(\.theme) private var theme
 
     var body: some View {
         Button {
             session.showsSettings = true
         } label: {
-            AvatarView(user: session.user, size: Size.target - Space.s4)
+            // A 36 pt photo, a 2 pt gap and a 2 pt ring: 44 pt across, in a 48 pt target.
+            AvatarView(user: session.user, size: Size.target - Space.s3)
+                .padding(Space.s1)
+                .overlay(Circle().strokeBorder(theme.accent, lineWidth: 2))
+                .frame(width: Size.target, height: Size.target)
+                .contentShape(Circle())
         }
         .accessibilityLabel("Settings")
         .accessibilityValue(session.user?.title ?? "")
+        .accessibilityHint("Profiles, appearance and playback settings.")
+        .accessibilityShowsLargeContentViewer {
+            Label("Settings", systemImage: "person.crop.circle")
+        }
         .accessibilityIdentifier("profile.button")
     }
 }

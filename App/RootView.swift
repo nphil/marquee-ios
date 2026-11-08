@@ -84,6 +84,7 @@ struct RootView: View {
 /// into playback.
 private struct MainTabs: View {
     @Environment(AppSession.self) private var session
+    @Environment(ThemeStore.self) private var store
     @State private var selection: AppTab = .home
     @State private var toasts = ToastCenter()
     @State private var changes = LibraryChanges()
@@ -107,8 +108,9 @@ private struct MainTabs: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        // The bar tucks away while scrolling the browse tabs and stays put elsewhere.
-        .tabBarMinimizeBehavior(selection == .home || selection == .library ? .onScrollDown : .never)
+        // Minimise on Scroll shrinks the bar while a page scrolls down; Hide on Scroll is each browse stack's
+        // own (BrowseStack). Search keeps the bar still while its results scroll and the keyboard comes and goes.
+        .tabBarMinimizeBehavior(store.tabBar == .minimise && selection != .search ? .onScrollDown : .never)
         .environment(toasts)
         .environment(changes)
         .onChange(of: session.server?.id) { changes.forgetDeletions() }

@@ -333,10 +333,9 @@ Tabs: Home · Library · Live TV · Watchlist · Search; Settings opens from the
 
 ```
 390 pt ───────────────────────────────────────────────────
-Live TV                                    [⏺ Recordings]    display, ink
-(All) (Favourites) (Recent) (Sports) (News) (Kids) →         chips, Space.s2 apart
-[ Now ]  8:30   9:00   9:30   10:00   Tonight   →            time strip
-──────────────────────────────────────────────────────────    edge hairline
+Live TV                                    [⏺ Recordings]    title in the bar, never collapses
+(All) (Favourites) (Recent) (Sports) (News) (Kids) →         chips, Space.s2 apart, pinned
+[ Now ]  8:30   9:00   9:30   10:00   Tonight   →            time strip, pinned
 ▢    Evening News                                    ⏺       row ≥ Size.rowMin
 2.1  8:00–8:30 · 12 min left
      ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬───────────                           progress 3 pt
@@ -349,6 +348,7 @@ Live TV                                    [⏺ Recordings]    display, ink
 - Programme `headline` `ink`, one line (two at large sizes); times and time left `caption` `ink2`; next airing `label` `ink2`.
 - Progress 3 pt capsule, `accent` on `trackOff`, advanced every 30 s without relayout.
 - Record glyph trailing (§6.10). Separator `edge` hairline from the text column.
+- Header: the title stays in the bar at one size (DESIGN §7.1), and the chips and time strip are pinned under it as one header with it (`safeAreaBar`). The rows scroll under all three behind the chosen header style's edge, so the header never changes height or moves while the guide scrolls.
 - Chips: height 32 (`Space.s7`) with a 48 pt hit area (`Size.target`); selected solid `accent` with `accentInk`, others outlined in `ink2` (M DESIGN.md:125, 138). Categories: All, Favourites (local, per profile), Recent, then the provider's genre filters.
 - Time strip: Now (with the `live` dot), half hours to 24 h ahead, then Tonight and Tomorrow. Plain `label` times in `ink2`; the chosen one in `ink` over a 3 pt `accent` underline that slides between them, so the strip reads as a timeline rather than a second row of chips. A chosen time shows the airing at that time and the one after; tapping such a row opens the programme sheet unless the airing is on now.
 - Tap a row on now: plays. Long press: menu (Watch, Record, Details, Favourite). Pull to refresh reloads the guide.

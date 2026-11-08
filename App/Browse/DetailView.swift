@@ -185,7 +185,10 @@ private struct DetailPage: View {
         } action: { top in
             barInset = top.isFinite ? max(top, 0) : 0
         }
+        // The hero runs under the bar, so the page keeps the soft edge whatever the header style: a hard
+        // edge or Blur's band would cover the artwork at rest.
         .scrollEdgeEffectStyle(.soft, for: .top)
+        .tabBarFollowsScroll()
         .swipeActionsContainer()
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top > barTitlePoint

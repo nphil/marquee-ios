@@ -38,6 +38,8 @@ struct WatchlistView: View {
                     .padding(.vertical, Space.s3)
                 }
                 .refreshable { await titles.refresh() }
+                .scrollHeader()
+                .tabBarFollowsScroll()
             } skeleton: {
                 ScrollView {
                     Skeleton.Grid(metrics: metrics)
@@ -56,6 +58,7 @@ struct WatchlistView: View {
         }
         .background(theme.canvas)
         .navigationTitle("Watchlist")
+        .toolbarTitleDisplayMode(.inlineLarge)
         // Each profile has its own watchlist, reached with its own token.
         .task(id: watchlist.map { ObjectIdentifier($0.http) }) {
             guard let watchlist else { return }

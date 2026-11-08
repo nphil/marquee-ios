@@ -33,6 +33,8 @@ struct HubGridView: View {
                     .padding(.vertical, Space.s3)
                 }
                 .refreshable { await titles.refresh() }
+                .scrollHeader()
+                .tabBarFollowsScroll()
             } skeleton: {
                 ScrollView {
                     Skeleton.Grid(metrics: metrics)

@@ -80,18 +80,19 @@ extension XCTestCase {
 
     /// The category chips and the time strip scroll sideways, which XCUITest does not reliably do for a
     /// tap, and at accessibility sizes most of them start off screen. `isHittable` fails the test for an
-    /// element off screen, so this compares frames.
+    /// element off screen, so this compares frames. The chips sit at the top of a bar pinned under the
+    /// navigation bar, so their scroll view reaches up under it (frame from y 0, chips at 116-164): the
+    /// drag runs along the target's own line, not through the strip's centre.
     @MainActor
     func tap(_ identifier: String, inStrip strip: String, in app: XCUIApplication) {
         let target = element(identifier, in: app)
         let row = element(strip, in: app)
         XCTAssertTrue(target.waitForExistence(timeout: 10), "No element \(identifier)")
         for _ in 0..<6 where !row.frame.contains(CGPoint(x: target.frame.midX, y: target.frame.midY)) {
-            if target.frame.midX < row.frame.midX {
-                row.swipeRight(velocity: .slow)
-            } else {
-                row.swipeLeft(velocity: .slow)
-            }
+            let start = app.coordinate(withNormalizedOffset: .zero)
+                .withOffset(CGVector(dx: row.frame.midX, dy: target.frame.midY))
+            let distance = row.frame.width / 2 * (target.frame.midX < row.frame.midX ? 1 : -1)
+            start.press(forDuration: 0.1, thenDragTo: start.withOffset(CGVector(dx: distance, dy: 0)), withVelocity: .slow, thenHoldForDuration: 0.1)
         }
         target.tap()
     }

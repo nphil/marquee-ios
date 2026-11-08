@@ -1,9 +1,10 @@
 import SwiftUI
 import Observation
 
-/// The theme choice (DESIGN §5.2). Matching the system keeps one theme per mode and follows the
-/// iPhone's appearance; with matching off one fixed mode shows. Saved in UserDefaults, so launch
-/// arguments such as `-marquee.theme.dark noir` override it (the UI tests rely on that).
+/// The appearance choices: the theme (DESIGN §5.2), the header style and what the tab bar does on scroll
+/// (DESIGN §7). Matching the system keeps one theme per mode and follows the iPhone's appearance; with
+/// matching off one fixed mode shows. Saved in UserDefaults, so launch arguments such as
+/// `-marquee.theme.dark noir` override them (the UI tests rely on that).
 @Observable @MainActor
 final class ThemeStore {
     private(set) var matchSystem: Bool
@@ -11,12 +12,16 @@ final class ThemeStore {
     private(set) var dark: Theme
     /// The mode on screen while `matchSystem` is off.
     private(set) var fixedMode: ThemeMode
+    private(set) var headerStyle: HeaderStyle
+    private(set) var tabBar: TabBarBehavior
 
     private enum Key {
         static let matchSystem = "marquee.theme.matchSystem"
         static let light = "marquee.theme.light"
         static let dark = "marquee.theme.dark"
         static let fixedMode = "marquee.theme.fixedMode"
+        static let headerStyle = "marquee.headerStyle"
+        static let tabBar = "marquee.tabBar"
     }
 
     init() {
@@ -26,6 +31,8 @@ final class ThemeStore {
         light = catalog.theme(id: defaults.string(forKey: Key.light), mode: .light)
         dark = catalog.theme(id: defaults.string(forKey: Key.dark), mode: .dark)
         fixedMode = defaults.string(forKey: Key.fixedMode).flatMap(ThemeMode.init(rawValue:)) ?? .dark
+        headerStyle = defaults.string(forKey: Key.headerStyle).flatMap(HeaderStyle.init(rawValue:)) ?? .soft
+        tabBar = defaults.string(forKey: Key.tabBar).flatMap(TabBarBehavior.init(rawValue:)) ?? .minimise
     }
 
     /// The theme on screen when the iPhone's appearance is `systemScheme`.
@@ -63,6 +70,16 @@ final class ThemeStore {
         save()
     }
 
+    func setHeaderStyle(_ style: HeaderStyle) {
+        headerStyle = style
+        save()
+    }
+
+    func setTabBar(_ behavior: TabBarBehavior) {
+        tabBar = behavior
+        save()
+    }
+
     /// Back to the first-launch choice, after Delete All Local Data emptied the saved one.
     func reset() {
         let catalog = ThemeCatalog.bundled
@@ -70,6 +87,8 @@ final class ThemeStore {
         light = catalog.theme(id: nil, mode: .light)
         dark = catalog.theme(id: nil, mode: .dark)
         fixedMode = .dark
+        headerStyle = .soft
+        tabBar = .minimise
     }
 
     private func save() {
@@ -78,5 +97,7 @@ final class ThemeStore {
         defaults.set(light.id, forKey: Key.light)
         defaults.set(dark.id, forKey: Key.dark)
         defaults.set(fixedMode.rawValue, forKey: Key.fixedMode)
+        defaults.set(headerStyle.rawValue, forKey: Key.headerStyle)
+        defaults.set(tabBar.rawValue, forKey: Key.tabBar)
     }
 }

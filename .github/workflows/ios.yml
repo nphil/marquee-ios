@@ -255,6 +255,7 @@ jobs:
             -skip-testing:MarqueeUITests/LiveTVAccessibilityScreenshots \
             -skip-testing:MarqueeUITests/HomeRowsAccessibilityScreenshots \
             -skip-testing:MarqueeUITests/PlayerAccessibilityScreenshots \
+            -skip-testing:MarqueeUITests/HeaderAccessibilityScreenshots \
             2>&1 | tee xcodebuild-test.log | xcbeautify
           STATUS=${PIPESTATUS[0]}
           set -e
@@ -287,6 +288,7 @@ jobs:
             -only-testing:MarqueeUITests/LiveTVAccessibilityScreenshots \
             -only-testing:MarqueeUITests/HomeRowsAccessibilityScreenshots \
             -only-testing:MarqueeUITests/PlayerAccessibilityScreenshots \
+            -only-testing:MarqueeUITests/HeaderAccessibilityScreenshots \
             2>&1 | xcbeautify
 
       - uses: actions/upload-artifact@v7

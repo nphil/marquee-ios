@@ -9,7 +9,7 @@ A second pass over the iPhone build against DESIGN.md and the reference apps, fr
 5. **Medium: art could stay a grey tile.** When a load of the same art finished between a view's first frame and its load task (a prefetch, or the backdrop under the hero's mirror), the view kept the fill it drew on that frame until it was rebuilt; the Caminandes poster in Search stayed grey in most CI runs, and the mirror sometimes showed a grey band. `App/Images/PlexArtView.swift`. Fixed: the load task takes the image from memory when it is already there.
 6. **Low: a rating with no format chips stood alone on its own line** (every show). Fixed: the rating ends the meta line.
 7. **Low: in landscape the tab bar covers the top of the Version menu on a movie.** It is the first row below the fold, and the bar tucks away on scroll in Home and Library. Unchanged.
-8. **Low: the Library's Jump To menu shows `textformat.abc`,** which reads as the word "Abc" beside the View menu. It is the accessible twin of the A–Z rail. Unchanged.
+8. **Low: the Library's Jump To menu shows `textformat.abc`,** which reads as the word "Abc" beside the View menu. It is the accessible twin of the A–Z rail. Fixed: the menu is gone; VoiceOver and Switch Control adjust the rail itself a letter at a time (DESIGN §8.2).
 9. **Low: episode synopses are Caption (12 pt),** small for the only prose in the row. Unchanged.
 
 Sign-in, the PIN pad, server and profile lists, Settings and its pages, empty Search and the Watchlist title that is not on the server hold up against §8 and the reference apps.

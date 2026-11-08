@@ -33,8 +33,10 @@ struct HomeView: View {
         }
         .background(theme.canvas)
         .navigationTitle("Home")
+        .toolbarTitleDisplayMode(.inlineLarge)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) { ProfileButton() }
+                .sharedBackgroundVisibility(.hidden)
         }
         // A library's hubs are asked for only while one of its rows is shown, so showing one reloads.
         .task(id: LoadKey(library: library?.instance, attempt: rows.attempt, extra: Reload(
@@ -92,6 +94,8 @@ struct HomeView: View {
                 .padding(.vertical, Space.s3)
             }
             .refreshable { await load() }
+            .scrollHeader()
+            .tabBarFollowsScroll()
         }
     }
 

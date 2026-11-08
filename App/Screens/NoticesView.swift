@@ -116,6 +116,7 @@ private struct LicenceTextView: View {
             .textSelection(.enabled)
             .padding(Space.inset)
         }
+        .scrollHeader()
         .background(theme.canvas)
         .navigationTitle(notice.name)
         .navigationBarTitleDisplayMode(.inline)

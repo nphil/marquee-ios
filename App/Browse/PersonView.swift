@@ -29,6 +29,8 @@ struct PersonView: View {
                 .padding(.vertical, Space.s3)
             }
             .refreshable { await load() }
+            .scrollHeader()
+            .tabBarFollowsScroll()
         }
         .background(theme.canvas)
         .navigationTitle("Filmography")

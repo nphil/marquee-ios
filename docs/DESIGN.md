@@ -265,11 +265,12 @@ Apple's rule: Liquid Glass is the navigation layer, not the content layer; use r
 | Picture | posters, hero art, video | Never tinted. Under text: a fade to canvas (hero) or a black scrim of .55 or more (player) |
 
 - **Glass is counted by shapes, not buttons.** A cluster of buttons in one `GlassEffectContainer` is one shape; glass cannot sample other glass (`W25-323`). Content screens use at most 3 custom glass shapes; the player chrome at most 4 clusters.
-- iOS 27 reportedly adds more defined glass borders in place of shadows, lighter dark glass, an ignored glass opt-out in Xcode 27 builds and a "hard" scroll-edge default (set soft only on the detail hero) (designfornative, 2026-06-10). [INFERENCE: first-beta write-up; re-verify on the shipping release.]
+- iOS 27 reportedly adds more defined glass borders in place of shadows, lighter dark glass, an ignored glass opt-out in Xcode 27 builds and a "hard" scroll-edge default (designfornative, 2026-06-10); Marquee's pages set their edge from the Header Style setting (§7.1). [INFERENCE: first-beta write-up; re-verify on the shipping release.]
 
 ## 7. Navigation model
 
-- **Root:** a tab view with Home, Library, Live TV, Watchlist and a Search tab in the search role (`W25-323`); built with the iOS 27 SDK the standard search tab sits in line with the others (`W26-292`). The tab bar collapses on scroll down on Home and Library (`tabBarMinimizeBehavior`, `W25-323`) and stays put elsewhere. Settings is not a tab: the profile button at the top of Home opens it in a sheet, as in the Apple TV app.
+- **Root:** a tab view with Home, Library, Live TV, Watchlist and a Search tab in the search role (`W25-323`); built with the iOS 27 SDK the standard search tab sits in line with the others (`W26-292`). Settings is not a tab: the profile button at the top of Home opens it in a sheet, as in the Apple TV app.
+- **Tab bar on scroll** is a setting, Appearance › Tab Bar, after Apollo's: **Minimise on Scroll** (the default) shrinks the bar to the current tab while a page scrolls down (`tabBarMinimizeBehavior(.onScrollDown)`, `W25-323`); **Hide on Scroll** slides it away after 24 pt of scrolling down and brings it back after 24 pt up, within 32 pt of the top, and on every push or pop; **Always Show** keeps it. Search keeps the bar under every choice, as its results scroll while the keyboard comes and goes. Hide on Scroll follows only a browse page's main scroll view and only a finger or a fling: a programmatic scroll, a sheet or the player never moves the bar, the bar stays as it is within three touch targets of a page's end (its coming and going changes the bottom inset by up to about 90 pt), and VoiceOver keeps it shown so the tabs stay reachable. The slide is the `tabBar` motion (§9).
 - **Each tab owns a navigation stack.** Detail pushes with a zoom transition from the tapped poster (`W26-251`); Reduce Motion makes it a 120 ms crossfade. The left-edge back swipe is never disabled or overlaid (`I:15`). No custom back buttons, no hamburger menu (`I:14`).
 - **Player:** a full-screen cover (`I:39`). The way out is a swipe down on the picture, the Close button, or the VoiceOver escape gesture; none depends on the chrome being visible.
 - **Sheets** hold short self-contained tasks: Settings, profile switcher (over Settings), subtitle style, subtitle timing, version picker, tracks info. Long tasks (subtitle search) are full pages pushed inside the sheet (`L:160`). **Menus** hold short choices: sort, filter, season, tracks, more. **Confirmation dialog** for sign-out and removals. **Alert** only for blocking errors.
@@ -277,9 +278,15 @@ Apple's rule: Liquid Glass is the navigation layer, not the content layer; use r
 - **Rotation and size:** browse screens work in every orientation [INFERENCE: WCAG 1.3.4]; the player follows the phone, and in portrait the picture is letterboxed on black with the same chrome over it. Tabs become a sidebar in iPhone landscape (`sidebarAdaptable`) [INFERENCE: first-beta]. Layout uses size classes, layout margins and safe areas, never device or `UIScreen.main` checks, so resizable windows and the foldable iPhone Duo (on sale 2026-10-23; the inner display can be regular width) work (`W26-269`, Apple developer news 2026-10-05).
 - **Unused:** the tab-bar bottom accessory (`tabViewBottomAccessory`) is kept free for a possible mini-player or a future TV-remote strip [INFERENCE: no design exists for either].
 
+### 7.1 Headers
+
+- **Titles:** the tab roots (Home, Library, Live TV, Watchlist, Search) and the Settings sheet carry a large leading title inside the bar (`toolbarTitleDisplayMode(.inlineLarge)`), so the header has one height and never collapses or moves as the page scrolls; pushed pages carry a centred inline title. Live TV pins its chips and time strip under the bar as one header with it (`safeAreaBar`, docs/LIVE-TV.md §6.4).
+- **Header Style** is a setting, Appearance › Header Style, after Apollo's: the edge where the page meets the bar as it scrolls under it. **Soft** (the default) is the system's soft scroll edge, which fades the page out under the bar; **Hard** is the system's hard edge, an opaque band with a dividing line; **Blur** frosts the page under the status bar, the bar and anything pinned under it in ultra-thin material under half-strength `canvas`, solid behind the bars and fading out over 24 pt below them, and fades in over the first 24 pt of scrolling. Under Reduce Transparency Blur's band is solid `canvas`.
+- Every list and grid page takes the chosen style (`scrollHeader()`), with two exceptions: partial sheets on system glass keep Soft, as Blur's band is drawn in the canvas, and the detail page keeps its hero under a clear bar on the soft edge (§8.3). Loading skeletons and the landscape Live TV grid keep the system edge.
+
 ## 8. Screens, in words
 
-Every screen: large title where top-level, canvas behind, 16 pt insets, one button size, hints as glyphs with accessible names (`L:121-127`, `L:381`).
+Every screen: a large title in the bar where top-level (§7.1), canvas behind, 16 pt insets, one button size, hints as glyphs with accessible names (`L:121-127`, `L:381`).
 
 ### 8.0 Sign-in and server choice (brief)
 
@@ -287,7 +294,7 @@ Sign-in is Plex's PIN flow: the button opens plex.tv in a browser sheet and the 
 
 ### 8.1 Home
 
-1. **Large title** "Home". Trailing: the profile button (the profile's photo), which opens Settings in a sheet; switching profile is the first row there [INFERENCE: a protected profile may ask for a PIN].
+1. **Large title** "Home" in the bar (§7.1). Trailing: the profile button, the profile's photo at 36 pt in a 2 pt `accent` ring, 44 pt across in a 48 pt target and without the bar's glass capsule, so the ring is its edge. It opens Settings in a sheet; switching profile is the first row there [INFERENCE: a protected profile may ask for a PIN].
 2. **Continue Watching** (hidden when empty, `B:§1`): a horizontal snap shelf of 16:9 cards, about 82% of the width so the next card peeks (33% from 600 pt wide, so a landscape card and its caption stay above the floating tab bar). Under each card, never over the art: a 3 pt progress bar (accent on `trackOff`), the title (Headline) and one line such as "S2 · E5 · 42 min left" in ink2 (the remaining time is the helpful context Apple asks for, `W26-250`). Tap resumes at once. Long-press opens a menu: Details, Mark watched, Remove from Continue Watching (with Undo).
 3. **Hubs**, in server order, empty ones hidden (`B:§1`). Each is a title (Manrope SemiBold 24) with a trailing `chevron.right` (accessible name "See all …") over a poster shelf. Poster cell: 2:3 art, a 3 pt progress bar if part-watched, a one-line title (Caption). Badge on the art, top trailing: a solid canvas-coloured pill with ink text (unwatched episode count; a check for watched), never glass.
 4. **Rows are the profile's choice.** Home shows the rows of Home Rows (§8.7) in its order: by default the server's Home hubs, with Continue Watching wherever it is placed. Long-press on a row's title (or its VoiceOver actions) offers Hide This Row (a toast with Undo) and Edit Home. An Edit Home button (tonal) ends the page; with every row hidden the page is an empty state with Edit Home. Edit Home opens Home Rows in a sheet at half height, so Home above it follows each change.
@@ -295,10 +302,10 @@ Sign-in is Plex's PIN flow: the button opens plex.tv in a browser sheet and the 
 
 ### 8.2 Library
 
-1. **Large title with a menu** to switch library ("Movies" with a menu chevron). Toolbar: one View menu (sort, filter, unwatched only).
+1. **Large title with a menu** in the bar (§7.1) to switch library ("Movies" with a menu chevron). Toolbar: one View menu (sort, filter, unwatched only).
 2. **Filter chips** appear under the title only while a filter is on: solid chips with `xmark`, full 48 pt hit height.
 3. **Poster grid:** adaptive, minimum 104 pt, 12 pt gutters; 3 columns at 390. At large accessibility sizes: 2 columns, then 1.
-4. **A–Z rail** on the trailing edge, only when sorted by title (`B:§1`): letters in Caption; dragging selects with a selection tick per letter. A "Jump to" toolbar menu is the accessible alternative.
+4. **A–Z rail** on the trailing edge, only when sorted by title (`B:§1`): letters in Caption 2 Semibold, 16 pt apart. Touching it jumps letter by letter with a selection tick, and the letters around the finger swell and lean out over a lens, after Apollo's index: the touched letter 2.9× and 27 pt out, its neighbours 1.85× and 16 pt, the next 1.38× and 7 pt, the rest dimmed to 72%, blended between rows. The lens is a `sheet` panel with an `edge` rim; the touched letter is `accentText`. Under Reduce Motion only the touched letter grows and nothing leans. VoiceOver and Switch Control adjust the rail a letter at a time, so it needs no separate menu.
 5. Collections and Recommended (`B:§1`) are a system segmented control under the title (`L:269`).
 
 ### 8.3 Detail (movie or show)
@@ -401,7 +408,7 @@ Round brackets are 56 pt glass buttons; the picture runs behind everything.
 Settings opens from Home's profile button in a sheet with Done (§7). It is a system inset-grouped list (`I:40`), rows 56 pt minimum. Top to bottom:
 
 1. **Account:** profile name and server name; opens the profile switcher.
-2. **Appearance:** the theme picker (below).
+2. **Appearance:** the theme picker, Header Style and Tab Bar (below).
 3. **Home:** Rows, reading Default or Custom, opens Home Rows: every row Home can show (the server's Home hubs, then each movie and TV library's hubs, named "Top Rated in Movies"), each with a small preview of its first posters, its first titles and a switch. The list is always in edit mode, so a row drags by its handle; VoiceOver offers Move Up and Move Down. A library's rows start off. Reset to Default restores the server's rows and order. Changes save at once for the profile, keyed by each hub's `hubIdentifier` (a library's prefixed with its uuid); a hub the server adds later shows at the end, and a library with no shown row is never asked for its hubs.
 4. **Video & playback** (`B:§1`): skip interval, intro skip (manual or auto, countdown), credits and auto-next delay, direct play mode (Auto, Disabled, Force; Force asks for confirmation with Cancel first), default aspect (`B:§4`); under **Live TV**, **Direct from Tuner** (on by default; off, every channel plays through Plex, docs/LIVE-TV.md §2.2).
 5. **Audio & subtitles** (`B:§1`): preferred audio language, subtitle mode, follow-dub rule, remember choices, **Subtitle style** with a live preview (`B:§3`).
@@ -414,6 +421,7 @@ Settings opens from Home's profile button in a sheet with Done (§7). It is a sy
 2. **Grid:** adaptive columns, minimum tile width 104 pt (3 at 390), 16 pt spacing (`S:Features/Settings/SettingsView.swift:213`). A tile is a rounded 3:4 preview drawn from the theme's own roles: canvas fill, two ink lines, a sheet-coloured panel holding an accent pill and three small poster blocks. The name sits under the tile (Caption). No images, no blur, no shadows, so scrolling stays smooth.
 3. **Selecting:** the tile gets a ring in the theme's `focus` colour plus a check mark (never colour alone); the app re-themes instantly with a selection tick and no animation.
 4. At large accessibility sizes the grid goes to 2 columns, then 1; names wrap.
+5. **Header Style** (§7.1) and **Tab Bar** (§7) follow the themes, each an inline picker with a footer saying what its choices do. Both apply at once, without rebuilding the page under them, and are kept with the theme, not per profile.
 
 ## 9. Motion and haptics
 
@@ -430,6 +438,8 @@ Motion tokens come from Lucent (`T:motion`, `L:214-227`); native adapters use th
 | Programmatic scroll (A–Z jump, "go to current episode") | scroll | 300 ms at most; a drag follows the finger without easing (`L:222`) |
 | Shelf posters first appear | stagger | 30 ms apart, at most 6 |
 | Zoom to detail; a card that grows | spring | response 260 ms, critically damped, no overshoot (`T:motion.spring`) |
+| Tab bar slides away or back (Hide on Scroll, §7) | tabBar | spring, response 300 ms, critically damped; under Reduce Motion it goes and comes without sliding |
+| A–Z rail lens follows the finger (§8.2) | follow | interactive spring, response 150 ms, damping .86 |
 | Reduce Motion | reduce | 120 ms linear opacity at most; no scale, parallax, zoom or travel; a press shows a wash (focusWash .07 dark, .06 light) in place of the scale (`L:235`) |
 
 Theme change: instant and atomic. Nothing loops at rest; no autoplay; no motion previews (`L:160`). Poster art fades in over 120 ms when it lands and the cell keeps its shape meanwhile (`L:295`).
@@ -452,7 +462,7 @@ No haptic on loads, countdowns or auto-skips. No sound from the app. [INFERENCE:
 - **Contrast:** 4.5:1 for text and 3:1 for non-text on composited colours in all 40 themes (§5.3, §5.5). Increase Contrast and Reduce Transparency follow §5.3.
 - **Reduce Motion:** §9. **Bold Text:** Manrope steps up one cut (design choice; the HIG sets no step). **Differentiate Without Colour:** every status pairs a glyph with words; selection uses a check, not only a ring colour.
 - **Targets:** 48 pt, at least 12 pt apart.
-- **VoiceOver:** a poster reads "Title, movie, 2019, 42 minutes left". Shelf titles are headings (rotor). Swipe actions and the A–Z rail have accessible alternatives. The scrubber is adjustable (up and down step by the skip interval) and the magic tap toggles play/pause. The player's escape gesture closes it. Toasts are announced politely; Undo stays reachable for at least 5 seconds (`L:278`). Every glyph button has a name that says what it does ("Skip forward 10 seconds", `L:126`).
+- **VoiceOver:** a poster reads "Title, movie, 2019, 42 minutes left". Shelf titles are headings (rotor). Swipe actions have accessible alternatives, and the A–Z rail is adjustable (swipe up or down a letter). The scrubber is adjustable (up and down step by the skip interval) and the magic tap toggles play/pause. The player's escape gesture closes it. Toasts are announced politely; Undo stays reachable for at least 5 seconds (`L:278`). Every glyph button has a name that says what it does ("Skip forward 10 seconds", `L:126`). Hide on Scroll leaves the tab bar shown while VoiceOver runs (§7).
 - **Captions:** the system caption style is respected by default; the in-app style is an override (`W26-256`).
 - **Keyboard and Switch Control:** the focus ring uses `focus` (9.30:1 or more on canvas in every theme).
 

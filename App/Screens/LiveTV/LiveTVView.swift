@@ -21,6 +21,7 @@ struct LiveTVView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(theme.canvas)
         .navigationTitle("Live TV")
+        .toolbarTitleDisplayMode(.inlineLarge)
         // Each profile keeps its own favourites and recent channels.
         .task(id: StoreKey(library: library?.instance, profile: session.user?.uuid)) {
             guard let library else {
@@ -51,6 +52,7 @@ private struct LiveGuideScreen: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(TabBarScroll.self) private var tabBar: TabBarScroll?
     /// The time strip's choice; nil is now.
     @State private var slot: Date?
     /// Bumped to bring the grid back to now.
@@ -70,7 +72,6 @@ private struct LiveGuideScreen: View {
 
     var body: some View {
         content
-            .navigationBarTitleDisplayMode(usesGrid ? .inline : .large)
             .toolbar {
                 if store.canRecord {
                     ToolbarItem(placement: .topBarTrailing) {
@@ -80,6 +81,8 @@ private struct LiveGuideScreen: View {
                 }
             }
             .navigationDestination(isPresented: $showsRecordings) { RecordingsView(store: store) }
+            // Recordings is pushed outside the stack's path, so it brings the tab bar back itself.
+            .onChange(of: showsRecordings) { tabBar?.show(reduceMotion: reduceMotion) }
             .sheet(item: $details, onDismiss: { playAfterSheet() }) { selection in
                 ProgrammeSheet(store: store, selection: selection) { channel in
                     watchAfterSheet = channel
@@ -140,24 +143,23 @@ private struct LiveGuideScreen: View {
 
     private var list: some View {
         ScrollView {
-            LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
-                Section {
-                    notices
-                    rows
-                } header: {
-                    VStack(spacing: 0) {
-                        CategoryChips(store: store)
-                        TimeStrip(now: store.now, end: store.guide.to, slot: $slot)
-                        Rectangle()
-                            .fill(theme.edge)
-                            .frame(height: 1)
-                    }
-                    .background(theme.canvas)
-                }
+            LazyVStack(spacing: 0) {
+                notices
+                rows
             }
         }
         .refreshable { await store.refresh() }
+        .scrollHeader()
+        .tabBarFollowsScroll()
         .accessibilityIdentifier("livetv.list")
+        // Pinned under the title as one header with it: the rows pass under both, behind the header
+        // style's edge (DESIGN §7.1), and the title never collapses, so the strips never move.
+        .safeAreaBar(edge: .top, spacing: 0) {
+            VStack(spacing: 0) {
+                CategoryChips(store: store)
+                TimeStrip(now: store.now, end: store.guide.to, slot: $slot)
+            }
+        }
     }
 
     @ViewBuilder

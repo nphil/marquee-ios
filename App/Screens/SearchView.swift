@@ -40,11 +40,13 @@ struct SearchView: View {
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
+        .scrollHeader()
         .scrollDismissesKeyboard(.immediately)
         .environment(\.defaultMinListRowHeight, Size.rowMin)
         .background(theme.canvas)
         .overlay { state }
         .navigationTitle("Search")
+        .toolbarTitleDisplayMode(.inlineLarge)
         // Always shown: with the default placement iOS 27 tucks the field away as soon as the list
         // has rows, which left the landing page with no way to type.
         .searchable(text: $text, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search your library")

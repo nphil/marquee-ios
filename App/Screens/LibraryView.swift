@@ -46,6 +46,7 @@ struct LibraryView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(theme.canvas)
+        .toolbarTitleDisplayMode(.inlineLarge)
         .task(id: LoadKey(library: library?.instance, attempt: sections.attempt)) {
             guard let library else { return }
             await sections.load { try await library.sections() }
@@ -118,6 +119,8 @@ private struct SectionBrowser: View {
                 .padding(.bottom, Space.s6)
             }
             .refreshable { await refresh() }
+            .scrollHeader()
+            .tabBarFollowsScroll()
             .safeAreaInset(edge: .top, spacing: 0) { banner }
             .overlay(alignment: .trailing) {
                 if showsRail, let entries = letters.value {
@@ -126,17 +129,6 @@ private struct SectionBrowser: View {
                 }
             }
             .toolbar {
-                if showsRail, let entries = letters.value {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            ForEach(entries, id: \.character) { entry in
-                                Button(entry.character) { jump(to: entry, proxy) }
-                            }
-                        } label: {
-                            Label("Jump To", systemImage: "textformat.abc")
-                        }
-                    }
-                }
                 if segment == .all {
                     ToolbarItem(placement: .topBarTrailing) { viewMenu }
                 }
@@ -399,41 +391,95 @@ private struct SectionBrowser: View {
     }
 }
 
-/// The A–Z rail (DESIGN §8.2): letters in Caption down the trailing edge. Dragging along it jumps letter by
-/// letter with a selection tick; the "Jump To" menu is the same jump for VoiceOver and Switch Control.
+/// The A–Z rail (DESIGN §8.2): letters in Caption down the trailing edge. Touching it jumps letter by letter
+/// with a selection tick, while the letters around the finger swell and lean out over a lens, after
+/// Apollo's index. VoiceOver and Switch Control step it a letter at a time.
 private struct AlphabetRail: View {
     let entries: [AlphabetIndexEntry]
     let select: @MainActor (AlphabetIndexEntry) -> Void
 
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var current: String? = nil
+    /// The finger's height on the rail while it touches it.
+    @State private var finger: CGFloat? = nil
     @State private var height: CGFloat = 0
+    /// Where VoiceOver and Switch Control last stepped to, an index into `entries`.
+    @State private var stepped = 0
 
     private static let rowHeight: CGFloat = 16
     private static let width: CGFloat = 24
+    /// Room for the touched letter leaning 27 pt out and for two letters either side of it.
+    private static let lens = CGSize(width: Size.target + Space.s4, height: Size.target * 2)
+    private static let follow = Animation.interactiveSpring(response: 0.15, dampingFraction: 0.86)
 
     var body: some View {
         let shown = shownEntries
+        let top = (height - CGFloat(shown.count) * Self.rowHeight) / 2
+        // The finger as a fractional row of the shown letters, 0 at the first one's centre.
+        let focus = finger.map { ($0 - top) / Self.rowHeight - 0.5 }
+        // Caption 2, capped as the rail is. Set at the lens's peak size and scaled down, since text scaled
+        // up is a stretched bitmap and the touched letter came out soft.
+        let letter = Manrope.size(11, as: .caption2, at: typeSize, cap: .xxxLarge) * LetterLens.peak
         VStack(spacing: 0) {
-            ForEach(shown, id: \.character) { entry in
+            ForEach(Array(shown.enumerated()), id: \.element.character) { row, entry in
+                let lens = LetterLens(distance: focus.map { abs(CGFloat(row) - $0) }, reduceMotion: reduceMotion)
                 Text(entry.character)
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(entry.character == current ? theme.accentText : theme.ink2)
+                    .font(.system(size: letter, weight: .semibold))
+                    .fixedSize()
+                    .foregroundStyle(entry.character == current ? theme.accentText : focus == nil ? theme.ink2 : theme.ink)
                     .frame(width: Self.width, height: Self.rowHeight)
+                    .scaleEffect(lens.scale / LetterLens.peak)
+                    .offset(x: -lens.lean)
+                    .opacity(lens.opacity)
             }
         }
         .frame(maxHeight: .infinity)
         .frame(width: Size.target / 2 + Space.s2)
+        .background(alignment: .topTrailing) {
+            if let focus {
+                let shape = RoundedRectangle(cornerRadius: Radius.tile, style: .continuous)
+                shape
+                    .fill(theme.roles.sheet.over(theme.roles.canvas).color)
+                    .overlay { shape.strokeBorder(theme.edge, lineWidth: 1) }
+                    .frame(width: Self.lens.width, height: Self.lens.height)
+                    .offset(y: top + (focus + 0.5) * Self.rowHeight - Self.lens.height / 2)
+                    .transition(.opacity)
+            }
+        }
         .contentShape(Rectangle())
         // An unbounded measuring pass reports an infinite height, which no letter count can be made from.
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { if $0.isFinite { height = $0 } }
         .gesture(
             DragGesture(minimumDistance: 0)
-                .onChanged { pick(at: $0.location.y, shownCount: shown.count) }
-                .onEnded { _ in current = nil }
+                .onChanged { drag in
+                    withAnimation(reduceMotion ? nil : Self.follow) { finger = drag.location.y }
+                    pick(at: drag.location.y, shownCount: shown.count)
+                }
+                .onEnded { _ in
+                    withAnimation(reduceMotion ? nil : Self.follow) { finger = nil }
+                    current = nil
+                }
         )
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
-        .accessibilityHidden(true)
+        .accessibilityElement()
+        .accessibilityLabel("Alphabet")
+        .accessibilityValue(entries[min(stepped, entries.count - 1)].character)
+        .accessibilityHint("Swipe up or down to jump to a letter.")
+        .accessibilityAdjustableAction { direction in
+            let now = min(stepped, entries.count - 1)
+            switch direction {
+            case .increment: stepped = min(now + 1, entries.count - 1)
+            case .decrement: stepped = max(now - 1, 0)
+            @unknown default: return
+            }
+            select(entries[stepped])
+        }
+        .accessibilityIdentifier("library.alphabetRail")
+        #if DEBUG
+        .task(id: height) { holdForTest() }
+        #endif
     }
 
     /// Every letter when they fit; otherwise an even sample, with the drag still reaching every letter.
@@ -453,5 +499,52 @@ private struct AlphabetRail: View {
         current = entry.character
         Haptics.selection()
         select(entry)
+    }
+
+    #if DEBUG
+    /// UI tests hold the rail mid-scrub on a letter (`-marquee.uitest.railScrub`), since a touch cannot be
+    /// held while the test takes its screenshot.
+    private func holdForTest() {
+        let shown = shownEntries
+        guard FakePlex.isActive, height > 0, finger == nil,
+              let letter = UserDefaults.standard.string(forKey: "marquee.uitest.railScrub"),
+              let row = shown.firstIndex(where: { $0.character == letter }) else { return }
+        let top = (height - CGFloat(shown.count) * Self.rowHeight) / 2
+        finger = top + (CGFloat(row) + 0.5) * Self.rowHeight
+        current = letter
+        select(shown[row])
+    }
+    #endif
+}
+
+/// Where one rail letter sits in the lens, `distance` rows from the finger. Apollo's index swells the
+/// touched letter to 2.9× and leans it 27 pt out, the letters beside it to 1.85× and 16 pt and the next to
+/// 1.38× and 7 pt, and dims the rest to 72%; between rows it blends. Under Reduce Motion only the touched
+/// letter grows and nothing leans.
+private struct LetterLens {
+    var scale: CGFloat = 1
+    var lean: CGFloat = 0
+    var opacity: Double = 1
+
+    /// The touched letter's scale, the largest any letter is drawn at.
+    static let peak: CGFloat = 2.9
+    private static let scales: [CGFloat] = [peak, 1.85, 1.38, 1]
+    private static let leans: [CGFloat] = [27, 16, 7, 0]
+    private static let dimmed = 0.72
+
+    init(distance: CGFloat?, reduceMotion: Bool) {
+        guard let distance, distance.isFinite else { return }
+        if reduceMotion {
+            if distance < 0.5 { scale = Self.scales[1] } else { opacity = Self.dimmed }
+            return
+        }
+        let reach = CGFloat(Self.scales.count - 1)
+        let clamped = min(distance, reach)
+        let lower = Int(clamped)
+        let upper = min(lower + 1, Self.scales.count - 1)
+        let blend = clamped - CGFloat(lower)
+        scale = Self.scales[lower] + (Self.scales[upper] - Self.scales[lower]) * blend
+        lean = Self.leans[lower] + (Self.leans[upper] - Self.leans[lower]) * blend
+        opacity = 1 - (1 - Self.dimmed) * Double(min(max(distance - reach + 1, 0), 1))
     }
 }
