@@ -21,16 +21,18 @@ final class PlayerScreenshotTests: XCTestCase {
     }
 
     /// "Watch Intro" stops the countdown; Skip Intro stays as a plain button. The offer drops to the
-    /// bottom edge when the controls hide 3 s into playback, so the tap waits for that, with a 10 s
-    /// countdown leaving time for it.
+    /// bottom edge when the controls hide 3 s into playback, and a loaded runner can take several
+    /// seconds to find the button, so the countdown is 20 s. The intro ends 28 s after the start, so
+    /// the check that no skip happened falls between the two.
     @MainActor
     func testWatchIntroStopsTheCountdown() throws {
-        let app = launchPlayer(at: 8, paused: false, mode: "dark", introSkipDelay: 10)
+        let app = launchPlayer(at: 6, paused: false, mode: "dark", introSkipDelay: 20)
+        let landed = Date()
         XCTAssertTrue(element("player.playPause", in: app).waitForNonExistence(timeout: 6), "The controls did not hide")
         tap("player.watchIntro", in: app)
         XCTAssertTrue(element("player.watchIntro", in: app).waitForNonExistence(timeout: 3), "Watch Intro is still showing")
-        // Past the end of the 10 s countdown.
-        Thread.sleep(forTimeInterval: 8)
+        // Past the end of the countdown, which began no later than the player appeared.
+        Thread.sleep(forTimeInterval: max(0, 22 - Date().timeIntervalSince(landed)))
         XCTAssertTrue(element("player.skipIntro", in: app).exists, "The intro was skipped after Watch Intro")
         try snap("player-10-watch-intro-rose-pine")
     }
@@ -282,7 +284,8 @@ private extension XCTestCase {
         XCTAssertNotNil(row, "No Subtitle Style in the menu")
         row?.tap()
         waitForBar("Subtitle Style", in: app)
-        reveal("style.reveal", in: app).tap()
+        // A landscape sheet ignores app.swipeUp, so the style list is dragged to the row.
+        scrollList(app.collectionViews["style.list"], to: element("style.reveal", in: app)).tap()
         let word = app.buttons["Word by Word"]
         XCTAssertTrue(word.waitForExistence(timeout: 5), "No Word by Word reveal")
         word.tap()

@@ -128,6 +128,7 @@ struct SubtitleStyleView: View {
             .listRowBackground(theme.sheet)
         }
         .themedList(theme)
+        .accessibilityIdentifier("style.list")
         .navigationTitle("Subtitle Style")
         .navigationBarTitleDisplayMode(.inline)
         .animation(.default, value: look.edge == .none)
