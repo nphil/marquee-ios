@@ -44,7 +44,7 @@ Screens do not own fetch logic scattered across views:
 
 - `Remote<Value>` and `RemoteContent` (`App/Browse/Remote.swift`) hold one screen's server content: nothing until the first answer, then the last good answer kept through later failures with an offline banner and its age. A load that a newer one overtook changes nothing.
 - `LoadKey` makes a screen's task restart when the library instance changes (sign-in again, profile or server switch), on Retry, or on a screen-specific input.
-- `LibraryChanges` is the record of what this app changed on the server. A confirmed watched, watchlist or deletion change bumps a revision, and every screen that shows the title refreshes it. Deletions are also held as `DeletedTitles`, because Plex lists a deleted title until its trash is emptied and a refetch would bring it back.
+- `LibraryChanges` is the record of what this app changed on the server. A confirmed watched, watchlist or deletion change bumps a revision, and every screen that shows the title refreshes it. Deletions are also held as `DeletedTitles`, because Plex lists a deleted title until its trash is emptied and a refetch would bring it back. A deleted title that was on the Watchlist is also kept off the Watchlist screen for the session.
 
 ### Caches
 

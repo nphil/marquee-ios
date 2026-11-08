@@ -100,8 +100,12 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
     /// Season number of an episode; 0 is Specials.
     public var parentIndex: Int?
     public var parentRatingKey: String?
+    /// The catalogue guid of an episode's season or a season's show, on a server that sends it.
+    public var parentGuid: String?
     public var parentTitle: String?
     public var grandparentRatingKey: String?
+    /// The catalogue guid of an episode's show, on a server that sends it.
+    public var grandparentGuid: String?
     public var grandparentTitle: String?
     public var thumb: String?
     public var art: String?
@@ -146,7 +150,7 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
     enum CodingKeys: String, CodingKey {
         case ratingKey, key, guid, type, subtype, extraType, primaryExtraKey, title, titleSort, originalTitle, summary, tagline, year
         case index, parentIndex
-        case parentRatingKey, parentTitle, grandparentRatingKey, grandparentTitle
+        case parentRatingKey, parentGuid, parentTitle, grandparentRatingKey, grandparentGuid, grandparentTitle
         case thumb, art, parentThumb, grandparentThumb, grandparentArt
         case duration, viewOffset, viewCount, leafCount, viewedLeafCount, childCount
         case addedAt, lastViewedAt, originallyAvailableAt, contentRating, studio, rating, audienceRating
@@ -173,8 +177,10 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
         index = c.int(.index)
         parentIndex = c.int(.parentIndex)
         parentRatingKey = c.string(.parentRatingKey)
+        parentGuid = c.string(.parentGuid)
         parentTitle = c.string(.parentTitle)
         grandparentRatingKey = c.string(.grandparentRatingKey)
+        grandparentGuid = c.string(.grandparentGuid)
         grandparentTitle = c.string(.grandparentTitle)
         thumb = c.string(.thumb)
         art = c.string(.art)

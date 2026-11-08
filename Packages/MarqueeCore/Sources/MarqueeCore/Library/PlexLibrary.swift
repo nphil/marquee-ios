@@ -96,6 +96,11 @@ public struct PlexLibrary: Sendable {
         return item
     }
 
+    /// Every episode of a show, across its seasons.
+    public func allLeaves(of ratingKey: String) async throws -> [PlexMetadata] {
+        try await container("/library/metadata/\(ratingKey)/allLeaves").metadata
+    }
+
     /// Seasons of a show or episodes of a season.
     public func children(of ratingKey: String) async throws -> [PlexMetadata] {
         try await container("/library/metadata/\(ratingKey)/children").metadata
@@ -135,10 +140,18 @@ public struct PlexLibrary: Sendable {
 
     // MARK: Deleting
 
+    /// How long a delete may take: the server removes the files before it answers.
+    static let deleteTimeout: TimeInterval = 180
+
     /// Deletes a movie, episode, season or show and its files from the server's disk. The server refuses
     /// (401 or 403) unless its owner turned on deleting media from the apps.
     public func delete(_ ratingKey: String) async -> DeleteOutcome {
         await deleting("/library/metadata/\(ratingKey)")
+    }
+
+    /// As `delete(_:)`, but throws what the server answered, for `MediaDeletion` to judge.
+    public func deleteItem(_ ratingKey: String) async throws {
+        try await perform(.delete, "/library/metadata/\(ratingKey)", [:], timeout: Self.deleteTimeout)
     }
 
     /// Deletes one version of a title and its file from the server's disk, leaving the others.
@@ -148,7 +161,7 @@ public struct PlexLibrary: Sendable {
 
     private func deleting(_ path: String) async -> DeleteOutcome {
         do {
-            try await perform(.delete, path, [:])
+            try await perform(.delete, path, [:], timeout: Self.deleteTimeout)
             return .deleted
         } catch {
             return DeleteOutcome(error)
@@ -250,8 +263,14 @@ public struct PlexLibrary: Sendable {
         return try PlexJSON.decode(PlexEnvelope.self, from: response.body).container
     }
 
-    private func perform(_ method: HTTPMethod, _ path: String, _ query: [String: String], headers: [String: String] = [:]) async throws {
-        _ = try await send(method, path, Self.items(query), headers: headers, idempotent: false)
+    private func perform(
+        _ method: HTTPMethod,
+        _ path: String,
+        _ query: [String: String],
+        headers: [String: String] = [:],
+        timeout: TimeInterval? = nil
+    ) async throws {
+        _ = try await send(method, path, Self.items(query), headers: headers, idempotent: false, timeout: timeout)
     }
 
     private func perform(_ method: HTTPMethod, _ path: String, _ query: [URLQueryItem], headers: [String: String]) async throws {
@@ -265,18 +284,19 @@ public struct PlexLibrary: Sendable {
         _ path: String,
         _ query: [URLQueryItem],
         headers: [String: String],
-        idempotent: Bool? = nil
+        idempotent: Bool? = nil,
+        timeout: TimeInterval? = nil
     ) async throws -> PlexHTTPResponse {
         let first = try await connection.connection()
         do {
-            return try await http.send(request(method, path, query, headers, idempotent, base: first.uri))
+            return try await http.send(request(method, path, query, headers, idempotent, timeout, base: first.uri))
         } catch PlexError.unreachable(let failure) {
             await connection.reportFailure(of: first)
             let isRead = idempotent ?? (method == .get)
             guard isRead, let next = try? await connection.connection(), next != first else {
                 throw PlexError.unreachable(failure)
             }
-            return try await http.send(request(method, path, query, headers, idempotent, base: next.uri))
+            return try await http.send(request(method, path, query, headers, idempotent, timeout, base: next.uri))
         }
     }
 
@@ -286,10 +306,13 @@ public struct PlexLibrary: Sendable {
         _ query: [URLQueryItem],
         _ headers: [String: String],
         _ idempotent: Bool?,
+        _ timeout: TimeInterval?,
         base: URL
     ) throws -> PlexRequest {
         guard let url = PlexURL.make(base: base, path: path, query: query) else { throw PlexError.decoding("bad path") }
-        return PlexRequest(method: method, url: url, headers: headers, isIdempotent: idempotent)
+        var request = PlexRequest(method: method, url: url, headers: headers, isIdempotent: idempotent)
+        if let timeout { request.timeout = timeout }
+        return request
     }
 
     private static func items(_ query: [String: String]) -> [URLQueryItem] {

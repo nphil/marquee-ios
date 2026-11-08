@@ -106,6 +106,25 @@ struct PlexLibraryTests {
         #expect(await transport.requests(to: "/library/metadata/12/media/5").map(\.method) == [.delete])
     }
 
+    /// A delete waits up to 180 s for the server, which removes the files before it answers; reads keep 20 s.
+    @Test func deletesWaitThreeMinutes() async throws {
+        let (library, transport) = Self.library { _ in container(["Metadata": [["ratingKey": "13", "type": "episode"]]]) }
+
+        try await library.deleteItem("12")
+        _ = await library.deleteVersion(5, of: "12")
+        _ = try await library.allLeaves(of: "20")
+
+        #expect(await transport.requests(to: "/library/metadata/12").map(\.timeout) == [180])
+        #expect(await transport.requests(to: "/library/metadata/12/media/5").map(\.timeout) == [180])
+        #expect(await transport.requests(to: "/library/metadata/20/allLeaves").map(\.timeout) == [20])
+    }
+
+    @Test func episodesAndSeasonsNameTheirShowByGuid() throws {
+        let episode = try decode(PlexMetadata.self, ["ratingKey": "22", "type": "episode", "parentGuid": "plex://season/s", "grandparentGuid": "plex://show/x"])
+
+        #expect(episode.parentGuid == "plex://season/s" && episode.grandparentGuid == "plex://show/x")
+    }
+
     /// 404 means gone already; 401 and 403 mean deleting is off, asked once only; faults allow a Retry.
     @Test func deleteOutcomeFollowsTheStatus() async {
         let expected: [(Int, DeleteOutcome)] = [(200, .deleted), (404, .deleted), (401, .notAllowed), (403, .notAllowed), (500, .failed), (503, .failed)]

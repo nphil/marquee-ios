@@ -70,6 +70,28 @@ final class LibraryChanges {
         watchlistRevision += 1
     }
 
+    /// Catalogue keys of the titles taken off the Watchlist this session. The Watchlist screen leaves
+    /// them out at once, without waiting for plex.tv to stop listing them.
+    private(set) var unlisted: Set<String> = []
+
+    func hideFromWatchlist(guid: String) {
+        if let key = PlexWatchlist.catalogueKey(guid: guid) { unlisted.insert(key) }
+        recordWatchlist()
+    }
+
+    /// Undoes `hideFromWatchlist` for a title saved again.
+    func showInWatchlist(guid: String) {
+        if let key = PlexWatchlist.catalogueKey(guid: guid) { unlisted.remove(key) }
+    }
+
+    /// `items` of the Watchlist without the titles taken off it this session.
+    func shownInWatchlist(_ items: [PlexMetadata]) -> [PlexMetadata] {
+        guard !unlisted.isEmpty else { return items }
+        return items.filter { item in
+            PlexWatchlist.catalogueKey(guid: item.guid).map { !unlisted.contains($0) } ?? true
+        }
+    }
+
     /// The titles touched after `revision`.
     func keys(after revision: Int) -> Set<String> {
         Set(touched.filter { $0.value > revision }.keys)
@@ -167,6 +189,7 @@ struct ItemActions: DynamicProperty {
             Task {
                 do {
                     if on { try await watchlist.add(guid: guid) } else { try await watchlist.remove(guid: guid) }
+                    if on { changes.showInWatchlist(guid: guid) }
                     Haptics.success()
                     changes.recordWatchlist()
                     onSuccess()

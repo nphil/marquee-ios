@@ -18,7 +18,7 @@ struct WatchlistView: View {
             PagedContent(loader: titles) {
                 ScrollView {
                     LazyVGrid(columns: metrics.gridItems, alignment: .leading, spacing: Space.s4) {
-                        ForEach(titles.items) { item in
+                        ForEach(changes.shownInWatchlist(titles.items)) { item in
                             let zoomID = "watchlist/\(item.ratingKey)"
                             NavigationLink(value: Route.watchlist(item, zoomID: zoomID)) {
                                 PosterCell(item: item, width: metrics.cellWidth, zoomID: zoomID)

@@ -22,6 +22,7 @@
   - `account()`: the user a token belongs to (`/api/v2/user`), the account or the profile switched to.
 - `PlexPIN`, `PlexHomeUser`: sign-in code and profile. `PlexHomeUser` is Codable, so the app keeps the active profile.
 - `PlexWatchlist`: the profile's watchlist on discover.provider.plex.tv, with the account token. `items(start:size:)`, `contains(guid:)`, `add(guid:)`, `remove(guid:)`. `catalogueKey(guid:)` is nil for titles matched by an older agent, which cannot be watchlisted.
+- `MediaDeletion(server:watchlist:)`: `delete(_:alreadyDeleted:afterDelete:)` deletes a title and cleans its Watchlist entry (rules in PARITY, Delete media) and returns a `MediaDeletionResult`: a `DeleteOutcome` plus a `WatchlistCleanup` (`unchanged`, `removed(guid:)`, `failed(guid:)`). It talks to `DeletionServer` (`PlexLibrary`) and `WatchlistAccount` (`PlexWatchlist`); waits go through an injected `sleep`. `PlexLibrary.deleteItem(_:)` and `deleteVersion` wait 180 s; `allLeaves(of:)` lists a show's episodes. `PlexMetadata.parentGuid` and `grandparentGuid` name an episode's season and show.
 
 ## Server address (`Connection/`)
 
@@ -115,7 +116,7 @@ The endpoints and the route rules are in `docs/LIVE-TV.md`.
 ## Not yet checked against a live server
 
 - The status codes for a wrong profile PIN (the live Plex Home has no protected profile). `/api/v2/resources`, `/api/v2/user` and `/api/v2/home/users` were decoded from a live account on 2026-11-06 with no mismatch.
-- The watchlist add and remove calls and `removeFromContinueWatching`, which have not been sent to a live account.
+- The watchlist add and remove calls and `removeFromContinueWatching`, which have not been sent to a live account; likewise `MediaDeletion`'s reads of `grandparentGuid` and `allLeaves`, and its recheck after a 5xx or timeout.
 - The universal transcode parameters, including identity sent as query items and the offset format.
 - The Keychain store, which has no tests.
 - Dolby Vision, HEVC level and HDR limits, and CEA-608 captions on the actual phone.

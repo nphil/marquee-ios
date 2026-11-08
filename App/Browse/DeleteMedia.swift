@@ -34,6 +34,7 @@ private struct DeleteConfirmation: ViewModifier {
     let onDeleted: @MainActor (DeleteTarget) -> Void
 
     @Environment(\.plexLibrary) private var library
+    @Environment(\.plexWatchlist) private var watchlist
     @Environment(LibraryChanges.self) private var changes
     @Environment(ToastCenter.self) private var toasts
     @State private var failure: Failure?
@@ -98,25 +99,41 @@ private struct DeleteConfirmation: ViewModifier {
     private func perform(_ target: DeleteTarget) {
         guard let library else { return }
         let item = target.item
+        let changes = changes
+        let toasts = toasts
+        let watchlist = watchlist
+        let onDeleted = onDeleted
         Task {
-            let outcome: DeleteOutcome
-            switch target {
-            case .title: outcome = await library.delete(item.ratingKey)
-            case .version(_, let index): outcome = await library.deleteVersion(item.media[index].id, of: item.ratingKey)
-            }
-            guard outcome == .deleted else {
-                failure = Failure(target: target, outcome: outcome)
-                return
-            }
             switch target {
             case .title:
-                changes.recordDeletion(of: item, server: library.server.id)
-                toasts.show("Deleted “\(item.title)”")
+                let result = await MediaDeletion(server: library, watchlist: watchlist)
+                    .delete(item, alreadyDeleted: changes.deleted) { @MainActor in
+                        changes.recordDeletion(of: item, server: library.server.id)
+                        onDeleted(target)
+                    }
+                guard result.outcome == .deleted else {
+                    failure = Failure(target: target, outcome: result.outcome)
+                    return
+                }
+                switch result.watchlist {
+                case .removed(let guid):
+                    changes.hideFromWatchlist(guid: guid)
+                    toasts.show("Deleted “\(item.title)”")
+                case .failed:
+                    toasts.show("Deleted, but couldn't remove it from your Watchlist.")
+                case .unchanged:
+                    toasts.show("Deleted “\(item.title)”")
+                }
             case .version(_, let index):
+                let outcome = await library.deleteVersion(item.media[index].id, of: item.ratingKey)
+                guard outcome == .deleted else {
+                    failure = Failure(target: target, outcome: outcome)
+                    return
+                }
                 changes.record(Set([item.ratingKey, item.parentRatingKey, item.grandparentRatingKey].compactMap(\.self)))
                 toasts.show("Deleted the \(item.media[index].versionLabel) version")
+                onDeleted(target)
             }
-            onDeleted(target)
         }
     }
 }
