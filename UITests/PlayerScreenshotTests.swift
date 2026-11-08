@@ -123,17 +123,7 @@ private extension XCTestCase {
         info.tap()
         waitFor("player.info", in: app)
         try snap("player-04-playback-info-\(suffix)")
-        // app.swipeUp() left this landscape sheet unscrolled, so the drag runs between two points of
-        // the list. At accessibility sizes the section is several screens down, and the row is
-        // hittable while only its top shows, so the drags go on until it is whole on screen.
-        let list = app.collectionViews["player.info"]
-        let copy = app.buttons["Copy Diagnostics"]
-        var drags = 0
-        while !(copy.exists && copy.isHittable && list.frame.contains(copy.frame)), drags < 15 {
-            list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
-                .press(forDuration: 0.1, thenDragTo: list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)))
-            drags += 1
-        }
+        let copy = scrollList(app.collectionViews["player.info"], to: app.buttons["Copy Diagnostics"])
         XCTAssertTrue(copy.wait(for: \.isHittable, toEqual: true, timeout: 5), "No Copy Diagnostics")
         try snap("player-04-playback-info-diagnostics-\(suffix)")
         app.navigationBars["Playback Info"].buttons["Done"].tap()
@@ -203,11 +193,12 @@ private extension XCTestCase {
         XCTAssertEqual(removal.label, "Part of the video file, so it can't be removed.", "An embedded track offers removal")
         try snap("player-13-wrong-subtitles-\(suffix)")
 
-        reveal("subtitleFix.findAnother", in: app).tap()
-        XCTAssertTrue(element("bazarr.result", in: app).waitForExistence(timeout: 10), "No Bazarr results")
+        scrollList(app.collectionViews["subtitleFix.wrong"], to: element("subtitleFix.findAnother", in: app)).tap()
+        // The language picker comes with the results; at accessibility sizes they start below it.
+        XCTAssertTrue(element("bazarr.language", in: app).waitForExistence(timeout: 10), "No Bazarr results")
         try snap("player-14-bazarr-results-\(suffix)")
 
-        reveal("bazarr.result", in: app).tap()
+        scrollList(app.collectionViews["subtitleFix.search"], to: element("bazarr.result", in: app)).tap()
         let state = element("bazarr.state", in: app)
         XCTAssertTrue(state.waitForExistence(timeout: 5), "The download did not start")
         XCTAssertTrue(state.wait(for: \.label, toEqual: "Active in player", timeout: 20), "The download did not show: \(state.label)")
@@ -221,7 +212,7 @@ private extension XCTestCase {
         let showing = element("subtitleFix.showing", in: app)
         XCTAssertTrue(showing.waitForExistence(timeout: 5), "Nothing is named as showing")
         XCTAssertTrue(showing.label.hasSuffix("A separate file next to the video"), "The download is not the subtitle showing: \(showing.label)")
-        reveal("subtitleFix.remove", in: app).tap()
+        scrollList(app.collectionViews["subtitleFix.wrong"], to: element("subtitleFix.remove", in: app)).tap()
         let confirm = labelled("Remove Subtitle", in: app)
         XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Removal was not confirmed first")
         try snap("player-17-remove-subtitle-\(suffix)")
@@ -260,6 +251,26 @@ private extension XCTestCase {
             )
         }
         return row()
+    }
+
+    /// app.swipeUp() leaves a landscape sheet's list unscrolled, so the drags run between two points of
+    /// the list. At accessibility sizes a row is hittable while only its top shows, so they go on until
+    /// `row` is whole on screen.
+    @MainActor
+    func scrollList(_ list: XCUIElement, to row: XCUIElement) -> XCUIElement {
+        XCTAssertTrue(list.waitForExistence(timeout: 10), "No list to scroll")
+        var drags = 0
+        while !(row.exists && row.isHittable && list.frame.contains(row.frame)), drags < 15 {
+            list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85)).press(
+                forDuration: 0.1,
+                thenDragTo: list.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)),
+                withVelocity: .slow,
+                thenHoldForDuration: 0.2
+            )
+            drags += 1
+        }
+        XCTAssertTrue(row.exists && row.isHittable, "Scrolling did not bring the row on screen")
+        return row
     }
 
     /// A button by its label alone, whatever identifier it carries.
