@@ -3,9 +3,9 @@
 How to read this: plain-English behaviour only. Plex endpoint names and query terms are given because they are public API facts. No code, names or comments are copied. Items marked [INFERENCE] are not confirmed in the docs.
 
 ## 0. Gaps and unverified items (read first)
-- **Sign-in on the phone:** the Plex PIN (link code) flow and QR sign-in are not confirmed in this pass. The TV uses QR sign-in. Check the Plex auth docs before designing this.
-- **Choosing a server connection:** the order of local, remote, relay and https is not confirmed in this pass. The README says relay and https are supported but not verified end to end.
-- **Skip interval default:** the options are 5, 10, 15, 30 or 60 seconds (`locales/en/settings.json` ~778–790). The default was not confirmed.
+- **Sign-in on the phone:** built as Plex's PIN flow (browser sheet, with a link-code fallback at plex.tv/link). The TV uses QR sign-in.
+- **Choosing a server connection:** built as local before remote before relay and https before http, probed in parallel (`docs/core-api.md`). Relay and https are not verified end to end against a live server.
+- **Skip interval default:** the options are 5, 10, 15, 30 or 60 seconds (`locales/en/settings.json` ~778–790). The iPhone default is 10 seconds.
 - **Playback speed:** More menu › Playback Speed: 0.5×, 0.75×, Normal, 1.25×, 1.5×, 1.75×, 2×. Each new item starts at Normal.
 - **Watched threshold:** about 90% of the length (`docs/pms-api.md` 1392). This was measured on one server version, so treat it as approximate.
 - **Not verified on real hardware:** SpeechDock word timing, Reveal-as-spoken, and the TV decoder details.
@@ -198,9 +198,3 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 - **Stats for Nerds:** the 120 Hz display-sync and 60 fps test readouts are TV-hardware checks.
 - **LG chip failures** (k5lp/k3lp 2019, firmware 3.9.3 in 2018). Not relevant to iOS.
 - **Keep the logic, rethink the screen:** subtitle and audio pick rules, Plex calls, resume, markers, Up Next, and the Bazarr flow all carry over. Only the layout and input change.
-
----
-
-## Next steps for the main agent
-1. Save this report text to `/tmp/marquee-ios/behaviour-spec.md` (no tool here can write there).
-2. Confirm the sign-in PIN flow, connection order, and skip-interval default before the iPhone design is locked. These are the three gaps in section 0.

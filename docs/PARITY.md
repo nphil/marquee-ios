@@ -134,10 +134,8 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 - TV remote focus and D-pad navigation: N/A.
 - Tuner sharing: N/A (server plugin).
 
-## Summary counts (approx.)
-- Done: about 45 rows.
-- Partial: about 10 rows.
-- Missing: about 25 rows.
+## Summary counts
+Count the status column: `grep -c '| Done |' docs/PARITY.md` (likewise `Partial`, `Missing`, `N/A`).
 
 ## Gaps
 - The TV's docs/ folder, CHANGELOG and player-submenus doc were not read. Rows rest on the locale strings and the iPhone's own spec. Mark rows as Unverified until those are read.

@@ -2,9 +2,9 @@
 
 **Answer first.** Marquee iOS is a calm, poster-first Plex client for iPhone. Apple's Liquid Glass (the see-through, blurred look of iOS 26 and 27) draws the bars, buttons and sheets. Marquee draws what sits inside them: posters, Manrope headings and 40 colour themes (20 dark, 20 light; Rosé Pine is the default). Every colour comes from one file, `themes.json`, and one script, `check_themes.py`, proves each theme is readable.
 
-Status: design direction only. Nothing is built and nothing has run on a device. Only the themes are checked by script (§5.5).
+Status: the design direction behind the built app. The themes are checked by script in CI (§5.5) and the screens by UI-test screenshots in CI (§13); playback, gestures and heat are checked by hand on a device (`docs/DEVICE-TEST.md`).
 
-This slice produced `DESIGN.md`, `themes.json` and `check_themes.py`. Sibling slices in the same folder: `behaviour-spec.md` (plain-words behaviour, cited as `B:`), `stashy-playbook.md`, `videoengine.md`.
+Companion files: `behaviour-spec.md` (plain-words behaviour, cited as `B:`), `Resources/themes.json` and `tools/check_themes.py`. Citations below to `stashy-playbook.md` and `videoengine.md` refer to notes that are not in this repo.
 
 Citation key:
 
@@ -29,13 +29,13 @@ Citation key:
 
 | # | Decision | Why | Cost to change |
 |---|---|---|---|
-| 1 | Tabs: Home, Library, Watchlist, Settings, Search | `B:§1` lists these destinations; Lucent allows 3 to 5 (`L:160`). Watchlist could fold into Library | one tab |
+| 1 | Tabs: Home, Library, Live TV, Watchlist, Search; Settings is a sheet from Home's profile button | `B:§1` lists these destinations; Lucent allows 3 to 5 (`L:160`). Watchlist could fold into Library | one tab |
 | 2 | "Match system appearance" is on by default | Apple expects both appearances to be supported (`W26-251`); `I:31` | one default |
 | 3 | Every player control is a 56 pt circle; play/pause is marked by a solid white fill, not by size | Lucent: one button size per screen (`L:381`) | one size |
 | 4 | Hero title 34 pt, not Lucent's 48 | A long film title takes about 4 lines at 48 pt and about 3 at 34 pt on a 390 pt screen [INFERENCE: estimated from average glyph width] | one size |
 | 5 | Theme is saved per device, not per Plex profile | It is a look, not a viewing preference (`B:§1` saves settings per profile) | one key |
 | 6 | Skip step defaults to 10 s | Stashy's value (`S:Features/Player/PlayerControlsView.swift:191-200`); the TV default is unconfirmed (`B:§0`) | one setting |
-| 7 | No playback-speed menu in the first build | The TV app has none (`B:§0`); Stashy has one (`S:Features/Player/PlayerControlsView.swift:253-256`) and it can be reused | one menu |
+| 7 | Playback-speed menu in the More menu, 0.5x to 2x | `B:§0` lists it for the TV app; each new item starts at Normal | one menu |
 
 ## 2. Product context (inferred)
 
@@ -141,7 +141,7 @@ One theme = Lucent's 20 colour roles (`L:85`) plus `id`, `name` and `mode`. View
 | focus, focusInk | ring for Full Keyboard Access and Switch Control, selected rings, the scrubber thumb; text on a focus-filled element |
 | trackOff | off and progress tracks: decoration, not a control boundary. Sliders and the scrubber use the readable track, ink mixed at .60 over the surface, which is 3:1 or more in all 40 themes (`L:98`, §5.5) |
 | accent, accentInk | the one tint (an action or the current step); label on an accent fill |
-| positive, warning, danger, info, live | meaning, never decoration (§5.2). `live` is reserved for live sources and is unused for now |
+| positive, warning, danger, info, live | meaning, never decoration (§5.2). `live` marks live sources (the Live TV guide's now line) |
 
 ### 5.2 Behaviour
 
@@ -182,7 +182,7 @@ Dawn's danger fill is `#B4637A`; accentInk on it is 4.36:1, so a custom danger b
 
 ### 5.5 Format and checker
 
-`themes.json`: `{schema: "lucent-colour-roles/1", default: "rose-pine", roles: [20 names], themes: [{id, name, mode: "dark" or "light", colors: {20 roles}}]}`. Colours are `#RRGGBB` or `#RRGGBBAA`. There are no preview images: a picker tile is drawn from the roles. The app bundles this same file. CI should run `python3 -B check_themes.py [themes.json]` (exit 0 on pass, 1 on a required failure) so a theme that fails breaks the build.
+`themes.json`: `{schema: "lucent-colour-roles/1", default: "rose-pine", roles: [20 names], themes: [{id, name, mode: "dark" or "light", colors: {20 roles}}]}`. Colours are `#RRGGBB` or `#RRGGBBAA`. There are no preview images: a picker tile is drawn from the roles. The app bundles this same file. CI runs `python3 -B tools/check_themes.py Resources/themes.json` (exit 0 on pass, 1 on a required failure) so a theme that fails breaks the build.
 
 **Required rules**
 
@@ -283,7 +283,7 @@ Every screen: large title where top-level, canvas behind, 16 pt insets, one butt
 
 ### 8.0 Sign-in and server choice (brief)
 
-The phone sign-in mechanism is not confirmed (`B:§0`), so only the screen is specified. One screen: the Marquee mark, one Sign in button, nothing else. After sign-in, a server list: one 56 pt row per server (name, owner, a connection glyph with a word); choosing one is remembered; only the user's own servers are listed (`B:§1`). Empty: "No servers found" with Retry. A failed or expired sign-in has its own state (§11).
+Sign-in is Plex's PIN flow: the button opens plex.tv in a browser sheet and the app polls the PIN; if the sheet cannot be used, the screen shows a 4-character code to enter at plex.tv/link. One screen: the Marquee mark, one Sign in button, nothing else. After sign-in, a server list: one 56 pt row per server (name, owner, a connection glyph with a word); choosing one is remembered; only the user's own servers are listed (`B:§1`). Empty: "No servers found" with Retry. A failed or expired sign-in has its own state (§11).
 
 ### 8.1 Home
 
@@ -504,14 +504,14 @@ Icons: SF Symbols only. [INFERENCE: every name needs a check in the SF Symbols a
 | Generated subtitle | `sparkles` |
 | States | `film.stack`, `photo`, `wifi.slash`, `exclamationmark.triangle`, `arrow.clockwise` |
 
-## 13. Verification plan (not run yet)
+## 13. Verification plan
 
 1. **Theme gallery in CI.** A UI test launched with a theme id screenshots Home, Detail, the player chrome and Settings for each of the 40 themes and uploads the PNGs, so Nitin can review without a Mac [INFERENCE: feasible on the macOS runner].
 2. **Dark and light, each at** default text, accessibility 2 (about 200%) and the largest size (`I:50`), on a 390 pt screen and a narrower one. Screenshots with `xcrun simctl io booted screenshot` (`I:49`); appearance with `xcrun simctl ui booted appearance dark` (`I:50`); text size and Increase Contrast through `xcrun simctl ui` [INFERENCE: option names to confirm with `xcrun simctl ui --help`]; Reduce Motion and Reduce Transparency by hand in Simulator settings.
 3. **Overlap check at 100% and 200% text** on every screen (`L:387`).
 4. **Glass slider:** both ends, on a build against the shipping iOS 27, because §5.3 and §6 rely on first-beta reports.
 5. **A real iPhone, not the Simulator,** for gestures, haptics, scroll smoothness and Picture in Picture (`I:51`). No "faster" or "smoother" claim without a measured frame result (`/data/home/lgtv/CLAUDE.md`).
-6. **Checker in CI:** `python3 -B check_themes.py` prints `RESULT: PASS`.
+6. **Checker in CI:** `python3 -B tools/check_themes.py Resources/themes.json` prints `RESULT: PASS`.
 7. Every case checked on the real device is recorded; the rest are listed as untested.
 
 ## 14. Sources and [INFERENCE] ledger
