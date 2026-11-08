@@ -32,8 +32,9 @@ Read first: `docs/ARCHITECTURE.md` (layers and why), then the file for the area 
 | `Playback/` | `PlaybackRouteDecider` (direct, remux, transcode and why), `DeviceCapabilities`, `TranscodeRequest` |
 | `Tracks/` | `AudioPicker`, `SubtitlePicker`, `TrackMemory`, language and track-label rules |
 | `Live/` | Plex Live TV and DVR (`PlexLiveTV`), guide models and `GuideCache`, recordings, `LiveRouteDecider`, `HDHomeRunClient` for the direct tuner path |
+| `Subtitles/` | `Bazarr` client (search, download), `SubtitleLook` (presets, fonts, edges, boxes, position), `SubtitleTiming` (offset), `SubtitleReveal` (Reveal as Spoken modes) |
 
-Subtitle extras (Bazarr fix, SubtitleLook, SubtitleTiming, SubtitleReveal for SpeechDock) are being built on branches `parity-subs` and `parity-speechdock`. Check `ls Packages/MarqueeCore/Sources/MarqueeCore` and `docs/PARITY.md` for what has reached `main`. Remote server content in the App is `App/Browse/Remote.swift`.
+SpeechDock word timing for Reveal as Spoken is being built on branch `parity-speechdock`. Remote server content in the App is `App/Browse/Remote.swift`.
 
 `Packages/MarqueeLive` (iOS only, FFmpeg through stashy-videoengine): `LiveEngine` (demux, decode, playout, tuner connection; no AVFoundation), `MarqueeLive` (`LiveStreamPlayer`, sample-buffer output, Picture in Picture and Now Playing types that the app does not use yet), `LiveFixtures` (synthetic tuner and stream).
 

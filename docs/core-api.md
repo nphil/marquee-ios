@@ -44,6 +44,7 @@
   - `createPlayQueue(for:)`, `playQueue(_:)`: a queue that continues through the show for episodes.
   - `selectStreams(partID:audioStreamID:subtitleStreamID:)`, `playbackURL(path:query:)`, `transcodeURL(_:)`, `stopTranscode(session:)`: playback. These URLs carry the token because the player cannot send headers; they are never logged or cached.
   - `transcodeSession(_:)`: the server's `PlexTranscodeSession` for a `TranscodeRequest.session` (speed, throttling, decisions, hardware), nil once it has ended; for the player's stats.
+  - `removeSubtitle(streamID:)`, `refresh(_:)`, `externalIDs(_:)`: deletes a separate subtitle file (the video stays), asks the server to re-read an item so a new file is listed, and an item's IMDb, TMDB and TVDB ids for Bazarr.
   - `imageURL(_:width:height:scale:)`, `authorizationHeaders()`: artwork and headers for the image loader and the remux.
 - `HomeRow`, `HomeLayout`: a profile's Home rows. A row is a Home hub or a library hub (id prefixed with the library's uuid). `arrange(_:)` orders rows by the saved placements, then unplaced ones in server order with their default visibility (library rows hidden); `save(_:)` keeps placements of rows the server did not send this time; `shownLibraries` names the libraries worth asking.
 - `SectionQuery`: item type, sort, Unwatched filter and genre for a grid.
@@ -64,6 +65,8 @@
 - `TrackLanguage`: `eng`, `en` and `en-US` compare as English. `matches(_:)`, `name`, `variantName`, `.english`; `all` lists every two-letter language by English name, for language pickers.
 - `AudioTrack`, `SubtitleTrack`, `TrackBadge`: tracks with plain menu labels ("English – 7.1", "English (on-screen text)", "Spanish (Latin America)") and Captions or Audio description badges. `SubtitleTrack.Kind` is full, captions, on-screen text or commentary.
 - `MediaTracks(part:)`: one part's tracks, separate files last. An embedded subtitle with an exact separate-file twin is hidden behind the file (`visibleSubtitles`, `visible(_:)`).
+- `MediaTracks.arrived(_:kind:since:)`: a separate file in a language that was not listed before, such as a Bazarr download once Plex lists it.
+- `SubtitleLanguages`: the tracks menu's groups, the preferred languages first and the rest A to Z behind Other Languages.
 - `SubtitlePicker.decide(tracks:audio:handPick:remembered:settings:canDrawImageSubtitles:)`: `SubtitleDecision` with its source. Order: hand pick, server selection, remembered choice, file default, setting. Automatic picks take only tracks the app can draw and follow the audio: the dub transcript for audio in the preferred language, the full translation for other audio.
 - `SubtitlePicker.onScreenText(for:in:)`: the on-screen-text track in the audio's language.
 - `AudioPicker.pick(in:handPick:remembered:preferredLanguage:)`: hand pick, remembered choice, server selection, preferred language, file default, first main track.
@@ -101,6 +104,14 @@ The endpoints and the route rules are in `docs/LIVE-TV.md`.
 - `HDHomeRunClient`: a tuner's `discover.json` (0.5 s timeout, the reachability check) and `lineup.json` (`HDHomeRunChannel` with codecs, HD and DRM when the tuner sends them).
 - `LiveSource` (`@MainActor` protocol): what the live player plays through; `LiveState`, `LiveError`.
 
+## Subtitles (`Subtitles/`)
+
+- `BazarrConfig.parse(address:key:)`: checks a typed address and key; plain http only for home-network addresses.
+- `BazarrClient`: `status()` (Bazarr, Sonarr and Radarr versions), `find(_:)` (a `BazarrLookup` by external id, then file name, then title and year, to a `BazarrTarget`), `search(_:)` (`BazarrSubtitle`s, best score first), `download(_:for:)`.
+- `SubtitleLook`: the subtitle style: the TV's presets, font, size, colour, edge, box, position, line spacing, blending with the video and file styling. `init(preset:)`, `isCustom`.
+- `SubtitleTiming`: a subtitle offset in 0.1 s steps, up to 60 s either way.
+- `SubtitleReveal.estimate(_:duration:by:)`, `visibility(of:at:)`: Reveal as Spoken timing estimated from a cue's text and length.
+
 ## Not yet checked against a live server
 
 - The status codes for a wrong profile PIN (the live Plex Home has no protected profile). `/api/v2/resources`, `/api/v2/user` and `/api/v2/home/users` were decoded from a live account on 2026-11-06 with no mismatch.
@@ -109,3 +120,4 @@ The endpoints and the route rules are in `docs/LIVE-TV.md`.
 - The Keychain store, which has no tests.
 - Dolby Vision, HEVC level and HDR limits, and CEA-608 captions on the actual phone.
 - The live endpoints: fixtures follow the server's API spec and the shapes recorded in `docs/LIVE-TV.md` §1, not a captured response.
+- `removeSubtitle(streamID:)`, which only FakePlex has answered, and the Bazarr client, which follows Bazarr's API source rather than a captured response.
