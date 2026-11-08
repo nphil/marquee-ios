@@ -86,7 +86,7 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 
 ## 3. Audio and subtitle rules
 
-**Subtitle pick, in order** (`docs/marquee/changelog.md`, `rust-modules/media/src/route/plan.rs` ~3640–3800):
+**Subtitle pick, in order** (`docs/marquee/changelog.md`):
 1. The pick for this playback only.
 2. A subtitle the server selected that the app can draw.
 3. The remembered choice for this show: a track, Off, or Forced only.
@@ -101,7 +101,7 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 - On-screen text and the account-level Forced only rule are never followed.
 - A remembered choice that picked the subtitle is never overridden.
 
-**Track kinds** (`rust-modules/data/src/metadata/track_label.rs`):
+**Track kinds:**
 - Full, SDH, Forced, Commentary. Forced words: "forced", "forsed", "форс", "sign", "signs". Commentary: "commentary" or "комментари".
 - Dub words: "dub", "dubs", "dubbed", "dubtitle", "dubtitles".
 - "Signs & Songs" is a style name, not a forced track.
