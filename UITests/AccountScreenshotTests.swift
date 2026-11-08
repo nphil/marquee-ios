@@ -98,11 +98,13 @@ extension XCTestCase {
         waitForBar("Home", in: app)
     }
 
-    /// Each Settings page in list order, an invalid SpeechDock address, a licence and the sign-out
-    /// confirmation; `turned` takes each shot in landscape.
+    /// Each Settings page in list order, an invalid SpeechDock address, Bazarr's connection test, a
+    /// licence and the sign-out confirmation; `turned` takes each shot in landscape.
     @MainActor
     func settingsFlow(mode: String, suffix: String, turned: Bool = false) throws {
-        let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine")
+        let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", arguments: [
+            "-marquee.fakeSignedIn", "YES", "-marquee.uitest.bazarr", "http://bazarr.local:6767",
+        ])
         openSettings(in: app)
         try snap("acct-04-settings-\(suffix)", turned: turned)
 
@@ -137,6 +139,14 @@ extension XCTestCase {
         waitFor("speechDock.invalid", in: app)
         try snap("acct-09-speechdock-\(suffix)", turned: turned)
         goBack(from: "SpeechDock", in: app)
+
+        reveal("settings.bazarr", in: app).tap()
+        waitForBar("Bazarr", in: app)
+        tap("bazarr.test", in: app)
+        let linked = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Sonarr 4.0.15.2941 and Radarr 5.26.2.10099 are linked'")).firstMatch
+        XCTAssertTrue(linked.waitForExistence(timeout: 10), "No linked Sonarr and Radarr after the connection test")
+        try snap("acct-09b-bazarr-\(suffix)", turned: turned)
+        goBack(from: "Bazarr", in: app)
 
         reveal("settings.notices", in: app).tap()
         waitForBar("Open-Source Notices", in: app)

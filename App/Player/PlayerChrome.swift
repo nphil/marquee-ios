@@ -493,6 +493,9 @@ struct TracksMenu: View {
             }
             .disabled(drawnByServer != nil)
             .accessibilityIdentifier("player.tracks.style")
+            if model.subtitleIsImage && drawnByServer == nil {
+                Text("Image subtitles keep their own size and position.")
+            }
             if let drawnByServer {
                 Text(drawnByServer)
             }

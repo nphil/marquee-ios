@@ -79,7 +79,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Other languages submenu | Done | Languages outside the wanted set, A to Z. | streams [code] |
 | Sidecar (external) subtitle download | Done | Downloads an external subtitle file and reads it. | `/library/streams/{id}` [code] |
 | Image subtitles (PGS, DVB, VOBSUB) | Done | Drawn as bitmaps. | streams [code] |
-| Image-subtitle badges and no-restyle rule | Partial | Image subtitles cannot be restyled; the reason row. | local |
+| Image-subtitle badges and no-restyle rule | Done | Image subtitles keep their own size and position; the style page and the track menu say so. | local |
 | Subtitle style (size, position, colour, background, presets, live preview) | Partial | The TV's presets, fonts, edges, boxes, rounded corners, padding, edge distance, line spacing and file styling Keep/My Look, with a live preview over sample scenes. Reveal as spoken is not built. | local [code] |
 | Subtitle timing (offset) | Done | Shifts subtitles earlier or later for the playing item. | local offset [code] |
 | Wrong subtitles? flow | Done | In the subtitle menu: remove a separate file from Plex, or search Bazarr for another. | Plex refresh `/library/metadata/{id}/refresh` [code] |
@@ -128,7 +128,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Feature | Status | Behaviour | API |
 |---|---|---|---|
 | Bazarr settings page (address, API key, Test connection, Forget key) | Done | Connection to Bazarr; the key is kept in the Keychain. | Bazarr REST API `GET /api/system/status` [code] |
-| Sonarr / Radarr linked | Missing | Shown on Bazarr page. | Bazarr config [INFERENCE] |
+| Sonarr / Radarr linked | Done | The Bazarr page's connection test names the linked Sonarr and Radarr versions. | Bazarr `/api/system/status` |
 | SpeechDock page | Partial | Toggle and address (no service calls yet). | local [code] |
 
 ## 10. Not on a phone
