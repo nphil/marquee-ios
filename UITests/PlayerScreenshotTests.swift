@@ -164,11 +164,12 @@ private extension XCTestCase {
             XCTAssertEqual(XCTWaiter().wait(for: [drawn], timeout: 15), .completed, "The scene thumbnail never showed at \(name)")
             try snap("player-13-scrub-\(name)-\(suffix)")
 
-            let layer = element("player.seekLayer", in: app).frame
+            // The scrubber's ends are the safe area's edges plus `Space.inset`, the margin the preview keeps.
+            let scrubber = element("player.scrubber", in: app).frame
             let thumb = element("player.scrubThumb", in: app).frame
             let box = preview.frame
-            let lowest = layer.minX + 16 + box.width / 2
-            let highest = layer.maxX - 16 - box.width / 2
+            let lowest = scrubber.minX + box.width / 2
+            let highest = scrubber.maxX - box.width / 2
             XCTAssertEqual(box.width, 224, accuracy: 1, "\(name): preview width")
             XCTAssertEqual(box.maxY, thumb.minY - 12, accuracy: 1, "\(name): gap above the thumb")
             XCTAssertEqual(box.midX, min(max(thumb.midX, lowest), highest), accuracy: 1, "\(name): preview centre")
@@ -177,8 +178,8 @@ private extension XCTestCase {
             case "end": XCTAssertGreaterThan(thumb.midX, highest, "end: the thumb is not at the end")
             default: XCTAssertTrue((lowest...highest).contains(thumb.midX), "middle: the thumb is not clear of the edges")
             }
-            XCTAssertGreaterThanOrEqual(box.minX, layer.minX + 15, "\(name): preview past the left edge")
-            XCTAssertLessThanOrEqual(box.maxX, layer.maxX - 15, "\(name): preview past the right edge")
+            XCTAssertGreaterThanOrEqual(box.minX, scrubber.minX - 1, "\(name): preview past the left edge")
+            XCTAssertLessThanOrEqual(box.maxX, scrubber.maxX + 1, "\(name): preview past the right edge")
             app.terminate()
         }
     }

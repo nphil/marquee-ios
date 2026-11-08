@@ -293,9 +293,6 @@ struct SeekPreviewLayer: View {
             }
         }
         .allowsHitTesting(false)
-        .accessibilityHidden(!SeekPreview.exposedToTests)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("player.seekLayer")
     }
 }
 
