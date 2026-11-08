@@ -16,6 +16,7 @@ The UI tests launch the app with `MARQUEE_FAKE_PLEX` set to this folder. `App/Te
 - A write, or a path with `/:/` in it (`/:/timeline`, `/video/:/transcode/universal/decision`) or under `/actions/`, without a fixture answers 200 `{}`. Any other missing fixture answers 404. A `DELETE` always answers 200 and the title stays in the fixtures, as a server lists a deleted title until its trash is emptied.
 - The server root `/` reads `pms/root.json`: Living Room allows deleting media from the apps.
 - Every channel's tune, `POST /livetv/dvrs/<dvr>/channels/<channel>/tune`, reads `pms/livetv/tune.json`: a rolling grab holding a 720p MPEG-2 session, the shape PMS 1.43.5 answers with. The player shows the `-marquee.uitest.frame` picture for every channel.
+- Scene thumbnails, `GET /library/parts/<id>/indexes/sd`, read the BIF file `pms/library/parts/<id>/indexes/sd.bif`. Part 2121 (Caminandes episode 2) has 15 frames, one per 10 s, cut from the fixture artwork.
 - `"__anchor": T` at the top of a fixture moves every `beginsAt` and `endsAt` in it by 9 PM today minus T. The app draws the Live TV guide at 9:41 PM today while the fake Plex is active, so the guide fixtures, written around T = 1800000000, always air at the same times.
 - `live.json` holds the Live TV favourites and recent channels each profile starts with.
 

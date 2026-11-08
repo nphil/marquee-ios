@@ -46,6 +46,7 @@ struct PlayerChrome: View {
                 .allowsHitTesting(false)
         }
         .animation(.easeOut(duration: 0.18), value: model.isScrubbing)
+        .overlayPreferenceValue(SeekPreviewKey.self) { SeekPreviewLayer(state: $0) }
     }
 
     // MARK: Top

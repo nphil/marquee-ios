@@ -49,6 +49,11 @@ final class PlayerScreenshotTests: XCTestCase {
     func testWrongSubtitlesAndBazarrInLightTheme() throws {
         try subtitleFixFlow(mode: "light", suffix: "paper")
     }
+
+    @MainActor
+    func testScrubPreviewFollowsTheThumb() throws {
+        try scrubPreviewFlow(suffix: "rose-pine")
+    }
 }
 
 /// Run by CI with Increase Contrast and an accessibility text size.
@@ -145,6 +150,37 @@ private extension XCTestCase {
         XCTAssertTrue(element("player.watchIntro", in: app).exists, "No countdown: Watch Intro is missing")
         try snap("player-09-skip-intro-\(suffix)")
         XCTAssertTrue(skip.waitForNonExistence(timeout: 8), "The intro was not skipped after the countdown")
+    }
+
+    /// The scrub preview with the scrubber held mid-drag at the start, middle and end of the track.
+    /// The preview must sit a fixed gap above the thumb, centred on it, and stay `Space.inset` inside
+    /// the safe area at both ends. The player is landscape-only on iPhone, so there is no portrait shot.
+    @MainActor
+    func scrubPreviewFlow(suffix: String) throws {
+        for (name, fraction) in [("start", 0.0), ("middle", 0.5), ("end", 1.0)] {
+            let app = launchPlayer(at: 61, paused: true, mode: "dark", scrub: fraction)
+            let preview = element("player.seekPreview", in: app)
+            let drawn = XCTNSPredicateExpectation(predicate: NSPredicate(format: "value == %@", "ready"), object: preview)
+            XCTAssertEqual(XCTWaiter().wait(for: [drawn], timeout: 15), .completed, "The scene thumbnail never showed at \(name)")
+            try snap("player-13-scrub-\(name)-\(suffix)")
+
+            let layer = element("player.seekLayer", in: app).frame
+            let thumb = element("player.scrubThumb", in: app).frame
+            let box = preview.frame
+            let lowest = layer.minX + 16 + box.width / 2
+            let highest = layer.maxX - 16 - box.width / 2
+            XCTAssertEqual(box.width, 224, accuracy: 1, "\(name): preview width")
+            XCTAssertEqual(box.maxY, thumb.minY - 12, accuracy: 1, "\(name): gap above the thumb")
+            XCTAssertEqual(box.midX, min(max(thumb.midX, lowest), highest), accuracy: 1, "\(name): preview centre")
+            switch name {
+            case "start": XCTAssertLessThan(thumb.midX, lowest, "start: the thumb is not at the start")
+            case "end": XCTAssertGreaterThan(thumb.midX, highest, "end: the thumb is not at the end")
+            default: XCTAssertTrue((lowest...highest).contains(thumb.midX), "middle: the thumb is not clear of the edges")
+            }
+            XCTAssertGreaterThanOrEqual(box.minX, layer.minX + 15, "\(name): preview past the left edge")
+            XCTAssertLessThanOrEqual(box.maxX, layer.maxX - 15, "\(name): preview past the right edge")
+            app.terminate()
+        }
     }
 
     /// At the final credits, Up Next counts down and then plays episode 3.
@@ -281,9 +317,9 @@ private extension XCTestCase {
 
     /// Opens the player on episode 212 at `seconds` with the phone on its side, and waits until it
     /// has landed there. `introSkipDelay` overrides the profile's intro countdown for this launch;
-    /// `bazarr` sets up the fake Bazarr.
+    /// `bazarr` sets up the fake Bazarr; `scrub` holds the scrubber at that fraction.
     @MainActor
-    func launchPlayer(at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, bazarr: Bool = false) -> XCUIApplication {
+    func launchPlayer(at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, bazarr: Bool = false, scrub: Double? = nil) -> XCUIApplication {
         XCUIDevice.shared.orientation = .landscapeLeft
         // A failed step ends the test early; the next test still has to start upright.
         addTeardownBlock {
@@ -298,10 +334,13 @@ private extension XCTestCase {
         ]
         if let introSkipDelay { arguments += ["-marquee.uitest.introSkipDelay", String(introSkipDelay)] }
         if bazarr { arguments += ["-marquee.uitest.bazarr", "http://bazarr.local:6767"] }
+        if let scrub { arguments += ["-marquee.uitest.scrub", String(scrub)] }
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", light: "paper", arguments: arguments, waitingFor: nil)
         // Up Next hides the transport, so whichever control shows first means the player is up.
+        // The scrub hold hides the transport, so the preview stands for it.
         let landed = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier IN %@", ["player.playPause", "player.skipIntro", "player.playNext"]))
+            .matching(NSPredicate(format: "identifier IN %@", scrub == nil
+                ? ["player.playPause", "player.skipIntro", "player.playNext"] : ["player.seekPreview"]))
             .firstMatch.waitForExistence(timeout: 20)
         let failure = element("player.failed", in: app)
         XCTAssertTrue(landed, failure.exists ? "Playback failed: \(failure.label)" : "The player did not open")

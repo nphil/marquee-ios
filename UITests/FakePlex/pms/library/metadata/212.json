@@ -47,6 +47,7 @@
         "file": "/media/movies/Caminandes - s01e02.mp4",
         "size": 146000000,
         "container": "mp4",
+        "indexes": "sd",
         "Stream": [
          {
           "id": 21211,

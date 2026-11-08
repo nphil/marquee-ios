@@ -25,6 +25,7 @@ import Synchronization
 ///   A `DELETE` always is, and the title stays in the fixtures.
 /// - The server root `/` reads `pms/root.json`.
 /// - Every channel's tune reads `pms/livetv/tune.json`.
+/// - Scene thumbnails, `/library/parts/<id>/indexes/sd`, read the BIF file `pms/library/parts/<id>/indexes/sd.bif`.
 /// - A fixture whose object has `"__anchor": T` has every `beginsAt` and `endsAt` in it moved by
 ///   `liveEvening` minus T, so the Live TV guide always airs around `liveNow`.
 /// - `live.json` holds the Live TV favourites and recent channels the app starts with.
@@ -118,6 +119,12 @@ struct FakePlexRouter {
         }
         if Self.imageExtensions.contains(url.pathExtension.lowercased()) {
             return .success(image(at: path))
+        }
+        // Scene thumbnails are a binary BIF file beside the JSON fixtures.
+        if path.hasPrefix("/library/parts/"), path.hasSuffix("/indexes/sd") {
+            let bif = root.appending(path: "pms" + path + ".bif")
+            guard let data = try? Data(contentsOf: bif) else { return .success(json(["MediaContainer": ["size": 0]], status: 404)) }
+            return .success(Reply(status: 200, body: data, contentType: "application/octet-stream"))
         }
 
         if method != "GET" { Self.wrote(path) }

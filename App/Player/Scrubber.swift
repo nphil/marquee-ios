@@ -3,8 +3,9 @@ import SwiftUI
 import UIKit
 
 /// The scrubber (DESIGN §8.6): elapsed time, a 6 pt track in a 56 pt hit area, remaining time. A drag
-/// shows the scene thumbnail and the time above the thumb, ticks once per thumbnail, and slows down as
-/// the finger moves away from the track, as in Stashy.
+/// shows the scene thumbnail and the time above the thumb the moment the finger lands, ticks once per
+/// thumbnail, and slows down as the finger moves away from the track, as in Stashy. The preview is
+/// drawn by the chrome (`SeekPreviewLayer`) from the thumb's anchor, so it shares the track's space.
 struct Scrubber: View {
     let model: PlayerModel
     let frames: TrickplayFrames
@@ -20,6 +21,22 @@ struct Scrubber: View {
     private static let hitHeight: CGFloat = 56
     private static let trackHeight: CGFloat = 6
     private static let thumb: CGFloat = 16
+
+    /// The thumb's drawn size while scrubbing, which the preview sits above.
+    private var thumbSize: CGFloat { model.isScrubbing && !reduceMotion ? Self.thumb * 1.4 : Self.thumb }
+
+    #if DEBUG
+    /// UI tests hold the scrubber mid-drag at a fraction of the item (`-marquee.uitest.scrub`), since a
+    /// touch cannot be held while the test takes its screenshot.
+    private func holdForTest() {
+        guard FakePlex.isActive, model.duration > 0, !model.isScrubbing,
+              let fraction = UserDefaults.standard.string(forKey: "marquee.uitest.scrub").flatMap(Double.init) else { return }
+        model.beginScrub()
+        speed = .full
+        scrubTime = min(1, max(0, fraction)) * model.duration
+        frameIndex = frames.index(at: scrubTime)
+    }
+    #endif
 
     var body: some View {
         let shown = model.isScrubbing ? scrubTime : model.time
@@ -54,11 +71,19 @@ struct Scrubber: View {
             }
         }
         .accessibilityIdentifier("player.scrubber")
+        #if DEBUG
+        .task(id: model.duration) { holdForTest() }
+        #endif
     }
 
     private func track(width: CGFloat, shown: TimeInterval) -> some View {
         let fraction = model.duration > 0 ? min(1, max(0, shown / model.duration)) : 0
         let x = width * fraction
+        // Read here, not in the preference's closure, so a thumbnail that lands redraws the preview.
+        let content = model.isScrubbing
+            ? (image: frames.image(near: scrubTime), hasFrames: frames.hasFrames,
+               time: clockText(scrubTime, hours: model.duration >= 3600), speed: speed.label)
+            : nil
         return ZStack(alignment: .leading) {
             ZStack(alignment: .leading) {
                 // The readable track (DESIGN §5.1): trackOff all but vanished over a bright picture.
@@ -74,25 +99,25 @@ struct Scrubber: View {
                 .fill(theme.ink)
                 .frame(width: Self.thumb, height: Self.thumb)
                 .scaleEffect(model.isScrubbing && !reduceMotion ? 1.4 : 1)
-                .offset(x: x - Self.thumb / 2)
                 .animation(.easeOut(duration: 0.12), value: model.isScrubbing)
+                .offset(x: x - Self.thumb / 2)
+                .transaction(value: model.isScrubbing) { $0.animation = nil }
         }
         .frame(width: width, height: Self.hitHeight)
         .contentShape(Rectangle())
         .gesture(drag(width: width))
-        .overlay(alignment: .bottomLeading) {
-            if model.isScrubbing {
-                SeekPreview(
-                    image: frames.image(near: scrubTime),
-                    time: clockText(scrubTime, hours: model.duration >= 3600),
-                    speed: speed.label
-                )
-                .alignmentGuide(.leading) { size in
-                    size.width / 2 - min(max(x, size.width / 2), max(size.width / 2, width - size.width / 2))
+        .overlay(alignment: .leading) {
+            // The thumb's frame, handed up as an anchor for the chrome to place the preview by. It sits at
+            // the thumb's own offset in this track, so the two cannot drift apart, and it moves without
+            // animation: the preview shows at the touch, not on its way there.
+            Color.clear
+                .frame(width: thumbSize, height: thumbSize)
+                .offset(x: x - thumbSize / 2)
+                .anchorPreference(key: SeekPreviewKey.self, value: .bounds) { thumb in
+                    content.map { SeekPreviewState(thumb: thumb, image: $0.image, hasFrames: $0.hasFrames, time: $0.time, speed: $0.speed) }
                 }
-                .offset(y: -(Self.hitHeight / 2 + 20))
+                .transaction(value: model.isScrubbing) { $0.animation = nil }
                 .allowsHitTesting(false)
-            }
         }
     }
 
@@ -215,25 +240,94 @@ enum ScrubSpeed: Equatable {
     }
 }
 
-/// The scene thumbnail and time above the scrubber's thumb.
+/// What the scrubber hands up to be drawn above everything else: the thumb's frame, as an anchor the
+/// chrome resolves in its own coordinate space, and the preview's content. The chrome draws the
+/// preview, so it is placed in the space the track lives in and clamped against the safe area it fills.
+struct SeekPreviewState {
+    let thumb: Anchor<CGRect>
+    let image: UIImage?
+    /// Whether scene thumbnails exist for this item, so the frame is reserved while one decodes.
+    let hasFrames: Bool
+    let time: String
+    let speed: String?
+}
+
+struct SeekPreviewKey: PreferenceKey {
+    static var defaultValue: SeekPreviewState? { nil }
+
+    static func reduce(value: inout SeekPreviewState?, nextValue: () -> SeekPreviewState?) {
+        value = value ?? nextValue()
+    }
+}
+
+/// Draws the preview centred on the thumb with a fixed gap above it, kept `Space.inset` inside the
+/// edges of the space it fills (the chrome, which sits inside the safe area). It appears with the
+/// touch, without a transition.
+struct SeekPreviewLayer: View {
+    let state: SeekPreviewState?
+
+    /// The space between the thumb's top and the preview's bottom edge.
+    private static let gap: CGFloat = Space.s3
+
+    var body: some View {
+        GeometryReader { proxy in
+            if let state {
+                let thumb = proxy[state.thumb]
+                let half = SeekPreview.width / 2
+                let lowest = Space.inset + half
+                let centre = min(max(thumb.midX, lowest), max(lowest, proxy.size.width - lowest))
+                ZStack(alignment: .bottomLeading) {
+                    SeekPreview(image: state.image, hasFrames: state.hasFrames, time: state.time, speed: state.speed)
+                        .offset(x: centre - half, y: thumb.minY - Self.gap - proxy.size.height)
+                    // Where the thumb is, for the UI tests: the scrubber's own element hides its children.
+                    Color.clear
+                        .frame(width: thumb.width, height: thumb.height)
+                        .offset(x: thumb.minX, y: thumb.minY + thumb.height - proxy.size.height)
+                        .accessibilityHidden(!SeekPreview.exposedToTests)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Thumb")
+                        .accessibilityIdentifier("player.scrubThumb")
+                }
+                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .bottomLeading)
+                .transition(.identity)
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(!SeekPreview.exposedToTests)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("player.seekLayer")
+    }
+}
+
+/// The scene thumbnail, 16:9, and the time under it.
 struct SeekPreview: View {
     let image: UIImage?
+    let hasFrames: Bool
     let time: String
     var speed: String?
 
     @Environment(\.theme) private var theme
-    private static let width: CGFloat = 176
+    /// 25-30% over the first version's 176 pt.
+    static let width: CGFloat = 224
+    /// The UI tests read the preview and the thumb through the accessibility tree; users never do.
+    static var exposedToTests: Bool { FakePlex.isActive }
 
     var body: some View {
         VStack(spacing: Space.s2) {
-            if let image {
-                let aspect = image.size.height > 0 ? image.size.width / image.size.height : 16 / 9
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: Self.width, height: Self.width / min(2.4, max(1.33, aspect)))
-                    .clipShape(RoundedRectangle(cornerRadius: Radius.control))
-                    .overlay(RoundedRectangle(cornerRadius: Radius.control).strokeBorder(theme.edgeRaised, lineWidth: 1))
+            if hasFrames || image != nil {
+                let shape = RoundedRectangle(cornerRadius: Radius.control)
+                Group {
+                    if let image {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        Rectangle().fill(theme.glass)
+                    }
+                }
+                .frame(width: Self.width, height: Self.width * 9 / 16)
+                .clipShape(shape)
+                .overlay(shape.strokeBorder(theme.edgeRaised, lineWidth: 1))
             }
             VStack(spacing: 2) {
                 Text(time)
@@ -250,8 +344,13 @@ struct SeekPreview: View {
             .padding(.vertical, Space.s1)
             .background(theme.glass, in: Capsule())
         }
-        .fixedSize()
-        .accessibilityHidden(true)
+        .frame(width: Self.width)
+        .fixedSize(horizontal: false, vertical: true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityHidden(!Self.exposedToTests)
+        .accessibilityLabel(time)
+        .accessibilityValue(image == nil ? "pending" : "ready")
+        .accessibilityIdentifier("player.seekPreview")
     }
 }
 
@@ -276,6 +375,8 @@ final class TrickplayFrames {
         recent = []
         pending = []
     }
+
+    var hasFrames: Bool { trickplay != nil }
 
     func index(at time: TimeInterval) -> Int? {
         trickplay?.index(at: time)
