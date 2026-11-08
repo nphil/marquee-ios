@@ -34,7 +34,7 @@ Read first: `docs/ARCHITECTURE.md` (layers and why), then the file for the area 
 | `Live/` | Plex Live TV and DVR (`PlexLiveTV`), guide models and `GuideCache`, recordings, `LiveRouteDecider`, `HDHomeRunClient` for the direct tuner path |
 | `Subtitles/` | `Bazarr` client (search, download), `SpeechDock` (word timing: the file as the service reads it, request windows, client), `SubtitleLook` (presets, fonts, edges, boxes, position), `SubtitleTiming` (offset), `SubtitleReveal` (Reveal as Spoken modes) |
 
-SpeechDock word timing for Reveal as Spoken is being built on branch `parity-speechdock`. Remote server content in the App is `App/Browse/Remote.swift`.
+Reveal as Spoken gets its word timing from SpeechDock through `App/Player/WordTiming.swift`. Remote server content in the App is `App/Browse/Remote.swift`.
 
 `Packages/MarqueeLive` (iOS only, FFmpeg through stashy-videoengine): `LiveEngine` (demux, decode, playout, tuner connection; no AVFoundation), `MarqueeLive` (`LiveStreamPlayer`, sample-buffer output, Picture in Picture and Now Playing types that the app does not use yet), `LiveFixtures` (synthetic tuner and stream).
 

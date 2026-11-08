@@ -313,7 +313,7 @@ private struct SubtitleOverlay: View {
                 let distance = CGFloat(look.edgeDistance) * area.height / 1080
                 VStack(spacing: 0) {
                     if look.anchor == .bottom { Spacer(minLength: 0) }
-                    SubtitleLine(text: text, look: look, pictureHeight: area.height)
+                    SubtitleLine(text: text, look: look, pictureHeight: area.height, words: model.cueWords)
                     if look.anchor == .top { Spacer(minLength: 0) }
                 }
                 .padding(.horizontal, area.width * 0.06)

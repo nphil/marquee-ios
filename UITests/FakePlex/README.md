@@ -32,7 +32,7 @@ The player tests play Caminandes episode 2, Gran Dillama (`212`): an intro from 
 
 Bazarr, at `http://bazarr.local:6767` when a test passes `-marquee.uitest.bazarr`, knows the Caminandes series and its episodes, and offers three English subtitles and a Spanish one for episode 2. Downloading one adds it to the episode in Plex as an external English subtitle (`21217`); removing that brings the episode back to its own tracks.
 
-SpeechDock, at `http://speechdock.local:8765` when a test passes `-marquee.uitest.speechDock`, answers its health check as version 1.0.0.
+SpeechDock, at `http://speechdock.local:8765` when a test passes `-marquee.uitest.speechDock`, answers its health check as version 1.0.0 and times every cue of a window, its words spread evenly over the time the cue shows.
 
 ## Artwork
 

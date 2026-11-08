@@ -8,11 +8,14 @@ struct SubtitleLine: View {
     let text: AttributedString
     let look: SubtitleLook
     let pictureHeight: CGFloat
+    /// Reveal as Spoken: the words still appearing.
+    let words: [RevealedWord]
 
-    init(text: AttributedString, look: SubtitleLook, pictureHeight: CGFloat) {
+    init(text: AttributedString, look: SubtitleLook, pictureHeight: CGFloat, words: [RevealedWord] = []) {
         self.text = text
         self.look = look
         self.pictureHeight = pictureHeight
+        self.words = words
     }
 
     init(text: String, look: SubtitleLook, pictureHeight: CGFloat) {
@@ -21,7 +24,8 @@ struct SubtitleLine: View {
 
     var body: some View {
         let metrics = SubtitleMetrics(look: look, pictureHeight: pictureHeight)
-        let lines = Self.lines(look.keepsFileStyling ? text : Self.withoutFileColours(text))
+        let styled = look.keepsFileStyling ? text : Self.withoutFileColours(text)
+        let lines = Self.lines(Self.revealed(styled, words, colour: PictureColours.subtitle(look)))
         VStack(spacing: metrics.lineGap) {
             ForEach(lines.indices, id: \.self) { index in
                 letters(lines[index], metrics)
@@ -64,6 +68,39 @@ struct SubtitleLine: View {
         text[AttributeScopes.SwiftUIAttributes.ForegroundColorAttribute.self] = nil
         return text
     }
+
+    private typealias Colour = AttributeScopes.SwiftUIAttributes.ForegroundColorAttribute
+
+    /// Reveal as Spoken: a word not yet said keeps its place in a fainter copy of its colour, so the line
+    /// does not reflow as words appear, and a hidden letter casts no edge.
+    static func revealed(_ text: AttributedString, _ words: [RevealedWord], colour: Color) -> AttributedString {
+        guard !words.isEmpty else { return text }
+        let characters = text.characters
+        let count = characters.count
+        var result = AttributedString()
+        var done = 0
+        var doneIndex = characters.startIndex
+        for word in words.sorted(by: { $0.offset < $1.offset }) where word.offset >= done && word.length > 0 && word.offset + word.length <= count {
+            let start = characters.index(doneIndex, offsetBy: word.offset - done)
+            let end = characters.index(start, offsetBy: word.length)
+            result += AttributedString(text[doneIndex..<start])
+            var faded = AttributedString(text[start..<end])
+            let own = faded.runs.first?[Colour.self]
+            faded[Colour.self] = (own ?? colour).opacity(word.visibility)
+            result += faded
+            done = word.offset + word.length
+            doneIndex = end
+        }
+        result += AttributedString(text[doneIndex...])
+        return result
+    }
+}
+
+/// Reveal as Spoken: a word of the cue text by Character offset, and how much of it shows, 0 to 1.
+struct RevealedWord: Equatable {
+    var offset: Int
+    var length: Int
+    var visibility: Double
 }
 
 /// The look's lengths in points for a picture of a given height. Pixel values are pixels of a 1080-line

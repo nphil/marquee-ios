@@ -27,6 +27,8 @@ import Synchronization
 /// - The server root `/` reads `pms/root.json`.
 /// - Every channel's tune reads `pms/livetv/tune.json`.
 /// - Scene thumbnails, `/library/parts/<id>/indexes/sd`, read the BIF file `pms/library/parts/<id>/indexes/sd.bif`.
+/// - SpeechDock's `POST /api/alignment/windows` times every cue of the window, its words spread evenly
+///   over the time the cue shows.
 /// - A fixture whose object has `"__anchor": T` has every `beginsAt` and `endsAt` in it moved by
 ///   `liveEvening` minus T, so the Live TV guide always airs around `liveNow`.
 /// - `live.json` holds the Live TV favourites and recent channels the app starts with.
@@ -111,6 +113,10 @@ struct FakePlexRouter {
         let path = url.path(percentEncoded: false)
         let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let method = request.httpMethod ?? "GET"
+        if path == "/api/alignment/windows", prefix(for: host) == "speechdock" {
+            guard let reply = Self.aligned(Self.body(of: request)) else { return .success(json([String: Any](), status: 400)) }
+            return .success(json(reply))
+        }
 
         if path == "/identity" {
             return .success(json(["MediaContainer": ["size": 0, "machineIdentifier": machine] as [String: Any]]))
@@ -259,6 +265,58 @@ struct FakePlexRouter {
     private func json(_ object: Any, status: Int = 200) -> Reply {
         let body = (try? JSONSerialization.data(withJSONObject: object)) ?? Data("{}".utf8)
         return Reply(status: status, body: body, contentType: "application/json")
+    }
+
+    /// SpeechDock's answer to a window: each cue's words spread evenly over the time it shows.
+    private static func aligned(_ body: Data?) -> [String: Any]? {
+        guard let body, let window = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any],
+              let id = window["request_id"] as? String, let generation = window["generation"] as? Int,
+              let cues = window["cues"] as? [[String: Any]] else { return nil }
+        let timed: [[String: Any]] = cues.compactMap { cue in
+            guard let cueID = cue["cue_id"] as? String, let start = cue["start_ms"] as? Int, let end = cue["end_ms"] as? Int,
+                  let text = cue["text"] as? String else { return nil }
+            let spans = wordSpans(text)
+            let step = spans.isEmpty ? 0 : (end - start) / spans.count
+            let words: [[String: Int]] = spans.enumerated().map { index, span in
+                ["start_byte": span.lowerBound, "end_byte": span.upperBound, "start_ms": start + index * step, "end_ms": start + (index + 1) * step]
+            }
+            return ["cue_id": cueID, "status": "aligned", "words": words]
+        }
+        return ["request_id": id, "generation": generation, "source_revision": "fake", "cues": timed]
+    }
+
+    /// The UTF-8 byte range of each run of non-space characters.
+    private static func wordSpans(_ text: String) -> [Range<Int>] {
+        var spans: [Range<Int>] = []
+        var start: Int?
+        var byte = 0
+        for scalar in text.unicodeScalars {
+            if scalar.properties.isWhitespace {
+                if let first = start { spans.append(first..<byte) }
+                start = nil
+            } else if start == nil {
+                start = byte
+            }
+            byte += UTF8.width(scalar)
+        }
+        if let first = start { spans.append(first..<byte) }
+        return spans
+    }
+
+    /// A request's body: a URL protocol sees an uploaded body as a stream.
+    private static func body(of request: URLRequest) -> Data? {
+        if let body = request.httpBody { return body }
+        guard let stream = request.httpBodyStream else { return nil }
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 4096)
+        while true {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            guard count > 0 else { break }
+            data.append(buffer, count: count)
+        }
+        return data
     }
 
     private static let timeKeys: Set<String> = ["beginsAt", "endsAt"]

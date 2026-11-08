@@ -103,6 +103,8 @@ final class PlayerModel: Identifiable {
     private(set) var offer: Offer?
     private(set) var countdown: Countdown?
     private(set) var cueText: AttributedString?
+    /// Reveal as Spoken: how much shows of each word of `cueText` still appearing.
+    private(set) var cueWords: [RevealedWord] = []
     private(set) var bitmaps: [SubtitleBitmap] = []
     /// How far the subtitles are moved from their own times, for this item only.
     private(set) var timing = SubtitleTiming()
@@ -217,6 +219,7 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var sidecar: SidecarContents?
     @ObservationIgnored private var overlayTrack: SubtitleOverlayTrack?
     @ObservationIgnored private var textCues: [TextCue] = []
+    @ObservationIgnored private var wordTiming: WordTiming?
     @ObservationIgnored private var lastSkip: (target: TimeInterval, at: Date, total: TimeInterval)?
     @ObservationIgnored private var menusOpen = 0
     @ObservationIgnored private var closed = false
@@ -403,6 +406,8 @@ final class PlayerModel: Identifiable {
         closed = true
         report(.stopped)
         generation += 1
+        wordTiming?.stop()
+        wordTiming = nil
         for task in [loadTask, seekTask, eventsTask, countdownTask, hideTask, stageTask, trickplayLoad?.task] { task?.cancel() }
         sideTasks.forEach { $0.cancel() }
         subtitleFix?.cancel()
@@ -602,6 +607,8 @@ final class PlayerModel: Identifiable {
     /// The profile's subtitle style changed.
     func styleChanged() {
         applyTextStyle()
+        updateWordTiming()
+        updateSubtitles(at: time)
     }
 
     // MARK: Offers
@@ -1304,7 +1311,9 @@ final class PlayerModel: Identifiable {
         textCues = []
         overlayTrack = nil
         cueText = nil
+        cueWords = []
         bitmaps = []
+        updateWordTiming()
         timing.fit(canGoEarlier: timingCanGoEarlier)
         if !canTimeSubtitles { showsTiming = false }
         guard let route else { return }
@@ -1363,27 +1372,75 @@ final class PlayerModel: Identifiable {
             let shown = overlayTrack.bitmaps(at: due)
             if shown.map(\.start) != bitmaps.map(\.start) || shown.map(\.y) != bitmaps.map(\.y) { bitmaps = shown }
         }
-        let text = textCues.isEmpty ? streamLine(at: due) : cueLine(at: due)
-        if text != cueText { cueText = text }
+        wordTiming?.ask(due: due, offset: timing.seconds)
+        let line = textCues.isEmpty ? streamLine(at: due) : cueLine(at: due)
+        if line?.text != cueText { cueText = line?.text }
+        let words = line?.words ?? []
+        if words != cueWords { cueWords = words }
     }
 
-    private func cueLine(at movie: TimeInterval) -> AttributedString? {
-        var text: AttributedString?
+    private func cueLine(at movie: TimeInterval) -> ShownLine? {
+        let reveal = session.settings.subtitleStyle.reveal
+        var line: ShownLine?
         for cue in textCues where cue.start <= movie && movie < cue.end {
-            if var joined = text {
-                joined += AttributedString("\n")
-                joined += cue.text
-                text = joined
-            } else {
-                text = cue.text
+            let text = String(cue.text.characters)
+            // SpeechDock's times once it has timed the cue, the estimate until then.
+            let words = wordTiming?.starts(at: cue.start).flatMap { SubtitleReveal.measured(text, starts: $0, by: reveal) }
+                ?? SubtitleReveal.estimate(text, duration: cue.end - cue.start, by: reveal)
+            var shown = line ?? ShownLine()
+            shown.add(cue.text, words, at: movie - cue.start)
+            line = shown
+        }
+        return line
+    }
+
+    private func streamLine(at movie: TimeInterval) -> ShownLine? {
+        guard !playerDrawsText, let origin, let showing = streamText.line(at: movie - origin) else { return nil }
+        let text = String(showing.text.characters)
+        // A line in the stream arrives as it starts, so its end is seldom known yet.
+        let duration = showing.end.map { $0 - showing.start } ?? SubtitleReveal.spoken(text)
+        var line = ShownLine()
+        line.add(showing.text, SubtitleReveal.estimate(text, duration: duration, by: session.settings.subtitleStyle.reveal), at: movie - origin - showing.start)
+        return line
+    }
+
+    /// The text showing and, for Reveal as Spoken, how much shows of each word still appearing.
+    private struct ShownLine {
+        var text = AttributedString()
+        var words: [RevealedWord] = []
+
+        /// Adds a cue below the lines before it, its words `elapsed` seconds into their reveal.
+        mutating func add(_ cue: AttributedString, _ timed: [SubtitleReveal.Word], at elapsed: TimeInterval) {
+            if !text.characters.isEmpty { text += AttributedString("\n") }
+            let base = text.characters.count
+            text += cue
+            for word in timed {
+                let visibility = SubtitleReveal.visibility(of: word, at: elapsed)
+                if visibility < 1 { words.append(RevealedWord(offset: base + word.offset, length: word.length, visibility: visibility)) }
             }
         }
-        return text
     }
 
-    private func streamLine(at movie: TimeInterval) -> AttributedString? {
-        guard !playerDrawsText, let origin else { return nil }
-        return streamText.text(at: movie - origin)
+    /// SpeechDock times an English text file over English audio while Reveal as Spoken is on; any other
+    /// subtitle keeps the estimate.
+    private func updateWordTiming() {
+        guard session.settings.subtitleStyle.reveal != .off, let client = session.speechDock.client,
+              case .sidecar(let track)? = route?.subtitle, sidecarID == track.id, sidecar?.bitmaps == nil,
+              let media, let audio = route?.audio,
+              let identity = SpeechDock.identity(server: library.server.id, ratingKey: item.ratingKey, media: media, audio: audio.id, subtitle: track.id) else {
+            wordTiming?.stop()
+            wordTiming = nil
+            return
+        }
+        guard wordTiming?.identity != identity || wordTiming?.origin != client.origin else { return }
+        wordTiming?.stop()
+        wordTiming = WordTiming(
+            client: client, identity: identity, path: "/library/streams/\(track.id)?encoding=utf-8&format=srt",
+            library: library, session: session.transport.session
+        ) { [weak self] in
+            guard let self else { return }
+            updateSubtitles(at: time)
+        }
     }
 
     /// AVPlayer draws the stream's text where Marquee's overlay is not seen: in Picture in Picture and on an

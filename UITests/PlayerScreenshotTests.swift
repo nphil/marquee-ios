@@ -210,7 +210,7 @@ private extension XCTestCase {
     /// lists and the player shows, that file removed from Plex again, then one Plex's own agents add.
     @MainActor
     func subtitleFixFlow(mode: String, suffix: String) throws {
-        let app = launchPlayer(at: 61, paused: true, mode: mode, bazarr: true)
+        let app = launchPlayer(at: 61, paused: true, mode: mode, bazarr: true, speechDock: true)
 
         tap("player.tracks", in: app)
         let off = app.buttons["Off"]
@@ -271,6 +271,22 @@ private extension XCTestCase {
         XCTAssertTrue(plexState.waitForExistence(timeout: 5), "The Plex download did not start")
         XCTAssertTrue(plexState.wait(for: \.label, toEqual: "Active in player", timeout: 20), "The Plex download did not show: \(plexState.label)")
         try snap("player-20-plex-added-\(suffix)")
+
+        // Reveal as Spoken on the file Plex added: SpeechDock times its English lines.
+        tap("subtitleFix.done", in: app)
+        XCTAssertTrue(element("subtitleFix.plex", in: app).waitForNonExistence(timeout: 5), "The sheet did not close")
+        tap("player.tracks", in: app)
+        let style = element("player.tracks.style", in: app)
+        XCTAssertNotNil(scrollMenu(in: app) { style.exists && style.isHittable ? style : nil }, "No Subtitle Style in the menu")
+        style.tap()
+        waitForBar("Subtitle Style", in: app)
+        reveal("style.reveal", in: app).tap()
+        let word = app.buttons["Word by Word"]
+        XCTAssertTrue(word.waitForExistence(timeout: 5), "No Word by Word reveal")
+        word.tap()
+        app.navigationBars["Subtitle Style"].buttons["Done"].tap()
+        XCTAssertTrue(app.navigationBars["Subtitle Style"].waitForNonExistence(timeout: 5), "The style sheet did not close")
+        try snap("player-21-reveal-as-spoken-\(suffix)")
     }
 
     @MainActor
@@ -331,7 +347,10 @@ private extension XCTestCase {
     /// has landed there. `introSkipDelay` overrides the profile's intro countdown for this launch;
     /// `bazarr` sets up the fake Bazarr; `scrub` holds the scrubber at that fraction.
     @MainActor
-    func launchPlayer(at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, bazarr: Bool = false, scrub: Double? = nil) -> XCUIApplication {
+    func launchPlayer(
+        at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, bazarr: Bool = false, speechDock: Bool = false,
+        scrub: Double? = nil
+    ) -> XCUIApplication {
         XCUIDevice.shared.orientation = .landscapeLeft
         // A failed step ends the test early; the next test still has to start upright.
         addTeardownBlock {
@@ -345,6 +364,7 @@ private extension XCTestCase {
             "-marquee.uitest.frame", "art/caminandes-backdrop.jpg",
         ]
         if let introSkipDelay { arguments += ["-marquee.uitest.introSkipDelay", String(introSkipDelay)] }
+        if speechDock { arguments += ["-marquee.uitest.speechDock", "http://speechdock.local:8765"] }
         if bazarr { arguments += ["-marquee.uitest.bazarr", "http://bazarr.local:6767"] }
         if let scrub { arguments += ["-marquee.uitest.scrub", String(scrub)] }
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", light: "paper", arguments: arguments, waitingFor: nil)

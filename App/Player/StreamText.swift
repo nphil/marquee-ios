@@ -39,8 +39,11 @@ final class StreamText: NSObject {
         changes = []
     }
 
-    func text(at itemTime: TimeInterval) -> AttributedString? {
-        changes.last { $0.start <= itemTime }?.text
+    /// The line showing at `itemTime` and when it started; its end too once the next change is known.
+    func line(at itemTime: TimeInterval) -> (text: AttributedString, start: TimeInterval, end: TimeInterval?)? {
+        guard let index = changes.lastIndex(where: { $0.start <= itemTime }), let text = changes[index].text else { return nil }
+        let next = index + 1
+        return (text, changes[index].start, next < changes.count ? changes[next].start : nil)
     }
 }
 
