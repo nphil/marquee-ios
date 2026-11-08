@@ -276,9 +276,11 @@ private extension XCTestCase {
         tap("subtitleFix.done", in: app)
         XCTAssertTrue(element("subtitleFix.plex", in: app).waitForNonExistence(timeout: 5), "The sheet did not close")
         tap("player.tracks", in: app)
-        let style = element("player.tracks.style", in: app)
-        XCTAssertNotNil(scrollMenu(in: app) { style.exists && style.isHittable ? style : nil }, "No Subtitle Style in the menu")
-        style.tap()
+        XCTAssertTrue(app.buttons["Off"].waitForExistence(timeout: 5), "No tracks menu")
+        let style = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Subtitle Style'")).firstMatch
+        let row = scrollMenu(in: app) { style.exists && style.isHittable ? style : nil }
+        XCTAssertNotNil(row, "No Subtitle Style in the menu")
+        row?.tap()
         waitForBar("Subtitle Style", in: app)
         reveal("style.reveal", in: app).tap()
         let word = app.buttons["Word by Word"]

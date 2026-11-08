@@ -333,7 +333,8 @@ final class AppSession {
     private func restoreUITest() {
         let arguments = UserDefaults.standard
         if let address = arguments.string(forKey: "marquee.uitest.bazarr").flatMap(URL.init(string:)) {
-            bazarr.save(BazarrConfig(address: address, apiKey: "fake"))
+            // Bazarr's page offers Test Connection only for a key of Bazarr's format, 16 to 64 letters and digits.
+            bazarr.save(BazarrConfig(address: address, apiKey: "fakefakefakefakefakefakefakefake"))
         }
         if let origin = arguments.string(forKey: "marquee.uitest.speechDock").flatMap({ try? SpeechDock.origin($0).get() }) {
             speechDock.save(origin)
