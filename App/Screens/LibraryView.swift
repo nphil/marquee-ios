@@ -421,17 +421,23 @@ private struct AlphabetRail: View {
         let focus = finger.map { ($0 - top) / Self.rowHeight - 0.5 }
         // Caption 2, capped as the rail is. Set at the lens's peak size and scaled down, since text scaled
         // up is a stretched bitmap and the touched letter came out soft.
-        let letter = Manrope.size(11, as: .caption2, at: typeSize, cap: .xxxLarge) * LetterLens.peak
+        let glyph = Manrope.size(11, as: .caption2, at: typeSize, cap: .xxxLarge)
+        let letter = glyph * LetterLens.peak
+        // Tall enough for the touched letter and two either side, which spread apart as they swell.
+        let lensHeight = max(Self.lens.height, 2 * (LetterLens.position(2, row: Self.rowHeight, glyph: glyph)
+            + LetterLens.height(of: 2, glyph: glyph) / 2 + Space.s1))
         VStack(spacing: 0) {
             ForEach(Array(shown.enumerated()), id: \.element.character) { row, entry in
-                let lens = LetterLens(distance: focus.map { abs(CGFloat(row) - $0) }, reduceMotion: reduceMotion)
+                let lens = LetterLens(
+                    offset: focus.map { CGFloat(row) - $0 }, reduceMotion: reduceMotion, row: Self.rowHeight, glyph: glyph
+                )
                 Text(entry.character)
                     .font(.system(size: letter, weight: .semibold))
                     .fixedSize()
                     .foregroundStyle(entry.character == current ? theme.accentText : focus == nil ? theme.ink2 : theme.ink)
                     .frame(width: Self.width, height: Self.rowHeight)
                     .scaleEffect(lens.scale / LetterLens.peak)
-                    .offset(x: -lens.lean)
+                    .offset(x: -lens.lean, y: lens.shift)
                     .opacity(lens.opacity)
             }
         }
@@ -443,8 +449,8 @@ private struct AlphabetRail: View {
                 shape
                     .fill(theme.roles.sheet.over(theme.roles.canvas).color)
                     .overlay { shape.strokeBorder(theme.edge, lineWidth: 1) }
-                    .frame(width: Self.lens.width, height: Self.lens.height)
-                    .offset(y: top + (focus + 0.5) * Self.rowHeight - Self.lens.height / 2)
+                    .frame(width: Self.lens.width, height: lensHeight)
+                    .offset(y: top + (focus + 0.5) * Self.rowHeight - lensHeight / 2)
                     .transition(.opacity)
             }
         }
@@ -517,34 +523,70 @@ private struct AlphabetRail: View {
     #endif
 }
 
-/// Where one rail letter sits in the lens, `distance` rows from the finger. Apollo's index swells the
+/// Where one rail letter sits in the lens, `offset` rows from the finger. Apollo's index swells the
 /// touched letter to 2.9× and leans it 27 pt out, the letters beside it to 1.85× and 16 pt and the next to
-/// 1.38× and 7 pt, and dims the rest to 72%; between rows it blends. Under Reduce Motion only the touched
-/// letter grows and nothing leans.
+/// 1.38× and 7 pt, and dims the rest to 72%; between rows it blends. The swollen letters would overlap at
+/// the rail's 16 pt row pitch, so the rows part from the finger until the gap between two letters is a
+/// fixed margin; the rest of the rail keeps its pitch, shifted by what the lens added. Under Reduce Motion
+/// only the touched letter grows, to a size that fits its row, and nothing leans or shifts.
 private struct LetterLens {
     var scale: CGFloat = 1
     var lean: CGFloat = 0
     var opacity: Double = 1
+    /// Vertical displacement from the letter's row, pointing away from the finger.
+    var shift: CGFloat = 0
 
     /// The touched letter's scale, the largest any letter is drawn at.
     static let peak: CGFloat = 2.9
     private static let scales: [CGFloat] = [peak, 1.85, 1.38, 1]
     private static let leans: [CGFloat] = [27, 16, 7, 0]
     private static let dimmed = 0.72
+    /// The rows the lens reaches past the touched one.
+    private static let reach = CGFloat(scales.count - 1)
+    /// A capital's height as a share of its font size, and the clear space kept between two capitals.
+    private static let capHeight: CGFloat = 0.72
+    private static let margin = Space.s1
 
-    init(distance: CGFloat?, reduceMotion: Bool) {
-        guard let distance, distance.isFinite else { return }
+    init(offset: CGFloat?, reduceMotion: Bool, row: CGFloat, glyph: CGFloat) {
+        guard let offset, offset.isFinite else { return }
+        let distance = abs(offset)
         if reduceMotion {
             if distance < 0.5 { scale = Self.scales[1] } else { opacity = Self.dimmed }
             return
         }
-        let reach = CGFloat(Self.scales.count - 1)
-        let clamped = min(distance, reach)
+        scale = Self.scale(at: distance)
+        let clamped = min(distance, Self.reach)
         let lower = Int(clamped)
         let upper = min(lower + 1, Self.scales.count - 1)
-        let blend = clamped - CGFloat(lower)
-        scale = Self.scales[lower] + (Self.scales[upper] - Self.scales[lower]) * blend
-        lean = Self.leans[lower] + (Self.leans[upper] - Self.leans[lower]) * blend
-        opacity = 1 - (1 - Self.dimmed) * Double(min(max(distance - reach + 1, 0), 1))
+        lean = Self.leans[lower] + (Self.leans[upper] - Self.leans[lower]) * (clamped - CGFloat(lower))
+        opacity = 1 - (1 - Self.dimmed) * Double(min(max(distance - Self.reach + 1, 0), 1))
+        shift = (Self.position(distance, row: row, glyph: glyph) - distance * row) * (offset < 0 ? -1 : 1)
+    }
+
+    /// The scale `distance` rows from the finger, blended between the rows.
+    private static func scale(at distance: CGFloat) -> CGFloat {
+        let clamped = min(distance, reach)
+        let lower = Int(clamped)
+        let upper = min(lower + 1, scales.count - 1)
+        return scales[lower] + (scales[upper] - scales[lower]) * (clamped - CGFloat(lower))
+    }
+
+    /// The height a capital shows at `distance` rows from the finger.
+    static func height(of distance: CGFloat, glyph: CGFloat) -> CGFloat {
+        glyph * capHeight * scale(at: distance)
+    }
+
+    /// How far `distance` rows from the finger a letter sits, in points, once the rows are parted: each
+    /// step of one row grows to the height of the capital there plus the margin, and never shrinks below
+    /// the row. Past the lens the step stays that of the unswollen letter.
+    static func position(_ distance: CGFloat, row: CGFloat, glyph: CGFloat) -> CGFloat {
+        let steps = 4
+        let inside = min(distance, reach)
+        let h = inside / CGFloat(steps)
+        var total: CGFloat = 0
+        for k in 0..<steps {
+            total += max(row, height(of: (CGFloat(k) + 0.5) * h, glyph: glyph) + margin) * h
+        }
+        return total + max(distance - reach, 0) * max(row, height(of: reach, glyph: glyph) + margin)
     }
 }
