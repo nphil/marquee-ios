@@ -25,6 +25,7 @@ final class SessionStorage {
         static let bazarrAddress = "marquee.bazarr.address"
         static let bazarrKey = "marquee.bazarr.key"
         static let castEnabled = "marquee.cast.enabled"
+        static let remoteEnabled = "marquee.remote.enabled"
         static let tracksPrefix = "marquee."
     }
 
@@ -111,6 +112,12 @@ final class SessionStorage {
             defaults.set(newValue?.address, forKey: Key.bazarrAddress)
             setSecret(newValue.map { Data($0.apiKey.utf8) }, for: Key.bazarrKey)
         }
+    }
+
+    /// Whether the LumaTV remote is on. Its paired TVs and settings are LumaRemoteKit's own.
+    var remoteEnabled: Bool {
+        get { defaults.bool(forKey: Key.remoteEnabled) }
+        set { defaults.set(newValue, forKey: Key.remoteEnabled) }
     }
 
     /// Sign-out: the token and servers leave the Keychain; settings and themes stay.

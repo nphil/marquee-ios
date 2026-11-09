@@ -25,6 +25,9 @@ packages:
   GoogleCast:
     url: https://github.com/googlecast/google-cast-ios-sdk.git
     exactVersion: 4.8.6
+  LumaRemoteKit:
+    url: https://github.com/nphil/LumaRemoteKit
+    from: 1.0.2
 
 targets:
   Marquee:
@@ -56,6 +59,10 @@ targets:
         product: VideoEngine
       - package: GoogleCast
         product: GoogleCastDynamic
+      - package: LumaRemoteKit
+        product: LumaRemoteKit
+      - package: LumaRemoteKit
+        product: LumaRemoteCore
     info:
       path: App/Info.plist
       properties:
@@ -67,11 +74,18 @@ targets:
         CADisableMinimumFrameDurationOnPhone: true
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-        NSLocalNetworkUsageDescription: Marquee looks for Plex servers on the local network and plays from them, and finds Chromecasts there while its Chromecast plugin is on.
+        NSLocalNetworkUsageDescription: Marquee looks for Plex servers and LumaTV on the local network, plays from the servers and works as the TV's remote, and finds Chromecasts there while its Chromecast plugin is on.
         NSBonjourServices:
           - _plex._tcp
           - _googlecast._tcp
           - _CC1AD845._googlecast._tcp
+          - _lumatv-remote._tcp
+        NSCameraUsageDescription: Marquee scans the code a LumaTV shows to pair the remote with it.
+        CFBundleURLTypes:
+          # The link in a LumaTV's pairing QR code.
+          - CFBundleURLName: com.nphil.marquee.lumaremote
+            CFBundleURLSchemes:
+              - lumaremote
         UIAppFonts:
           - Manrope.ttf
           - AtkinsonHyperlegible-Regular.ttf
@@ -110,6 +124,9 @@ targets:
         buildPhase: resources
     dependencies:
       - target: Marquee
+      # The UI tests serve a fake LumaTV from the test runner for the remote to pair with.
+      - package: LumaRemoteKit
+        product: LumaRemoteFakeTV
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nphil.marquee.uitests

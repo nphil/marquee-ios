@@ -60,6 +60,8 @@ final class AppSession {
     let bazarr: BazarrSettings
     /// The Chromecast plugin (DESIGN §8.7 Integrations), kept per iPhone.
     let cast: CastCenter
+    /// The LumaTV remote (DESIGN §8.7 Integrations), kept per iPhone.
+    let remote: TVRemote
 
     /// Made again by Delete All Local Data, which removes the stored client identifier.
     private(set) var identity: PlexClientIdentity
@@ -85,6 +87,7 @@ final class AppSession {
         bazarr = BazarrSettings(storage: storage, transport: transport)
         speechDock = SpeechDockSettings(storage: storage, transport: transport)
         cast = CastCenter(storage: storage)
+        remote = TVRemote(storage: storage, inMemory: FakePlex.isActive)
         restore()
         watchNetwork()
         watchForeground()
@@ -250,6 +253,7 @@ final class AppSession {
     func deleteAllLocalData() async {
         signOut()
         storage.eraseAll()
+        remote.eraseAll()
         identity = Self.identity(defaults: storage.defaults)
         URLCache.shared.removeAllCachedResponses()
         HTTPCookieStorage.shared.removeCookies(since: .distantPast)
@@ -335,7 +339,8 @@ final class AppSession {
     /// UI-test launches start signed out unless `-marquee.fakeSignedIn YES` (open on the first server)
     /// or `-marquee.fakeServerList YES` (open on the server list) is passed. `-marquee.uitest.bazarr`
     /// with an address saves a Bazarr there, answered by the fake Plex's `bazarr` fixtures;
-    /// `-marquee.uitest.speechDock` does the same for SpeechDock and its `speechdock` fixtures.
+    /// `-marquee.uitest.speechDock` does the same for SpeechDock and its `speechdock` fixtures, and
+    /// `-marquee.uitest.remote YES` turns the LumaTV remote on.
     private func restoreUITest() {
         let arguments = UserDefaults.standard
         if let address = arguments.string(forKey: "marquee.uitest.bazarr").flatMap(URL.init(string:)) {
@@ -344,6 +349,9 @@ final class AppSession {
         }
         if let origin = arguments.string(forKey: "marquee.uitest.speechDock").flatMap({ try? SpeechDock.origin($0).get() }) {
             speechDock.save(origin)
+        }
+        if arguments.bool(forKey: "marquee.uitest.remote") {
+            remote.setEnabled(true)
         }
         let pick: ServerPick
         if arguments.bool(forKey: "marquee.fakeSignedIn") {

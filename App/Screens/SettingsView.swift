@@ -146,6 +146,15 @@ struct SettingsView: View {
                     }
                 }
                 .accessibilityIdentifier("settings.cast")
+                NavigationLink {
+                    TVRemoteSettingsView()
+                } label: {
+                    LabeledContent("LumaTV Remote") {
+                        Text(session.remote.isEnabled ? "On" : "Off")
+                            .foregroundStyle(theme.ink2)
+                    }
+                }
+                .accessibilityIdentifier("settings.remote")
             }
             .listRowBackground(theme.sheet)
 
@@ -191,7 +200,7 @@ struct SettingsView: View {
                     .accessibilityIdentifier("settings.deleteData.confirm")
                     Button("Cancel", role: .cancel) {}
                 } message: {
-                    Text("This signs out and removes everything Marquee keeps on this iPhone: the sign-in, every profile's settings, remembered tracks, themes, Live TV lists and cached artwork. Nothing on the Plex server changes.")
+                    Text("This signs out and removes everything Marquee keeps on this iPhone: the sign-in, every profile's settings, remembered tracks, themes, Live TV lists, paired TVs and cached artwork. Nothing on the Plex server changes.")
                 }
             } footer: {
                 Text("Signs out and returns Marquee to how it was when first installed.")

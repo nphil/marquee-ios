@@ -19,6 +19,7 @@ struct RootView: View {
     var body: some View {
         @Bindable var session = session
         @Bindable var player = session.player
+        @Bindable var remote = session.remote
         let theme = store.theme(for: colorScheme)
             .adjusted(increaseContrast: contrast == .increased, reduceTransparency: reduceTransparency)
         let scheme = store.presentationScheme(for: theme)
@@ -37,6 +38,17 @@ struct RootView: View {
         .animation(reduceMotion ? .linear(duration: 0.12) : .easeOut(duration: 0.22), value: stage)
         .fullScreenCover(item: $player.presented, onDismiss: { session.player.dismissed() }) { model in
             PlayerView(model: model, outerTheme: theme, outerScheme: scheme ?? colorScheme)
+        }
+        .fullScreenCover(isPresented: $remote.isPresented) {
+            TVRemoteScreen()
+                .preferredColorScheme(scheme)
+        }
+        // The TV's pairing QR code carries a lumaremote:// link. The remote opens from here, so Settings,
+        // a sheet over the same view, closes first.
+        .onOpenURL { url in
+            guard url.scheme == "lumaremote" else { return }
+            session.showsSettings = false
+            session.remote.open(url)
         }
         .sheet(isPresented: $session.showsSettings) {
             NavigationStack {
