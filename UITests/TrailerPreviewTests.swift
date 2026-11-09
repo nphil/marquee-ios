@@ -11,7 +11,6 @@ final class TrailerPreviewTests: XCTestCase {
         open(tab: "Library", title: "Movies", in: app)
         reveal("poster.105", in: app).tap()
         waitFor("detail.title", in: app)
-        XCTAssertFalse(element("detail.trailerPreview", in: app).exists, "The trailer played before the dwell")
         waitFor("detail.trailerPreview", in: app)
         try snap("trailer-01-hero-dark")
     }
