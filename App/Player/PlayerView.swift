@@ -83,7 +83,7 @@ struct PlayerView: View {
         .accessibilityAction(.magicTap) { model.togglePlay() }
         .sheet(isPresented: $model.showsEpisodes) {
             EpisodeSheet(model: model)
-                .panel(model, theme: outerTheme, scheme: outerScheme)
+                .panel(model, theme: outerTheme, scheme: outerScheme, detents: [.fraction(0.55), .large])
         }
         .sheet(isPresented: $model.showsInfo) {
             NavigationStack {
@@ -255,10 +255,13 @@ enum TapSide: Equatable {
 
 private extension View {
     /// A panel opened from the player: the app's own theme, and the controls stay up while it shows.
-    func panel(_ model: PlayerModel, theme: Theme, scheme: ColorScheme) -> some View {
+    func panel(
+        _ model: PlayerModel, theme: Theme, scheme: ColorScheme,
+        detents: Set<PresentationDetent> = [.medium, .large]
+    ) -> some View {
         environment(\.theme, theme)
             .tint(theme.accent)
-            .presentationDetents([.medium, .large])
+            .presentationDetents(detents)
             .presentationBackground(theme.sheet)
             .preferredColorScheme(scheme)
             .onAppear { model.menuOpened() }

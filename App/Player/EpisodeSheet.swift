@@ -1,29 +1,47 @@
 import MarqueeCore
 import SwiftUI
 
-/// The show's episodes, opened from the player: a season menu and rows as on the show's page (DESIGN
-/// §8.4). A tap plays the episode from where it was left; the menu offers the beginning.
+/// The show's episodes, opened from the player over the playing picture: a season menu and rows as on the
+/// show's page (DESIGN §8.4). The playing episode is marked and scrolled into view. A tap plays the
+/// episode from where it was left; the menu offers the beginning.
 struct EpisodeSheet: View {
     let model: PlayerModel
     @Environment(\.theme) private var theme
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var seasons: [PlexMetadata] = []
     @State private var season: String?
     @State private var episodes: [PlexMetadata]?
     @State private var failed = false
+    private let prefetch = ArtPrefetcher()
+
+    /// How many rows below the one on screen have their stills loaded ahead of the scroll.
+    private static let prefetchAhead = 6
+
+    private var stillSize: CGSize {
+        typeSize.isAccessibilitySize ? CGSize(width: 256, height: 144) : CGSize(width: 128, height: 72)
+    }
 
     var body: some View {
         NavigationStack {
             ScrollViewReader { proxy in
-                List {
-                    if let episodes {
-                        ForEach(episodes) { episode in
-                            row(episode)
-                                .listRowBackground(theme.sheet)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: Space.s2) {
+                        if seasons.count > 1 {
+                            seasonMenu
+                        }
+                        if let episodes {
+                            ForEach(Array(episodes.enumerated()), id: \.element.ratingKey) { position, episode in
+                                row(episode)
+                                    .id(episode.ratingKey)
+                                    .onAppear { prefetchStills(after: position, in: episodes) }
+                            }
                         }
                     }
+                    .padding(.horizontal, Space.inset)
+                    .padding(.bottom, Space.s4)
                 }
-                .themedList(theme)
+                .background(theme.sheet)
                 .overlay {
                     if failed {
                         EmptyState(
@@ -50,11 +68,6 @@ struct EpisodeSheet: View {
             .navigationTitle(model.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if seasons.count > 1 {
-                    ToolbarItem(placement: .topBarLeading) {
-                        seasonMenu
-                    }
-                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") { dismiss() }
                 }
@@ -65,6 +78,11 @@ struct EpisodeSheet: View {
         .accessibilityIdentifier("player.episodeSheet")
     }
 
+    private var seasonTitle: String {
+        seasons.first { $0.ratingKey == season }?.title ?? "Season"
+    }
+
+    /// Full width and wrapping, so a long season name never clips at large text.
     private var seasonMenu: some View {
         Menu {
             Picker("Season", selection: $season) {
@@ -73,35 +91,45 @@ struct EpisodeSheet: View {
                 }
             }
         } label: {
-            HStack(spacing: Space.s1) {
-                Text(seasons.first { $0.ratingKey == season }?.title ?? "Season")
+            HStack(spacing: Space.s2) {
+                Text(seasonTitle)
+                    .textRole(.headline)
+                    .multilineTextAlignment(.leading)
                 Image(systemName: "chevron.up.chevron.down")
                     .imageScale(.small)
+                Spacer(minLength: 0)
             }
+            .foregroundStyle(theme.ink)
+            .padding(.horizontal, Space.s4)
+            .padding(.vertical, Space.s2)
+            .frame(maxWidth: .infinity, minHeight: Size.target, alignment: .leading)
+            .background(theme.glass, in: RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
         }
         .accessibilityLabel("Season")
-        .accessibilityValue(seasons.first { $0.ratingKey == season }?.title ?? "")
+        .accessibilityValue(seasonTitle)
     }
 
     private func row(_ episode: PlexMetadata) -> some View {
         let playing = episode.ratingKey == model.item.ratingKey
+        let layout = typeSize.isAccessibilitySize
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Space.s2))
+            : AnyLayout(HStackLayout(alignment: .top, spacing: Space.s3))
         return Button {
             Haptics.impact(.light)
             model.play(episode: episode, fromStart: false)
             dismiss()
         } label: {
-            HStack(alignment: .top, spacing: Space.s3) {
-                EpisodeStill(episode: episode)
-                VStack(alignment: .leading, spacing: 2) {
+            layout {
+                EpisodeStill(episode: episode, size: stillSize)
+                VStack(alignment: .leading, spacing: Space.s1) {
                     Text([episode.index.map(String.init), episode.title].compactMap { $0 }.joined(separator: " · "))
                         .textRole(.headline)
                         .foregroundStyle(theme.ink)
+                        .multilineTextAlignment(.leading)
                     HStack(spacing: Space.s1) {
                         if playing {
                             Image(systemName: "speaker.wave.2.fill")
-                                .foregroundStyle(theme.accentText)
-                            Text("Playing")
-                                .foregroundStyle(theme.accentText)
+                            Text("Now playing")
                         } else if episode.isWatched {
                             Image(systemName: "checkmark.circle.fill")
                             Text("Watched")
@@ -110,15 +138,29 @@ struct EpisodeSheet: View {
                         }
                     }
                     .textRole(.caption)
-                    .foregroundStyle(theme.ink2)
+                    .foregroundStyle(playing ? theme.accentText : theme.ink2)
                     if !episode.summary.isEmpty {
                         Text(episode.summary)
                             .textRole(.caption)
                             .foregroundStyle(theme.ink2)
-                            .lineLimit(2)
+                            .lineLimit(typeSize.isAccessibilitySize ? 4 : 2)
+                            .multilineTextAlignment(.leading)
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(Space.s2)
+            .frame(minHeight: Size.rowMin)
+            .background {
+                if playing {
+                    RoundedRectangle(cornerRadius: Radius.control, style: .continuous).fill(theme.glass)
+                }
+            }
+            .overlay {
+                if playing {
+                    RoundedRectangle(cornerRadius: Radius.control, style: .continuous)
+                        .strokeBorder(theme.accent, lineWidth: Space.s1 / 2)
+                }
             }
             .contentShape(Rectangle())
         }
@@ -132,6 +174,7 @@ struct EpisodeSheet: View {
             }
         }
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel(episode, playing: playing))
         .accessibilityAddTraits(playing ? .isSelected : [])
         .accessibilityAction(named: "Play from beginning") {
             model.play(episode: episode, fromStart: true)
@@ -140,12 +183,34 @@ struct EpisodeSheet: View {
         .accessibilityIdentifier("player.episode.\(episode.ratingKey)")
     }
 
+    private func accessibilityLabel(_ episode: PlexMetadata, playing: Bool) -> String {
+        var parts: [String] = []
+        if let index = episode.index { parts.append("Episode \(index)") }
+        parts.append(episode.title)
+        if playing {
+            parts.append("Now playing")
+        } else if episode.isWatched {
+            parts.append("Watched")
+        } else if episode.viewOffset > 0, episode.duration > 0 {
+            parts.append("In progress, \(runtime(episode))")
+        } else if episode.duration > 0 {
+            parts.append(runtime(episode))
+        }
+        return parts.joined(separator: ", ")
+    }
+
     private func runtime(_ episode: PlexMetadata) -> String {
         let minutes = max(1, episode.duration / 60_000)
         if episode.viewOffset > 0 {
             return "\(max(1, (episode.duration - episode.viewOffset) / 60_000)) min left"
         }
         return "\(minutes) min"
+    }
+
+    /// Stills of the next rows, requested at the size the rows draw, so they are in memory on arrival.
+    private func prefetchStills(after position: Int, in episodes: [PlexMetadata]) {
+        let next = episodes.dropFirst(position + 1).prefix(Self.prefetchAhead)
+        prefetch(next.map(\.thumb), size: stillSize)
     }
 
     private func reload() {
@@ -180,11 +245,12 @@ struct EpisodeSheet: View {
 /// A 16:9 still with the watched part of a started episode under it.
 private struct EpisodeStill: View {
     let episode: PlexMetadata
+    let size: CGSize
     @Environment(\.theme) private var theme
 
     var body: some View {
-        PlexArtView(path: episode.thumb, size: CGSize(width: 128, height: 72), placeholder: "tv")
-            .frame(width: 128, height: 72)
+        PlexArtView(path: episode.thumb, size: size, placeholder: "tv")
+            .frame(width: size.width, height: size.height)
             .clipShape(RoundedRectangle(cornerRadius: Radius.control))
             .overlay(alignment: .bottom) {
                 if episode.viewOffset > 0, episode.duration > 0, !episode.isWatched {

@@ -212,6 +212,8 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var stream: Stream?
     @ObservationIgnored private var streamKey: StreamKey?
     @ObservationIgnored private var origin: TimeInterval?
+    /// When Restart was last pressed on this item.
+    @ObservationIgnored private var lastPreviousPress: Date?
     @ObservationIgnored private var landing: TimeInterval?
     @ObservationIgnored private var itemReady = false
     @ObservationIgnored private var farSeeking = false
@@ -307,8 +309,13 @@ final class PlayerModel: Identifiable {
 
     var isWaiting: Bool { phase == .loading || isBuffering || landing != nil }
 
-    /// Previous restarts the item past its first five seconds.
-    var canGoBack: Bool { time >= 5 || hasPreviousItem }
+    /// What the next press of Restart does (`PreviousPress`): the start of this item, or the previous one.
+    var previousAction: PreviousPress.Action {
+        PreviousPress.action(
+            position: time, sincePreviousPress: lastPreviousPress.map { Date.now.timeIntervalSince($0) },
+            hasPreviousItem: hasPreviousItem
+        )
+    }
 
     var introAutoSkips: Bool { session.settings.introSkipDelay > 0 && !introCancelled }
 
@@ -542,11 +549,12 @@ final class PlayerModel: Identifiable {
     }
 
     func previous() {
-        guard !(time >= 5 || !hasPreviousItem), let target = queue?.item(before: item) else {
-            seek(to: 0)
+        if previousAction == .previousItem, let target = queue?.item(before: item) {
+            go(to: target)
             return
         }
-        go(to: target)
+        lastPreviousPress = .now
+        seek(to: 0)
     }
 
     func next() {
@@ -1236,6 +1244,7 @@ final class PlayerModel: Identifiable {
     }
 
     private func go(to target: PlexMetadata) {
+        lastPreviousPress = nil
         report(.stopped)
         stopStream()
         handAudio = nil

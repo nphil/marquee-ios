@@ -177,10 +177,7 @@ private extension XCTestCase {
         try snap("player-04-playback-info-diagnostics-\(suffix)")
         app.navigationBars["Playback Info"].buttons["Done"].tap()
 
-        tap("player.more", in: app)
-        let episodes = moreMenuItem("Episodes", in: app)
-        XCTAssertTrue(episodes.exists && episodes.isHittable, "No Episodes item in More")
-        episodes.tap()
+        tap("player.episodes", in: app)
         // The list opens on the playing episode, also when large text leaves room for one row.
         let playing = element("player.episode.212", in: app)
         XCTAssertTrue(playing.wait(for: \.isHittable, toEqual: true, timeout: 10), "The list did not open on episode 2")
@@ -188,17 +185,17 @@ private extension XCTestCase {
         app.navigationBars["Caminandes"].buttons["Done"].tap()
     }
 
-    /// The chrome holds close, title, AirPlay, the transport, the scrubber, Tracks and More, every
-    /// control at least 44 pt at any text size; previous, next and the episode list live in More.
+    /// The chrome holds close, title, the route button, the transport, the scrubber, restart, episodes,
+    /// next, Tracks and More, every control at least 44 pt at any text size.
     @MainActor
     func assertChrome(in app: XCUIApplication) {
-        for control in ["player.close", "player.skipBack", "player.playPause", "player.skipForward", "player.tracks", "player.more"] {
+        for control in [
+            "player.close", "player.skipBack", "player.playPause", "player.skipForward", "player.previous",
+            "player.episodes", "player.next", "player.tracks", "player.more",
+        ] {
             let button = element(control, in: app)
             XCTAssertTrue(button.waitForExistence(timeout: 5) && button.isHittable, "\(control) is not on screen")
             XCTAssertGreaterThanOrEqual(min(button.frame.width, button.frame.height), 44, "\(control) is under 44 pt")
-        }
-        for moved in ["player.previous", "player.next", "player.episodes"] {
-            XCTAssertFalse(element(moved, in: app).exists, "\(moved) is still on the chrome")
         }
     }
 

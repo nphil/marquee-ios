@@ -92,6 +92,17 @@ struct PlayerChrome: View {
                 model.showsStats.toggle()
             }
 
+            // Apple's player puts Picture in Picture beside the route button, top trailing.
+            if model.canPictureInPicture, model.castDevice == nil {
+                Button {
+                    model.togglePictureInPicture()
+                } label: {
+                    Image(systemName: "pip.enter")
+                }
+                .buttonStyle(PlayerButtonStyle())
+                .accessibilityLabel("Picture in Picture")
+                .accessibilityIdentifier("player.pip")
+            }
             RouteButton(model: model, menuRoom: menuRoom)
         }
     }
@@ -174,6 +185,44 @@ struct PlayerChrome: View {
 
     // MARK: Bottom
 
+    /// Restart, Episodes and Next, icon only on the leading side; a movie has none of them.
+    @ViewBuilder
+    private var queueControls: some View {
+        if model.isEpisode || model.hasPreviousItem || model.hasNext {
+            HStack(spacing: Space.s3) {
+                Button {
+                    Haptics.impact(.light)
+                    model.previous()
+                } label: {
+                    Image(systemName: "backward.end.fill")
+                }
+                .buttonStyle(PlayerButtonStyle())
+                .accessibilityLabel(model.previousAction == .restart ? "Restart" : "Previous episode")
+                .accessibilityIdentifier("player.previous")
+                if model.isEpisode {
+                    Button {
+                        model.showsEpisodes = true
+                    } label: {
+                        Image(systemName: "rectangle.stack")
+                    }
+                    .buttonStyle(PlayerButtonStyle())
+                    .accessibilityLabel("Episodes")
+                    .accessibilityIdentifier("player.episodes")
+                }
+                Button {
+                    Haptics.impact(.light)
+                    model.next()
+                } label: {
+                    Image(systemName: "forward.end.fill")
+                }
+                .buttonStyle(PlayerButtonStyle())
+                .disabled(!model.hasNext)
+                .accessibilityLabel("Next episode")
+                .accessibilityIdentifier("player.next")
+            }
+        }
+    }
+
     @ViewBuilder
     private var bottom: some View {
         switch model.phase {
@@ -181,6 +230,8 @@ struct PlayerChrome: View {
             VStack(spacing: Space.s1) {
                 Scrubber(model: model, frames: frames)
                 HStack(spacing: Space.s3) {
+                    queueControls
+                        .opacity(model.isScrubbing ? 0 : 1)
                     Spacer(minLength: 0)
                     TracksMenu(model: model)
                         .opacity(model.isScrubbing ? 0 : 1)
@@ -640,6 +691,7 @@ struct LoadingArc: View {
 /// Audio and subtitles in one native menu, as Apple's own player has them (DESIGN §8.6, Tracks menu).
 struct TracksMenu: View {
     @Bindable var model: PlayerModel
+    @Environment(\.theme) private var theme
     @Environment(AppSession.self) private var session
 
     var body: some View {
@@ -655,6 +707,7 @@ struct TracksMenu: View {
         .menuOrder(.fixed)
         .menuStyle(.button)
         .buttonStyle(PlayerButtonStyle())
+        .tint(theme.ink)
         .disabled(model.tracks == nil)
         .accessibilityLabel("Audio and subtitles")
         .accessibilityIdentifier("player.tracks")
@@ -832,51 +885,14 @@ struct TracksMenu: View {
     }
 }
 
-/// Everything the chrome keeps off its edges (DESIGN §8.6): the previous, episodes and next row, Picture
-/// in Picture, aspect, quality and speed, the audio enhancements, playback info and stats for nerds.
+/// Everything the chrome keeps off its edges (DESIGN §8.6): aspect, quality and speed, the audio
+/// enhancements, playback info and stats for nerds.
 struct MoreMenu: View {
     @Bindable var model: PlayerModel
+    @Environment(\.theme) private var theme
 
     var body: some View {
         Menu {
-            Section {
-                ControlGroup {
-                    Button {
-                        Haptics.impact(.light)
-                        model.previous()
-                    } label: {
-                        Label(model.time >= 5 || !model.hasPreviousItem ? "Restart" : "Previous", systemImage: "backward.end.fill")
-                    }
-                    .disabled(!model.canGoBack)
-                    .accessibilityIdentifier("player.previous")
-                    if model.isEpisode {
-                        Button {
-                            model.showsEpisodes = true
-                        } label: {
-                            Label("Episodes", systemImage: "rectangle.stack")
-                        }
-                        .accessibilityIdentifier("player.episodes")
-                    }
-                    Button {
-                        Haptics.impact(.light)
-                        model.next()
-                    } label: {
-                        Label("Next", systemImage: "forward.end.fill")
-                    }
-                    .disabled(!model.hasNext)
-                    .accessibilityIdentifier("player.next")
-                }
-                if model.canPictureInPicture, model.castDevice == nil {
-                    Button {
-                        model.togglePictureInPicture()
-                    } label: {
-                        Label("Picture in Picture", systemImage: "pip.enter")
-                    }
-                    .accessibilityIdentifier("player.pip")
-                }
-            }
-            .onAppear { model.menuOpened() }
-            .onDisappear { model.menuClosed() }
             if model.castDevice == nil {
                 Section {
                     Picker(selection: $model.aspectPick) {
@@ -937,11 +953,14 @@ struct MoreMenu: View {
                     Label("Stats for Nerds", systemImage: "chart.bar.xaxis")
                 }
             }
+            .onAppear { model.menuOpened() }
+            .onDisappear { model.menuClosed() }
         } label: {
             Image(systemName: "ellipsis")
         }
         .menuStyle(.button)
         .buttonStyle(PlayerButtonStyle())
+        .tint(theme.ink)
         .accessibilityLabel("More")
         .accessibilityIdentifier("player.more")
     }

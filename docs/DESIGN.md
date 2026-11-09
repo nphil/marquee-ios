@@ -375,21 +375,22 @@ Round brackets are 56 pt glass buttons; the picture runs behind everything.
 - The chrome is always in the dark colour scheme, so glass over video stays dark in every theme. Panels that open from the player use the theme's own mode.
 - Subtitles lift above the bottom chrome while it shows; they are never hidden behind it.
 
-**Chrome** (one control size: 56 pt circles, `Size.control`; every glyph, AirPlay's included, 22 pt semibold, `Size.controlGlyph`, 40% of the circle; play/pause is a solid white fill with a dark glyph). Glyphs grow with Dynamic Type to 28 pt (`Size.controlGlyphMax`) and stop there; the circles keep 56 pt so the chrome fits a 375 pt-tall phone on its side, and past the cap a long press shows the large content viewer. Each edge carries at most three controls; everything else is in More.
+**Chrome** (one control size: 56 pt circles, `Size.control`; every glyph, AirPlay's included, 22 pt semibold, `Size.controlGlyph`, 40% of the circle; play/pause is a solid white fill with a dark glyph). Glyphs grow with Dynamic Type to 28 pt (`Size.controlGlyphMax`) and stop there; the circles keep 56 pt so the chrome fits a 375 pt-tall phone on its side, and past the cap a long press shows the large content viewer. The top row carries at most four controls and the bottom row at most five; everything else is in More. Icon-only controls keep their accessibility labels and a 44 pt target.
 
 1. **Scrims:** black gradients, .55 or more at the very top and bottom edges, fading to clear. Glass clusters sit on them (clear glass over media with at least 35% dimming, HIG Materials).
-2. **Top row:** Close (`chevron.down`) leading; the title block in the middle (title, "S2 · E5" in white at 70%); trailing AirPlay (`airplayvideo`). The glyph is drawn like the others and turns accent while sound and picture go to a receiver; the system route picker lies over it, tinted clear, and takes the tap.
+2. **Top row:** Close (`chevron.down`) leading; the title block in the middle (title, "S2 · E5" in white at 70%); trailing Picture in Picture (`pip.enter`, when the video allows it and nothing is cast) and the route button, as in Apple's own player (`airplayvideo`). The glyph is drawn like the others and turns accent while sound and picture go to a receiver; the system route picker lies over it, tinted clear, and takes the tap.
 3. **Centre transport:** skip back (`gobackward.N`), Play/Pause, skip forward (`goforward.N`), with N from the skip setting (5, 10, 15, 30 or 60 s, `B:§4`; default 10). Glyph names to check in the SF Symbols app.
 4. **Scrubber:** a 6 pt readable track (§5.1) with a 56 pt-tall hit area and a white thumb; elapsed time leading, remaining time trailing (Caption, tabular). Dragging shows, at touch-down and without a fade, a 224 pt, 16:9 scene thumbnail with the time under it, 12 pt above the thumb and centred on it; it is clamped 16 pt inside the safe area at both ends of the track. It ticks once per preview frame, and moving the finger away vertically slows the scrub (`S:Features/Player/PlayerControlsView.swift:513-534`). Intro and credits ranges from the server cut the track into segments, a 2 pt gap at each edge, with an accessible label (`B:§2`).
-5. **Bottom row:** Tracks (`captions.bubble`) and More (`ellipsis`) trailing.
-6. **More menu**, nearest the button first: a row of Previous (`backward.end.fill`), Episodes (`rectangle.stack`, episodes only) and Next (`forward.end.fill`); Picture in Picture (`pip.enter`) when the video allows it; Aspect (Fit, Fill, Original, Zoom, Stretch, `B:§4`); Quality; Playback Speed; Audio Enhancements (Boost dialog, Normalize loudness; Plex Pass servers only); Playback Info; Stats for Nerds. Previous restarts the item when 5 s or more in, otherwise goes to the previous item (`B:§4`). An item with no target is dimmed, and VoiceOver reads "unavailable" (`B:§4`, `L:74`).
+5. **Bottom row:** Restart (`backward.end.fill`), Episodes (`rectangle.stack`) and Next (`forward.end.fill`) leading, icon only, for episodes and queues (a movie has none of them); Tracks (`captions.bubble`) and More (`ellipsis`) trailing. Restart works as a music player's previous: the first press goes to the start of the episode; a second within 3 s, or a press in the first 3 s, goes to the previous episode (`PreviousPress`, label "Previous episode" while that is next). Next is dimmed with no target. The menus take the theme's ink as their tint.
+6. **More menu:** Aspect (Fit, Fill, Original, Zoom, Stretch, `B:§4`); Quality; Playback Speed; Audio Enhancements (Boost dialog, Normalize loudness; Plex Pass servers only); Playback Info; Stats for Nerds.
+7. **Episodes sheet,** from the Episodes button: a sheet over the playing video, which keeps playing and stays visible above it at a 55% detent (large on drag). A season menu leads a lazy list of episode rows as in 8.4; the playing episode carries a glass fill and an accent edge ("Now playing") and is scrolled into view once the list loads. Stills of the next six rows are prefetched. At accessibility sizes the larger still moves above its text.
 
 What moved where when the chrome went to three controls per edge:
 
 | Control | Was | Now |
 |---|---|---|
-| Picture in Picture | top row | More |
-| Previous, Episodes, Next | bottom row, leading | More, first row |
+| Picture in Picture | top row | More, then top row beside the route button |
+| Previous, Episodes, Next | bottom row, leading | More, then bottom row, leading, icon only |
 | Boost dialog, Normalize loudness | Tracks › Audio | More › Audio Enhancements |
 | AirPlay glyph | the route picker's own, smaller and lighter | the player glyph |
 | Glyph size | 26 pt, fixed | 22 pt, scaling to 28 pt |
