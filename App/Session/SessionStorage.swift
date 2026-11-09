@@ -24,6 +24,7 @@ final class SessionStorage {
         static let speechDockAddress = "marquee.speechDock.address"
         static let bazarrAddress = "marquee.bazarr.address"
         static let bazarrKey = "marquee.bazarr.key"
+        static let castEnabled = "marquee.cast.enabled"
         static let tracksPrefix = "marquee."
     }
 
@@ -92,6 +93,12 @@ final class SessionStorage {
     var speechDockAddress: String {
         get { defaults.string(forKey: Key.speechDockAddress) ?? "" }
         set { defaults.set(newValue, forKey: Key.speechDockAddress) }
+    }
+
+    /// The Chromecast plugin is on; kept per iPhone, as the receivers are on its network.
+    var castEnabled: Bool {
+        get { defaults.bool(forKey: Key.castEnabled) }
+        set { defaults.set(newValue, forKey: Key.castEnabled) }
     }
 
     /// Bazarr's address and API key; the key is a secret like the Plex sign-in. Kept through sign-out.

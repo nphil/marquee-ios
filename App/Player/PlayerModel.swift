@@ -103,6 +103,8 @@ final class PlayerModel: Identifiable {
     private(set) var presentationSize: CGSize = .zero
     private(set) var isExternalPlayback = false
     private(set) var canPictureInPicture = false
+    /// The Chromecast playing this item, while one does.
+    private(set) var castDevice: CastDevice?
     private(set) var trickplay: Trickplay?
     private(set) var offer: Offer?
     private(set) var countdown: Countdown?
@@ -238,6 +240,14 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var stageTask: Task<Void, Never>?
     @ObservationIgnored private var sideTasks: [Task<Void, Never>] = []
     @ObservationIgnored private var trickplayLoad: (part: Int, task: Task<Void, Never>, waits: Bool)?
+    @ObservationIgnored private var castProgress: CastProgress?
+    @ObservationIgnored private var castTask: Task<Void, Never>?
+    /// The server stream a Chromecast plays, stopped with the cast.
+    @ObservationIgnored private var castSession: String?
+    /// Where a seek sent the receiver, shown until its next status.
+    @ObservationIgnored private var castSeekTarget: TimeInterval?
+    /// The receiver could not open the file itself, so the server streams it.
+    @ObservationIgnored private var castReceiverFailed = false
 
     init(request: PlaybackRequest, session: AppSession, library: PlexLibrary, capabilities: PlaybackCapabilities) {
         self.request = request
@@ -405,6 +415,8 @@ final class PlayerModel: Identifiable {
                 MainActor.assumeIsolated { self?.enteringForeground() }
             },
         ]
+        session.cast.player = self
+        session.cast.beginSearch()
         loadItem(request.item.ratingKey)
     }
 
@@ -426,6 +438,10 @@ final class PlayerModel: Identifiable {
         audioSession.deactivate()
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         observers = []
+        // Nothing would control the receiver once the player is gone.
+        if session.cast.player === self { session.cast.player = nil }
+        session.cast.disconnect()
+        session.cast.endSearch()
     }
 
     func retry() {
@@ -445,13 +461,13 @@ final class PlayerModel: Identifiable {
         if phase == .finished {
             replay()
         } else if phase == .playing {
-            backend.play()
+            if castDevice != nil { session.cast.play() } else { backend.play() }
         }
     }
 
     func pause() {
         wantsPlay = false
-        backend.pause()
+        if castDevice != nil { session.cast.pause() } else { backend.pause() }
         interruptCountdown()
     }
 
@@ -465,7 +481,11 @@ final class PlayerModel: Identifiable {
         countdownStopped = false
         wantsPlay = true
         seek(to: 0)
-        backend.play()
+        if castDevice == nil {
+            backend.play()
+        } else if castProgress?.state != .stopped {
+            session.cast.play()
+        }
     }
 
     /// Quick skips within a second and a half add up from the last target.
@@ -491,6 +511,18 @@ final class PlayerModel: Identifiable {
         if phase == .finished { phase = .playing }
         let target = clamp(requested)
         time = target
+        if castDevice != nil {
+            // A receiver that has finished holds nothing to seek in.
+            if castProgress == nil || castProgress?.state == .stopped {
+                restart(at: target)
+            } else {
+                castSeekTarget = target
+                session.cast.seek(to: target)
+            }
+            publishPosition()
+            report()
+            return
+        }
         if landing != nil {
             if farSeeking, case .remux(let remux) = stream { farSeek(remux, to: target) } else { landing = target }
             return
@@ -808,6 +840,10 @@ final class PlayerModel: Identifiable {
 
     private func decideRoute() async {
         guard let tracks, let media, let part else { return }
+        if let castDevice {
+            decideCastRoute(castDevice, tracks: tracks, media: media, part: part)
+            return
+        }
         let settings = session.settings
         let memory = settings.remembersTracks ? session.trackMemory(for: item) : nil
         let picked = AudioPicker.pick(in: tracks, handPick: handAudio, remembered: memory?.audio, preferredLanguage: settings.audioLanguage)
@@ -887,6 +923,10 @@ final class PlayerModel: Identifiable {
 
     private func startStream(at target: TimeInterval, generation: Int) async {
         guard let route, let part else { return }
+        if castDevice != nil {
+            await startCast(at: target, generation: generation)
+            return
+        }
         stopStream()
         loadStage = .opening
         landing = target
@@ -1055,6 +1095,7 @@ final class PlayerModel: Identifiable {
         }
         stream = nil
         mediaInfo = nil
+        stopCast()
     }
 
     /// Keeps what the ending stream measured of the link to its server, for the next route: the remux's
@@ -1952,5 +1993,172 @@ final class PlayerCenter {
         active?.close()
         active = nil
         presented = nil
+    }
+}
+
+// MARK: Chromecast
+
+extension PlayerModel: CastPlayer {
+    func castConnected(_ device: CastDevice) {
+        guard !closed else { return }
+        castDevice = device
+        castReceiverFailed = false
+        // An item still loading decides for the receiver once it has its tracks.
+        guard route != nil else { return }
+        if case .failed = phase { enterLoading() }
+        report(.stopped)
+        stopStream()
+        isPlaying = false
+        isBuffering = true
+        reroute(handPick: false)
+    }
+
+    /// Back on the phone, paused where the receiver was.
+    func castDisconnected() {
+        guard castDevice != nil, !closed else { return }
+        if let castProgress, castProgress.state != .stopped { time = clamp(castProgress.position(at: Self.uptime)) }
+        report(.stopped)
+        stopStream()
+        castDevice = nil
+        castReceiverFailed = false
+        wantsPlay = false
+        isPlaying = false
+        guard route != nil else { return }
+        if case .failed = phase { return }
+        isBuffering = true
+        reroute(handPick: false)
+    }
+
+    func castStatus(_ status: CastStatus) {
+        guard castDevice != nil, var progress = castProgress else { return }
+        let end = progress.update(status, now: Self.uptime)
+        castProgress = progress
+        castSeekTarget = nil
+        switch end {
+        case .finished:
+            castTask?.cancel()
+            ended()
+        case .failed:
+            if route?.kind == .directPlay, !castReceiverFailed {
+                castReceiverFailed = true
+                reroute(handPick: false)
+            } else {
+                fail("The Chromecast couldn't play this video.")
+            }
+        case .stopped:
+            // Stopped on the TV, or another sender cast to it.
+            session.cast.disconnect(stopping: false)
+        case nil:
+            guard progress.state != .stopped else { return }
+            if phase == .loading, progress.state != .buffering {
+                retries = 0
+                phase = .playing
+                stageTask?.cancel()
+                showsStage = false
+                startTiming.mark(.playing)
+            }
+            let playing = progress.state == .playing, buffering = progress.state == .buffering
+            if playing != isPlaying || buffering != isBuffering { stateChanged(playing: playing, buffering: buffering) }
+        }
+    }
+
+    private static var uptime: TimeInterval { ProcessInfo.processInfo.systemUptime }
+
+    /// The receiver's route: subtitles are burned in, as the Default Media Receiver draws none of Plex's.
+    private func decideCastRoute(_ device: CastDevice, tracks: MediaTracks, media: PlexMedia, part: PlexPart) {
+        let settings = session.settings
+        let memory = settings.remembersTracks ? session.trackMemory(for: item) : nil
+        let picked = AudioPicker.pick(in: tracks, handPick: handAudio, remembered: memory?.audio, preferredLanguage: settings.audioLanguage)
+        let decision = SubtitlePicker.decide(
+            tracks: tracks, audio: picked, handPick: handSubtitle, remembered: memory?.subtitle,
+            settings: settings.subtitles, canDrawImageSubtitles: true
+        )
+        let reason: RouteReason? = castReceiverFailed ? .receiverFailed : settings.directPlay == .disabled ? .directPlayOff : nil
+        let route = CastRouteDecider.decide(
+            media: media, part: part, tracks: tracks, audio: picked, subtitle: decision,
+            receiver: CastReceiver(modelName: device.model), limits: RouteLimits(serverReason: reason, quality: settings.quality)
+        )
+        enhancements = EnhancementState()
+        subtitle = decision
+        self.route = route
+        audio = route.audio
+        subtitleProblem = nil
+    }
+
+    /// Hands the receiver the file, or the server's stream of it from the start, with a transient token
+    /// in place of the account's; it starts at `target` itself.
+    private func startCast(at target: TimeInterval, generation: Int) async {
+        guard let route, let part else { return }
+        stopStream()
+        loadStage = .opening
+        landing = nil
+        origin = nil
+        streamKey = StreamKey(route)
+        do {
+            let token = try await library.transientToken()
+            let connection = try await library.connection.connection()
+            guard generation == self.generation, castDevice != nil else { return }
+            let base = CastStream.address(current: connection, among: library.server.connections).uri
+            let stream: CastStream?
+            if route.kind == .directPlay {
+                stream = CastStream.file(part: part, base: base, token: token)
+                reporter = TimelineReporter(library: library, item: item)
+            } else {
+                try await selectForServer(route, part: part)
+                guard generation == self.generation else { return }
+                let id = UUID().uuidString
+                castSession = id
+                stream = CastStream.transcode(
+                    TranscodeRequest(item: item, mediaIndex: mediaIndex, route: route, offset: 0, session: id),
+                    base: base, identity: session.identity, isLocal: connection.isLocal, token: token
+                )
+                reporter = TimelineReporter(library: library, item: item, sessionIdentifier: id)
+            }
+            guard let stream else { throw URLError(.badURL) }
+            streamConnection = connection
+            let poster = (isEpisode ? (item.grandparentThumb ?? item.thumb) : item.thumb).flatMap {
+                PlexURL.make(base: base, path: $0, query: [URLQueryItem(name: PlexHeader.token, value: token)])
+            }
+            castProgress = CastProgress(startingAt: target, replacing: session.cast.mediaSessionID, now: Self.uptime)
+            session.cast.load(CastLoad(
+                stream: stream, title: title, subtitle: subtitleLine, poster: poster, isEpisode: isEpisode,
+                duration: duration, startAt: target, autoplay: wantsPlay
+            ))
+            startTiming.mark(.stream)
+            castTask = Task { [weak self] in
+                while !Task.isCancelled {
+                    guard let self else { return }
+                    self.castTicked()
+                    try? await Task.sleep(for: .milliseconds(500))
+                }
+            }
+        } catch {
+            guard generation == self.generation, !(error is CancellationError) else { return }
+            fail(PlaybackFailure(text: Self.message(error)))
+        }
+    }
+
+    /// Between statuses the position runs on from the last one.
+    private func castTicked() {
+        guard let castProgress, castProgress.state != .stopped else { return }
+        let position = castSeekTarget ?? castProgress.position(at: Self.uptime)
+        let movie = duration > 0 ? min(position, duration) : position
+        if !isScrubbing { time = movie }
+        guard phase == .playing else { return }
+        updateOffers(at: movie)
+        if !markedWatched, duration > 0, movie >= duration * 0.9 { markWatched() }
+        if Date.now.timeIntervalSince(lastReport) >= 1 { report() }
+    }
+
+    private func stopCast() {
+        castTask?.cancel()
+        castTask = nil
+        castProgress = nil
+        castSeekTarget = nil
+        if let castSession {
+            let library = library
+            Task { try? await library.stopTranscode(session: castSession) }
+            self.castSession = nil
+        }
     }
 }

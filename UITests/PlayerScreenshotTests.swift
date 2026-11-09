@@ -56,6 +56,23 @@ final class PlayerScreenshotTests: XCTestCase {
     func testScrubPreviewFollowsTheThumb() throws {
         try scrubPreviewFlow(suffix: "rose-pine")
     }
+
+    /// The Chromecast plugin's route popover, a hand-off to FakeCast's receiver and back to the phone.
+    @MainActor
+    func testCastsToAChromecastAndBack() throws {
+        let app = launchPlayer(at: 30, paused: true, mode: "dark", cast: true)
+        tap("player.route", in: app)
+        let receiver = element("route.fake-cast", in: app)
+        XCTAssertTrue(receiver.waitForExistence(timeout: 10), "The Chromecast was not listed")
+        try snap("player-30-cast-picker-rose-pine")
+        receiver.tap()
+        let playing = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "Playing on Living Room TV")).firstMatch
+        XCTAssertTrue(playing.waitForExistence(timeout: 15), "The video did not move to the Chromecast")
+        try snap("player-31-casting-rose-pine")
+        tap("player.route", in: app)
+        tap("route.phone", in: app)
+        XCTAssertTrue(playing.waitForNonExistence(timeout: 10), "The video did not come back to the phone")
+    }
 }
 
 /// Run by CI with Increase Contrast and an accessibility text size.
@@ -373,11 +390,12 @@ private extension XCTestCase {
 
     /// Opens the player on episode 212 at `seconds` with the phone on its side, and waits until it
     /// has landed there. `introSkipDelay` overrides the profile's intro countdown for this launch;
-    /// `bazarr` sets up the fake Bazarr; `scrub` holds the scrubber at that fraction.
+    /// `bazarr` sets up the fake Bazarr; `scrub` holds the scrubber at that fraction; `cast` turns the
+    /// Chromecast plugin on with FakeCast's receiver.
     @MainActor
     func launchPlayer(
         at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, bazarr: Bool = false, speechDock: Bool = false,
-        scrub: Double? = nil
+        scrub: Double? = nil, cast: Bool = false
     ) -> XCUIApplication {
         XCUIDevice.shared.orientation = .landscapeLeft
         // A failed step ends the test early; the next test still has to start upright.
@@ -395,6 +413,7 @@ private extension XCTestCase {
         if speechDock { arguments += ["-marquee.uitest.speechDock", "http://speechdock.local:8765"] }
         if bazarr { arguments += ["-marquee.uitest.bazarr", "http://bazarr.local:6767"] }
         if let scrub { arguments += ["-marquee.uitest.scrub", String(scrub)] }
+        if cast { arguments += ["-marquee.uitest.cast", "YES"] }
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", light: "paper", arguments: arguments, waitingFor: nil)
         // Up Next hides the transport, so whichever control shows first means the player is up.
         // The scrub hold hides the transport, so the preview stands for it.

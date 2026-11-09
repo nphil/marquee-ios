@@ -87,7 +87,7 @@ struct PlayerChrome: View {
                 model.showsStats.toggle()
             }
 
-            AirPlayButton()
+            RouteButton(model: model)
         }
     }
 
@@ -303,6 +303,191 @@ private struct RoutePicker: UIViewRepresentable {
     }
 
     func updateUIView(_ view: AVRoutePickerView, context: Context) {}
+}
+
+/// AirPlay, or with the Chromecast plugin on the Cast mark, in accent while a Chromecast plays. Its
+/// popover lists this iPhone, the Chromecasts found and the system's AirPlay and Bluetooth picker.
+struct RouteButton: View {
+    let model: PlayerModel
+    @Environment(AppSession.self) private var session
+    @State private var showsRoutes = false
+
+    var body: some View {
+        if session.cast.isEnabled {
+            Button {
+                Haptics.impact(.light)
+                showsRoutes = true
+            } label: {
+                CastGlyph(connected: model.castDevice != nil)
+            }
+            .buttonStyle(PlayerButtonStyle())
+            .accessibilityLabel(model.castDevice.map { "Playing on \($0.name)" } ?? "Play On")
+            .accessibilityIdentifier("player.route")
+            .popover(isPresented: $showsRoutes) {
+                RouteList { showsRoutes = false }
+                    .presentationCompactAdaptation(.popover)
+            }
+            .onChange(of: showsRoutes) { _, shown in
+                if shown { model.menuOpened() } else { model.menuClosed() }
+            }
+        } else {
+            AirPlayButton()
+        }
+    }
+}
+
+private struct CastGlyph: View {
+    let connected: Bool
+    @Environment(\.theme) private var theme
+    @ScaledMetric(relativeTo: .body) private var size = Size.controlGlyph
+
+    var body: some View {
+        let side = min(size, Size.controlGlyphMax)
+        CastMark(connected: connected)
+            .foregroundStyle(connected ? theme.accent : theme.ink)
+            .frame(width: side, height: side)
+    }
+}
+
+/// The route button's popover. Picking a Chromecast keeps it open until the receiver connects.
+private struct RouteList: View {
+    let dismiss: () -> Void
+    @Environment(AppSession.self) private var session
+    @Environment(\.theme) private var theme
+
+    private enum RowState { case idle, connecting, chosen }
+
+    var body: some View {
+        let cast = session.cast
+        VStack(alignment: .leading, spacing: 0) {
+            row("This iPhone", systemImage: "iphone", state: cast.link == .none ? .chosen : .idle, id: "route.phone") {
+                cast.disconnect()
+                dismiss()
+            }
+            ForEach(cast.devices) { device in
+                row(device.name, systemImage: "tv", state: Self.state(of: device, link: cast.link), id: "route.\(device.id)") {
+                    cast.connect(device)
+                }
+            }
+            if cast.devices.isEmpty {
+                Text("Looking for Chromecasts…")
+                    .textRole(.caption)
+                    .foregroundStyle(theme.ink2)
+                    .padding(.horizontal, Space.s4)
+                    .padding(.vertical, Space.s3)
+            }
+            Divider()
+                .overlay(theme.edge)
+            Label("AirPlay & Bluetooth", systemImage: "airplayvideo")
+                .textRole(.body)
+                .foregroundStyle(theme.ink)
+                .padding(.horizontal, Space.s4)
+                .frame(maxWidth: .infinity, minHeight: Size.control, alignment: .leading)
+                .overlay { RoutePicker() }
+                .accessibilityIdentifier("route.airplay")
+        }
+        .frame(minWidth: 260)
+        .presentationBackground(theme.sheet)
+        .onChange(of: cast.link) { _, link in
+            if case .connected = link { dismiss() }
+        }
+    }
+
+    private static func state(of device: CastDevice, link: CastCenter.Link) -> RowState {
+        switch link {
+        case .connected(let current) where current == device: .chosen
+        case .connecting(let current) where current == device: .connecting
+        default: .idle
+        }
+    }
+
+    private func row(_ title: String, systemImage: String, state: RowState, id: String, action: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.impact(.light)
+            action()
+        } label: {
+            HStack(spacing: Space.s3) {
+                Image(systemName: systemImage)
+                Text(title)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                switch state {
+                case .chosen:
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(theme.accent)
+                case .connecting:
+                    ProgressView()
+                        .tint(theme.ink2)
+                case .idle:
+                    EmptyView()
+                }
+            }
+            .textRole(.body)
+            .foregroundStyle(theme.ink)
+            .padding(.horizontal, Space.s4)
+            .frame(minHeight: Size.control)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(state == .chosen ? .isSelected : [])
+        .accessibilityIdentifier(id)
+    }
+}
+
+/// Google's Cast mark (Material Symbols "cast", Apache 2.0) drawn on its 24-point grid; `connected`
+/// fills the screen, as "cast_connected" does.
+struct CastMark: Shape {
+    var connected = false
+
+    func path(in rect: CGRect) -> Path {
+        let scale = min(rect.width, rect.height) / 24
+        let origin = CGPoint(x: rect.midX - 12 * scale, y: rect.midY - 12 * scale)
+        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: origin.x + x * scale, y: origin.y + y * scale) }
+        var path = Path()
+        // The screen, open at the bottom left for the waves.
+        path.move(to: p(21, 3))
+        path.addLine(to: p(3, 3))
+        path.addCurve(to: p(1, 5), control1: p(1.9, 3), control2: p(1, 3.9))
+        path.addLine(to: p(1, 8))
+        path.addLine(to: p(3, 8))
+        path.addLine(to: p(3, 5))
+        path.addLine(to: p(21, 5))
+        path.addLine(to: p(21, 19))
+        path.addLine(to: p(14, 19))
+        path.addLine(to: p(14, 21))
+        path.addLine(to: p(21, 21))
+        path.addCurve(to: p(23, 19), control1: p(22.1, 21), control2: p(23, 20.1))
+        path.addLine(to: p(23, 5))
+        path.addCurve(to: p(21, 3), control1: p(23, 3.9), control2: p(22.1, 3))
+        path.closeSubpath()
+        // The dot and the two waves.
+        path.move(to: p(1, 18))
+        path.addLine(to: p(1, 21))
+        path.addLine(to: p(4, 21))
+        path.addCurve(to: p(1, 18), control1: p(4, 19.34), control2: p(2.66, 18))
+        path.closeSubpath()
+        path.move(to: p(1, 14))
+        path.addLine(to: p(1, 16))
+        path.addCurve(to: p(6, 21), control1: p(3.76, 16), control2: p(6, 18.24))
+        path.addLine(to: p(8, 21))
+        path.addCurve(to: p(1, 14), control1: p(8, 17.13), control2: p(4.87, 14))
+        path.closeSubpath()
+        path.move(to: p(1, 10))
+        path.addLine(to: p(1, 12))
+        path.addCurve(to: p(10, 21), control1: p(5.97, 12), control2: p(10, 16.03))
+        path.addLine(to: p(12, 21))
+        path.addCurve(to: p(1, 10), control1: p(12, 14.92), control2: p(7.08, 10))
+        path.closeSubpath()
+        if connected {
+            path.move(to: p(19, 7))
+            path.addLine(to: p(5, 7))
+            path.addLine(to: p(5, 8.63))
+            path.addCurve(to: p(13.37, 17), control1: p(8.96, 9.91), control2: p(12.09, 13.04))
+            path.addLine(to: p(19, 17))
+            path.closeSubpath()
+        }
+        return path
+    }
 }
 
 /// The loading screen's middle: the arc and, a second in, what the start waits for.
@@ -630,7 +815,7 @@ struct MoreMenu: View {
                     .disabled(!model.hasNext)
                     .accessibilityIdentifier("player.next")
                 }
-                if model.canPictureInPicture {
+                if model.canPictureInPicture, model.castDevice == nil {
                     Button {
                         model.togglePictureInPicture()
                     } label: {
@@ -641,16 +826,18 @@ struct MoreMenu: View {
             }
             .onAppear { model.menuOpened() }
             .onDisappear { model.menuClosed() }
-            Section {
-                Picker(selection: $model.aspectPick) {
-                    ForEach(VideoAspect.allCases, id: \.self) { aspect in
-                        Text(aspect.title).tag(aspect)
+            if model.castDevice == nil {
+                Section {
+                    Picker(selection: $model.aspectPick) {
+                        ForEach(VideoAspect.allCases, id: \.self) { aspect in
+                            Text(aspect.title).tag(aspect)
+                        }
+                    } label: {
+                        Label("Aspect", systemImage: "aspectratio")
+                        Text(model.aspect.title)
                     }
-                } label: {
-                    Label("Aspect", systemImage: "aspectratio")
-                    Text(model.aspect.title)
+                    .pickerStyle(.menu)
                 }
-                .pickerStyle(.menu)
             }
             Section {
                 Picker(selection: $model.qualityPick) {
@@ -667,16 +854,18 @@ struct MoreMenu: View {
                 if model.quality == .original, model.isConverting {
                     Text("Your Plex server is converting this video.")
                 }
-                Picker(selection: $model.speedPick) {
-                    ForEach(Self.speeds, id: \.self) { speed in
-                        Text(Self.title(of: speed)).tag(speed)
+                if model.castDevice == nil {
+                    Picker(selection: $model.speedPick) {
+                        ForEach(Self.speeds, id: \.self) { speed in
+                            Text(Self.title(of: speed)).tag(speed)
+                        }
+                    } label: {
+                        Label("Playback Speed", systemImage: "gauge.with.dots.needle.67percent")
+                        Text(Self.title(of: model.speed))
                     }
-                } label: {
-                    Label("Playback Speed", systemImage: "gauge.with.dots.needle.67percent")
-                    Text(Self.title(of: model.speed))
+                    .pickerStyle(.menu)
+                    .accessibilityIdentifier("player.speed")
                 }
-                .pickerStyle(.menu)
-                .accessibilityIdentifier("player.speed")
                 if model.enhancements.offered {
                     Menu {
                         enhancementRows(model.enhancements)

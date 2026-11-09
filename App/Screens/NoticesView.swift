@@ -60,6 +60,9 @@ private struct Notice: Identifiable {
         Notice(id: "marquee", name: "Marquee", licence: "MIT", files: ["LICENSE"]),
         Notice(id: "manrope", name: "Manrope", licence: "SIL OFL 1.1", files: ["OFL.txt"]),
         Notice(id: "atkinson", name: "Atkinson Hyperlegible", licence: "SIL OFL 1.1", files: ["AtkinsonHyperlegible-OFL.txt"]),
+        Notice(id: "googlecast", name: "Google Cast SDK", licence: "Google APIs Terms of Service", files: [
+            "Licences/googlecast/NOTICE.txt", "Licences/googlecast/OPEN-SOURCE.txt",
+        ]),
     ]
 
     #if canImport(Libavutil)

@@ -40,8 +40,8 @@ struct PlayerView: View {
             .offset(y: pull)
             .scaleEffect(1 - min(pull, 400) / 4000)
 
-            if model.isExternalPlayback {
-                ExternalPlaybackView()
+            if model.isExternalPlayback || model.castDevice != nil {
+                ExternalPlaybackView(castName: model.castDevice?.name)
                     .allowsHitTesting(false)
             }
             if let flash = model.skipFlash {
@@ -138,22 +138,25 @@ struct PlayerView: View {
         let rect = VideoFrame.rect(aspect: model.aspect, video: model.presentationSize, in: size, displayScale: displayScale)
         return ZStack(alignment: .topLeading) {
             Color.black
-            Group {
-                if let still = model.stillImage {
-                    Image(uiImage: still)
-                        .resizable()
-                } else {
-                    VideoSurface(view: model.layerView)
+            // A Chromecast draws the picture and its subtitles itself.
+            if model.castDevice == nil {
+                Group {
+                    if let still = model.stillImage {
+                        Image(uiImage: still)
+                            .resizable()
+                    } else {
+                        VideoSurface(view: model.layerView)
+                    }
                 }
+                .frame(width: rect.width, height: rect.height)
+                .offset(x: rect.minX, y: rect.minY)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: model.aspect)
+                SubtitleOverlay(
+                    model: model, picture: rect, screen: size,
+                    lift: model.chromeVisible ? max(0, size.height - bottomControls.minY) : 0,
+                    look: session.settings.subtitleStyle
+                )
             }
-            .frame(width: rect.width, height: rect.height)
-            .offset(x: rect.minX, y: rect.minY)
-            .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: model.aspect)
-            SubtitleOverlay(
-                model: model, picture: rect, screen: size,
-                lift: model.chromeVisible ? max(0, size.height - bottomControls.minY) : 0,
-                look: session.settings.subtitleStyle
-            )
         }
         .frame(width: size.width, height: size.height)
         .clipped()

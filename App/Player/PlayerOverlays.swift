@@ -440,16 +440,25 @@ struct SkipFlashView: View {
     }
 }
 
-/// Over the black picture while the video plays on an AirPlay screen.
+/// Over the black picture while the video plays on an AirPlay screen or a Chromecast.
 struct ExternalPlaybackView: View {
+    /// The Chromecast playing the video; nil while AirPlay does.
+    var castName: String?
     @Environment(\.theme) private var theme
 
     var body: some View {
         VStack(spacing: Space.s3) {
-            Image(systemName: "airplayvideo")
-                .font(.system(size: 56, weight: .regular))
-                .foregroundStyle(theme.ink2)
-            Text("Playing on \(routeName)")
+            Group {
+                if castName != nil {
+                    CastMark(connected: true)
+                        .frame(width: 56, height: 56)
+                } else {
+                    Image(systemName: "airplayvideo")
+                        .font(.system(size: 56, weight: .regular))
+                }
+            }
+            .foregroundStyle(theme.ink2)
+            Text("Playing on \(castName ?? routeName)")
                 .textRole(.headline)
                 .foregroundStyle(theme.ink)
                 .multilineTextAlignment(.center)

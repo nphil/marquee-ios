@@ -22,6 +22,9 @@ packages:
   VideoEngine:
     url: https://github.com/nphil/stashy-videoengine.git
     exactVersion: 2.0.1
+  GoogleCast:
+    url: https://github.com/googlecast/google-cast-ios-sdk.git
+    exactVersion: 4.8.6
 
 targets:
   Marquee:
@@ -51,6 +54,8 @@ targets:
         product: LiveFixtures
       - package: VideoEngine
         product: VideoEngine
+      - package: GoogleCast
+        product: GoogleCastDynamic
     info:
       path: App/Info.plist
       properties:
@@ -62,9 +67,11 @@ targets:
         CADisableMinimumFrameDurationOnPhone: true
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-        NSLocalNetworkUsageDescription: Marquee looks for Plex servers on the local network and plays from them.
+        NSLocalNetworkUsageDescription: Marquee looks for Plex servers on the local network and plays from them, and finds Chromecasts there while its Chromecast plugin is on.
         NSBonjourServices:
           - _plex._tcp
+          - _googlecast._tcp
+          - _CC1AD845._googlecast._tcp
         UIAppFonts:
           - Manrope.ttf
           - AtkinsonHyperlegible-Regular.ttf

@@ -58,6 +58,8 @@ final class AppSession {
     private var settingsLoaded = false
     /// Bazarr (DESIGN §8.7 Integrations), kept per iPhone.
     let bazarr: BazarrSettings
+    /// The Chromecast plugin (DESIGN §8.7 Integrations), kept per iPhone.
+    let cast: CastCenter
 
     /// Made again by Delete All Local Data, which removes the stored client identifier.
     private(set) var identity: PlexClientIdentity
@@ -82,6 +84,7 @@ final class AppSession {
         transport = URLSessionTransport(session: URLSession(configuration: configuration))
         bazarr = BazarrSettings(storage: storage, transport: transport)
         speechDock = SpeechDockSettings(storage: storage, transport: transport)
+        cast = CastCenter(storage: storage)
         restore()
         watchNetwork()
         watchForeground()

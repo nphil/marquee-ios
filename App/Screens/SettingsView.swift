@@ -137,6 +137,15 @@ struct SettingsView: View {
                     }
                 }
                 .accessibilityIdentifier("settings.bazarr")
+                NavigationLink {
+                    CastView()
+                } label: {
+                    LabeledContent("Chromecast") {
+                        Text(session.cast.isEnabled ? "On" : "Off")
+                            .foregroundStyle(theme.ink2)
+                    }
+                }
+                .accessibilityIdentifier("settings.cast")
             }
             .listRowBackground(theme.sheet)
 
