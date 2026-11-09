@@ -1,0 +1,11 @@
+Google Cast SDK 4.8.6 for iOS
+
+Copyright Google LLC. All rights reserved.
+
+The Google Cast SDK is not open-source software. It is used under the Google APIs Terms of Service (https://developers.google.com/terms) and the Google Cast SDK Additional Developer Terms of Service (https://developers.google.com/cast/docs/terms).
+
+Marquee links the SDK only to find Chromecast devices and play on them. It does so only while Chromecast is turned on in Settings › Integrations.
+
+The SDK collects diagnostic data, which Google uses to monitor and improve the reliability and performance of the Cast SDK (the SDK's NutritionLabel.txt). Marquee does not enable the SDK's analytics logging or use its user interface.
+
+The open-source components inside the SDK and their licences are listed under Google Cast SDK Components.

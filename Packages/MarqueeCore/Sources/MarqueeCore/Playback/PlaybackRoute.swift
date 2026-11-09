@@ -82,6 +82,10 @@ public enum RouteReason: Sendable, Hashable, CustomStringConvertible {
     case slowLink(kbps: Int)
     /// Boost dialog or Normalize loudness is on, which only the server's audio conversion can do.
     case audioEnhancement
+    /// A Chromecast plays a file's first audio track only; the server streams the picked one.
+    case notFirstAudioTrack
+    /// The Chromecast could not open the file itself, so the server streams it.
+    case receiverFailed
 
     /// The server has to re-encode the video for this reason.
     var needsReencode: Bool {
@@ -89,7 +93,7 @@ public enum RouteReason: Sendable, Hashable, CustomStringConvertible {
         case .videoCodec, .videoFormat, .dolbyVision, .hdrOnSDRScreen, .levelOrFrameRate, .bitrateLimit, .burnsSubtitle, .slowLink:
             true
         case .container, .hevcTag, .dolbyVisionBaseLayer, .audio, .onDeviceFailed, .directPlayOff, .airPlay, .remoteConnection,
-             .audioEnhancement:
+             .audioEnhancement, .notFirstAudioTrack, .receiverFailed:
             false
         }
     }
@@ -113,6 +117,8 @@ public enum RouteReason: Sendable, Hashable, CustomStringConvertible {
         case .remoteConnection: "Server reached over the internet"
         case .slowLink(let kbps): "Link measured at \(Double(kbps / 100) / 10) Mbps"
         case .audioEnhancement: "Boost dialog or Normalize loudness on"
+        case .notFirstAudioTrack: "Chromecast plays only the first audio track"
+        case .receiverFailed: "The Chromecast couldn't open the file"
         }
     }
 }
@@ -333,18 +339,18 @@ public enum PlaybackRouteDecider {
     }
 
     /// The file's picture is larger than `frame`.
-    private static func exceeds(_ media: PlexMedia, _ video: PlexStream?, _ frame: (width: Int, height: Int)?) -> Bool {
+    static func exceeds(_ media: PlexMedia, _ video: PlexStream?, _ frame: (width: Int, height: Int)?) -> Bool {
         guard let frame, let width = video?.width ?? media.width, let height = video?.height ?? media.height else { return false }
         return width > frame.width || height > frame.height
     }
 
     private static let directContainers: Set<String> = ["mp4", "m4v", "mov"]
 
-    private static func isHEVC(_ codec: String) -> Bool {
+    static func isHEVC(_ codec: String) -> Bool {
         ["hevc", "h265", "hvc1", "hev1"].contains(codec)
     }
 
-    private static func isH264(_ codec: String) -> Bool {
+    static func isH264(_ codec: String) -> Bool {
         ["h264", "avc", "avc1"].contains(codec)
     }
 
