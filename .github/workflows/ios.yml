@@ -410,12 +410,14 @@ jobs:
           xcrun simctl boot "$(sed -n 1p udids.txt)"
 
       - name: Build for testing
+        env:
+          SMALL: ${{ steps.simulators.outputs.small }}
         run: |
           set -o pipefail
           xcodebuild build-for-testing \
             -project Marquee.xcodeproj \
             -scheme Marquee \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination "id=$SMALL" \
             -derivedDataPath build/DD-sim \
             -clonedSourcePackagesDirPath build/SourcePackages \
             2>&1 | tee xcodebuild-build.log | xcbeautify
