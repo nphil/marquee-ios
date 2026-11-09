@@ -16,7 +16,7 @@ MarqueeCore holds the Plex client, the choice of server address, library calls, 
 
 Reasons:
 
-- **No local Mac.** The App target builds and runs UI tests only on a GitHub Actions macOS runner, and the `app` job takes about an hour. Keeping logic out of it gives a 30-second loop: `swift test --build-system native` on Linux runs the whole Core suite. The package declares macOS only so the same tests run on the CI host too.
+- **No local Mac.** The App target builds and runs UI tests only on a GitHub Actions macOS runner, and the full UI test run takes about 30 minutes even split over 4 runners. Keeping logic out of it gives a 30-second loop: `swift test --build-system native` on Linux runs the whole Core suite. The package declares macOS only so the same tests run on the CI host too.
 - **Decisions are pure functions.** `PlaybackRouteDecider.decide`, `LiveRouteDecider.route`, `SubtitlePicker.decide`, `AudioPicker.pick`, `ConnectionRanking`, `HomeLayout.arrange` and `LiveRecordings.mark` take values and return values. The App performs the effect (start a stream, probe an address). A rule change is then a Linux test, and a route is explained in plain words (`RouteReason`) rather than reconstructed from logs.
 - **Plex is lenient input.** Plex sends `"1"`, `1` or `true` for one field and omits others, and server versions differ. Models make every field optional and decode through `LenientDecoding`, so a bad field never drops an item.
 - **No token in anything that persists.** `PlexError` carries no token or URL; image URLs are built without a token so they are stable cache keys; `URL.removingPlexToken` is the one way to put a URL in a log. Only playback and transcode URLs carry the token, because AVPlayer cannot send headers, and they are never logged or cached.
@@ -81,11 +81,11 @@ Integrations (SpeechDock, Bazarr, the direct Live TV path, anything added later)
 |---|---|---|
 | MarqueeCore | Swift Testing on Linux (`PlexTransport` fakes, fixed clocks) | `PlexTransport` protocol, injected clocks and sleeps |
 | MarqueeLive | simulator `xcodebuild test`, synthetic tuner | `LiveFixtures`, a simulated clock |
-| App | XCUITest on the CI simulator, screenshots in dark, light and large text | `FakePlex` (a `URLProtocol` answering from `UITests/FakePlex/`, Debug only), `StillFrameBackend`, `FakeTuner`, a fixed Live TV clock |
+| App | XCUITest on the CI simulator (4 shards, one simulator each, split by `tools/ui-shards.py`), screenshots in dark, light and large text | `FakePlex` (a `URLProtocol` answering from `UITests/FakePlex/`, Debug only), `StillFrameBackend`, `FakeTuner`, a fixed Live TV clock |
 | Playback and heat | by hand on an iPhone | `docs/DEVICE-TEST.md` |
 
 Test-only types are `#if DEBUG`, so the Release IPA carries none of them.
 
 ## Build and release
 
-XcodeGen builds the project from `project.yml`; the `.xcodeproj` is not stored. CI builds an unsigned Release IPA, runs the UI tests, and on `main` publishes it as a GitHub release and patches the Feather source (`apps.json`) on `main`. The version is derived from the newest tag, so it is never committed. Details are in `AGENTS.md` under CI and release.
+XcodeGen builds the project from `project.yml`; the `.xcodeproj` is not stored. CI builds an unsigned Release IPA, runs the UI tests in 4 parallel shards (the accessibility pass on `main` always, on a branch only when app code, tests, resources, tools or the workflow changed) and merges their screenshots into one `screens` artifact; on `main`, only when every test job is green, it publishes it as a GitHub release and patches the Feather source (`apps.json`) on `main`. The version is derived from the newest tag, so it is never committed. Details are in `AGENTS.md` under CI and release.
