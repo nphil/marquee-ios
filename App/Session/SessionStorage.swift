@@ -75,14 +75,9 @@ final class SessionStorage {
         defaults.set(uri, forKey: Key.addressPrefix + serverID)
     }
 
-    /// A profile's settings, keyed by its Plex uuid; defaults for a profile that has none.
-    func settings(for profile: String?) -> ProfileSettings {
-        defaults.data(forKey: Key.settingsPrefix + (profile ?? ""))
-            .flatMap { try? JSONDecoder().decode(ProfileSettings.self, from: $0) } ?? ProfileSettings()
-    }
-
-    func setSettings(_ settings: ProfileSettings, for profile: String?) {
-        defaults.set(try? JSONEncoder().encode(settings), forKey: Key.settingsPrefix + (profile ?? ""))
+    /// Each profile's settings, keyed by its Plex uuid.
+    var profileSettings: ProfileSettingsStore<ProfileSettings> {
+        ProfileSettingsStore(prefix: Key.settingsPrefix, blobs: DefaultsBlobs(defaults: defaults), defaults: { ProfileSettings() })
     }
 
     /// The audio and subtitle picks remembered for a show or movie, under `TrackMemory.storageKey`.
@@ -141,4 +136,11 @@ final class SessionStorage {
         }
         try? keychain.setData(data, for: key)
     }
+}
+
+private final class DefaultsBlobs: SettingsBlobStore {
+    let defaults: UserDefaults
+    init(defaults: UserDefaults) { self.defaults = defaults }
+    func blob(forKey key: String) -> Data? { defaults.data(forKey: key) }
+    func setBlob(_ data: Data?, forKey key: String) { defaults.set(data, forKey: key) }
 }

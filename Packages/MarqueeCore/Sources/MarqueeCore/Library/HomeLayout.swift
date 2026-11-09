@@ -15,7 +15,8 @@ public struct HomeRow: Sendable, Hashable, Identifiable {
     public init(hub: PlexHub, library: PlexLibrarySection? = nil) {
         self.hub = hub
         self.library = library
-        id = library.map { "\(HomeLayout.libraryID($0))/\(hub.id)" } ?? hub.id
+        let stable = HomeLayout.stableID(hub.id)
+        id = library.map { "\(HomeLayout.libraryID($0))/\(stable)" } ?? stable
         shown = library == nil
     }
 }
@@ -23,6 +24,7 @@ public struct HomeRow: Sendable, Hashable, Identifiable {
 /// One profile's choice of Home rows: which show and in what order. Rows it never placed follow the
 /// placed ones in the server's order with their default visibility, so a hub the server adds later
 /// turns up at the end. Placed rows the server stops sending keep their place for when they return.
+/// Row ids are `stableID`s, so a layout saved by an older version reads the same as a new one.
 public struct HomeLayout: Codable, Hashable, Sendable {
     public struct Placement: Codable, Hashable, Sendable {
         public var id: String
@@ -31,9 +33,20 @@ public struct HomeLayout: Codable, Hashable, Sendable {
         public var library: String?
 
         public init(id: String, shown: Bool, library: String? = nil) {
-            self.id = id
+            self.id = HomeLayout.stableID(id)
             self.shown = shown
             self.library = library
+        }
+
+        enum CodingKeys: String, CodingKey { case id, shown, library }
+
+        public init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            self.init(
+                id: try c.decode(String.self, forKey: .id),
+                shown: try c.decodeIfPresent(Bool.self, forKey: .shown) ?? true,
+                library: try c.decodeIfPresent(String.self, forKey: .library)
+            )
         }
     }
 
@@ -41,7 +54,40 @@ public struct HomeLayout: Codable, Hashable, Sendable {
     public var placements: [Placement]
 
     public init(placements: [Placement] = []) {
-        self.placements = placements
+        var seen: Set<String> = []
+        self.placements = placements.filter { seen.insert($0.id).inserted }
+    }
+
+    /// Placements that no longer decode are dropped one by one, so one odd entry from an older version
+    /// does not bring every row back.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        var list = try c.nestedUnkeyedContainer(forKey: .placements)
+        var placements: [Placement] = []
+        while !list.isAtEnd {
+            if let placement = try? list.decode(Placement.self) {
+                placements.append(placement)
+            } else {
+                _ = try? list.decode(Discarded.self)
+            }
+        }
+        self.init(placements: placements)
+    }
+
+    private enum CodingKeys: String, CodingKey { case placements }
+    private struct Discarded: Decodable {}
+
+    /// A hub's id without the part Plex rotates: "Top Movies in <genre>" and "Top Movies with <person>"
+    /// come with a new genre or person on each request and for each account
+    /// (`movie.genre.1.3718`, `movie.genre.1.6`), so the row is `movie.genre.1`. Every other id is
+    /// unchanged.
+    public static func stableID(_ id: String) -> String {
+        let parts = id.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count >= 4, parts.last.map({ !$0.isEmpty && !$0.contains("/") }) ?? false,
+              parts[parts.count - 2].allSatisfy(\.isNumber) else { return id }
+        let kind = parts.dropLast(2).joined(separator: ".")
+        guard kind.hasSuffix(".genre") || kind.hasSuffix(".by.actor.or.director") else { return id }
+        return parts.dropLast().joined(separator: ".")
     }
 
     public var isDefault: Bool { placements.isEmpty }

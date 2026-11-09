@@ -15,9 +15,11 @@ struct HomeView: View {
     @State private var editing = false
 
     var body: some View {
+        // Read here, not only inside the row content, so Home redraws on every layout change.
+        let layout = session.settings.homeRows
         WidthReader { width in
             RemoteContent(remote: rows) { rows in
-                content(session.settings.homeRows.arrange(withoutDeleted(rows)), width: width)
+                content(layout.arrange(withoutDeleted(rows)), width: width)
             } skeleton: {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Space.s7) {

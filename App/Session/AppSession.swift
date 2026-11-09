@@ -46,13 +46,16 @@ final class AppSession {
         get { profileSettings }
         set {
             profileSettings = newValue
-            storage.setSettings(newValue, for: user?.uuid)
+            storage.profileSettings.save(newValue, profile: settingsProfile)
         }
     }
     /// SpeechDock (DESIGN §8.7 Integrations). A service address is not a viewing preference, so it is
     /// kept per iPhone rather than per profile, like Bazarr's.
     let speechDock: SpeechDockSettings
     private var profileSettings = ProfileSettings()
+    /// The profile `profileSettings` was read for and is saved under, so a save and the next read use one key.
+    private var settingsProfile = ""
+    private var settingsLoaded = false
     /// Bazarr (DESIGN §8.7 Integrations), kept per iPhone.
     let bazarr: BazarrSettings
 
@@ -317,7 +320,7 @@ final class AppSession {
         let tv = makePlexTV(token: token)
         plexTV = tv
         servers = storage.servers
-        setUser(storage.profile)
+        setUser(storage.profile, sameAccount: true)
         if let server = rememberedServer(in: servers) {
             connect(to: server)
         } else {
@@ -393,7 +396,7 @@ final class AppSession {
             servers = found
             homeUsers = profiles
             linkCode = nil
-            setUser(account ?? profiles.first(where: \.isAdmin))
+            setUser(account ?? profiles.first(where: \.isAdmin), sameAccount: true)
             switch pick {
             case .remembered: show(found)
             case .first: if let first = found.first { choose(first) } else { state = .choosingServer(found) }
@@ -415,7 +418,7 @@ final class AppSession {
             guard !Task.isCancelled else { return }
             storage.servers = found
             servers = found
-            if let account { setUser(account) }
+            if let account { setUser(account, sameAccount: true) }
             if let profiles { homeUsers = profiles }
             switch state {
             case .ready:
@@ -503,11 +506,18 @@ final class AppSession {
         serverInfo = info
     }
 
-    /// Loads the profile's own settings along with it.
-    private func setUser(_ profile: PlexHomeUser?) {
+    /// Loads the profile's own settings along with it. `sameAccount` is for the profile the sign-in
+    /// already belongs to (restoring, refreshing, signing in): settings kept under another uuid for it
+    /// carry over, and settings already in use stay. Switching to another profile passes false.
+    private func setUser(_ profile: PlexHomeUser?, sameAccount: Bool = false) {
+        let key = profile?.uuid ?? ""
+        let previous = settingsProfile
         user = profile
         storage.profile = profile
-        profileSettings = storage.settings(for: profile?.uuid)
+        guard key != previous || !settingsLoaded else { return }
+        settingsLoaded = true
+        settingsProfile = key
+        profileSettings = storage.profileSettings.load(profile: key, inheriting: sameAccount ? previous : nil)
     }
 
     private func watchNetwork() {
