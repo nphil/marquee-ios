@@ -14,8 +14,9 @@ import pathlib
 import re
 import sys
 
-# Seconds per test as measured in CI on the 3-core runner (run 42559038250, 2026-11-09). A test that is
-# not listed gets the default, so a new test is placed roughly until its number is added here.
+# Seconds per test as measured in CI on the 3-core runner (run 42559038250, 2026-11-09; the remote's from run
+# 42614908575). A test that is not listed gets the default, so a new test is placed roughly until its number
+# is added here.
 SECONDS = {
     "AccountAccessibilityScreenshots/testProfiles": 65,
     "AccountAccessibilityScreenshots/testSettings": 233,
@@ -81,6 +82,10 @@ SECONDS = {
     "PlayerScreenshotTests/testWatchIntroStopsTheCountdown": 40,
     "PlayerScreenshotTests/testWrongSubtitlesAndBazarr": 202,
     "PlayerScreenshotTests/testWrongSubtitlesAndBazarrInLightTheme": 147,
+    "RemoteAccessibilityScreenshots/testRemote": 35,
+    "RemoteScreenshotTests/testRemoteDawn": 43,
+    "RemoteScreenshotTests/testRemoteRosePine": 29,
+    "RemoteScreenshotTests/testSettingsSwitch": 59,
     "ScreenshotTests/testAccessibilitySettings": 22,
     "ScreenshotTests/testEmber": 20,
     "ScreenshotTests/testMatchSystemSlots": 38,
