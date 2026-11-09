@@ -90,6 +90,9 @@ Tracks titled Signs or Songs count as on-screen text, as the spec's forced-word 
 - `PlaybackRoute`: kind, `RouteReason`s, played audio and whether it stands in, audio conversion, video re-encode, `SubtitleDelivery` (sidecar, in stream, burned in, not shown).
 - `RouteReason`: plain-English reasons. `RouteLimits`: a server reason (on-device failure, direct play off, AirPlay), phone only (Direct play forced: never the server, unshowable subtitles not shown), bitrate cap.
 - `TranscodeRequest`: start offset, quality, video copy and burn-in for `PlexLibrary.transcodeURL(_:)`. The server takes audio and subtitle from the streams set with `selectStreams`. `init(live:)` streams a tuned channel; the server copies H.264 and HEVC and converts MPEG-2.
+- `CastReceiver(modelName:)`: what a Chromecast plays (4K HEVC for Chromecast Ultra and Google TV Streamer, 1080p H.264 for the rest). `CastRouteDecider.decide(media:part:tracks:audio:subtitle:receiver:limits:)`: the receiver opens an MP4 with video it decodes and AAC or MP3 first itself, else the server's HLS of H.264 and AAC; a subtitle is always burned in, since the Default Media Receiver draws none of Plex's formats.
+- `CastStream`: the receiver's URL, content type and server session. `address(current:among:)` swaps plain http for an HTTPS address of the same machine; `file(part:base:token:)`, `transcode(_:base:identity:isLocal:token:)`. `PlexLibrary.transientToken()`: the 48-hour delegation token the receiver holds instead of the account's.
+- `CastProgress`: one load's state from `CastStatus` updates: position between updates, `PlaybackState` for the timeline, and how it ended (finished, stopped, failed, replaced).
 
 ## Live TV (`Live/`)
 

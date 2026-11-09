@@ -62,6 +62,7 @@ Screens do not own fetch logic scattered across views:
 - **Backend seam.** `VideoBackend` hides AVPlayer. The simulator decodes no video, so UI tests use `StillFrameBackend` (a fixture picture and a clock that ticks like AVPlayer's observer) and every player screen, gesture and offer is testable on CI while decoding stays a device-only check.
 - **Server side effects.** The server chooses the audio and burned-in subtitle through `selectStreams`; loudness normalisation and dialog boost are server transcode options, since AVPlayer offers no audio tap on HLS.
 - **Subtitles are drawn by the app.** Text cues and image subtitles are drawn in an overlay so one style, timing and position apply to every source; AVPlayer's own drawing remains only where the overlay cannot be seen (Picture in Picture, AirPlay).
+- **Chromecast.** `CastCenter` wraps the Google Cast SDK (`GoogleCastBackend`; `FakeCast` in UI tests) and searches only while the player or its Settings page is open. A cast moves the model's playback to the receiver: `CastRouteDecider` picks the file or a server stream, AVPlayer stops, and position, play state, Skip Intro, Up Next and timeline reports follow `CastProgress`. Back on the phone, the stream is rebuilt paused at the receiver's position.
 
 ### Live TV
 
@@ -73,7 +74,7 @@ Screens do not own fetch logic scattered across views:
 
 ### Integrations
 
-Integrations (SpeechDock, Bazarr, the direct Live TV path, anything added later) are off until enabled in Settings, each with its own page and stored connection. They supply data to the core and never styling. Secrets such as an API key go to the Keychain, and an address that is not a viewing preference is kept per iPhone rather than per profile.
+Integrations (SpeechDock, Bazarr, Chromecast, the direct Live TV path, anything added later) are off until enabled in Settings, each with its own page and stored connection. They supply data to the core and never styling. Secrets such as an API key go to the Keychain, and an address that is not a viewing preference is kept per iPhone rather than per profile.
 
 ## Tests and seams
 
