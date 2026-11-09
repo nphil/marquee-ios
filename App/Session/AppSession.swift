@@ -472,7 +472,8 @@ final class AppSession {
     #if DEBUG
     /// UI tests open the player straight on an item, paused where they want it, against the fake server.
     /// `marquee.uitest.introSkipDelay` lengthens the intro countdown for this launch only, so a test can
-    /// wait for the controls to hide before it taps the offer.
+    /// wait for the controls to hide before it taps the offer; `marquee.uitest.directPlay` sets Direct Play
+    /// (`disabled` sends the item through a server transcode).
     private func playForUITest(_ library: PlexLibrary) {
         let defaults = UserDefaults.standard
         guard FakePlex.isActive, let key = defaults.string(forKey: "marquee.uitest.play") else { return }
@@ -480,6 +481,9 @@ final class AppSession {
             guard let item = try? await library.metadata(key) else { return }
             let delay = defaults.integer(forKey: "marquee.uitest.introSkipDelay")
             if delay > 0 { profileSettings.introSkipDelay = delay }
+            if let mode = defaults.string(forKey: "marquee.uitest.directPlay").flatMap(DirectPlayMode.init(rawValue:)) {
+                profileSettings.directPlay = mode
+            }
             let time = defaults.double(forKey: "marquee.uitest.playerTime")
             let request = PlaybackRequest(item: item, startAt: time > 0 ? time : nil, startsPaused: defaults.bool(forKey: "marquee.uitest.paused"))
             player.play(request, session: self)

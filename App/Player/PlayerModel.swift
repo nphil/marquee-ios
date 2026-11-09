@@ -78,6 +78,8 @@ final class PlayerModel: Identifiable {
     /// A second into loading the stage word shows.
     private(set) var showsStage = false
     private(set) var loadStage: LoadStage = .connecting
+    /// How long this item's start took to reach each step, for stats for nerds.
+    private(set) var startTiming = StartTiming()
     private(set) var route: PlaybackRoute?
     /// Why the phone's own route was given up for the server's: the error's domain and code, for stats and
     /// Playback info. The banner says only that the server took over.
@@ -654,6 +656,7 @@ final class PlayerModel: Identifiable {
         generation += 1
         let generation = generation
         enterLoading()
+        startTiming = StartTiming()
         speed = 1
         backend.rate = 1
         enhancementRefused = false
@@ -663,7 +666,11 @@ final class PlayerModel: Identifiable {
             do {
                 var full = try await library.metadata(ratingKey)
                 guard generation == self.generation else { return }
-                if queue == nil { queue = try? await library.createPlayQueue(for: full) }
+                startTiming.mark(.metadata)
+                if queue == nil {
+                    queue = try? await library.createPlayQueue(for: full)
+                    startTiming.mark(.queue)
+                }
                 guard generation == self.generation else { return }
                 if let queued = queue?.items.first(where: { $0.ratingKey == full.ratingKey }) {
                     full.playQueueItemID = queued.playQueueItemID
@@ -713,6 +720,7 @@ final class PlayerModel: Identifiable {
         nextFromStart = false
         // Scene thumbnails load after the first picture (`arrived`).
         await decideRoute()
+        startTiming.mark(.route)
         guard generation == self.generation else { return }
         await startStream(at: start, generation: generation)
     }
@@ -869,6 +877,7 @@ final class PlayerModel: Identifiable {
             }
             guard generation == self.generation else { return }
             applySubtitleSources()
+            startTiming.mark(.stream)
             load(url)
         } catch {
             guard generation == self.generation, !(error is CancellationError) else { return }
@@ -1155,6 +1164,7 @@ final class PlayerModel: Identifiable {
             stateChanged(playing: playing, buffering: buffering)
         case .ready:
             itemReady = true
+            startTiming.mark(.ready)
             loadStage = .starting
             if case .transcode = stream, origin == nil {
                 // Some servers list the whole film whatever the offset; the stream then starts at zero.
@@ -1210,6 +1220,7 @@ final class PlayerModel: Identifiable {
             writeBack()
         }
         if wantsPlay { backend.play() }
+        startTiming.mark(.playing)
         if let origin { time = backend.itemTime + origin }
         publishPosition()
         report()

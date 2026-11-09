@@ -184,7 +184,7 @@ enum PlayerStats {
 
     /// How playback keeps up, and how the phone is coping.
     static func health(_ model: PlayerModel, server: Server?) -> [Line] {
-        var lines: [Line] = []
+        var lines = [Line("Start", model.startTiming.summary)]
         let size = model.presentationSize
         if size.width > 0 {
             lines.append(Line("Display", "\(Int(size.width)) × \(Int(size.height)) · \(model.aspect.title)"))

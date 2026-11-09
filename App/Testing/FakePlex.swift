@@ -46,6 +46,10 @@ enum FakePlex {
 
     static var isActive: Bool { root != nil }
 
+    /// Seconds every answer waits (`-marquee.uitest.latency`, in milliseconds), so a start can be timed
+    /// against a server as slow as a real one.
+    static let latency: TimeInterval = isActive ? UserDefaults.standard.double(forKey: "marquee.uitest.latency") / 1000 : 0
+
     /// 9 PM today while active: where an anchored fixture's T lands.
     static let liveEvening: Date? = isActive ? Calendar.current.date(bySettingHour: 21, minute: 0, second: 0, of: Date()) : nil
 
@@ -70,11 +74,26 @@ enum FakePlex {
 
 #if DEBUG
 final class FakePlexProtocol: URLProtocol {
+    private var delay: Timer?
+
     override class func canInit(with request: URLRequest) -> Bool { FakePlex.isActive }
 
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
+        guard FakePlex.latency > 0 else { return answer() }
+        // A timer on this thread's run loop rather than a sleep, so requests made together wait together.
+        let timer = Timer(timeInterval: FakePlex.latency, target: self, selector: #selector(answer), userInfo: nil, repeats: false)
+        RunLoop.current.add(timer, forMode: .common)
+        delay = timer
+    }
+
+    override func stopLoading() {
+        delay?.invalidate()
+        delay = nil
+    }
+
+    @objc private func answer() {
         guard let root = FakePlex.root, let url = request.url else {
             client?.urlProtocol(self, didFailWithError: URLError(.badURL))
             return
@@ -93,8 +112,6 @@ final class FakePlexProtocol: URLProtocol {
             client?.urlProtocolDidFinishLoading(self)
         }
     }
-
-    override func stopLoading() {}
 }
 
 struct FakePlexRouter {
