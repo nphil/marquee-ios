@@ -31,7 +31,7 @@ extension XCTestCase {
         let topRated = "homeRows.fake-movies/movie.toprated.1"
 
         reveal("shelf.Recently Added Movies", in: app).press(forDuration: 1)
-        let edit = app.buttons.matching(NSPredicate(format: "label == 'Edit Home' AND identifier != 'home.edit'")).firstMatch
+        let edit = app.buttons["Edit Home"].firstMatch
         XCTAssertTrue(edit.waitForExistence(timeout: 5), "No Edit Home in the row menu")
         XCTAssertTrue(app.buttons["Hide This Row"].exists, "No Hide This Row in the row menu")
         try snap("home-rows-01-menu-\(suffix)")

@@ -88,14 +88,6 @@ struct HomeView: View {
                             PosterShelf(hub: row.hub, id: row.id, title: row.title, menu: menu)
                         }
                     }
-                    Button {
-                        editing = true
-                    } label: {
-                        Label("Edit Home", systemImage: "slider.horizontal.3")
-                    }
-                    .buttonStyle(.tonal)
-                    .frame(maxWidth: .infinity)
-                    .accessibilityIdentifier("home.edit")
                 }
                 .padding(.vertical, Space.s3)
             }
