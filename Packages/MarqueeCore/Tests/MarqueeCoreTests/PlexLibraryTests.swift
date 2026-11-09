@@ -225,6 +225,19 @@ struct PlexLibraryTests {
         #expect(request.headers[PlexHeader.sessionIdentifier] == "s-1")
     }
 
+    @Test func reporterCarriesAQueueItemThatArrivesLater() async throws {
+        let (library, transport) = Self.library { _ in container([:]) }
+        let item = try decode(PlexMetadata.self, ["ratingKey": "12", "key": "/library/metadata/12"])
+        let reporter = TimelineReporter(library: library, item: item)
+
+        await reporter.update(.playing, time: 0, duration: 1_450_000)
+        await reporter.queued(as: 502)
+        await reporter.update(.paused, time: 1_000, duration: 1_450_000)
+
+        let reports = await transport.requests(to: "/:/timeline")
+        #expect(reports.map { $0.url.query("playQueueItemID") } == [nil, "502"])
+    }
+
     @Test func timelineIsReportedOnStateChangesAndEveryInterval() {
         var cadence = TimelineCadence(interval: .seconds(10))
         let start = ContinuousClock.now

@@ -227,6 +227,7 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var closed = false
     @ObservationIgnored private var observers: [any NSObjectProtocol] = []
     @ObservationIgnored private var loadTask: Task<Void, Never>?
+    @ObservationIgnored private var queueTask: Task<Void, Never>?
     @ObservationIgnored private var seekTask: Task<Void, Never>?
     @ObservationIgnored private var eventsTask: Task<Void, Never>?
     @ObservationIgnored private var countdownTask: Task<Void, Never>?
@@ -410,7 +411,7 @@ final class PlayerModel: Identifiable {
         generation += 1
         wordTiming?.stop()
         wordTiming = nil
-        for task in [loadTask, seekTask, eventsTask, countdownTask, hideTask, stageTask, trickplayLoad?.task] { task?.cancel() }
+        for task in [loadTask, queueTask, seekTask, eventsTask, countdownTask, hideTask, stageTask, trickplayLoad?.task] { task?.cancel() }
         sideTasks.forEach { $0.cancel() }
         subtitleFix?.cancel()
         stopStream()
@@ -667,18 +668,35 @@ final class PlayerModel: Identifiable {
                 var full = try await library.metadata(ratingKey)
                 guard generation == self.generation else { return }
                 startTiming.mark(.metadata)
-                if queue == nil {
-                    queue = try? await library.createPlayQueue(for: full)
-                    startTiming.mark(.queue)
-                }
-                guard generation == self.generation else { return }
                 if let queued = queue?.items.first(where: { $0.ratingKey == full.ratingKey }) {
                     full.playQueueItemID = queued.playQueueItemID
+                } else if queue == nil {
+                    makeQueue(for: full)
                 }
                 await begin(full, generation: generation)
             } catch {
                 guard generation == self.generation, !(error is CancellationError) else { return }
                 fail(Self.message(error))
+            }
+        }
+    }
+
+    /// The play queue is made beside the start rather than before it: on the server it took 71–104 ms of
+    /// every start. Next, Previous and the timeline's queue item follow when it arrives.
+    private func makeQueue(for full: PlexMetadata) {
+        queueTask?.cancel()
+        queueTask = Task { [weak self] in
+            guard let self else { return }
+            guard let made = try? await library.createPlayQueue(for: full), !Task.isCancelled,
+                  queue == nil, item.ratingKey == full.ratingKey else { return }
+            queue = made
+            startTiming.mark(.queue)
+            hasNext = made.item(after: item) != nil
+            hasPreviousItem = made.item(before: item) != nil
+            nowPlaying?.setQueue(hasNext: hasNext, hasPrevious: hasPreviousItem)
+            if let id = made.items.first(where: { $0.ratingKey == full.ratingKey })?.playQueueItemID {
+                item.playQueueItemID = id
+                await reporter?.queued(as: id)
             }
         }
     }

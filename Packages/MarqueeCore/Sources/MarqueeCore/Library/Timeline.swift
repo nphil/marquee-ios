@@ -68,7 +68,7 @@ public struct TimelineCadence: Sendable {
 /// interval later.
 public actor TimelineReporter {
     private let library: PlexLibrary
-    private let item: PlexMetadata
+    private var item: PlexMetadata
     private let sessionIdentifier: String?
     private var cadence: TimelineCadence
 
@@ -77,6 +77,11 @@ public actor TimelineReporter {
         self.item = item
         self.sessionIdentifier = sessionIdentifier
         cadence = TimelineCadence(interval: interval)
+    }
+
+    /// The item's place in the play queue, which arrives after playback has started.
+    public func queued(as playQueueItemID: Int) {
+        item.playQueueItemID = playQueueItemID
     }
 
     /// - Parameters:
