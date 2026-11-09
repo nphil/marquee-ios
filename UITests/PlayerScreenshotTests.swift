@@ -82,12 +82,18 @@ final class PlayerAccessibilityScreenshots: XCTestCase {
 }
 
 private extension XCTestCase {
-    /// Paused mid-episode: the controls, the audio and subtitles menu, the More menu, Playback Info,
-    /// the episode list and stats for nerds.
+    /// Paused mid-episode: the controls on the phone's side and upright, the audio and subtitles menu,
+    /// the More menu, Playback Info, the episode list and stats for nerds.
     @MainActor
     func pausedFlow(mode: String, suffix: String) throws {
         let app = launchPlayer(at: 61, paused: true, mode: mode)
+        assertChrome(in: app)
         try snap("player-01-paused-\(suffix)")
+
+        XCUIDevice.shared.orientation = .portrait
+        try snap("player-07-portrait-\(suffix)")
+        assertChrome(in: app)
+        XCUIDevice.shared.orientation = .landscapeLeft
 
         tap("player.tracks", in: app)
         XCTAssertTrue(app.buttons["Off"].waitForExistence(timeout: 5), "No audio and subtitles menu")
@@ -109,7 +115,7 @@ private extension XCTestCase {
         waitFor("player.stats", in: app)
         let copy = app.buttons["player.stats.copy"]
         XCTAssertTrue(copy.exists, "No Copy button on the stats overlay")
-        for control in ["player.scrubber", "player.previous", "player.playPause"] {
+        for control in ["player.scrubber", "player.playPause", "player.tracks", "player.more"] {
             XCTAssertFalse(copy.frame.intersects(element(control, in: app).frame), "\(control) covers the stats Copy button")
         }
         try snap("player-06-stats-\(suffix)")
@@ -135,12 +141,29 @@ private extension XCTestCase {
         try snap("player-04-playback-info-diagnostics-\(suffix)")
         app.navigationBars["Playback Info"].buttons["Done"].tap()
 
-        tap("player.episodes", in: app)
+        tap("player.more", in: app)
+        let episodes = moreMenuItem("Episodes", in: app)
+        XCTAssertTrue(episodes.exists && episodes.isHittable, "No Episodes item in More")
+        episodes.tap()
         // The list opens on the playing episode, also when large text leaves room for one row.
         let playing = element("player.episode.212", in: app)
         XCTAssertTrue(playing.wait(for: \.isHittable, toEqual: true, timeout: 10), "The list did not open on episode 2")
         try snap("player-05-episodes-\(suffix)")
         app.navigationBars["Caminandes"].buttons["Done"].tap()
+    }
+
+    /// The chrome holds close, title, AirPlay, the transport, the scrubber, Tracks and More, every
+    /// control at least 44 pt at any text size; previous, next and the episode list live in More.
+    @MainActor
+    func assertChrome(in app: XCUIApplication) {
+        for control in ["player.close", "player.skipBack", "player.playPause", "player.skipForward", "player.tracks", "player.more"] {
+            let button = element(control, in: app)
+            XCTAssertTrue(button.waitForExistence(timeout: 5) && button.isHittable, "\(control) is not on screen")
+            XCTAssertGreaterThanOrEqual(min(button.frame.width, button.frame.height), 44, "\(control) is under 44 pt")
+        }
+        for moved in ["player.previous", "player.next", "player.episodes"] {
+            XCTAssertFalse(element(moved, in: app).exists, "\(moved) is still on the chrome")
+        }
     }
 
     /// Inside the intro while playing, the pill counts down and then skips by itself.

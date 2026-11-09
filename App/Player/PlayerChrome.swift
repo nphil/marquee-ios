@@ -1,10 +1,12 @@
 import AVKit
+import Combine
 import MarqueeCore
 import SwiftUI
 
-/// The controls over the picture (DESIGN §8.6): close, title, AirPlay and Picture in Picture on top; the
-/// transport in the middle; the scrubber, queue buttons and menus at the bottom. While the finger is
-/// on the scrubber everything but the scrubber fades, so the preview has the picture to itself.
+/// The controls over the picture (DESIGN §8.6): close, title and AirPlay on top; the transport in the
+/// middle; the scrubber, the tracks menu and More at the bottom. Everything else lives in More. While
+/// the finger is on the scrubber everything but the scrubber fades, so the preview has the picture to
+/// itself.
 struct PlayerChrome: View {
     let model: PlayerModel
     let frames: TrickplayFrames
@@ -86,16 +88,6 @@ struct PlayerChrome: View {
             }
 
             AirPlayButton()
-            if model.canPictureInPicture {
-                Button {
-                    model.togglePictureInPicture()
-                } label: {
-                    Image(systemName: "pip.enter")
-                }
-                .buttonStyle(PlayerButtonStyle())
-                .accessibilityLabel("Picture in Picture")
-                .accessibilityIdentifier("player.pip")
-            }
         }
     }
 
@@ -178,7 +170,6 @@ struct PlayerChrome: View {
             VStack(spacing: Space.s1) {
                 Scrubber(model: model, frames: frames)
                 HStack(spacing: Space.s3) {
-                    queueButtons
                     Spacer(minLength: 0)
                     TracksMenu(model: model)
                         .opacity(model.isScrubbing ? 0 : 1)
@@ -189,45 +180,6 @@ struct PlayerChrome: View {
         case .loading, .failed:
             EmptyView()
         }
-    }
-
-    @ViewBuilder
-    private var queueButtons: some View {
-        Group {
-            Button {
-                Haptics.impact(.light)
-                model.previous()
-            } label: {
-                Image(systemName: "backward.end.fill")
-            }
-            .buttonStyle(PlayerButtonStyle())
-            .disabled(!model.canGoBack)
-            .accessibilityLabel(model.time >= 5 || !model.hasPreviousItem ? "Restart" : "Previous episode")
-            .accessibilityIdentifier("player.previous")
-
-            Button {
-                Haptics.impact(.light)
-                model.next()
-            } label: {
-                Image(systemName: "forward.end.fill")
-            }
-            .buttonStyle(PlayerButtonStyle())
-            .disabled(!model.hasNext)
-            .accessibilityLabel("Next episode")
-            .accessibilityIdentifier("player.next")
-
-            if model.isEpisode {
-                Button {
-                    model.showsEpisodes = true
-                } label: {
-                    Image(systemName: "rectangle.stack")
-                }
-                .buttonStyle(PlayerButtonStyle())
-                .accessibilityLabel("Episodes")
-                .accessibilityIdentifier("player.episodes")
-            }
-        }
-        .opacity(model.isScrubbing ? 0 : 1)
     }
 }
 
@@ -266,8 +218,8 @@ struct Scrims: View {
     }
 }
 
-/// The one control size of the player: a 56 pt glass circle with a 26 pt semibold glyph. The prominent
-/// one (play and pause) is a solid ink fill with a canvas glyph. Dimmed when disabled.
+/// The one control size of the player: a `Size.control` glass circle with the player glyph. The
+/// prominent one (play and pause) is a solid ink fill with a canvas glyph. Dimmed when disabled.
 struct PlayerButtonStyle: ButtonStyle {
     var prominent = false
 
@@ -284,9 +236,9 @@ private struct PlayerButtonLabel: View {
 
     var body: some View {
         configuration.label
-            .font(.system(size: 26, weight: .semibold))
+            .modifier(PlayerGlyph())
             .foregroundStyle(prominent ? theme.canvas : theme.ink)
-            .frame(width: 56, height: 56)
+            .frame(width: Size.control, height: Size.control)
             .background(prominent ? theme.ink : theme.glass, in: Circle())
             .overlay {
                 if !prominent { Circle().strokeBorder(theme.edge, lineWidth: 1) }
@@ -294,37 +246,63 @@ private struct PlayerButtonLabel: View {
             .contentShape(Circle())
             .opacity(isEnabled ? 1 : 0.5)
             .pressed(configuration.isPressed, in: Circle())
+            .accessibilityShowsLargeContentViewer()
     }
 }
 
-/// The system AirPlay route picker in the player's glass circle; it prefers video receivers.
+/// Every player glyph, the route glyph included, is `Size.controlGlyph` semibold. It grows with
+/// Dynamic Type up to `Size.controlGlyphMax`, half the circle; the circles keep their size so the
+/// controls still fit a 375 pt-tall screen, and past the cap the large content viewer shows the glyph.
+private struct PlayerGlyph: ViewModifier {
+    @ScaledMetric(relativeTo: .body) private var size = Size.controlGlyph
+
+    func body(content: Content) -> some View {
+        content
+            .font(.system(size: min(size, Size.controlGlyphMax), weight: .semibold))
+            .imageScale(.medium)
+    }
+}
+
+/// AirPlay in the player's glass circle, its glyph drawn like every other control's and in accent while
+/// sound and picture go to a receiver. The system route picker lies over it, tinted clear, and takes
+/// the tap; it prefers video receivers.
 struct AirPlayButton: View {
     @Environment(\.theme) private var theme
+    @State private var routedAway = false
 
     var body: some View {
-        RoutePicker(tint: UIColor(theme.ink), active: UIColor(theme.accent))
-            .frame(width: 56, height: 56)
+        Image(systemName: "airplayvideo")
+            .modifier(PlayerGlyph())
+            .foregroundStyle(routedAway ? theme.accent : theme.ink)
+            .frame(width: Size.control, height: Size.control)
             .background(theme.glass, in: Circle())
             .overlay(Circle().strokeBorder(theme.edge, lineWidth: 1))
+            .accessibilityHidden(true)
+            .overlay { RoutePicker() }
             .accessibilityIdentifier("player.airplay")
+            .onAppear { routedAway = Self.isRoutedAway }
+            // Route changes arrive on a background queue.
+            .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification).receive(on: DispatchQueue.main)) { _ in
+                routedAway = Self.isRoutedAway
+            }
+    }
+
+    private static var isRoutedAway: Bool {
+        AVAudioSession.sharedInstance().currentRoute.outputs.contains { $0.portType == .airPlay }
     }
 }
 
 private struct RoutePicker: UIViewRepresentable {
-    let tint: UIColor
-    let active: UIColor
-
     func makeUIView(context: Context) -> AVRoutePickerView {
         let view = AVRoutePickerView()
         view.prioritizesVideoDevices = true
         view.backgroundColor = .clear
+        view.tintColor = .clear
+        view.activeTintColor = .clear
         return view
     }
 
-    func updateUIView(_ view: AVRoutePickerView, context: Context) {
-        view.tintColor = tint
-        view.activeTintColor = active
-    }
+    func updateUIView(_ view: AVRoutePickerView, context: Context) {}
 }
 
 /// The loading screen's middle: the arc and, a second in, what the start waits for.
@@ -450,15 +428,10 @@ struct TracksMenu: View {
     /// section's header, which left the audio and subtitle lists unnamed.
     @ViewBuilder
     private func menuContent(_ tracks: MediaTracks) -> some View {
-        if tracks.audio.count > 1 || model.enhancements.offered {
+        if tracks.audio.count > 1 {
             Section("Audio") {
-                if tracks.audio.count > 1 {
-                    ForEach(orderedAudio(tracks)) { track in
-                        choice(track.label, detail: detail(track.badges), value: Optional(track.id), selection: $model.audioPick)
-                    }
-                }
-                if model.enhancements.offered {
-                    enhancementRows(model.enhancements)
+                ForEach(orderedAudio(tracks)) { track in
+                    choice(track.label, detail: detail(track.badges), value: Optional(track.id), selection: $model.audioPick)
                 }
             }
         }
@@ -551,22 +524,6 @@ struct TracksMenu: View {
         }
     }
 
-    /// Boost dialog and Normalize loudness, shown only for a Plex Pass server; the reason they cannot
-    /// apply to this video stands under them.
-    @ViewBuilder
-    private func enhancementRows(_ state: PlayerModel.EnhancementState) -> some View {
-        enhancementToggle("Boost dialog", .boostDialog, state)
-        enhancementToggle("Normalize loudness", .normalizeLoudness, state)
-        if let text = state.unavailable ?? state.note {
-            Text(text)
-        }
-    }
-
-    private func enhancementToggle(_ title: String, _ enhancement: AudioEnhancements, _ state: PlayerModel.EnhancementState) -> some View {
-        Toggle(title, isOn: Binding { state.asked.contains(enhancement) } set: { _ in model.toggleEnhancement(enhancement) })
-            .disabled(state.unavailable != nil)
-    }
-
     /// Searches for another subtitle, with Plex's own agents and with Bazarr once it is set up, and the
     /// way out of a subtitle that doesn't match the video.
     private var subtitleFixes: some View {
@@ -639,12 +596,51 @@ struct TracksMenu: View {
     }
 }
 
-/// Quality, speed, aspect, playback info and the stats overlay.
+/// Everything the chrome keeps off its edges (DESIGN §8.6): the previous, episodes and next row, Picture
+/// in Picture, aspect, quality and speed, the audio enhancements, playback info and stats for nerds.
 struct MoreMenu: View {
     @Bindable var model: PlayerModel
 
     var body: some View {
         Menu {
+            Section {
+                ControlGroup {
+                    Button {
+                        Haptics.impact(.light)
+                        model.previous()
+                    } label: {
+                        Label(model.time >= 5 || !model.hasPreviousItem ? "Restart" : "Previous", systemImage: "backward.end.fill")
+                    }
+                    .disabled(!model.canGoBack)
+                    .accessibilityIdentifier("player.previous")
+                    if model.isEpisode {
+                        Button {
+                            model.showsEpisodes = true
+                        } label: {
+                            Label("Episodes", systemImage: "rectangle.stack")
+                        }
+                        .accessibilityIdentifier("player.episodes")
+                    }
+                    Button {
+                        Haptics.impact(.light)
+                        model.next()
+                    } label: {
+                        Label("Next", systemImage: "forward.end.fill")
+                    }
+                    .disabled(!model.hasNext)
+                    .accessibilityIdentifier("player.next")
+                }
+                if model.canPictureInPicture {
+                    Button {
+                        model.togglePictureInPicture()
+                    } label: {
+                        Label("Picture in Picture", systemImage: "pip.enter")
+                    }
+                    .accessibilityIdentifier("player.pip")
+                }
+            }
+            .onAppear { model.menuOpened() }
+            .onDisappear { model.menuClosed() }
             Section {
                 Picker(selection: $model.aspectPick) {
                     ForEach(VideoAspect.allCases, id: \.self) { aspect in
@@ -656,8 +652,6 @@ struct MoreMenu: View {
                 }
                 .pickerStyle(.menu)
             }
-            .onAppear { model.menuOpened() }
-            .onDisappear { model.menuClosed() }
             Section {
                 Picker(selection: $model.qualityPick) {
                     ForEach(VideoQuality.allCases, id: \.self) { quality in
@@ -683,6 +677,15 @@ struct MoreMenu: View {
                 }
                 .pickerStyle(.menu)
                 .accessibilityIdentifier("player.speed")
+                if model.enhancements.offered {
+                    Menu {
+                        enhancementRows(model.enhancements)
+                    } label: {
+                        Label("Audio Enhancements", systemImage: "waveform")
+                        Text(enhancementValue)
+                    }
+                    .accessibilityIdentifier("player.enhancements")
+                }
             }
             Section {
                 Button {
@@ -701,6 +704,29 @@ struct MoreMenu: View {
         .buttonStyle(PlayerButtonStyle())
         .accessibilityLabel("More")
         .accessibilityIdentifier("player.more")
+    }
+
+    /// Boost dialog and Normalize loudness, shown only for a Plex Pass server; the reason they cannot
+    /// apply to this video stands under them.
+    @ViewBuilder
+    private func enhancementRows(_ state: PlayerModel.EnhancementState) -> some View {
+        enhancementToggle("Boost dialog", .boostDialog, state)
+        enhancementToggle("Normalize loudness", .normalizeLoudness, state)
+        if let text = state.unavailable ?? state.note {
+            Text(text)
+        }
+    }
+
+    private func enhancementToggle(_ title: String, _ enhancement: AudioEnhancements, _ state: PlayerModel.EnhancementState) -> some View {
+        Toggle(title, isOn: Binding { state.asked.contains(enhancement) } set: { _ in model.toggleEnhancement(enhancement) })
+            .disabled(state.unavailable != nil)
+    }
+
+    /// The enhancements asked for, or Off.
+    private var enhancementValue: String {
+        let all: [(AudioEnhancements, String)] = [(.boostDialog, "Boost dialog"), (.normalizeLoudness, "Normalize loudness")]
+        let asked = all.filter { model.enhancements.asked.contains($0.0) }.map { $0.1 }
+        return asked.isEmpty ? "Off" : asked.joined(separator: ", ")
     }
 
     static let speeds: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]

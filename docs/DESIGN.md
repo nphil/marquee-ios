@@ -355,12 +355,12 @@ Sign-in is Plex's PIN flow: the button opens plex.tv in a browser sheet and the 
 
 ```
 +---------------------------------------------------------------+
-| (v)  Title                              S2 E5   (airplay) (pip) |
+| (v)  Title                              S2 E5         (airplay) |
 |                                                               |
 |              (<<10)          (> / ||)          (10>>)         |
 |                                                               |
 | 0:42:10  =====================o--------------------  -1:03:22 |
-| (|<) (>|)                                      (tracks) (...)  |
+|                                                (tracks) (...)  |
 +---------------------------------------------------------------+
 ```
 
@@ -375,13 +375,26 @@ Round brackets are 56 pt glass buttons; the picture runs behind everything.
 - The chrome is always in the dark colour scheme, so glass over video stays dark in every theme. Panels that open from the player use the theme's own mode.
 - Subtitles lift above the bottom chrome while it shows; they are never hidden behind it.
 
-**Chrome** (one control size: 56 pt circles, glyphs 26 pt semibold; play/pause is a solid white fill with a dark glyph)
+**Chrome** (one control size: 56 pt circles, `Size.control`; every glyph, AirPlay's included, 22 pt semibold, `Size.controlGlyph`, 40% of the circle; play/pause is a solid white fill with a dark glyph). Glyphs grow with Dynamic Type to 28 pt (`Size.controlGlyphMax`) and stop there; the circles keep 56 pt so the chrome fits a 375 pt-tall phone on its side, and past the cap a long press shows the large content viewer. Each edge carries at most three controls; everything else is in More.
 
 1. **Scrims:** black gradients, .55 or more at the very top and bottom edges, fading to clear. Glass clusters sit on them (clear glass over media with at least 35% dimming, HIG Materials).
-2. **Top row:** Close (`chevron.down`) leading; the title block in the middle (title, "S2 · E5" in white at 70%); trailing AirPlay (`airplayvideo`, system route picker) and Picture in Picture (`pip.enter`).
+2. **Top row:** Close (`chevron.down`) leading; the title block in the middle (title, "S2 · E5" in white at 70%); trailing AirPlay (`airplayvideo`). The glyph is drawn like the others and turns accent while sound and picture go to a receiver; the system route picker lies over it, tinted clear, and takes the tap.
 3. **Centre transport:** skip back (`gobackward.N`), Play/Pause, skip forward (`goforward.N`), with N from the skip setting (5, 10, 15, 30 or 60 s, `B:§4`; default 10). Glyph names to check in the SF Symbols app.
 4. **Scrubber:** a 6 pt readable track (§5.1) with a 56 pt-tall hit area and a white thumb; elapsed time leading, remaining time trailing (Caption, tabular). Dragging shows, at touch-down and without a fade, a 224 pt, 16:9 scene thumbnail with the time under it, 12 pt above the thumb and centred on it; it is clamped 16 pt inside the safe area at both ends of the track. It ticks once per preview frame, and moving the finger away vertically slows the scrub (`S:Features/Player/PlayerControlsView.swift:513-534`). Intro and credits ranges from the server cut the track into segments, a 2 pt gap at each edge, with an accessible label (`B:§2`).
-5. **Bottom row:** Previous (`backward.end.fill`) and Next (`forward.end.fill`) leading; Tracks (`captions.bubble`) and More (`ellipsis`) trailing. Previous restarts the item when 5 s or more in, otherwise goes to the previous item (`B:§4`). A button with no target is dimmed, and VoiceOver reads "unavailable" (`B:§4`, `L:74`). More: Aspect (Fit, Fill, Original, Zoom, Stretch, `B:§4`), Playback Info, Stats for Nerds.
+5. **Bottom row:** Tracks (`captions.bubble`) and More (`ellipsis`) trailing.
+6. **More menu**, nearest the button first: a row of Previous (`backward.end.fill`), Episodes (`rectangle.stack`, episodes only) and Next (`forward.end.fill`); Picture in Picture (`pip.enter`) when the video allows it; Aspect (Fit, Fill, Original, Zoom, Stretch, `B:§4`); Quality; Playback Speed; Audio Enhancements (Boost dialog, Normalize loudness; Plex Pass servers only); Playback Info; Stats for Nerds. Previous restarts the item when 5 s or more in, otherwise goes to the previous item (`B:§4`). An item with no target is dimmed, and VoiceOver reads "unavailable" (`B:§4`, `L:74`).
+
+What moved where when the chrome went to three controls per edge:
+
+| Control | Was | Now |
+|---|---|---|
+| Picture in Picture | top row | More |
+| Previous, Episodes, Next | bottom row, leading | More, first row |
+| Boost dialog, Normalize loudness | Tracks › Audio | More › Audio Enhancements |
+| AirPlay glyph | the route picker's own, smaller and lighter | the player glyph |
+| Glyph size | 26 pt, fixed | 22 pt, scaling to 28 pt |
+
+On the smallest iPhones (375 × 667 pt), upright, the top row leaves the title 207 pt (139 pt before), the bottom row's two buttons take 124 of 343 pt (328 before), and the transport takes 248 pt.
 
 **Stats for nerds:** More › Stats for Nerds, or a long press on the title, lays a glass panel over the top leading corner, refreshed twice a second: the route and why, the server address (local, remote or relay, then its IP, read out of a plex.direct name, and the port when it is not 32400), file, video, picture (dynamic range and whether this iPhone decodes it in hardware), audio (copied or converted), subtitles; then display size, network, buffer, dropped frames and stalls, player errors, the remux lead or the server's transcode (speed, throttling, decisions, GPU), heat and memory. Two columns in landscape. Only its Copy button takes touches, so the picture's gestures still work through it, and it sits under the chrome and offers, so the controls stay legible over it. Copy sits at the top beside the lines, where the transport and bottom row never cover it, even when large text runs the panel down behind them. Copy, and Playback Info's Copy Diagnostics, put the same lines on the clipboard with the engine's recent measurements and this iPhone's hardware report, for bug reports.
 

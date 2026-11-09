@@ -20,6 +20,12 @@ enum Size {
     static let rowMin: CGFloat = 56
     /// Minimum poster and theme-tile width in an adaptive grid: 3 columns at 390 pt, 2 at 320 pt.
     static let gridMin: CGFloat = 104
+    /// The player's round controls (DESIGN §8.6).
+    static let control: CGFloat = 56
+    /// A player control's glyph at the default text size: 40% of the circle.
+    static let controlGlyph: CGFloat = 22
+    /// The most Dynamic Type grows a player glyph: half the circle.
+    static let controlGlyphMax: CGFloat = 28
 }
 
 enum Radius {

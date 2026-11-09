@@ -55,10 +55,10 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Playback speed 0.5x–2x | Done | More menu › Playback Speed: 0.5×, 0.75×, Normal, 1.25×, 1.5×, 1.75×, 2×; back to Normal for each new item; pitch kept. | local (`AVPlayer.defaultRate`) |
 | Quality picker in player | Done | More menu › Quality (Original, 20, 12, 8, 4, 2 Mbps); "Original · Converted" while the server re-encodes. Picking one also sets the default. | `maxVideoBitrate`, `videoResolution` on transcode |
 | Default quality ceiling (Settings) | Done | Video & Playback › Default Quality; Forced Direct Play reads "original quality". | local setting |
-| Normalize loudness / Boost dialog (Plex Pass) | Done | Audio menu toggles, shown only for a Plex Pass server; each reason they cannot apply is shown. The server reworks the sound on a copy of the video; on-device processing is not used because AVPlayer gives no audio tap on HLS streams. | `boostDialog=1`, `normalizeLoudness=1` on transcode; `Stream.canNormalizeLoudness` |
+| Normalize loudness / Boost dialog (Plex Pass) | Done | More › Audio Enhancements toggles, shown only for a Plex Pass server; each reason they cannot apply is shown. The server reworks the sound on a copy of the video; on-device processing is not used because AVPlayer gives no audio tap on HLS streams. | `boostDialog=1`, `normalizeLoudness=1` on transcode; `Stream.canNormalizeLoudness` |
 | Stats for Nerds | Done | Route, stream and bitrate overlay. | local [code] |
 | Playback Info sheet | Done | Route, subtitle track, bitrate, frame rate. | local [code] |
-| AirPlay / Picture in Picture | Done | PiP on phone; AirPlay stream handling. | AVKit [code] |
+| AirPlay / Picture in Picture | Done | AirPlay in the top row; PiP on phone from More; AirPlay stream handling. | AVKit [code] |
 | Resume position | Done | Starts at saved offset. | `viewOffset` [code] |
 | Watched threshold | Done | Marks watched near the end. | timeline [code] |
 | Remote-control focus | N/A | TV remote focus. | — |
