@@ -21,10 +21,20 @@
       "appPermissions": {
         "entitlements": [],
         "privacy": {
-          "NSLocalNetworkUsageDescription": "Marquee looks for Plex servers on the local network and plays from them, and finds Chromecasts there while its Chromecast plugin is on."
+          "NSCameraUsageDescription": "Marquee scans the code a LumaTV shows to pair the remote with it.",
+          "NSLocalNetworkUsageDescription": "Marquee looks for Plex servers and LumaTV on the local network, plays from the servers and works as the TV's remote, and finds Chromecasts there while its Chromecast plugin is on."
         }
       },
       "versions": [
+        {
+          "version": "0.1.25",
+          "buildVersion": "0.1.25",
+          "date": "2026-11-09T13:43:11Z",
+          "localizedDescription": "Unsigned IPA, built from 035bc97.",
+          "downloadURL": "https://github.com/nphil/marquee-ios/releases/download/v0.1.25/Marquee.ipa",
+          "size": 19805685,
+          "minOSVersion": "27.0"
+        },
         {
           "version": "0.1.24",
           "buildVersion": "0.1.24",
