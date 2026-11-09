@@ -108,8 +108,7 @@ jobs:
   app:
     name: App
     runs-on: xcode-27
-    # The whole job ran 79 min on 2026-11-07 once the player, Live TV and Home Rows UI tests were all in.
-    timeout-minutes: 110
+    timeout-minutes: 30
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -214,6 +213,73 @@ jobs:
           path: Marquee.ipa
           if-no-files-found: error
 
+  # The UI tests are split across a matrix of runners, one simulator each. A runner has 3 cores and 7 GB;
+  # a second simulator on it doubled every test's time and hit the 15 s waits (measured 2026-11-09), and
+  # the runner pool holds 4 jobs at once (Core, App and Live take three of them for the first minutes), so
+  # a fifth shard waits for a whole shard to end. The serial run took
+  # 58 min plus 17 min for the accessibility pass. tools/ui-shards.py reads the tests from UITests/ and
+  # balances them, so a new test joins a shard on its own. A shard runs its accessibility tests after
+  # its standard ones.
+  plan:
+    name: Plan UI tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # The Increase Contrast and accessibility text pass is skipped on a branch whose change leaves the
+      # app, its tests, its resources and the CI itself alone; main always runs it, so no release ships
+      # without it. If the comparison with main fails, the pass runs.
+      - name: Shard the tests
+        id: plan
+        run: |
+          FLAGS=""
+          if [ "$GITHUB_REF" != refs/heads/main ] \
+             && git diff --quiet origin/main...HEAD -- App UITests Resources Packages project.yml tools .github; then
+            FLAGS="--no-accessibility"
+            echo "No app, test or CI files changed: the accessibility pass is skipped."
+          fi
+          echo "matrix=$(python3 tools/ui-shards.py 4 $FLAGS)" >> "$GITHUB_OUTPUT"
+
+  ui:
+    name: UI tests ${{ matrix.shard }}
+    needs: plan
+    runs-on: xcode-27
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    env:
+      STANDARD: ${{ matrix.standard }}
+      ACCESSIBILITY: ${{ matrix.accessibility }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Generate project
+        run: |
+          # Homebrew's own update and cleanup are skipped: with a simulator booting, this step took 3-6 min.
+          HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install xcodegen
+          xcodegen generate
+
+      - name: Resolve Swift packages
+        run: |
+          for attempt in 1 2 3; do
+            if xcodebuild -resolvePackageDependencies \
+                 -project Marquee.xcodeproj \
+                 -scheme Marquee \
+                 -clonedSourcePackagesDirPath build/SourcePackages; then
+              exit 0
+            fi
+            echo "Package resolution failed (attempt $attempt of 3)."
+            sleep $((attempt * 20))
+          done
+          exit 1
+
+      # The first boot takes minutes; started now, it finishes while the project builds.
       - name: Boot iPhone 18 Pro simulator
         id: simulator
         run: |
@@ -227,10 +293,21 @@ jobs:
                           raise SystemExit
           raise SystemExit("No iPhone 18 Pro simulator on iOS 27.0")
           ')
-          xcrun simctl bootstatus "$UDID" -b
-          xcrun simctl ui "$UDID" appearance light
-          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
+          xcrun simctl boot "$UDID"
           echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+
+      - name: Build for testing
+        env:
+          UDID: ${{ steps.simulator.outputs.udid }}
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project Marquee.xcodeproj \
+            -scheme Marquee \
+            -destination "id=$UDID" \
+            -derivedDataPath build/DD-sim \
+            -clonedSourcePackagesDirPath build/SourcePackages \
+            2>&1 | tee xcodebuild-build.log | xcbeautify
 
       # A failed test runs once more: the xcode-27 preview simulator sometimes stalls UI queries or app
       # launch for 30+ s under load (2026-11-07: testProfiles launch timeout, testProfilesDawn query
@@ -240,74 +317,79 @@ jobs:
           UDID: ${{ steps.simulator.outputs.udid }}
         run: |
           mkdir -p screens
-          set +e
-          TEST_RUNNER_SCREENS_DIR="$PWD/screens" xcodebuild test \
-            -project Marquee.xcodeproj \
-            -scheme Marquee \
-            -destination "id=$UDID" \
-            -derivedDataPath build/DD-sim \
-            -clonedSourcePackagesDirPath build/SourcePackages \
-            -resultBundlePath build/UITests.xcresult \
-            -retry-tests-on-failure -test-iterations 2 \
-            -skip-testing:MarqueeUITests/ScreenshotTests/testAccessibilitySettings \
-            -skip-testing:MarqueeUITests/AccountAccessibilityScreenshots \
-            -skip-testing:MarqueeUITests/BrowseAccessibilityScreenshots \
-            -skip-testing:MarqueeUITests/LiveTVAccessibilityScreenshots \
-            -skip-testing:MarqueeUITests/HomeRowsAccessibilityScreenshots \
-            -skip-testing:MarqueeUITests/PlayerAccessibilityScreenshots \
-            -skip-testing:MarqueeUITests/HeaderAccessibilityScreenshots \
-            2>&1 | tee xcodebuild-test.log | xcbeautify
-          STATUS=${PIPESTATUS[0]}
-          set -e
-          if grep -qE ':[0-9]+:[0-9]+: error: ' xcodebuild-test.log; then
-            grep -E ':[0-9]+:[0-9]+: error: ' xcodebuild-test.log | sort -u
-            grep -E '\.swift:[0-9]+:[0-9]+: error: ' xcodebuild-test.log | sort -u \
-              | sed -E "s#^${GITHUB_WORKSPACE}/##" \
-              | sed -E 's#^(.+):([0-9]+):([0-9]+): error: (.*)$#::error file=\1,line=\2,col=\3::\4#'
-          fi
-          exit "$STATUS"
+          xcrun simctl bootstatus "$UDID" -b
+          xcrun simctl ui "$UDID" appearance light
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
 
-      - name: Screenshots with Increase Contrast and accessibility text size
-        env:
-          UDID: ${{ steps.simulator.outputs.udid }}
-        run: |
-          set -o pipefail
-          xcrun simctl ui "$UDID" increase_contrast enabled
-          xcrun simctl ui "$UDID" content_size accessibility-large
-          TEST_RUNNER_SCREENS_DIR="$PWD/screens" xcodebuild test-without-building \
-            -project Marquee.xcodeproj \
-            -scheme Marquee \
-            -destination "id=$UDID" \
-            -derivedDataPath build/DD-sim \
-            -clonedSourcePackagesDirPath build/SourcePackages \
-            -resultBundlePath build/UITests-accessibility.xcresult \
-            -retry-tests-on-failure -test-iterations 2 \
-            -only-testing:MarqueeUITests/ScreenshotTests/testAccessibilitySettings \
-            -only-testing:MarqueeUITests/AccountAccessibilityScreenshots \
-            -only-testing:MarqueeUITests/BrowseAccessibilityScreenshots \
-            -only-testing:MarqueeUITests/LiveTVAccessibilityScreenshots \
-            -only-testing:MarqueeUITests/HomeRowsAccessibilityScreenshots \
-            -only-testing:MarqueeUITests/PlayerAccessibilityScreenshots \
-            -only-testing:MarqueeUITests/HeaderAccessibilityScreenshots \
-            2>&1 | xcbeautify
+          FAILED=0
+          run_pass() {
+            NAME=$1
+            TESTS=$2
+            if [ -z "$TESTS" ]; then return 0; fi
+            FLAGS=()
+            for TEST in $TESTS; do FLAGS+=("-only-testing:MarqueeUITests/$TEST"); done
+            set +e
+            TEST_RUNNER_SCREENS_DIR="$PWD/screens" xcodebuild test-without-building \
+              -project Marquee.xcodeproj \
+              -scheme Marquee \
+              -destination "id=$UDID" \
+              -derivedDataPath build/DD-sim \
+              -clonedSourcePackagesDirPath build/SourcePackages \
+              -resultBundlePath "build/UITests-$NAME.xcresult" \
+              -retry-tests-on-failure -test-iterations 2 \
+              "${FLAGS[@]}" \
+              2>&1 | tee "xcodebuild-test-$NAME.log" | xcbeautify
+            STATUS=${PIPESTATUS[0]}
+            set -e
+            if grep -qE ':[0-9]+:[0-9]+: error: ' "xcodebuild-test-$NAME.log"; then
+              grep -E ':[0-9]+:[0-9]+: error: ' "xcodebuild-test-$NAME.log" | sort -u
+              grep -E '\.swift:[0-9]+:[0-9]+: error: ' "xcodebuild-test-$NAME.log" | sort -u \
+                | sed -E "s#^${GITHUB_WORKSPACE}/##" \
+                | sed -E 's#^(.+):([0-9]+):([0-9]+): error: (.*)$#::error file=\1,line=\2,col=\3::\4#'
+            fi
+            if [ "$STATUS" -ne 0 ]; then FAILED=1; fi
+          }
+
+          run_pass standard "$STANDARD"
+          if [ -n "$ACCESSIBILITY" ]; then
+            xcrun simctl ui "$UDID" increase_contrast enabled
+            xcrun simctl ui "$UDID" content_size accessibility-large
+          fi
+          run_pass accessibility "$ACCESSIBILITY"
+          exit "$FAILED"
 
       - uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: screens
+          name: screens-${{ matrix.shard }}
           path: screens/
           if-no-files-found: warn
 
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
-          name: UITests-xcresult
+          name: UITests-xcresult-${{ matrix.shard }}
           path: build/UITests*.xcresult
           if-no-files-found: ignore
 
+  # One `screens` artifact with every screenshot, as when a single job took them all.
+  screens:
+    name: Screenshots
+    needs: ui
+    if: always() && needs.ui.result != 'skipped'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/upload-artifact/merge@v7
+        with:
+          name: screens
+          pattern: screens-*
+          delete-merged: true
+          if-no-files-found: warn
+
   release:
     name: Release
-    needs: [core, live, app]
+    needs: [core, live, app, ui]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
