@@ -113,4 +113,30 @@ struct CastTests {
         #expect(try await library.transientToken() == "transient-abc")
         #expect(await transport.requests(to: "/security/token").count == 1)
     }
+
+    @Test func progressRunsOnWhilePlayingAndHoldsOtherwise() {
+        var progress = CastProgress(startingAt: 600, replacing: nil, now: 0)
+        #expect(progress.state == .buffering)
+        #expect(progress.position(at: 5) == 600)
+        #expect(progress.update(CastStatus(mediaSessionID: 1, player: .playing, position: 601, rate: 1), now: 10) == nil)
+        #expect(progress.state == .playing)
+        #expect(progress.position(at: 14) == 605)
+        _ = progress.update(CastStatus(mediaSessionID: 1, player: .paused, position: 606), now: 15)
+        #expect(progress.state == .paused)
+        #expect(progress.position(at: 40) == 606)
+    }
+
+    @Test func progressIgnoresTheReplacedItemAndReportsHowItsOwnEnded() {
+        var progress = CastProgress(startingAt: 0, replacing: 7, now: 0)
+        #expect(progress.update(CastStatus(mediaSessionID: 7, player: .idle(.interrupted), position: 50), now: 1) == nil)
+        #expect(progress.state == .buffering)
+        _ = progress.update(CastStatus(mediaSessionID: 8, player: .playing, position: 0), now: 2)
+        #expect(progress.update(CastStatus(mediaSessionID: 8, player: .idle(.finished), position: 0), now: 3) == .finished)
+        #expect(progress.state == .stopped)
+
+        var failed = CastProgress(startingAt: 0, replacing: 7, now: 0)
+        #expect(failed.update(CastStatus(mediaSessionID: 8, player: .idle(.error), position: 0), now: 1) == .failed)
+        var stopped = CastProgress(startingAt: 0, replacing: nil, now: 0)
+        #expect(stopped.update(CastStatus(mediaSessionID: 1, player: .idle(.cancelled), position: 0), now: 1) == .stopped)
+    }
 }
