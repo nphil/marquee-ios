@@ -179,6 +179,14 @@ struct PlayerView: View {
             skip(side)
             return
         }
+        // A still picture invites taps to wake it; while playback waits on data they bring the controls
+        // and never skip.
+        if model.isStalled {
+            tapTask?.cancel()
+            lastTap = nil
+            model.showChrome()
+            return
+        }
         if let last = lastTap, now.timeIntervalSince(last.at) < 0.3, last.side == side {
             tapTask?.cancel()
             lastTap = nil

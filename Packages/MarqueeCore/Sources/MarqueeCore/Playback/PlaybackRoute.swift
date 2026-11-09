@@ -150,6 +150,16 @@ public enum VideoQuality: Int, Sendable, Hashable, Codable, CaseIterable {
         guard let kbps = maxBitrateKbps, let frame else { return "Original" }
         return "\(kbps / 1000) Mbps \(frame.height)p"
     }
+
+    /// What a long wait on the network offers: the highest preset at or below half the rate playing now,
+    /// the file's own (`mediaKbps`) or this ceiling, whichever is lower. Nil when none is that low or the
+    /// rate is unknown.
+    public func lower(mediaKbps: Int?) -> VideoQuality? {
+        guard let rate = [mediaKbps, maxBitrateKbps].compactMap({ $0 }).min() else { return nil }
+        return Self.allCases
+            .filter { $0.maxBitrateKbps.map { 2 * $0 <= rate } ?? false }
+            .max { $0.rawValue < $1.rawValue }
+    }
 }
 
 /// Plex Pass audio processing the server applies while it converts the audio. Either one needs the

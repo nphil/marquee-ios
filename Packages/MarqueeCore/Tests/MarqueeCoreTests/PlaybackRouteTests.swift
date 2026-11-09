@@ -258,6 +258,15 @@ struct PlaybackRouteTests {
         #expect(Self.route(large, limits: RouteLimits(phoneOnly: true, quality: .mbps8)).kind == .directPlay)
     }
 
+    @Test func aLowerQualityHalvesTheRatePlayingNow() {
+        #expect(VideoQuality.original.lower(mediaKbps: 11_200) == .mbps4)
+        #expect(VideoQuality.original.lower(mediaKbps: 40_000) == .mbps20)
+        // Under a ceiling the file is above, the ceiling is the rate playing.
+        #expect(VideoQuality.mbps8.lower(mediaKbps: 40_000) == .mbps4)
+        #expect(VideoQuality.mbps4.lower(mediaKbps: 3_000) == nil)
+        #expect(VideoQuality.original.lower(mediaKbps: nil) == nil)
+    }
+
     @Test func serverReasonsStreamFromTheServerCopyingTheVideo() throws {
         let file = try Self.file("mp4", bitrate: 20_000)
 

@@ -15,8 +15,8 @@ import re
 import sys
 
 # Seconds per test as measured in CI on the 3-core runner (run 42559038250, 2026-11-09; the remote's from run
-# 42614908575). A test that is not listed gets the default, so a new test is placed roughly until its number
-# is added here.
+# 42614908575, the network wait's from run 42688112822). A test that is not listed gets the default, so a new
+# test is placed roughly until its number is added here.
 SECONDS = {
     "AccountAccessibilityScreenshots/testProfiles": 65,
     "AccountAccessibilityScreenshots/testSettings": 233,
@@ -74,6 +74,7 @@ SECONDS = {
     "LiveTVScreenshotTests/testPlayerRosePine": 79,
     "LiveTVScreenshotTests/testRecordingsDawn": 86,
     "LiveTVScreenshotTests/testRecordingsRosePine": 79,
+    "PlayerAccessibilityScreenshots/testNetworkWait": 43,
     "PlayerAccessibilityScreenshots/testPausedControlsAndPanels": 75,
     "PlayerAccessibilityScreenshots/testSkipIntro": 22,
     "PlayerAccessibilityScreenshots/testUpNext": 31,
@@ -81,6 +82,7 @@ SECONDS = {
     "PlayerRouteMenuScreenshots/testRouteMenuLandscape": 40,
     "PlayerRouteMenuScreenshots/testRouteMenuPortrait": 40,
     "PlayerAccessibilityScreenshots/testRouteMenu": 45,
+    "PlayerScreenshotTests/testNetworkWaitOffersALowerQuality": 33,
     "PlayerScreenshotTests/testPanelsInLightTheme": 35,
     "PlayerScreenshotTests/testPausedControlsAndPanels": 66,
     "PlayerScreenshotTests/testScrubPreviewFollowsTheThumb": 39,

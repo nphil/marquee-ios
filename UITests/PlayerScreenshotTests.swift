@@ -20,6 +20,11 @@ final class PlayerScreenshotTests: XCTestCase {
         try skipIntroFlow(suffix: "rose-pine")
     }
 
+    @MainActor
+    func testNetworkWaitOffersALowerQuality() throws {
+        try networkWaitFlow(suffix: "rose-pine")
+    }
+
     /// "Watch Intro" stops the countdown; Skip Intro stays as a plain button. The offer drops to the
     /// bottom edge when the controls hide 3 s into playback, and a loaded runner can take several
     /// seconds to find the button, so the countdown is 20 s. The intro ends 28 s after the start, so
@@ -99,6 +104,11 @@ final class PlayerAccessibilityScreenshots: XCTestCase {
     @MainActor
     func testSkipIntro() throws {
         try skipIntroFlow(suffix: "ax")
+    }
+
+    @MainActor
+    func testNetworkWait() throws {
+        try networkWaitFlow(suffix: "ax")
     }
 
     @MainActor
@@ -208,6 +218,31 @@ private extension XCTestCase {
         XCTAssertTrue(element("player.watchIntro", in: app).exists, "No countdown: Watch Intro is missing")
         try snap("player-09-skip-intro-\(suffix)")
         XCTAssertTrue(skip.waitForNonExistence(timeout: 8), "The intro was not skipped after the countdown")
+    }
+
+    /// Playback that waits on data for good: "Waiting for the network" under the ring after 2 s, the
+    /// lower-quality offer after 10 s (the caption gives way to it), and, once taken, the new stream's own
+    /// wait and the More menu showing the quality it took (8 Mbps file → 4 Mbps).
+    @MainActor
+    func networkWaitFlow(suffix: String) throws {
+        let app = launchPlayer(at: 61, paused: false, mode: "dark", stall: true)
+        waitFor("player.networkWait", in: app)
+        try snap("player-40-network-wait-\(suffix)")
+        let offer = element("player.lowerQuality", in: app)
+        XCTAssertTrue(offer.waitForExistence(timeout: 15), "No lower-quality offer after 10 s of waiting")
+        try snap("player-41-lower-quality-\(suffix)")
+        offer.tap()
+        // The stream at the lower quality waits too, which keeps the controls up.
+        XCTAssertTrue(offer.waitForNonExistence(timeout: 5), "The offer stayed after it was taken")
+        waitFor("player.networkWait", in: app)
+        tap("player.more", in: app)
+        let picked = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS '4 Mbps 720p'")).firstMatch
+        let quality = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Quality'")).firstMatch
+        XCTAssertTrue(quality.waitForExistence(timeout: 5), "No Quality item in the More menu")
+        let shown = "\(quality.label) \(quality.value as? String ?? "")"
+        XCTAssertTrue(picked.exists || shown.contains("4 Mbps 720p"), "The More menu shows \(shown), not 4 Mbps 720p")
+        try snap("player-42-lower-quality-more-\(suffix)")
+        dismissMenu(in: app)
     }
 
     /// The scrub preview with the scrubber held mid-drag at the start, middle and end of the track.
@@ -407,11 +442,11 @@ private extension XCTestCase {
     /// Opens the player on episode 212 at `seconds` with the phone on its side, and waits until it
     /// has landed there. `introSkipDelay` overrides the profile's intro countdown for this launch;
     /// `bazarr` sets up the fake Bazarr; `scrub` holds the scrubber at that fraction; `cast` turns the
-    /// Chromecast plugin on with FakeCast's receiver.
+    /// Chromecast plugin on with FakeCast's receiver; `stall` keeps playback waiting on data.
     @MainActor
     func launchPlayer(
         at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, bazarr: Bool = false, speechDock: Bool = false,
-        scrub: Double? = nil, cast: Bool = false
+        scrub: Double? = nil, cast: Bool = false, stall: Bool = false
     ) -> XCUIApplication {
         XCUIDevice.shared.orientation = .landscapeLeft
         // A failed step ends the test early; the next test still has to start upright.
@@ -430,6 +465,7 @@ private extension XCTestCase {
         if bazarr { arguments += ["-marquee.uitest.bazarr", "http://bazarr.local:6767"] }
         if let scrub { arguments += ["-marquee.uitest.scrub", String(scrub)] }
         if cast { arguments += ["-marquee.uitest.cast", "YES"] }
+        if stall { arguments += ["-marquee.uitest.stall", "YES"] }
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", light: "paper", arguments: arguments, waitingFor: nil)
         // Up Next hides the transport, so whichever control shows first means the player is up.
         // The scrub hold hides the transport, so the preview stands for it.

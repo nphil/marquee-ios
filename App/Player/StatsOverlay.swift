@@ -219,6 +219,10 @@ enum PlayerStats {
             ].compactMap { $0 }
             lines.append(Line("Remux", parts.joined(separator: " · ")))
         }
+        if let recovered = model.recoveries {
+            let ahead = recovered.ahead.formatted(.number.precision(.fractionLength(1)))
+            lines.append(Line("Recovered", "\(recovered.count) · last at \(clockText(recovered.at)), \(recovered.cause.rawValue), \(ahead) s ahead"))
+        }
         if let session = model.transcodeSession {
             lines.append(Line("Transcode", server?.transcode.map(summary) ?? "session \(session.prefix(8))"))
         }

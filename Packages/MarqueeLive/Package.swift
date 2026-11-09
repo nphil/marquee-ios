@@ -14,7 +14,7 @@ let package = Package(
     ],
     dependencies: [
         // The same pin as the app's VideoEngine, so both resolve to one checkout.
-        .package(url: "https://github.com/nphil/stashy-videoengine.git", exact: "2.0.1"),
+        .package(url: "https://github.com/nphil/stashy-videoengine.git", exact: "2.0.3"),
     ],
     targets: [
         // Platform-neutral: no AVFoundation, so a scratch package can test it on Linux.

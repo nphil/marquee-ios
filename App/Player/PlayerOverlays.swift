@@ -2,8 +2,9 @@ import AVFoundation
 import MarqueeCore
 import SwiftUI
 
-/// Skip intro and Up Next (DESIGN §8.6, Offers), bottom trailing and one at a time. They are not part of
-/// the auto-hiding chrome: they stay while their marker runs and take touch while they show.
+/// Skip intro, Up Next and, after a long wait on the network, a lower quality (DESIGN §8.6, Offers),
+/// bottom trailing and one at a time. They are not part of the auto-hiding chrome: they stay while their
+/// marker or wait lasts and take touch while they show.
 struct OfferView: View {
     let model: PlayerModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -17,6 +18,21 @@ struct OfferView: View {
             case .upNext(let next)?:
                 UpNextCard(model: model, next: next)
                     .transition(transition)
+            case .lowerQuality(let quality)?:
+                Button {
+                    Haptics.impact(.light)
+                    model.playAtLowerQuality()
+                } label: {
+                    HStack(spacing: Space.s2) {
+                        Image(systemName: "dial.low")
+                        Text("Play at Lower Quality")
+                    }
+                }
+                .buttonStyle(PlayerPillStyle(prominent: true))
+                .accessibilityLabel("Play at lower quality")
+                .accessibilityHint("Plays on at \(quality.title) until the player closes.")
+                .accessibilityIdentifier("player.lowerQuality")
+                .transition(transition)
             case nil:
                 EmptyView()
             }

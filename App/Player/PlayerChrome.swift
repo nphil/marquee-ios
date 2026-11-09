@@ -131,6 +131,12 @@ struct PlayerChrome: View {
             // bottom rows in place.
             if !upNextShowing {
                 transport
+                    // Full width, so the caption wraps only on a screen too narrow for its line: two lines
+                    // under the transport's width reached the scrubber at large text sizes.
+                    .frame(maxWidth: .infinity)
+                    // A zero-height frame on the transport's bottom edge: the caption hangs below it, outside
+                    // the transport's layout, so the buttons stay put. A bottom alignment guide left it on them.
+                    .overlay(alignment: .bottom) { networkWait.frame(height: 0, alignment: .top) }
                     .transition(.opacity)
             }
         }
@@ -139,6 +145,23 @@ struct PlayerChrome: View {
     private var upNextShowing: Bool {
         guard case .upNext? = model.offer else { return false }
         return true
+    }
+
+    /// Under the ring until an offer takes the band below the transport, where the two would meet at large
+    /// text sizes or on a small phone.
+    @ViewBuilder
+    private var networkWait: some View {
+        if model.waitsForNetwork, model.offer == nil {
+            Text("Waiting for the network")
+                .textRole(.label)
+                .foregroundStyle(theme.ink)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.top, Space.s3)
+                .allowsHitTesting(false)
+                .accessibilityIdentifier("player.networkWait")
+                .transition(.opacity)
+        }
     }
 
     private var transport: some View {

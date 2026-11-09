@@ -4,7 +4,8 @@ import UIKit
 
 /// The UI tests' frame source. The simulator decodes no video, so a fixture picture (the path in the
 /// fake Plex folder given as `-marquee.uitest.frame`) stands in for it. Its clock reports time the way
-/// AVPlayer's periodic observer does: every 0.1 s while playing, and once after a seek or a stop.
+/// AVPlayer's periodic observer does: every 0.1 s while playing, and once after a seek or a stop. With
+/// `-marquee.uitest.stall` it never starts: playback waits on data for good, as on a dead link.
 @MainActor
 final class StillFrameBackend: VideoBackend {
     let image: UIImage?
@@ -14,6 +15,7 @@ final class StillFrameBackend: VideoBackend {
     var itemDuration: TimeInterval? { nil }
     var rate: Float = 1
     private var clock: Task<Void, Never>?
+    private let stalls = UserDefaults.standard.bool(forKey: "marquee.uitest.stall")
 
     init(root: URL) {
         let frame = UserDefaults.standard.string(forKey: "marquee.uitest.frame") ?? ""
@@ -34,6 +36,10 @@ final class StillFrameBackend: VideoBackend {
 
     func play() {
         guard clock == nil else { return }
+        if stalls {
+            onEvent?(.state(isPlaying: true, isBuffering: true))
+            return
+        }
         onEvent?(.state(isPlaying: true, isBuffering: false))
         clock = Task { [weak self] in
             while !Task.isCancelled {

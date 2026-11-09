@@ -42,11 +42,14 @@ final class PlayerModel: Identifiable {
     enum Offer: Equatable {
         case skipIntro(end: TimeInterval)
         case upNext(PlexMetadata)
+        /// After 10 s waiting on the network: the same video at this quality, for the rest of this playback.
+        case lowerQuality(VideoQuality)
 
         static func == (lhs: Offer, rhs: Offer) -> Bool {
             switch (lhs, rhs) {
             case let (.skipIntro(a), .skipIntro(b)): a == b
             case let (.upNext(a), .upNext(b)): a.ratingKey == b.ratingKey
+            case let (.lowerQuality(a), .lowerQuality(b)): a == b
             default: false
             }
         }
@@ -62,6 +65,15 @@ final class PlayerModel: Identifiable {
         var forward: Bool
         var seconds: Int
         var serial: Int
+    }
+
+    /// The stuck remux runs restarted at the playhead on this item: how many, and the last one's place,
+    /// output in hand and cause.
+    struct Recoveries: Equatable {
+        var count: Int
+        var at: TimeInterval
+        var ahead: TimeInterval
+        var cause: StallWatch.Cause
     }
 
     /// The sheets "Wrong Subtitles?" and the two "Search Subtitles" open.
@@ -100,6 +112,11 @@ final class PlayerModel: Identifiable {
     private(set) var duration: TimeInterval = 0
     private(set) var isPlaying = false
     private(set) var isBuffering = false
+    /// Playback waits on data in mid-play: taps on the picture bring the controls rather than skip.
+    private(set) var isStalled = false
+    /// The wait has lasted 2 s on the link to the server; said under the ring.
+    private(set) var waitsForNetwork = false
+    private(set) var recoveries: Recoveries?
     private(set) var presentationSize: CGSize = .zero
     private(set) var isExternalPlayback = false
     private(set) var canPictureInPicture = false
@@ -140,8 +157,11 @@ final class PlayerModel: Identifiable {
         var note: String?
     }
 
-    /// The highest quality videos play at; picking one here changes Settings' default too.
-    var quality: VideoQuality { session.settings.quality }
+    /// The highest quality videos play at: Settings' default, or the lower one a long wait on the network
+    /// offered, which lasts for this playback (`qualityCap`). Picking one here changes Settings' default
+    /// too and lifts the cap.
+    var quality: VideoQuality { qualityCap ?? session.settings.quality }
+    private(set) var qualityCap: VideoQuality?
     var showsInfo = false
     var showsStyle = false
     var showsStats = false
@@ -175,11 +195,15 @@ final class PlayerModel: Identifiable {
         var burnedIn: Int?
         var remuxText: Int?
         var reencodes: Bool
+        var bitrate: Int?
+        var resolution: String?
 
         init(_ route: PlaybackRoute) {
             kind = route.kind
             audio = route.kind == .directPlay ? nil : route.audio?.id
             reencodes = route.reencodesVideo
+            bitrate = route.maxVideoBitrateKbps
+            resolution = route.videoResolution
             switch route.subtitle {
             case .burnedIn(let track): burnedIn = track.id
             case .sidecar(let track) where route.kind == .remux && !track.isImageBased: remuxText = track.id
@@ -240,6 +264,8 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var countdownTask: Task<Void, Never>?
     @ObservationIgnored private var hideTask: Task<Void, Never>?
     @ObservationIgnored private var stageTask: Task<Void, Never>?
+    @ObservationIgnored private var stallTask: Task<Void, Never>?
+    @ObservationIgnored private var stallWatch = StallWatch()
     @ObservationIgnored private var sideTasks: [Task<Void, Never>] = []
     @ObservationIgnored private var trickplayLoad: (part: Int, task: Task<Void, Never>, waits: Bool)?
     @ObservationIgnored private var castProgress: CastProgress?
@@ -434,7 +460,7 @@ final class PlayerModel: Identifiable {
         generation += 1
         wordTiming?.stop()
         wordTiming = nil
-        for task in [loadTask, queueTask, seekTask, eventsTask, countdownTask, hideTask, stageTask, trickplayLoad?.task] { task?.cancel() }
+        for task in [loadTask, queueTask, seekTask, eventsTask, countdownTask, hideTask, stageTask, stallTask, trickplayLoad?.task] { task?.cancel() }
         sideTasks.forEach { $0.cancel() }
         subtitleFix?.cancel()
         stopStream()
@@ -629,9 +655,10 @@ final class PlayerModel: Identifiable {
 
     func setQuality(_ quality: VideoQuality) {
         scheduleHide()
-        guard quality != session.settings.quality else { return }
-        session.settings.quality = quality
-        reroute(handPick: false)
+        let playing = self.quality
+        qualityCap = nil
+        if quality != session.settings.quality { session.settings.quality = quality }
+        if quality != playing { reroute(handPick: false) }
     }
 
     func setSpeed(_ speed: Float) {
@@ -676,6 +703,15 @@ final class PlayerModel: Identifiable {
         creditsDismissed = true
         cancelCountdown()
         withAnimation(.easeOut(duration: 0.18)) { offer = nil }
+    }
+
+    /// Takes a long network wait's offer: this playback goes on at the lower quality.
+    func playAtLowerQuality() {
+        guard case .lowerQuality(let lower)? = offer else { return }
+        qualityCap = lower
+        // Before the route is decided again, or the next look would offer a lower quality still.
+        forgetWait()
+        reroute(handPick: false)
     }
 
     // MARK: Tracks
@@ -772,6 +808,8 @@ final class PlayerModel: Identifiable {
 
     private func begin(_ full: PlexMetadata, generation: Int) async {
         item = full
+        stallWatch = StallWatch()
+        recoveries = nil
         if subtitleFix?.ratingKey != full.ratingKey {
             subtitleFix?.cancel()
             subtitleFix = nil
@@ -817,13 +855,13 @@ final class PlayerModel: Identifiable {
         case .force:
             return RouteLimits(phoneOnly: true)
         case .disabled:
-            return RouteLimits(serverReason: .directPlayOff, quality: session.settings.quality)
+            return RouteLimits(serverReason: .directPlayOff, quality: quality)
         case .auto:
             // A file that failed on the phone earlier in this run goes straight to the server when reopened.
             let failedBefore = part.map { session.player.phoneFailures.contains($0.id) } ?? false
             return RouteLimits(
                 serverReason: onDeviceFailed || failedBefore ? .onDeviceFailed : nil,
-                quality: session.settings.quality,
+                quality: quality,
                 remoteConnection: connection.map { !$0.isLocal } ?? false,
                 linkKbps: connection.flatMap { session.player.linkKbps[$0.uri] }
             )
@@ -836,7 +874,7 @@ final class PlayerModel: Identifiable {
         if session.settings.directPlay == .force {
             return "Not available while Force Direct Play is on. Set Direct Play to Auto in Settings to use it."
         }
-        if session.settings.quality != .original { return "Available only at Original quality." }
+        if quality != .original { return "Available only at Original quality." }
         if base.reencodesVideo { return "Not available while your Plex server converts this video." }
         if part?.videoStream?.dolbyVision?.profile == 5 { return "Not available for this Dolby Vision video." }
         if audio?.canNormalizeLoudness != true {
@@ -938,6 +976,8 @@ final class PlayerModel: Identifiable {
         stopStream()
         loadStage = .opening
         landing = target
+        // A landing can finish between two looks at a wait, which would then count on into the new stream.
+        forgetWait()
         origin = nil
         streamKey = StreamKey(route)
         do {
@@ -1410,6 +1450,8 @@ final class PlayerModel: Identifiable {
     private func stateChanged(playing: Bool, buffering: Bool) {
         isPlaying = playing
         isBuffering = buffering || landing != nil
+        if case .remux(let remux) = stream { remux.setPlayerWaiting(buffering) }
+        if playing, buffering { watchStall() } else { endStall() }
         if !playing || buffering {
             if case .upNext? = offer { interruptCountdown() } else { cancelCountdown() }
         } else {
@@ -1418,6 +1460,77 @@ final class PlayerModel: Identifiable {
         report()
         publishPosition()
         if playing { scheduleHide() } else { hideTask?.cancel() }
+    }
+
+    /// While playback waits in mid-play, looks at once and then every half second (`StallWatch`).
+    private func watchStall() {
+        guard stallTask == nil else { return }
+        stallTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .milliseconds(500))
+                guard let self, !Task.isCancelled else { return }
+                checkStall()
+            }
+        }
+        checkStall()
+    }
+
+    private func endStall() {
+        stallTask?.cancel()
+        stallTask = nil
+        isStalled = false
+        forgetWait()
+    }
+
+    /// The wait so far no longer counts: playback moved on, or a new stream's own wait counts from its start.
+    private func forgetWait() {
+        stallWatch.resume()
+        waitsForNetwork = false
+        if case .lowerQuality? = offer { withAnimation(.easeOut(duration: 0.18)) { offer = nil } }
+    }
+
+    private func checkStall() {
+        guard !closed, phase == .playing, castDevice == nil, isPlaying, isBuffering else { return endStall() }
+        // A seek's own wait is the user's doing; the watch starts again once it is over.
+        guard landing == nil, !isSeeking else {
+            waitsForNetwork = false
+            return stallWatch.resume()
+        }
+        isStalled = true
+        var run: StallWatch.Run?
+        var paced = false
+        if case .remux(let remux) = stream, let origin {
+            let progress = remux.progress
+            run = StallWatch.Run(produced: origin + progress.mediaSeconds, fetching: progress.isFetching)
+            paced = progress.isPaced
+        }
+        switch stallWatch.check(now: ProcessInfo.processInfo.systemUptime, position: time, run: run) {
+        case .network(let seconds):
+            guard seconds >= 2 else { return }
+            if !waitsForNetwork { withAnimation(.easeOut(duration: 0.18)) { waitsForNetwork = true } }
+            hideTask?.cancel()
+            if !chromeVisible { setChrome(true) }
+            if seconds >= 10 { offerLowerQuality() }
+        case .stuck(let ahead, let cause):
+            let at = time
+            recoveries = Recoveries(count: (recoveries?.count ?? 0) + 1, at: at, ahead: ahead, cause: cause)
+            EngineLog.logger.event("stall.recovered", [
+                ("at", String(format: "%.1f", at)), ("ahead", String(format: "%.1f", ahead)), ("paced", String(paced)),
+                ("cause", cause.rawValue),
+            ])
+            waitsForNetwork = false
+            restart(at: at)
+        case .giveUp:
+            streamFailed(PlaybackFailure(text: "The video stopped arriving from \(library.server.name)."))
+        }
+    }
+
+    /// A quality at half the rate playing now or below, unless Settings have every file play as it is.
+    private func offerLowerQuality() {
+        if case .lowerQuality? = offer { return }
+        guard !forcesDirectPlay, let lower = quality.lower(mediaKbps: media?.bitrate) else { return }
+        cancelCountdown()
+        withAnimation(.easeOut(duration: 0.22)) { offer = .lowerQuality(lower) }
     }
 
     private func ended() {
@@ -1744,6 +1857,8 @@ final class PlayerModel: Identifiable {
     }
 
     private func updateOffers(at movie: TimeInterval) {
+        // The lower-quality offer lasts as long as the wait that brought it (`endStall`).
+        if case .lowerQuality? = offer { return }
         let ms = Int(movie * 1000)
         var next: Offer?
         if let intro = item.markers(.intro).first(where: { $0.contains(ms) }), Double(intro.end) / 1000 - movie > 1 {
@@ -1767,7 +1882,7 @@ final class PlayerModel: Identifiable {
         case .upNext?:
             guard settings.nextEpisodeDelay > 0, !countdownStopped, menusOpen == 0, !isScrubbing else { return }
             runCountdown(TimeInterval(settings.nextEpisodeDelay)) { [weak self] in self?.next() }
-        case nil:
+        case .lowerQuality?, nil:
             break
         }
     }
@@ -2089,7 +2204,7 @@ extension PlayerModel: CastPlayer {
         let reason: RouteReason? = castReceiverFailed ? .receiverFailed : settings.directPlay == .disabled ? .directPlayOff : nil
         let route = CastRouteDecider.decide(
             media: media, part: part, tracks: tracks, audio: picked, subtitle: decision,
-            receiver: CastReceiver(modelName: device.model), limits: RouteLimits(serverReason: reason, quality: settings.quality)
+            receiver: CastReceiver(modelName: device.model), limits: RouteLimits(serverReason: reason, quality: quality)
         )
         enhancements = EnhancementState()
         subtitle = decision

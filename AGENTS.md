@@ -68,7 +68,7 @@ Other: `UITests/` (UI tests; `UITests/FakePlex/` fixtures and rules in its `READ
   - The accessibility pass runs on every push to `main`. On other branches it runs only when the branch differs from `main` in `App`, `UITests`, `Resources`, `Packages`, `project.yml`, `tools` or `.github`; otherwise it is skipped (`--no-accessibility`).
   - `ui-sizes`: one runner, the smallest and the largest iPhone simulator of the image (`tools/size-simulators.py` picks them by screen size) running `PlayerRouteMenuScreenshots`, one simulator at a time; its shots are named with the screen size and land in the `screens` artifact.
   - `screens`: merges the shard artifacts `screens-N` into the one `screens` artifact. `UITests-xcresult-N` stays per shard.
-  - `release` (`main` only) needs `core`, `live`, `app`, `ui-sizes` and every `ui` shard to be green. The engine is `stashy-videoengine` pinned to exact 2.0.1 in `project.yml` and `Packages/MarqueeLive/Package.swift`; change both together.
+  - `release` (`main` only) needs `core`, `live`, `app`, `ui-sizes` and every `ui` shard to be green. The engine is `stashy-videoengine` pinned to exact 2.0.3 in `project.yml` and `Packages/MarqueeLive/Package.swift`; change both together.
 - Running CI: batch the work. When a run fails, fix every failure on a branch and push the combined change once; do not push `main` a fix per failure, and do not push `main` while another `main` run is in progress (each run takes 4 runners). Rebase on `main` right before pushing.
 - A UI change is reviewed from the `screens` artifact: dark, light and large-text screenshots must be checked for overlap and contrast. UI tests run against FakePlex.
 
