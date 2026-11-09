@@ -32,7 +32,9 @@ final class PlayerModel: Identifiable {
     enum LoadStage: Equatable {
         case connecting
         case opening
-        /// The share of the start buffer in hand.
+        /// A server transcode, until AVPlayer can play it.
+        case preparing
+        /// The share of a remux's start lead in hand (`RemuxHandOff`).
         case buffering(Double)
         case starting
     }
@@ -211,6 +213,7 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var landing: TimeInterval?
     @ObservationIgnored private var itemReady = false
     @ObservationIgnored private var farSeeking = false
+    @ObservationIgnored private var remuxFinished = false
     @ObservationIgnored private var transcodeOffset: TimeInterval = 0
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var seekSerial = 0
@@ -278,16 +281,17 @@ final class PlayerModel: Identifiable {
 
     var stageText: String {
         switch loadStage {
-        case .connecting: "Connecting"
-        case .opening: "Opening file"
-        case .buffering: "Buffering"
+        case .connecting: "Connecting to \(library.server.name)"
+        case .opening: "Opening the file"
+        case .preparing: "\(library.server.name) is preparing the video"
+        case .buffering(let share): "Buffering \(Int(share * 100))%"
         case .starting: "Starting"
         }
     }
 
-    /// The share of the start buffer in hand while buffering; nil while the wait has no measure.
+    /// The share of the wait in hand while one is measured; nil while the wait has no measure.
     var loadFraction: Double? {
-        if case .buffering(let fraction) = loadStage { return fraction }
+        if case .buffering(let share) = loadStage { return share }
         return nil
     }
 
@@ -657,6 +661,14 @@ final class PlayerModel: Identifiable {
         generation += 1
         let generation = generation
         enterLoading()
+        #if DEBUG
+        if let held = Self.heldStage {
+            stageTask?.cancel()
+            loadStage = held
+            showsStage = true
+            return
+        }
+        #endif
         startTiming = StartTiming()
         speed = 1
         backend.rate = 1
@@ -700,6 +712,23 @@ final class PlayerModel: Identifiable {
             }
         }
     }
+
+    #if DEBUG
+    /// `-marquee.uitest.loadStage` holds the loading screen at one stage for the ring's screenshots:
+    /// connecting, opening, preparing, starting, or buffering with its share, as in buffering:0.42.
+    private static var heldStage: LoadStage? {
+        guard FakePlex.isActive, let value = UserDefaults.standard.string(forKey: "marquee.uitest.loadStage") else { return nil }
+        let parts = value.split(separator: ":").map(String.init)
+        switch parts.first ?? "" {
+        case "connecting": return .connecting
+        case "opening": return .opening
+        case "preparing": return .preparing
+        case "starting": return .starting
+        case "buffering": return .buffering(parts.count > 1 ? Double(parts[1]) ?? 0 : 0)
+        default: return nil
+        }
+    }
+    #endif
 
     private func begin(_ full: PlexMetadata, generation: Int) async {
         item = full
@@ -881,7 +910,9 @@ final class PlayerModel: Identifiable {
                 stream = .remux(remux)
                 listen(to: remux)
                 reporter = TimelineReporter(library: library, item: item)
+                remuxFinished = false
                 url = try await remux.start(at: target)
+                try await handOff(remux, landing: target)
             case .serverTranscode:
                 try await selectForServer(route, part: part)
                 let session = UUID().uuidString
@@ -892,6 +923,7 @@ final class PlayerModel: Identifiable {
                     TranscodeRequest(item: item, mediaIndex: mediaIndex, route: route, offset: target, session: session)
                 )
                 streamConnection = await library.connection.currentConnection
+                loadStage = .preparing
             }
             guard generation == self.generation else { return }
             applySubtitleSources()
@@ -915,6 +947,34 @@ final class PlayerModel: Identifiable {
         playerItem.externalMetadata = metadataItems()
         itemReady = false
         backend.load(playerItem)
+    }
+
+    /// Holds a remux run's playlist until AVPlayer can start from its first read (`RemuxHandOff`),
+    /// showing the share of the lead in hand.
+    private func handOff(_ remux: RemuxSession, landing target: TimeInterval) async throws {
+        let gate = RemuxHandOff(landing: target)
+        let clock = ContinuousClock()
+        let start = clock.now
+        while true {
+            guard case .remux(let current) = stream, current === remux else { throw CancellationError() }
+            let progress = remux.progress
+            let decision = gate.decide(
+                origin: remux.timelineOrigin, mediaSeconds: progress.mediaSeconds, isPaced: progress.isPaced,
+                finished: remuxFinished, elapsed: clock.now - start
+            )
+            switch decision {
+            case .wait(let share):
+                loadStage = share.map { LoadStage.buffering($0) } ?? .opening
+                try await Task.sleep(for: .milliseconds(50))
+            case .handOver(let reason):
+                if startTiming.handOff == nil {
+                    let held = Int(((clock.now - start) / .milliseconds(1)).rounded())
+                    startTiming.handOff = "playlist held \(held) ms (\(reason.rawValue))"
+                }
+                loadStage = .starting
+                return
+            }
+        }
     }
 
     private func makeRemux(source: URL, part: PlexPart, route: PlaybackRoute) -> RemuxSession {
@@ -962,15 +1022,10 @@ final class PlayerModel: Identifiable {
                 case .timeline(let origin):
                     if self.origin == nil {
                         self.origin = origin
-                        if !itemReady { loadStage = .buffering(0) }
                         land()
                     }
-                case .progress(let progress):
-                    if case .buffering = loadStage, let origin, let target = landing {
-                        // The first segment has to reach past the landing point by the start buffer.
-                        let needed = max(0, target - origin) + Self.startBuffer
-                        loadStage = .buffering(min(1, progress.mediaSeconds / needed))
-                    }
+                case .finished:
+                    remuxFinished = true
                 case .failed(let error, _):
                     streamFailed(PlaybackFailure(text: error.localizedDescription))
                 default:
@@ -1213,7 +1268,8 @@ final class PlayerModel: Identifiable {
         let generation = generation
         seekTask = Task { [weak self] in
             guard let self else { return }
-            if local > 0.5 { _ = await backend.seek(to: local, precise: true) }
+            // AVPlayer can join a growing playlist part-way rather than at its start.
+            if abs(backend.itemTime - local) > 0.5 { _ = await backend.seek(to: local, precise: true) }
             guard generation == self.generation, serial == seekSerial else { return }
             landing = nil
             farSeeking = false
@@ -1276,8 +1332,11 @@ final class PlayerModel: Identifiable {
             itemReady = false
             origin = nil
             do {
+                remuxFinished = false
                 let url = try await remux.seek(to: target)
                 guard serial == seekSerial, case .remux(let current) = stream, current === remux else { return }
+                try await handOff(remux, landing: target)
+                guard serial == seekSerial else { return }
                 load(url)
             } catch {
                 guard serial == seekSerial, !(error is CancellationError) else { return }

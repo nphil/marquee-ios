@@ -105,18 +105,7 @@ struct PlayerChrome: View {
     private var centre: some View {
         switch model.phase {
         case .loading:
-            VStack(spacing: Space.s3) {
-                LoadingArc(fraction: model.loadFraction)
-                Text(model.showsStage ? model.stageText : " ")
-                    .textRole(.label)
-                    .foregroundStyle(theme.ink2)
-                    .contentTransition(.opacity)
-                    .animation(.easeOut(duration: 0.12), value: model.showsStage)
-                    .animation(.easeOut(duration: 0.2), value: model.stageText)
-            }
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Loading")
-            .accessibilityValue(model.showsStage ? stageValue : "")
+            LoadingStage(model: model)
         case .failed(let message):
             FailureCard(message: message, close: close, retry: model.retry)
         case .finished:
@@ -131,11 +120,6 @@ struct PlayerChrome: View {
                     .transition(.opacity)
             }
         }
-    }
-
-    private var stageValue: String {
-        guard let fraction = model.loadFraction else { return model.stageText }
-        return "\(model.stageText), \(Int(fraction * 100)) percent"
     }
 
     private var upNextShowing: Bool {
@@ -166,7 +150,7 @@ struct PlayerChrome: View {
             .buttonStyle(PlayerButtonStyle(prominent: true))
             .overlay {
                 if model.isWaiting {
-                    LoadingArc(diameter: 68)
+                    LoadingArc(diameter: 68, fraction: model.loadFraction)
                         .allowsHitTesting(false)
                 }
             }
@@ -343,30 +327,92 @@ private struct RoutePicker: UIViewRepresentable {
     }
 }
 
-/// Loading: an arc that turns while the wait has no measure, and fills to the real share of the start
-/// buffer while a stream buffers. Reduce Motion holds it still.
-struct LoadingArc: View {
-    var diameter: CGFloat = 56
-    /// The share of the start buffer in hand; nil turns the arc.
-    var fraction: Double?
+/// The loading screen's middle: the arc and, a second in, what the start waits for.
+struct LoadingStage: View {
+    let model: PlayerModel
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TimelineView(.animation(paused: fraction != nil || reduceMotion)) { context in
-            ZStack {
-                if fraction != nil {
-                    Circle().stroke(theme.trackOff, lineWidth: 3)
+        VStack(spacing: Space.s3) {
+            LoadingArc(fraction: model.loadFraction)
+            Text(model.showsStage ? model.stageText : " ")
+                .textRole(.label)
+                .monospacedDigit()
+                .multilineTextAlignment(.center)
+                .foregroundStyle(theme.ink2)
+                .contentTransition(.opacity)
+                // A new stage fades in; the share counting up within one changes in place.
+                .animation(reduceMotion ? .linear(duration: 0.12) : .easeOut(duration: 0.2), value: step)
+                .animation(.easeOut(duration: 0.12), value: model.showsStage)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Loading")
+        .accessibilityValue(model.showsStage ? model.stageText : "")
+    }
+
+    /// The stage without its share.
+    private var step: Int {
+        switch model.loadStage {
+        case .connecting: 0
+        case .opening: 1
+        case .preparing: 2
+        case .buffering: 3
+        case .starting: 4
+        }
+    }
+}
+
+/// Loading: an arc that turns while the wait has no measure, and a ring that fills to the measured share
+/// while one is known. The two cross-fade and the fill follows the share. Reduce Motion holds the arc
+/// still and cuts the cross-fade to 120 ms.
+struct LoadingArc: View {
+    var diameter: CGFloat = 56
+    /// The share of the wait in hand; nil turns the arc.
+    var fraction: Double?
+    @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The last share, kept while the ring fades out.
+    @State private var shown: Double = 0
+
+    var body: some View {
+        ZStack {
+            if fraction == nil {
+                TimelineView(.animation(paused: reduceMotion)) { context in
+                    arc(to: 0.22)
+                        .rotationEffect(.degrees(reduceMotion ? -90 : turn(at: context.date)))
                 }
-                Circle()
-                    .trim(from: 0, to: fraction.map { max(0.02, $0) } ?? 0.22)
-                    .stroke(theme.ink, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                    .rotationEffect(.degrees(fraction == nil && !reduceMotion ? turn(at: context.date) : -90))
-                    .animation(.easeOut(duration: 0.3), value: fraction)
+                .transition(.opacity)
+            } else {
+                ZStack {
+                    Circle().stroke(theme.trackOff, lineWidth: Self.line)
+                    arc(to: max(0.02, shown))
+                        .rotationEffect(.degrees(-90))
+                }
+                .transition(.opacity)
             }
         }
+        .animation(reduceMotion ? .linear(duration: 0.12) : .easeInOut(duration: 0.25), value: fraction == nil)
         .frame(width: diameter, height: diameter)
+        .onChange(of: fraction, initial: true) { old, new in
+            guard let new else { return }
+            let share = min(1, max(0, new))
+            // A ring fading in starts at its share rather than filling from the last one.
+            if old == nil || reduceMotion {
+                shown = share
+            } else {
+                withAnimation(.linear(duration: 0.15)) { shown = share }
+            }
+        }
         .accessibilityHidden(true)
+    }
+
+    private static let line: CGFloat = 3
+
+    private func arc(to end: Double) -> some View {
+        Circle()
+            .trim(from: 0, to: end)
+            .stroke(theme.ink, style: StrokeStyle(lineWidth: Self.line, lineCap: .round))
     }
 
     /// One turn every 1.2 s, from the top.
