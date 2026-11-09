@@ -152,6 +152,9 @@ struct FakePlexRouter {
         }
 
         if method != "GET" { Self.wrote(path) }
+        if path == "/:/scrobble" || path == "/:/unscrobble", let key = query.first(where: { $0.name == "key" })?.value {
+            Self.watchedWrites.withLock { $0.append(WatchedWrite(key: key, watched: path == "/:/scrobble")) }
+        }
         // The fixtures keep a deleted title, as a server lists one until its trash is emptied.
         if method == "DELETE" {
             return .success(json([String: Any]()))
@@ -164,6 +167,7 @@ struct FakePlexRouter {
                let moved = Self.shifted(object, by: Int(evening.timeIntervalSince1970) - anchor) as? [String: Any] {
                 object = moved
             }
+            if prefix(for: host) == "pms" { object = Self.withWatchedWrites(object) }
             if path == "/hubs/search", let text = query.first(where: { $0.name == "query" })?.value {
                 object = Self.search(object, for: text, limit: query.first { $0.name == "limit" }?.value.flatMap(Int.init))
             } else {
@@ -189,6 +193,59 @@ struct FakePlexRouter {
             names.removeAll { $0 == name }
             names.append(name)
         }
+    }
+
+    // MARK: Watched state
+
+    private struct WatchedWrite {
+        let key: String
+        let watched: Bool
+    }
+
+    /// What `/:/scrobble` and `/:/unscrobble` were asked, latest last.
+    private static let watchedWrites = Mutex<[WatchedWrite]>([])
+
+    /// The titles of `object` as the server would list them after those writes: a title takes the latest
+    /// write for itself, its season or its show, and a title just marked watched leaves Continue Watching.
+    /// The fixtures themselves never change.
+    private static func withWatchedWrites(_ object: [String: Any]) -> [String: Any] {
+        let writes = watchedWrites.withLock { $0 }
+        guard !writes.isEmpty, var container = object["MediaContainer"] as? [String: Any] else { return object }
+
+        func latest(_ item: [String: Any]) -> Bool? {
+            let keys = ["ratingKey", "parentRatingKey", "grandparentRatingKey"].compactMap { item[$0] as? String }
+            return writes.last { keys.contains($0.key) }?.watched
+        }
+        func applied(_ items: [[String: Any]], leavingWhenWatched: Bool) -> [[String: Any]] {
+            items.compactMap { item in
+                guard let watched = latest(item) else { return item }
+                if watched, leavingWhenWatched { return nil }
+                var item = item
+                if let leaves = item["leafCount"] as? Int, leaves > 0 {
+                    item["viewedLeafCount"] = watched ? leaves : 0
+                } else {
+                    item["viewCount"] = watched ? max(item["viewCount"] as? Int ?? 0, 1) : 0
+                }
+                item["viewOffset"] = nil
+                return item
+            }
+        }
+        if let items = container["Metadata"] as? [[String: Any]] {
+            container["Metadata"] = applied(items, leavingWhenWatched: false)
+        }
+        if let hubs = container["Hub"] as? [[String: Any]] {
+            container["Hub"] = hubs.map { hub in
+                var hub = hub
+                guard let items = hub["Metadata"] as? [[String: Any]] else { return hub }
+                let kept = applied(items, leavingWhenWatched: (hub["hubIdentifier"] as? String) == "home.continue")
+                hub["Metadata"] = kept
+                hub["size"] = kept.count
+                return hub
+            }
+        }
+        var result = object
+        result["MediaContainer"] = container
+        return result
     }
 
     // MARK: Fixtures

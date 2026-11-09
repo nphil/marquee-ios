@@ -24,7 +24,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Search | Done | Search titles. | `/hubs/search` [code] |
 | Collections / hubs (home rows) | Done | Home and hub rows; collection destinations. | `/hubs/*` [code] |
 | Person filmography | Done | Tap a cast member (or a person in Search) for their titles in the libraries, newest first, with film and show counts. | `/library/people/{id}/media` |
-| Stats logging (opt-in) | Missing | Opt-in usage reporting, separate from Stats for Nerds. | none |
+| Stats logging (opt-in) | N/A | The iPhone app sends no usage reports, so there is nothing to opt in to; Stats for Nerds stays local. | none |
 
 ## 2. Detail actions
 | Feature | Status | Behaviour | API |
@@ -32,7 +32,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Play / Resume | Done | Play or resume; label shows 'Resume · N min left'. | `/library/metadata/{key}`, timeline [code] |
 | Play from Beginning | Done | Starts again from zero. | `viewOffset=0` [code] |
 | Mark Watched / Unwatched | Done | Toggles watched state on title or episode. | `/:/scrobble`, `/:/unscrobble` [code] |
-| Mark show watched | Partial | Show-level watched toggle, separate from episode. Not found as a show-level action. | `/:/scrobble` on each episode [code/INFERENCE] |
+| Mark show watched | Done | Mark Show Watched / Unwatched on a show's page (the check button), in the long-press menu of a show's poster in the library grid and shelves, and on an episode in Continue Watching; Mark Season Watched / Unwatched in the menu beside the season name. Plex marks every episode; badges, episode checks and Continue Watching change at once, and Undo is offered. | `/:/scrobble`, `/:/unscrobble` with the show's or season's `ratingKey` [code] |
 | Remove from Continue Watching | Done | Removes a title from the continue row. | `/:/unscrobble` / on-deck [code] |
 | Cast shelf | Done | Circular photos with names. | `roles` in metadata [code] |
 | Related titles | Done | Related shelves on the detail page. | `/library/metadata/{key}/related` [code] |
@@ -69,7 +69,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 |---|---|---|---|
 | Audio track selector | Done | Pick track; wanted-language first; check on playing track. | streams [code] |
 | Preferred audio language | Done | Per-profile preference. | local [code] |
-| Follow-dub rule | Partial | Verify exact rule. | local [code] |
+| Follow-dub rule | Done | Subtitles follow the audio: English audio takes the dub transcript (SDH or CC flag, `.cc`/`.sdh`, a Dub or Dubtitle title), other audio the full translation; a downloaded track beats a built-in one. Switching audio picks again unless the viewer chose the subtitle or the show remembers one; Off and on-screen text are left alone. Audio & Subtitles › Follow the Audio turns it off. | local [code] |
 | Normalize loudness / Boost | Done | See Playback. | `boostDialog`, `normalizeLoudness` |
 
 ## 5. Subtitles
@@ -111,10 +111,12 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Audio & subtitles page | Done | Preferred audio, subtitle mode, remember choices, style. | local [code] |
 | Intro skip (manual/3/5/10/15/30s) | Done | Intro skip delay. | local [code] |
 | Credits countdown | Done | Up Next delay. | local [code] |
-| Auto sign-in, interface resolution, language | Missing | Not found in the iPhone code. | local |
-| Trailers auto-play | Missing | Not found. | local |
+| Auto sign-in | N/A | The iPhone keeps its session in the Keychain and opens straight to the last profile, so there is no sign-in step to skip. | local |
+| Interface resolution | N/A | A TV output-size setting; an iPhone draws at its own screen size. | local |
+| Language | N/A | The interface language follows the iPhone's per-app language in iOS Settings. | local |
+| Trailers auto-play | Done | Settings › Video & Playback › Play Trailers Automatically, on by default, per profile. After 2 s on a movie's or show's page its trailer plays in the hero with sound, once, from a file the iPhone plays untouched; no watch state is written. It waits in Low Power Mode, with Reduce Motion, on cellular or in Low Data Mode, while the app is inactive, the hero is scrolled off or the player is open; the sound follows the silent switch and mixes with other apps, and a trailer is silent over audio already playing. | `/library/metadata/{key}/extras`, part file [code] |
 | Favourite libraries | Done | Settings › Favorite Libraries: switched-off libraries leave Home's shelves and the Library title menu; one always stays on. | local |
-| Privacy / consent (crash, product reports) | Missing | Opt-in reporting with its own explanation. | none (local) |
+| Privacy / consent (crash, product reports) | N/A | Nothing is reported from the iPhone app, so there is no consent to ask for; Delete All Local Data covers what is stored on the phone. | none (local) |
 | Delete all local data | Done | Settings › Delete All Local Data, after a confirmation: signs out and removes Keychain items, preferences, themes, cached artwork and guide data; the sign-in screen says what happened. | local |
 | Appearance (theme picker) | Done | Themes. | local [code] |
 | Sign out | Done | Confirmation dialog. | local [code] |

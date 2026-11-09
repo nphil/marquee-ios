@@ -84,6 +84,15 @@ struct VideoPlaybackSettingsView: View {
             .listRowBackground(theme.sheet)
 
             Section {
+                Toggle("Play Trailers Automatically", isOn: $session.settings.playsTrailers)
+                    .accessibilityIdentifier("video.playsTrailers")
+            } footer: {
+                Text("After a moment on a title, play its trailer with sound. It waits while Low Power Mode, Reduce Motion or a cellular connection is on, and plays silently over other audio.")
+                    .foregroundStyle(theme.ink2)
+            }
+            .listRowBackground(theme.sheet)
+
+            Section {
                 Toggle("Direct from Tuner", isOn: $session.settings.readsTunerDirectly)
                     .accessibilityIdentifier("video.readsTunerDirectly")
             } header: {

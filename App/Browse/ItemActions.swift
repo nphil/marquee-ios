@@ -108,12 +108,48 @@ struct ItemActions: DynamicProperty {
     @Environment(ToastCenter.self) private var toasts
     @Environment(LibraryChanges.self) private var changes
 
+    /// What a watched change covers; it words the toast. Plex marks every episode under a show or season.
+    enum Scope {
+        case title, season, show
+
+        func marked(_ watched: Bool) -> String {
+            let state = watched ? "watched" : "unwatched"
+            return switch self {
+            case .title: "Marked \(state)"
+            case .season: "Season marked \(state)"
+            case .show: "Show marked \(state)"
+            }
+        }
+
+        func failed(_ watched: Bool) -> String {
+            let state = watched ? "watched" : "unwatched"
+            return switch self {
+            case .title: "Couldn't mark \(state)"
+            case .season: "Couldn't mark season \(state)"
+            case .show: "Couldn't mark show \(state)"
+            }
+        }
+    }
+
     /// Marks `item` watched or unwatched. `show` puts a state on screen; Undo and failures call it again
-    /// with the state to return to.
+    /// with the state to return to. A show or season passes its own rating key, and Plex marks every
+    /// episode under it.
     func setWatched(_ watched: Bool, _ item: PlexMetadata, show: @escaping @MainActor (Bool) -> Void) {
+        let scope: Scope = switch item.type {
+        case .show: .show
+        case .season: .season
+        default: .title
+        }
+        setWatched(watched, key: item.ratingKey, touching: [item.parentRatingKey, item.grandparentRatingKey], scope: scope, show: show)
+    }
+
+    /// The same for the title with rating key `key`, which `touching` names the parents of. A screen that
+    /// shows an episode and offers its show passes the show's key.
+    func setWatched(
+        _ watched: Bool, key: String, touching parents: [String?], scope: Scope, show: @escaping @MainActor (Bool) -> Void
+    ) {
         guard let library else { return }
-        let key = item.ratingKey
-        let touched = Set([item.ratingKey, item.parentRatingKey, item.grandparentRatingKey].compactMap(\.self))
+        let touched = Set(([key] + parents).compactMap(\.self))
         let toasts = toasts
         let changes = changes
 
@@ -133,7 +169,7 @@ struct ItemActions: DynamicProperty {
 
         show(watched)
         send(watched) {
-            toasts.show(watched ? "Marked watched" : "Marked unwatched", undo: {
+            toasts.show(scope.marked(watched), undo: {
                 show(!watched)
                 send(!watched, onSuccess: {}) {
                     show(watched)
@@ -142,7 +178,7 @@ struct ItemActions: DynamicProperty {
             })
         } onFailure: {
             show(!watched)
-            toasts.show(watched ? "Couldn't mark watched" : "Couldn't mark unwatched")
+            toasts.show(scope.failed(watched))
         }
     }
 

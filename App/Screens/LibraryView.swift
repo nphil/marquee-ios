@@ -306,6 +306,7 @@ private struct SectionBrowser: View {
                     PosterCell(item: item, width: metrics.cellWidth, zoomID: zoomID)
                 }
                 .buttonStyle(.press)
+                .showWatchedMenu(item) { shown in _ = loader.patch(item.markedWatched(shown)) }
                 .id(item.id)
                 .onAppear { appeared(item, in: loader, metrics: metrics) }
             }

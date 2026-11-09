@@ -88,6 +88,8 @@ private struct DetailPage: View {
     @State private var watchlisted: Bool? = nil
     @State private var extras: [PlexMetadata] = []
     @State private var deleting: DeleteTarget?
+    /// The last show or season marked here, which the seasons and episodes below follow at once.
+    @State private var wave: WatchedWave?
     @Environment(\.plexLibrary) private var library
     @Environment(\.dismiss) private var dismiss
     private let actions = ItemActions()
@@ -125,6 +127,12 @@ private struct DetailPage: View {
         return tracks.audio.isEmpty && tracks.visibleSubtitles.isEmpty ? nil : tracks
     }
 
+    /// The trailer the hero previews: only a movie's or show's own page, whose extras are loaded.
+    private var heroTrailer: PlexMetadata? {
+        guard isOnServer, item.type == .movie || item.type == .show else { return nil }
+        return ExtrasShelf.trailer(in: extras, primaryKey: item.primaryExtraKey)
+    }
+
     /// What Play starts: the title itself, or for a show the episode up next.
     private var playTarget: PlexMetadata? {
         guard isOnServer else { return nil }
@@ -140,7 +148,7 @@ private struct DetailPage: View {
             VStack(alignment: .leading, spacing: 0) {
                 if isLandscape {
                     HStack(alignment: .top, spacing: Space.s6) {
-                        DetailHero(item: item, size: cardSize, bleeds: false)
+                        DetailHero(item: item, size: cardSize, trailer: heroTrailer, bleeds: false)
                         VStack(alignment: .leading, spacing: Space.s5) {
                             titleBlock
                             actionBlock
@@ -154,7 +162,7 @@ private struct DetailPage: View {
                     .padding(.horizontal, Space.inset)
                     .padding(.top, Space.s6)
                 } else {
-                    DetailHero(item: item, size: CGSize(width: width, height: heroHeight), reach: barInset)
+                    DetailHero(item: item, size: CGSize(width: width, height: heroHeight), trailer: heroTrailer, reach: barInset)
                     VStack(alignment: .leading, spacing: Space.s5) {
                         titleBlock
                         actionBlock
@@ -228,7 +236,7 @@ private struct DetailPage: View {
             TracksRow(tracks: tracks) { showsTracks = true }
         }
         if isOnServer, item.type == .show || item.type == .season {
-            SeasonsSection(parent: item)
+            SeasonsSection(parent: item, wave: $wave)
         }
     }
 
@@ -331,19 +339,31 @@ private struct DetailPage: View {
                 if isOnServer, item.type != .clip {
                     Button {
                         let watched = !item.isWatched
-                        actions.setWatched(watched, item, show: showWatched)
+                        actions.setWatched(watched, item) { shown in
+                            showWatched(shown)
+                            if item.type == .show || item.type == .season {
+                                wave = WatchedWave(id: (wave?.id ?? 0) + 1, ratingKey: item.ratingKey, watched: shown)
+                            }
+                        }
                     } label: {
                         Image(systemName: item.isWatched ? "checkmark.circle.fill" : "checkmark.circle")
                             .contentTransition(.symbolEffect(.replace))
                     }
                     .buttonStyle(.round)
-                    .accessibilityLabel(item.isWatched ? "Mark Unwatched" : "Mark Watched")
+                    .accessibilityLabel(watchedLabel)
+                    .accessibilityIdentifier("detail.watched")
                 }
                 if isOnServer {
                     moreMenu
                 }
             }
         }
+    }
+
+    /// "Mark Watched", or "Mark Show Unwatched" on a show's page: Plex marks every episode under it.
+    private var watchedLabel: String {
+        let scope = item.type == .show ? " Show" : item.type == .season ? " Season" : ""
+        return "Mark\(scope) " + (item.isWatched ? "Unwatched" : "Watched")
     }
 
     private var moreMenu: some View {
@@ -436,6 +456,8 @@ private struct DetailPage: View {
 private struct DetailHero: View {
     let item: PlexMetadata
     let size: CGSize
+    /// The trailer that plays over the art once the page has been in view for a moment.
+    var trailer: PlexMetadata?
     /// The bars' height above the backdrop.
     var reach: CGFloat = 0
     var bleeds = true
@@ -453,13 +475,20 @@ private struct DetailHero: View {
                         .blur(radius: Space.s6, opaque: true)
                 }
                 art
+                    .overlay { preview }
                     .overlay { fade }
             }
-            .accessibilityHidden(true)
         } else {
             art
+                .overlay { preview }
                 .clipShape(RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
-                .accessibilityHidden(true)
+        }
+    }
+
+    @ViewBuilder
+    private var preview: some View {
+        if let trailer {
+            TrailerPreview(trailer: trailer)
         }
     }
 
@@ -490,6 +519,7 @@ private struct DetailHero: View {
             }
         }
         .frame(width: size.width, height: size.height)
+        .accessibilityHidden(true)
     }
 }
 
@@ -679,45 +709,71 @@ private struct TrackRow: View {
 
 // MARK: Seasons and episodes
 
+/// A show or season marked watched or unwatched on its page. The seasons and episodes under it follow
+/// at once; `id` tells two changes of the same state apart.
+struct WatchedWave: Equatable {
+    let id: Int
+    let ratingKey: String
+    let watched: Bool
+}
+
 /// A show's seasons under a season menu, or a season's own episodes (DESIGN §8.4).
 private struct SeasonsSection: View {
     let parent: PlexMetadata
+    @Binding var wave: WatchedWave?
 
     @Environment(\.plexLibrary) private var library
     @Environment(\.theme) private var theme
     @Environment(LibraryChanges.self) private var changes
     @State private var seasons = Remote<[PlexMetadata]>()
     @State private var chosen: String? = nil
+    private let actions = ItemActions()
 
     var body: some View {
         RemoteContent(remote: seasons) { loaded in
             let seasons = changes.shown(loaded)
             if let season = current(in: seasons) {
                 VStack(alignment: .leading, spacing: Space.s3) {
-                    if seasons.count > 1 {
-                        Menu {
-                            Picker("Season", selection: Binding(get: { season.ratingKey }, set: { chosen = $0 })) {
-                                ForEach(seasons) { Text(Self.menuTitle($0)).tag($0.ratingKey) }
+                    HStack(spacing: Space.s2) {
+                        if seasons.count > 1 {
+                            Menu {
+                                Picker("Season", selection: Binding(get: { season.ratingKey }, set: { chosen = $0 })) {
+                                    ForEach(seasons) { Text(Self.menuTitle($0)).tag($0.ratingKey) }
+                                }
+                            } label: {
+                                MenuPill(title: season.title)
                             }
-                        } label: {
-                            MenuPill(title: season.title)
+                            .capsuleMenuLabel()
+                            .accessibilityLabel("Season, \(season.title)")
+                            .accessibilityIdentifier("detail.seasonMenu")
+                        } else if parent.type == .show {
+                            Text(season.title)
+                                .textRole(.title)
+                                .foregroundStyle(theme.ink)
+                                .accessibilityAddTraits(.isHeader)
                         }
-                        .capsuleMenuLabel()
-                        .accessibilityLabel("Season, \(season.title)")
-                        .accessibilityIdentifier("detail.seasonMenu")
-                    } else if parent.type == .show {
-                        Text(season.title)
-                            .textRole(.title)
-                            .foregroundStyle(theme.ink)
-                            .accessibilityAddTraits(.isHeader)
+                        if parent.type == .show {
+                            Spacer(minLength: 0)
+                            seasonMenu(season)
+                        }
                     }
-                    EpisodeList(season: season)
+                    EpisodeList(season: season, wave: waveAffecting(season))
                         .id(season.ratingKey)
                 }
             }
         } skeleton: {
             Skeleton.Rows(artSize: CGSize(width: 128, height: 72))
                 .padding(.horizontal, -Space.inset)
+        }
+        .onChange(of: wave) { _, wave in
+            guard let wave else { return }
+            withAnimation(Motion.label) {
+                seasons.update { list in
+                    for index in list.indices where wave.ratingKey == parent.ratingKey || wave.ratingKey == list[index].ratingKey {
+                        list[index] = list[index].markedWatched(wave.watched)
+                    }
+                }
+            }
         }
         .task(id: LoadKey(library: library?.instance, attempt: seasons.attempt, extra: changes.revision)) {
             guard let library else { return }
@@ -728,6 +784,34 @@ private struct SeasonsSection: View {
                 await seasons.load { try await library.children(of: parent.ratingKey) }
             }
         }
+    }
+
+    /// Mark Season Watched or Unwatched, beside the season's name.
+    private func seasonMenu(_ season: PlexMetadata) -> some View {
+        Menu {
+            Button(
+                season.isWatched ? "Mark Season Unwatched" : "Mark Season Watched",
+                systemImage: season.isWatched ? "circle" : "checkmark.circle"
+            ) {
+                actions.setWatched(!season.isWatched, season) { shown in
+                    wave = WatchedWave(id: (wave?.id ?? 0) + 1, ratingKey: season.ratingKey, watched: shown)
+                }
+            }
+            .accessibilityIdentifier("detail.seasonWatched")
+        } label: {
+            Image(systemName: "ellipsis")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(theme.ink2)
+                .frame(width: Size.target, height: Size.target)
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel("More for \(season.title)")
+        .accessibilityIdentifier("detail.seasonMore")
+    }
+
+    /// The change a season's episodes follow: its own, or its show's.
+    private func waveAffecting(_ season: PlexMetadata) -> WatchedWave? {
+        wave.flatMap { $0.ratingKey == parent.ratingKey || $0.ratingKey == season.ratingKey ? $0 : nil }
     }
 
     /// The chosen season; at first the one holding the episode up next, else the first with episodes left,
@@ -748,6 +832,7 @@ private struct SeasonsSection: View {
 
 private struct EpisodeList: View {
     let season: PlexMetadata
+    let wave: WatchedWave?
 
     @Environment(\.plexLibrary) private var library
     @Environment(LibraryChanges.self) private var changes
@@ -773,6 +858,12 @@ private struct EpisodeList: View {
         } skeleton: {
             Skeleton.Rows(artSize: CGSize(width: 128, height: 72))
                 .padding(.horizontal, -Space.inset)
+        }
+        .onChange(of: wave) { _, wave in
+            guard let wave else { return }
+            withAnimation(Motion.label) {
+                episodes.update { list in list = list.map { $0.markedWatched(wave.watched) } }
+            }
         }
         .task(id: LoadKey(library: library?.instance, attempt: episodes.attempt, extra: changes.revision)) {
             guard let library else { return }

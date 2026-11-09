@@ -154,7 +154,7 @@ struct HomeView: View {
 }
 
 /// The Continue Watching row: snapping 16:9 cards. A tap resumes; a long press offers Details, Mark
-/// Watched and Remove from Continue Watching.
+/// Watched, Mark Show Watched (on an episode) and Remove from Continue Watching.
 private struct ContinueShelf: View {
     let hub: PlexHub
     let title: String
@@ -180,6 +180,7 @@ private struct ContinueShelf: View {
                         }
                         .buttonStyle(PressButtonStyle(cornerRadius: Radius.card))
                         .contextMenu { menu(item, index: index, zoomID: zoomID) }
+                        .accessibilityIdentifier("continue.\(item.ratingKey)")
                         .accessibilityHint("Resumes playback")
                         .accessibilityActions { menu(item, index: index, zoomID: zoomID) }
                     }
@@ -199,6 +200,15 @@ private struct ContinueShelf: View {
         }
         Button("Mark Watched", systemImage: "checkmark.circle") {
             actions.setWatched(true, item) { watched in setShown(!watched, item, index) }
+        }
+        if item.type == .episode, let show = item.grandparentRatingKey {
+            Button("Mark Show Watched", systemImage: "checkmark.circle.fill") {
+                // Every card of the show leaves at once, as the server drops its Continue Watching entries.
+                let cards = hub.items.enumerated().filter { $0.element.grandparentRatingKey == show }
+                actions.setWatched(true, key: show, touching: [], scope: .show) { watched in
+                    for card in cards { setShown(!watched, card.element, card.offset) }
+                }
+            }
         }
         Button("Remove from Continue Watching", systemImage: "minus.circle") {
             actions.removeFromContinueWatching(item) { hidden in setShown(!hidden, item, index) }

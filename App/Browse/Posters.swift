@@ -103,6 +103,36 @@ struct PosterCell: View {
     }
 }
 
+/// A long press on a show's poster offers Mark Show Watched or Unwatched; Plex marks every episode. Other
+/// titles have no menu of their own, so their long press does nothing.
+private struct ShowWatchedMenu: ViewModifier {
+    let item: PlexMetadata
+    let show: @MainActor (Bool) -> Void
+    private let actions = ItemActions()
+
+    func body(content: Content) -> some View {
+        if item.type == .show {
+            content.contextMenu {
+                Button(
+                    item.isWatched ? "Mark Show Unwatched" : "Mark Show Watched",
+                    systemImage: item.isWatched ? "circle" : "checkmark.circle"
+                ) {
+                    actions.setWatched(!item.isWatched, item, show: show)
+                }
+            }
+        } else {
+            content
+        }
+    }
+}
+
+extension View {
+    /// `show` puts the new state on screen ahead of the server, as for `ItemActions.setWatched`.
+    func showWatchedMenu(_ item: PlexMetadata, show: @escaping @MainActor (Bool) -> Void = { _ in }) -> some View {
+        modifier(ShowWatchedMenu(item: item, show: show))
+    }
+}
+
 /// Press feedback for posters and cards: the .97 scale, or the wash under Reduce Motion (DESIGN §9).
 struct PressButtonStyle: ButtonStyle {
     var cornerRadius: CGFloat = Radius.tile
@@ -202,6 +232,7 @@ struct PosterShelf: View {
                             PosterCell(item: item, width: Size.gridMin, zoomID: zoomID)
                         }
                         .buttonStyle(.press)
+                        .showWatchedMenu(item)
                         .opacity(appeared ? 1 : 0)
                         .animation(entrance(index), value: appeared)
                     }

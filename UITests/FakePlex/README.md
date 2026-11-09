@@ -7,6 +7,8 @@ The UI tests launch the app with `MARQUEE_FAKE_PLEX` set to this folder. `App/Te
 - A request reads `<prefix>/<path>.json`: prefix `plextv` for plex.tv, `discover` for discover.provider.plex.tv, `bazarr` for a host starting with `bazarr`, `speechdock` for a host starting with `speechdock`, `pms` for any other host. `GET /library/metadata/12` on the fake server reads `pms/library/metadata/12.json`.
 - `<path>@<name>=<value>.json` wins over `<path>.json` when the request has that query item, e.g. `plextv/api/v2/home/users/<uuid>/switch@pin=1234.json`.
 - After a write (any method but GET) to `/a/b`, `<path>@after=a_b.json` wins over every other fixture of the path; of several, the one for the latest write. `pms/library/metadata/212@after=api_providers_episodes.json` is the episode once Bazarr has downloaded a subtitle for it.
+- `/:/scrobble` and `/:/unscrobble` are remembered for the run: afterwards every list reads as the server would show it, a title taking the latest write for itself, its season or its show (`viewCount`, `viewedLeafCount`, no `viewOffset`), and a title marked watched leaves the `home.continue` hub. The fixture files themselves never change.
+- Elephants Dream (`105`) has one trailer, `pms/library/metadata/105/extras.json`, an H.264 MP4 the page previews in its hero; the preview shows the `-marquee.uitest.frame` picture.
 - A GET without a JSON fixture serves `<path>.srt` as text when that file exists, as `pms/library/streams/21217.srt` does for an external subtitle.
 - `"__status": 401` at the top of a fixture answers with that status.
 - `hosts.json` maps a host to the machine identifier its `/identity` reports, or to `null` for a host that cannot be reached. Unlisted hosts report `fake-server`.

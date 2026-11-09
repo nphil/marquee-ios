@@ -23,6 +23,15 @@ struct NetworkPath: Equatable, Sendable {
         }
     }
 
+    /// Whether the link is metered, now and on each change: cellular, a personal hotspot or Low Data Mode.
+    static func meteredUpdates() -> AsyncStream<Bool> {
+        AsyncStream { continuation in
+            let monitor = Monitor()
+            monitor.start { continuation.yield($0.isExpensive || $0.isConstrained) }
+            continuation.onTermination = { _ in monitor.cancel() }
+        }
+    }
+
     /// NWPathMonitor is thread-safe; the box only lets the stream's termination handler reach it.
     private final class Monitor: @unchecked Sendable {
         private let monitor = NWPathMonitor()

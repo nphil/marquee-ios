@@ -44,7 +44,7 @@ No PRODUCT.md interview was possible. This section is inferred from the brief, L
 - **Purpose.** Watch the household's own Plex movies and TV on an iPhone: resume fast, find something quickly, get audio and subtitles right.
 - **People.** Nitin and the household, each a Plex Home profile. Couch, one hand, dim room; sometimes daylight.
 - **Personality.** Composed, cinematic, unhurried.
-- **Anti-references.** A website in an app shell. Autoplaying trailers and busy carousels. Glass on everything. A dense Plex Web clone.
+- **Anti-references.** A website in an app shell. Autoplaying trailers beyond the one hero preview the TV has (Settings turns it off) and busy carousels. Glass on everything. A dense Plex Web clone.
 - **Principles.**
   1. Posters are the colour; chrome recedes (`L:382`).
   2. The system owns navigation; Marquee owns content, type and tint (`W26-251`, `I:5`).

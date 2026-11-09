@@ -29,6 +29,9 @@ struct ProfileSettings: Equatable, Sendable {
     /// Libraries switched off under Favorite Libraries, by `HomeLayout.libraryID`. Empty shows every library,
     /// and one the server adds later shows until switched off.
     var hiddenLibraries: Set<String> = []
+    /// Plays a title's trailer in its page's hero after a moment (behaviour spec: Play trailers
+    /// automatically, on by default).
+    var playsTrailers = true
 
     static let skipIntervals = [5, 10, 15, 30, 60]
     static let countdowns = [3, 5, 10, 15, 30]
@@ -38,7 +41,7 @@ extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
         case skipInterval, introSkipDelay, nextEpisodeDelay, directPlay, aspect, readsTunerDirectly
         case audioLanguage, subtitles, remembersTracks, subtitleStyle, homeRows
-        case posterLabels, quality, audioEnhancements, hiddenLibraries
+        case posterLabels, quality, audioEnhancements, hiddenLibraries, playsTrailers
     }
 
     init(from decoder: any Decoder) throws {
@@ -60,6 +63,7 @@ extension ProfileSettings: Codable {
         quality = value(.quality) ?? quality
         audioEnhancements = value(.audioEnhancements) ?? audioEnhancements
         hiddenLibraries = value(.hiddenLibraries) ?? hiddenLibraries
+        playsTrailers = value(.playsTrailers) ?? playsTrailers
     }
 }
 
