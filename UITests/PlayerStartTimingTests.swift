@@ -2,7 +2,9 @@ import XCTest
 
 /// Times the player's start against the fake server with every answer held 100 ms, about a real
 /// server's round trip, on direct play and on a server transcode. The times come from the Start line
-/// of stats for nerds; CI keeps them in `start-timing.txt` beside the screenshots.
+/// of stats for nerds; CI keeps them in `start-timing-direct.txt` and `start-timing-transcode.txt`
+/// beside the screenshots. One file per test, because the two can run in different UI test shards and
+/// merging the shards' screens keeps only one copy of a repeated file name.
 final class PlayerStartTimingTests: XCTestCase {
     @MainActor
     func testDirectPlayStart() throws {
@@ -39,13 +41,6 @@ private extension XCTestCase {
         let report = lines.joined(separator: "\n") + "\n"
         add(XCTAttachment(string: report))
         guard let directory = ProcessInfo.processInfo.environment["SCREENS_DIR"] else { return }
-        let file = URL(fileURLWithPath: directory).appendingPathComponent("start-timing.txt")
-        if let handle = try? FileHandle(forWritingTo: file) {
-            defer { try? handle.close() }
-            try handle.seekToEnd()
-            try handle.write(contentsOf: Data(report.utf8))
-        } else {
-            try Data(report.utf8).write(to: file)
-        }
+        try Data(report.utf8).write(to: URL(fileURLWithPath: directory).appendingPathComponent("start-timing-\(route).txt"))
     }
 }
