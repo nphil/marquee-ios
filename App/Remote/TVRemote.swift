@@ -103,15 +103,34 @@ struct TVRemoteScreen: View {
     }
 }
 
-/// Home's remote button, beside the profile button while the remote is on.
+/// Home's remote button, beside the profile button while the remote is on. It wears the profile button's
+/// shape (a 36 pt disc, a 2 pt gap and a 2 pt accent ring, 44 pt across) so the two read as a pair,
+/// and stands outside the bar's glass capsule as the profile button does.
 struct TVRemoteButton: View {
     @Environment(AppSession.self) private var session
+    @Environment(\.theme) private var theme
 
     var body: some View {
-        Button("TV Remote", systemImage: "av.remote") {
+        Button {
             session.remote.isPresented = true
+        } label: {
+            Image(systemName: "appletvremote.gen4.fill")
+                // 40% of the disc, the player controls' glyph proportion (Size.controlGlyph).
+                .font(.system(size: (Size.target - Space.s3) * Size.controlGlyph / Size.control, weight: .semibold))
+                .foregroundStyle(theme.accentText)
+                .frame(width: Size.target - Space.s3, height: Size.target - Space.s3)
+                .background(theme.sheet, in: Circle())
+                .padding(Space.s1)
+                .overlay(Circle().strokeBorder(theme.accent, lineWidth: 2))
+                .frame(width: Size.target, height: Size.target)
+                .contentShape(Circle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("TV Remote")
         .accessibilityHint("Controls the LumaTV.")
+        .accessibilityShowsLargeContentViewer {
+            Label("TV Remote", systemImage: "appletvremote.gen4.fill")
+        }
         .accessibilityIdentifier("remote.button")
     }
 }

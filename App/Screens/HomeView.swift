@@ -39,6 +39,7 @@ struct HomeView: View {
         .toolbar {
             if session.remote.isEnabled {
                 ToolbarItem(placement: .topBarTrailing) { TVRemoteButton() }
+                    .sharedBackgroundVisibility(.hidden)
                 ToolbarSpacer(.fixed, placement: .topBarTrailing)
             }
             ToolbarItem(placement: .topBarTrailing) { ProfileButton() }
