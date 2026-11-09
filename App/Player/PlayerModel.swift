@@ -1537,9 +1537,13 @@ final class PlayerModel: Identifiable {
     private struct ShownLine {
         var text = AttributedString()
         var words: [RevealedWord] = []
+        private var shown: Set<String> = []
 
-        /// Adds a cue below the lines before it, its words `elapsed` seconds into their reveal.
+        /// Adds a cue below the lines before it, its words `elapsed` seconds into their reveal. A cue whose
+        /// text is already showing is skipped: files and streams repeat a cue over the same time, and two
+        /// copies of one line stacked are never meant.
         mutating func add(_ cue: AttributedString, _ timed: [SubtitleReveal.Word], at elapsed: TimeInterval) {
+            guard shown.insert(String(cue.characters)).inserted else { return }
             if !text.characters.isEmpty { text += AttributedString("\n") }
             let base = text.characters.count
             text += cue

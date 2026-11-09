@@ -26,6 +26,8 @@ enum Size {
     static let controlGlyph: CGFloat = 22
     /// The most Dynamic Type grows a player glyph: half the circle.
     static let controlGlyphMax: CGFloat = 28
+    /// The icon column of a menu row at the default text size; it scales with Dynamic Type.
+    static let menuGlyph: CGFloat = 28
 }
 
 enum Radius {

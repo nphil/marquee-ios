@@ -372,10 +372,101 @@ jobs:
           path: build/UITests*.xcresult
           if-no-files-found: ignore
 
+  # The route menu on the smallest and the largest iPhone simulator the image has, upright and on its
+  # side: the rows must stay inside the screen and scroll when they do not fit. The standard shards run
+  # the same tests on the iPhone 18 Pro.
+  ui-sizes:
+    name: UI tests on the smallest and largest iPhone
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Generate project
+        run: |
+          HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew install xcodegen
+          xcodegen generate
+
+      - name: Resolve Swift packages
+        run: |
+          for attempt in 1 2 3; do
+            if xcodebuild -resolvePackageDependencies \
+                 -project Marquee.xcodeproj \
+                 -scheme Marquee \
+                 -clonedSourcePackagesDirPath build/SourcePackages; then
+              exit 0
+            fi
+            echo "Package resolution failed (attempt $attempt of 3)."
+            sleep $((attempt * 20))
+          done
+          exit 1
+
+      - name: Pick and boot the simulators
+        id: simulators
+        run: |
+          python3 tools/size-simulators.py > udids.txt
+          echo "small=$(sed -n 1p udids.txt)" >> "$GITHUB_OUTPUT"
+          echo "large=$(sed -n 2p udids.txt)" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$(sed -n 1p udids.txt)"
+
+      - name: Build for testing
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -project Marquee.xcodeproj \
+            -scheme Marquee \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/DD-sim \
+            -clonedSourcePackagesDirPath build/SourcePackages \
+            2>&1 | tee xcodebuild-build.log | xcbeautify
+
+      # One simulator at a time: two on a runner double every test's time. A failed test runs once more.
+      - name: Route menu screenshots
+        env:
+          SMALL: ${{ steps.simulators.outputs.small }}
+          LARGE: ${{ steps.simulators.outputs.large }}
+        run: |
+          mkdir -p screens
+          FAILED=0
+          for UDID in "$SMALL" "$LARGE"; do
+            xcrun simctl bootstatus "$UDID" -b
+            xcrun simctl ui "$UDID" appearance light
+            xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
+            set +e
+            TEST_RUNNER_SCREENS_DIR="$PWD/screens" xcodebuild test-without-building \
+              -project Marquee.xcodeproj \
+              -scheme Marquee \
+              -destination "id=$UDID" \
+              -derivedDataPath build/DD-sim \
+              -clonedSourcePackagesDirPath build/SourcePackages \
+              -resultBundlePath "build/UITests-$UDID.xcresult" \
+              -retry-tests-on-failure -test-iterations 2 \
+              -only-testing:MarqueeUITests/PlayerRouteMenuScreenshots \
+              2>&1 | tee "xcodebuild-test-$UDID.log" | xcbeautify
+            if [ "${PIPESTATUS[0]}" -ne 0 ]; then FAILED=1; fi
+            set -e
+            xcrun simctl shutdown "$UDID"
+          done
+          exit "$FAILED"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: screens-sizes
+          path: screens/
+          if-no-files-found: warn
+
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: UITests-xcresult-sizes
+          path: build/UITests*.xcresult
+          if-no-files-found: ignore
+
   # One `screens` artifact with every screenshot, as when a single job took them all.
   screens:
     name: Screenshots
-    needs: ui
+    needs: [ui, ui-sizes]
     if: always() && needs.ui.result != 'skipped'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -389,7 +480,7 @@ jobs:
 
   release:
     name: Release
-    needs: [core, live, app, ui]
+    needs: [core, live, app, ui, ui-sizes]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10

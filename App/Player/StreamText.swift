@@ -77,11 +77,12 @@ extension StreamText: @preconcurrency AVPlayerItemLegibleOutputPushDelegate {
 enum CaptionMarkup {
     static func attributed(_ strings: [NSAttributedString]) -> AttributedString? {
         var lines: [AttributedString] = []
+        // The output hands over every cue showing, and a stream may carry one cue twice (a cue that spans
+        // two segments is written into both), so a string with the lines of an earlier one is dropped.
+        var seen: Set<[String]> = []
         for string in strings {
-            for line in SubtitleLine.lines(attributed(string)) {
-                let clean = trimmed(line)
-                if !clean.characters.isEmpty { lines.append(clean) }
-            }
+            let block = SubtitleLine.lines(attributed(string)).map(trimmed).filter { !$0.characters.isEmpty }
+            if seen.insert(block.map { String($0.characters) }).inserted { lines += block }
         }
         guard var text = lines.first else { return nil }
         for line in lines.dropFirst() {

@@ -75,6 +75,20 @@ final class PlayerScreenshotTests: XCTestCase {
     }
 }
 
+/// The route menu with FakeCast's four receivers, on a phone on its side and upright. Besides the standard
+/// simulator, CI runs these on the smallest and largest iPhone simulators; the shots carry the screen's size.
+final class PlayerRouteMenuScreenshots: XCTestCase {
+    @MainActor
+    func testRouteMenuLandscape() throws {
+        try routeMenuFlow(orientation: .landscapeLeft, suffix: "rose-pine")
+    }
+
+    @MainActor
+    func testRouteMenuPortrait() throws {
+        try routeMenuFlow(orientation: .portrait, suffix: "rose-pine")
+    }
+}
+
 /// Run by CI with Increase Contrast and an accessibility text size.
 final class PlayerAccessibilityScreenshots: XCTestCase {
     @MainActor
@@ -95,6 +109,11 @@ final class PlayerAccessibilityScreenshots: XCTestCase {
     @MainActor
     func testWrongSubtitlesAndBazarr() throws {
         try subtitleFixFlow(mode: "dark", suffix: "ax")
+    }
+
+    @MainActor
+    func testRouteMenu() throws {
+        try routeMenuFlow(orientation: .landscapeLeft, suffix: "ax")
     }
 }
 
@@ -424,6 +443,47 @@ private extension XCTestCase {
         let failure = element("player.failed", in: app)
         XCTAssertTrue(landed, failure.exists ? "Playback failed: \(failure.label)" : "The player did not open")
         return app
+    }
+
+    /// The route menu open: every row inside the screen with a margin, the first row reachable, and the
+    /// last reachable by scrolling when the rows are taller than the room. The shots show the icons in one
+    /// column, the labels on one line and the check at the trailing margin.
+    @MainActor
+    func routeMenuFlow(orientation: UIDeviceOrientation, suffix: String) throws {
+        let app = launchPlayer(at: 61, paused: true, mode: "dark", cast: true)
+        XCUIDevice.shared.orientation = orientation
+        assertChrome(in: app)
+        tap("player.route", in: app)
+        let menu = element("route.menu", in: app)
+        XCTAssertTrue(menu.waitForExistence(timeout: 10), "The route menu did not open")
+        let phone = element("route.phone", in: app)
+        XCTAssertTrue(phone.waitForExistence(timeout: 10), "No This iPhone row")
+        for id in ["route.fake-cast", "route.fake-cast-2", "route.fake-cast-3", "route.fake-cast-4"] {
+            XCTAssertTrue(element(id, in: app).exists, "The Chromecast \(id) was not listed")
+        }
+
+        let screen = app.windows.firstMatch.frame
+        let box = menu.frame
+        let margin: CGFloat = 8
+        XCTAssertGreaterThanOrEqual(box.minX, screen.minX + margin, "The menu runs off the leading edge: \(box) in \(screen)")
+        XCTAssertLessThanOrEqual(box.maxX, screen.maxX - margin, "The menu runs off the trailing edge: \(box) in \(screen)")
+        XCTAssertGreaterThanOrEqual(box.minY, screen.minY + margin, "The menu runs off the top: \(box) in \(screen)")
+        XCTAssertLessThanOrEqual(box.maxY, screen.maxY - margin, "The menu runs off the bottom: \(box) in \(screen)")
+        XCTAssertTrue(phone.isHittable, "The first row is under the menu's edge")
+        XCTAssertGreaterThanOrEqual(phone.frame.minY, box.minY - 1, "The first row starts above the menu")
+
+        let width = Int(min(screen.width, screen.height)), height = Int(max(screen.width, screen.height))
+        let place = orientation.isLandscape ? "landscape" : "portrait"
+        try snap("player-32-route-menu-\(place)-\(width)x\(height)-\(suffix)")
+
+        // The last row: in view, or one drag brings it in.
+        let airplay = element("route.airplay", in: app)
+        XCTAssertTrue(airplay.exists, "No AirPlay & Bluetooth row")
+        if !airplay.isHittable {
+            menu.swipeUp()
+            XCTAssertTrue(airplay.isHittable, "The last row cannot be scrolled into view")
+            try snap("player-32-route-menu-\(place)-\(width)x\(height)-\(suffix)-end")
+        }
     }
 
     /// A tap away from a menu closes it without reaching the player underneath.

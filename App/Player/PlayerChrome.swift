@@ -15,9 +15,12 @@ struct PlayerChrome: View {
     let bottomChanged: (CGRect) -> Void
 
     @Environment(\.theme) private var theme
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
     /// The top row's bottom edge and the bottom controls' top edge, on screen, for the scrims.
     @State private var topRow: CGFloat = 0
     @State private var bottomRow: CGFloat = .infinity
+    /// The bottom controls' bottom edge: the lowest a menu from the top row may reach.
+    @State private var bottomEdge: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,12 +40,14 @@ struct PlayerChrome: View {
                     proxy.frame(in: .global)
                 } action: { frame in
                     bottomRow = frame.minY
+                    bottomEdge = frame.maxY
                     bottomChanged(frame)
                 }
         }
         .padding(.horizontal, Space.inset)
-        .padding(.top, Space.s2)
-        .padding(.bottom, Space.s2)
+        // On its side the phone has no top safe area and only the home indicator's below, so the rows would
+        // sit 8 pt from the edge.
+        .padding(.vertical, verticalSizeClass == .compact ? Space.s4 : Space.s2)
         .background {
             Scrims(topRow: topRow, bottomRow: bottomRow)
                 .allowsHitTesting(false)
@@ -87,8 +92,14 @@ struct PlayerChrome: View {
                 model.showsStats.toggle()
             }
 
-            RouteButton(model: model)
+            RouteButton(model: model, menuRoom: menuRoom)
         }
+    }
+
+    /// Height below the top row for the route menu: down to the bottom controls' edge, less the popover's
+    /// arrow and a margin. Before the first layout, a height that fits a phone on its side.
+    private var menuRoom: CGFloat {
+        bottomEdge > topRow ? bottomEdge - topRow - Space.s6 : 240
     }
 
     // MARK: Centre
@@ -309,6 +320,8 @@ private struct RoutePicker: UIViewRepresentable {
 /// popover lists this iPhone, the Chromecasts found and the system's AirPlay and Bluetooth picker.
 struct RouteButton: View {
     let model: PlayerModel
+    /// The height the route menu may take below the button.
+    let menuRoom: CGFloat
     @Environment(AppSession.self) private var session
     @State private var showsRoutes = false
 
@@ -324,7 +337,7 @@ struct RouteButton: View {
             .accessibilityLabel(model.castDevice.map { "Playing on \($0.name)" } ?? "Play On")
             .accessibilityIdentifier("player.route")
             .popover(isPresented: $showsRoutes) {
-                RouteList { showsRoutes = false }
+                RouteList(room: menuRoom) { showsRoutes = false }
                     .presentationCompactAdaptation(.popover)
             }
             .onChange(of: showsRoutes) { _, shown in
@@ -349,17 +362,41 @@ private struct CastGlyph: View {
     }
 }
 
-/// The route button's popover. Picking a Chromecast keeps it open until the receiver connects.
+/// The route button's popover. Picking a Chromecast keeps it open until the receiver connects. It takes
+/// the room below the top row and scrolls when the rows are taller, so a phone on its side never clips
+/// the first or last row.
 private struct RouteList: View {
+    let room: CGFloat
     let dismiss: () -> Void
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
-
-    private enum RowState { case idle, connecting, chosen }
+    @ScaledMetric(relativeTo: .body) private var glyphColumn = Size.menuGlyph
+    @State private var contentHeight: CGFloat = 0
 
     var body: some View {
+        let measured = rows
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        Group {
+            if contentHeight > room {
+                ScrollView { measured }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .frame(height: room)
+            } else {
+                measured
+            }
+        }
+        .frame(minWidth: 260)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("route.menu")
+        .presentationBackground(theme.sheet)
+        .onChange(of: session.cast.link) { _, link in
+            if case .connected = link { dismiss() }
+        }
+    }
+
+    private var rows: some View {
         let cast = session.cast
-        VStack(alignment: .leading, spacing: 0) {
+        return VStack(alignment: .leading, spacing: 0) {
             row("This iPhone", systemImage: "iphone", state: cast.link == .none ? .chosen : .idle, id: "route.phone") {
                 cast.disconnect()
                 dismiss()
@@ -370,30 +407,23 @@ private struct RouteList: View {
                 }
             }
             if cast.devices.isEmpty {
+                // Under the labels above, not under their icons.
                 Text("Looking for Chromecasts…")
                     .textRole(.caption)
                     .foregroundStyle(theme.ink2)
-                    .padding(.horizontal, Space.s4)
+                    .padding(.leading, Space.s4 + glyphColumn + Space.s3)
+                    .padding(.trailing, Space.s4)
                     .padding(.vertical, Space.s3)
             }
             Divider()
                 .overlay(theme.edge)
-            Label("AirPlay & Bluetooth", systemImage: "airplayvideo")
-                .textRole(.body)
-                .foregroundStyle(theme.ink)
-                .padding(.horizontal, Space.s4)
-                .frame(maxWidth: .infinity, minHeight: Size.control, alignment: .leading)
+            RouteRowLabel(title: "AirPlay & Bluetooth", systemImage: "airplayvideo", state: .idle)
                 .overlay { RoutePicker() }
                 .accessibilityIdentifier("route.airplay")
         }
-        .frame(minWidth: 260)
-        .presentationBackground(theme.sheet)
-        .onChange(of: cast.link) { _, link in
-            if case .connected = link { dismiss() }
-        }
     }
 
-    private static func state(of device: CastDevice, link: CastCenter.Link) -> RowState {
+    private static func state(of device: CastDevice, link: CastCenter.Link) -> RouteRowLabel.Mark {
         switch link {
         case .connected(let current) where current == device: .chosen
         case .connecting(let current) where current == device: .connecting
@@ -401,15 +431,39 @@ private struct RouteList: View {
         }
     }
 
-    private func row(_ title: String, systemImage: String, state: RowState, id: String, action: @escaping () -> Void) -> some View {
+    private func row(_ title: String, systemImage: String, state: RouteRowLabel.Mark, id: String, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.impact(.light)
             action()
         } label: {
-            HStack(spacing: Space.s3) {
-                Image(systemName: systemImage)
-                Text(title)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+            RouteRowLabel(title: title, systemImage: systemImage, state: state)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(state == .chosen ? .isSelected : [])
+        .accessibilityIdentifier(id)
+    }
+}
+
+/// One row of the route menu: every icon in one column, so the labels start on one line, and the mark of
+/// the chosen row (or the spinner of the one connecting) in a column of the same width at the trailing
+/// margin.
+private struct RouteRowLabel: View {
+    enum Mark { case idle, connecting, chosen }
+
+    let title: String
+    let systemImage: String
+    let state: Mark
+    @Environment(\.theme) private var theme
+    @ScaledMetric(relativeTo: .body) private var column = Size.menuGlyph
+
+    var body: some View {
+        HStack(spacing: Space.s3) {
+            Image(systemName: systemImage)
+                .frame(width: column)
+            Text(title)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Group {
                 switch state {
                 case .chosen:
                     Image(systemName: "checkmark")
@@ -418,19 +472,16 @@ private struct RouteList: View {
                     ProgressView()
                         .tint(theme.ink2)
                 case .idle:
-                    EmptyView()
+                    Color.clear
                 }
             }
-            .textRole(.body)
-            .foregroundStyle(theme.ink)
-            .padding(.horizontal, Space.s4)
-            .frame(minHeight: Size.control)
-            .contentShape(Rectangle())
+            .frame(width: column, alignment: .trailing)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(state == .chosen ? .isSelected : [])
-        .accessibilityIdentifier(id)
+        .textRole(.body)
+        .foregroundStyle(theme.ink)
+        .padding(.horizontal, Space.s4)
+        .frame(minHeight: Size.target)
+        .contentShape(Rectangle())
     }
 }
 
