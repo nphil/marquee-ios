@@ -155,14 +155,11 @@ private extension XCTestCase {
         let app = launchPlayer(at: 61, paused: true, mode: "dark", bazarr: true)
         XCUIDevice.shared.orientation = orientation
         defer { XCUIDevice.shared.orientation = .portrait }
-        tap("player.tracks", in: app)
-        let search = element("player.tracks.search", in: app)
-        let row = scrollMenu(in: app) { search.isHittable ? search : nil }
-        XCTAssertNotNil(row, "No provider-neutral search in the tracks menu")
-        row?.tap()
+        openSubtitles(in: app)
+        scrollList(app.collectionViews["player.subtitles"], to: element("player.tracks.search", in: app)).tap()
         XCTAssertTrue(element("subtitleSearch.language", in: app).waitForExistence(timeout: 10))
         XCTAssertTrue(element("bazarr.result", in: app).waitForExistence(timeout: 10))
-        try snap("subtitle-search-(suffix)")
+        try snap("subtitle-search-\(suffix)")
     }
 
     /// Paused mid-episode: the controls on the phone's side and upright, the audio and subtitles menu,
@@ -179,7 +176,7 @@ private extension XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
 
         tap("player.tracks", in: app)
-        XCTAssertTrue(app.buttons["Off"].waitForExistence(timeout: 5), "No audio and subtitles menu")
+        XCTAssertTrue(element("player.tracks.subtitles", in: app).waitForExistence(timeout: 5), "No subtitles entry in tracks menu")
         try snap("player-02-tracks-menu-\(suffix)")
         dismissMenu(in: app)
 
@@ -349,18 +346,10 @@ private extension XCTestCase {
     func subtitleFixFlow(mode: String, suffix: String) throws {
         let app = launchPlayer(at: 61, paused: true, mode: mode, bazarr: true, speechDock: true)
 
-        tap("player.tracks", in: app)
-        let off = app.buttons["Off"]
-        XCTAssertTrue(off.waitForExistence(timeout: 5), "No subtitle list in the menu")
-        // The audio list has an English row too; the subtitle rows sit below Off.
+        openSubtitles(in: app)
         let english = app.buttons.matching(NSPredicate(format: "label == 'English'"))
-        let subtitle = scrollMenu(in: app) {
-            english.allElementsBoundByIndex
-                .filter { $0.isHittable && (!off.exists || $0.frame.minY > off.frame.minY) }
-                .min { $0.frame.minY < $1.frame.minY }
-        }
-        XCTAssertNotNil(subtitle, "No English subtitle in the menu")
-        subtitle?.tap()
+        scrollList(app.collectionViews["player.subtitles"], to: english.firstMatch).tap()
+        tap("subtitleFix.done", in: app)
         openWrongSubtitles(in: app)
         let removal = element("subtitleFix.removal", in: app)
         XCTAssertTrue(removal.waitForExistence(timeout: 5), "No removal line")
@@ -410,12 +399,8 @@ private extension XCTestCase {
         // Reveal as Spoken on the file Plex added: SpeechDock times its English lines.
         tap("subtitleFix.done", in: app)
         XCTAssertTrue(element("subtitleFix.search", in: app).waitForNonExistence(timeout: 5), "The sheet did not close")
-        tap("player.tracks", in: app)
-        XCTAssertTrue(app.buttons["Off"].waitForExistence(timeout: 5), "No tracks menu")
-        let style = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Subtitle Style'")).firstMatch
-        let row = scrollMenu(in: app) { style.exists && style.isHittable ? style : nil }
-        XCTAssertNotNil(row, "No Subtitle Style in the menu")
-        row?.tap()
+        openSubtitles(in: app)
+        scrollList(app.collectionViews["player.subtitles"], to: element("player.tracks.style", in: app)).tap()
         waitForBar("Subtitle Style", in: app)
         // A landscape sheet ignores app.swipeUp, so the style list is dragged to the row.
         scrollList(app.collectionViews["style.list"], to: element("style.reveal", in: app)).tap()
@@ -429,13 +414,16 @@ private extension XCTestCase {
 
     @MainActor
     func openWrongSubtitles(in app: XCUIApplication) {
-        tap("player.tracks", in: app)
-        XCTAssertTrue(app.buttons["Off"].waitForExistence(timeout: 5), "No tracks menu")
-        let wrong = labelled("Wrong Subtitles?", in: app)
-        let row = scrollMenu(in: app) { wrong.exists && wrong.isHittable ? wrong : nil }
-        XCTAssertNotNil(row, "No Wrong Subtitles? in the menu")
-        row?.tap()
+        openSubtitles(in: app)
+        scrollList(app.collectionViews["player.subtitles"], to: element("player.tracks.wrong", in: app)).tap()
         waitFor("subtitleFix.wrong", in: app)
+    }
+
+    @MainActor
+    func openSubtitles(in app: XCUIApplication) {
+        tap("player.tracks", in: app)
+        tap("player.tracks.subtitles", in: app)
+        waitFor("player.subtitles", in: app)
     }
 
     /// An open menu lays out only the rows that fit on screen. The tracks menu hangs from the right of

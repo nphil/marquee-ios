@@ -209,6 +209,7 @@ struct SubtitleSearchView: View {
                         Text(fix.language.name ?? "Unknown").foregroundStyle(theme.ink2)
                     }
                 }
+                .disabled(fix.plexAddUnresolved)
                 .accessibilityIdentifier("subtitleSearch.language")
             }.listRowBackground(theme.sheet)
 
@@ -220,7 +221,7 @@ struct SubtitleSearchView: View {
             }
             if fix.plexAddUnresolved {
                 Section {
-                    Text("Finish checking the requested subtitle in Plex before searching Plex again.")
+                    Text("Finish checking the requested subtitle in Plex before changing language or searching Plex again.")
                         .foregroundStyle(theme.ink2)
                 }.listRowBackground(theme.sheet)
             } else if fix.plexSearch == nil && fix.results.isEmpty && (fix.search != nil || model.bazarr == nil) {

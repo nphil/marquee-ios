@@ -152,7 +152,7 @@ final class SubtitleFix {
     }
 
     func selectLanguage(_ selected: TrackLanguage) {
-        guard selected != language else { return }
+        guard !plexAddUnresolved, selected != language else { return }
         language = selected
         plexSearchTask?.cancel()
         plexSearch = nil
