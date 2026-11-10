@@ -46,17 +46,17 @@ struct SettingsView: View {
             }
             .listRowBackground(theme.sheet)
 
-            Section("Appearance") {
+            Section {
                 NavigationLink {
                     AppearanceView()
                 } label: {
                     LabeledContent {
                         Text(theme.name).foregroundStyle(theme.ink2)
                     } label: {
-                        Text("Theme")
+                        Text("Appearance")
                     }
                 }
-                .accessibilityIdentifier("settings.theme")
+                .accessibilityIdentifier("settings.appearance")
             }
             .listRowBackground(theme.sheet)
 

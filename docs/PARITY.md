@@ -119,7 +119,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Favourite libraries | Done | Settings › Favorite Libraries: switched-off libraries leave Home's shelves and the Library title menu; one always stays on. | local |
 | Privacy / consent (crash, product reports) | N/A | Nothing is reported from the iPhone app, so there is no consent to ask for; Delete All Local Data covers what is stored on the phone. | none (local) |
 | Delete all local data | Done | Settings › Delete All Local Data, after a confirmation: signs out and removes Keychain items, preferences, themes, cached artwork and guide data; the sign-in screen says what happened. | local |
-| Appearance (theme picker) | Done | Themes. | local [code] |
+| Appearance | Done | Settings › Appearance: Theme (theme picker), Tab Bar, Header Style, Show Scroll Bars. | local [code] |
 | Sign out | Done | Confirmation dialog. | local [code] |
 
 ## 8. Profiles

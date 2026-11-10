@@ -40,7 +40,7 @@ struct TabBarView: View {
             } header: {
                 Text("Tabs")
             } footer: {
-                Text("Up to five tabs, in this order. Home stays a tab, as its profile button opens Settings, and Search stays last.")
+                Text("Up to five, in this order. Home stays a tab and Search stays last.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)
@@ -60,7 +60,7 @@ struct TabBarView: View {
             } header: {
                 Text("On Scroll")
             } footer: {
-                Text("While a page scrolls down, Hide on Scroll slides the tab bar away and Minimise on Scroll shrinks it to the current tab. Scrolling back up or reaching the top brings it back.")
+                Text("Scrolling down, Hide on Scroll slides the bar away and Minimise on Scroll shrinks it to the current tab. Scrolling up brings it back.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)

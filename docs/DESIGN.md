@@ -430,7 +430,7 @@ On the smallest iPhones (375 × 667 pt), upright, the top row leaves the title 2
 Settings opens from Home's profile button in a sheet with Done (§7). It is a system inset-grouped list (`I:40`), rows 56 pt minimum. Top to bottom:
 
 1. **Account:** profile name and server name; opens the profile switcher.
-2. **Appearance:** the theme picker, Header Style, Tab Bar and Show Scroll Bars (below).
+2. **Appearance:** one row reading the active theme's name, opening a short list: Theme, Tab Bar, Header Style, each a row with its current value that opens its own page, and Show Scroll Bars as a switch (below).
 3. **Home:** Rows, reading Default or Custom, opens Home Rows: every row Home can show (the server's Home hubs, then each movie and TV library's hubs, named "Top Rated in Movies"), each with a small preview of its first posters, its first titles and a switch. The list is always in edit mode, so a row drags by its handle; VoiceOver offers Move Up and Move Down. A library's rows start off. Reset to Default restores the server's rows and order. Changes save at once for the profile, keyed by each hub's `hubIdentifier` (a library's prefixed with its uuid); a hub the server adds later shows at the end, and a library with no shown row is never asked for its hubs.
 4. **Video & playback** (`B:§1`): skip interval (the live player's skips too), intro skip (manual or auto, countdown), credits and auto-next delay, direct play mode (Auto, Disabled, Force; Force asks for confirmation with Cancel first), default aspect (`B:§4`), Play Trailers Automatically, **Play Theme Music** with its volume (§8.3); under **Live TV**, **Direct from Tuner** (on by default; off, every channel plays through Plex, docs/LIVE-TV.md §2.2).
 5. **Audio & subtitles** (`B:§1`): preferred audio language, subtitle mode, follow-dub rule, remember choices, **Subtitle style** with a live preview (`B:§3`).
@@ -440,13 +440,13 @@ Settings opens from Home's profile button in a sheet with Done (§7). It is a sy
 
 The LumaTV remote’s Remote Access setting selects Mini Bar (default) or Home Button. The native tab-bar accessory shows the TV name and connection state in a compact glass capsule, adapting inline when the tab bar minimises; tap or swipe up opens the remote, and swipe down closes it. Both automatic entries are hidden away from home or when presence is unknown. The integration page keeps pairing and opening the remote available regardless of presence.
 
-**Theme picker** (Appearance page)
+**Theme picker** (Appearance › Theme)
 
 1. **Match system appearance** toggle, on by default (`S:Features/Settings/SettingsView.swift:201`). On: two rows, Light and Dark, each showing a preview tile and the theme name and opening that mode's 20-theme grid. Off: one grid with a Dark | Light segmented control above it.
 2. **Grid:** adaptive columns, minimum tile width 104 pt (3 at 390), 16 pt spacing (`S:Features/Settings/SettingsView.swift:213`). A tile is a rounded 3:4 preview drawn from the theme's own roles: canvas fill, two ink lines, a sheet-coloured panel holding an accent pill and three small poster blocks. The name sits under the tile (Caption). No images, no blur, no shadows, so scrolling stays smooth.
 3. **Selecting:** the tile gets a ring in the theme's `focus` colour plus a check mark (never colour alone); the app re-themes instantly with a selection tick and no animation.
 4. At large accessibility sizes the grid goes to 2 columns, then 1; names wrap.
-5. **Header Style** (§7.1) follows the themes, an inline picker with a footer saying what its choices do. **Tab Bar** (§7) is a row reading "5 Tabs" that opens its page: each place with its tab icon, a line saying where it opens when it is not a tab, and a switch, in edit mode so a row drags by its handle (Search stays last and has none), then the On Scroll choice. **Show Scroll Bars**, on by default, shows the system scroll indicator on every page and sheet; the A–Z rail shows either way. All apply at once, without rebuilding the page under them, and are kept with the theme, not per profile.
+5. The Appearance page holds what is not a theme. **Header Style** (§7.1) opens an inline picker with a one-line footer saying what its choices do. **Tab Bar** (§7) is a row reading "5 Tabs" that opens its page: each place with its tab icon, a line saying where it opens when it is not a tab, and a switch, in edit mode so a row drags by its handle (Search stays last and has none), then the On Scroll choice. **Show Scroll Bars**, on by default, shows the system scroll indicator on every page and sheet; the A–Z rail shows either way. All apply at once, without rebuilding the page under them, and are kept with the theme, not per profile.
 
 ### 8.8 Requests
 

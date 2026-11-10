@@ -1,12 +1,10 @@
 import MarqueeCore
 import SwiftUI
 
-/// The theme picker (DESIGN §8.7), the header style (§7.1), the way into Tab Bar (§7) and the scroll bars.
-/// Matching the system shows a Light and a Dark slot, each opening its mode's grid; with matching off one
-/// grid shows under a Dark | Light switch.
-struct AppearanceView: View {
+/// The theme picker (DESIGN §8.7), under Settings › Appearance. Matching the system shows a Light and a
+/// Dark slot, each opening its mode's grid; with matching off one grid shows under a Dark | Light switch.
+struct ThemeView: View {
     @Environment(ThemeStore.self) private var store
-    @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     /// The grid on show while matching is off; until the switch is used, the mode on screen.
@@ -23,8 +21,8 @@ struct AppearanceView: View {
                 .accessibilityIdentifier("appearance.matchSystem")
             } footer: {
                 Text(store.matchSystem
-                     ? "Marquee follows the iPhone's light or dark appearance, with a theme for each."
-                     : "One theme, whatever the iPhone's appearance.")
+                     ? "A theme for light and one for dark, following the iPhone."
+                     : "One theme in both appearances.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)
@@ -60,57 +58,9 @@ struct AppearanceView: View {
                 .listRowBackground(Color.clear)
                 .listRowSeparator(.hidden)
             }
-
-            Section {
-                Picker("Header Style", selection: Binding(
-                    get: { store.headerStyle },
-                    set: { store.setHeaderStyle($0) }
-                )) {
-                    ForEach(HeaderStyle.allCases) { style in
-                        Text(style.name).tag(style)
-                            .accessibilityIdentifier("appearance.header.\(style.rawValue)")
-                    }
-                }
-                .pickerStyle(.inline)
-                .labelsHidden()
-            } header: {
-                Text("Header Style")
-            } footer: {
-                Text("How the bar at the top meets the page scrolling under it: Soft fades the page out, Hard draws a line under the bar, Blur frosts it.")
-                    .foregroundStyle(theme.ink2)
-            }
-            .listRowBackground(theme.sheet)
-
-            Section {
-                NavigationLink {
-                    TabBarView()
-                } label: {
-                    LabeledContent {
-                        Text("\(store.tabLayout.tabs(available: Destination.available(in: session)).count) Tabs")
-                            .foregroundStyle(theme.ink2)
-                    } label: {
-                        Text("Tab Bar")
-                    }
-                }
-                .accessibilityIdentifier("appearance.tabBar")
-            }
-            .listRowBackground(theme.sheet)
-
-            Section {
-                Toggle("Show Scroll Bars", isOn: Binding(
-                    get: { store.showsScrollBars },
-                    set: { store.setShowsScrollBars($0) }
-                ))
-                .tint(theme.accent)
-                .accessibilityIdentifier("appearance.scrollBars")
-            } footer: {
-                Text("The thin bar at a page's edge while it scrolls. The Library's A–Z rail shows either way.")
-                    .foregroundStyle(theme.ink2)
-            }
-            .listRowBackground(theme.sheet)
         }
         .themedList(theme)
-        .navigationTitle("Appearance")
+        .navigationTitle("Theme")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

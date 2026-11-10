@@ -1,7 +1,7 @@
 import XCTest
 
 /// The header styles (DESIGN §7.1) on Home, the Library and Live TV, at rest and scrolled; the tab bar's
-/// scroll behaviours (§7) with the Appearance page that chooses them; and the A–Z rail held mid-scrub
+/// scroll behaviours (§7) with the Tab Bar page that chooses them; and the A–Z rail held mid-scrub
 /// (§8.2), which CI also shoots on the smallest and largest iPhone, so its shots carry the screen's size.
 /// In Rosé Pine and Dawn.
 final class HeaderScreenshotTests: XCTestCase {
@@ -106,9 +106,9 @@ extension XCTestCase {
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine")
         waitFor("poster.102", in: app)
         openSettings(in: app)
-        tap("settings.theme", in: app)
+        tap("settings.appearance", in: app)
         waitForBar("Appearance", in: app)
-        reveal("appearance.tabBar", in: app).tap()
+        tap("appearance.tabBar", in: app)
         waitForBar("Tab Bar", in: app)
         try snap("tabbar-00-tabs-\(suffix)")
         reveal("appearance.tabBar.hide", in: app).tap()
