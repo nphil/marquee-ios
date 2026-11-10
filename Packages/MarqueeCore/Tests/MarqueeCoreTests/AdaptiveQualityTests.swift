@@ -79,19 +79,21 @@ struct AdaptiveQualityTests {
         #expect(play(&abr, from: 0, to: 600, kbps: 5_000) { $0 < 300 ? 8 : 30 }.isEmpty)
     }
 
-    @Test func aLinkThatDropsAfterEachClimbStopsClimbingUntilFiveCalmMinutes() {
+    @Test func repeatedDropsHoldTheFloorUntilTheLinkRecovers() {
         var abr = make(.away(.remote), link: 3_000)
         var moves: [Move] = []
-        // 30 s at 30 Mbit/s, then 30 s at 3 Mbit/s with the buffer run down, for 5 minutes.
         for cycle in 0..<5 {
             let start = TimeInterval(cycle * 60)
             moves += play(&abr, from: start, to: start + 28, kbps: 30_000) { _ in 20 }
             moves += play(&abr, from: start + 30, to: start + 58, kbps: 3_000) { _ in 8 }
         }
-        // The hold doubles with each drop, to 40 s after the second: longer than a good spell.
-        #expect(moves.filter { $0.to == .original }.map(\.at) == [20, 80])
-        let calm = play(&abr, from: 420, to: 480, kbps: 30_000) { _ in 20 }
-        #expect(calm == [Move(at: 430, to: .original)])
+        let climbs = moves.filter { $0.to == .original }
+        #expect(climbs.count == 2)
+        #expect(climbs.allSatisfy { $0.at < 120 })
+        #expect(abr.rung == abr.floor)
+        let recovered = play(&abr, from: 420, to: 480, kbps: 30_000) { _ in 20 }
+        #expect(recovered.map(\.to) == [.original])
+        #expect(abr.rung == .original)
     }
 
     @Test func scoresStopTheClimbWhereMoreRateLooksNoBetter() {

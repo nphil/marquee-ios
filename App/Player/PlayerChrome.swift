@@ -151,15 +151,15 @@ struct PlayerChrome: View {
     /// text sizes or on a small phone.
     @ViewBuilder
     private var networkWait: some View {
-        if model.waitsForNetwork, model.offer == nil {
-            Text("Waiting for the network")
+        if model.waitsForNetwork || model.belowQualityFloor, model.offer == nil {
+            Text(model.belowQualityFloor ? "Keeping picture quality; buffering may be needed." : "Waiting for the network")
                 .textRole(.label)
                 .foregroundStyle(theme.ink)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.top, Space.s3)
                 .allowsHitTesting(false)
-                .accessibilityIdentifier("player.networkWait")
+                .accessibilityIdentifier(model.belowQualityFloor ? "player.qualityFloor" : "player.networkWait")
                 .transition(.opacity)
         }
     }

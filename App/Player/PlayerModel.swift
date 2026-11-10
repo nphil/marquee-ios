@@ -174,6 +174,7 @@ final class PlayerModel: Identifiable {
     private(set) var place: NetworkPlace?
     /// Auto's estimate of the link to the server, for stats for nerds.
     private(set) var linkEstimateKbps: Int?
+    private(set) var belowQualityFloor = false
     var showsInfo = false
     var showsStyle = false
     var showsStats = false
@@ -319,6 +320,9 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var lastTransfer: (bytes: Int64, seconds: TimeInterval)?
     /// The longest wait on the network since Auto's last look.
     @ObservationIgnored private var longestWait: TimeInterval = 0
+    @ObservationIgnored private var viewport = CGSize.zero
+    @ObservationIgnored private var viewportScale: CGFloat = 1
+    @ObservationIgnored private var streamNetworkRevision = -1
 
     init(request: PlaybackRequest, session: AppSession, library: PlexLibrary, capabilities: PlaybackCapabilities) {
         self.request = request
@@ -963,11 +967,14 @@ final class PlayerModel: Identifiable {
 
     private func decideRoute() async {
         guard let tracks, let media, let part else { return }
+        let owner = generation
+        let network = session.presenceNetworkRevision
         if let castDevice {
             decideCastRoute(castDevice, tracks: tracks, media: media, part: part)
             return
         }
         let choice = await chooseRoute(tracks: tracks, media: media, part: part, quality: quality)
+        guard owner == generation, network == session.presenceNetworkRevision, !Task.isCancelled else { return }
         take(choice)
         if case .sidecar(let track) = choice.route.subtitle { await loadSidecar(track) }
     }
@@ -1038,18 +1045,24 @@ final class PlayerModel: Identifiable {
 
     private func loadSidecar(_ track: SubtitleTrack) async {
         guard sidecarID != track.id else { return }
+        let owner = generation
+        let network = session.presenceNetworkRevision
         sidecar = nil
         sidecarID = nil
         let key = part?.streams.first(where: { $0.id == track.id })?.key ?? "/library/streams/\(track.id)"
         do {
+            let loaded: SidecarContents
             if let download = request.download {
                 guard let saved = download.subtitles.first(where: { $0.streamID == track.id }) else { throw CocoaError(.fileNoSuchFile) }
-                sidecar = try await SidecarLoader.load(track, fileURL: session.downloads.store.subtitleFile(for: download, saved))
+                loaded = try await SidecarLoader.load(track, fileURL: session.downloads.store.subtitleFile(for: download, saved))
             } else {
-                sidecar = try await SidecarLoader.load(track, key: key, library: library, session: session.transport.session)
+                loaded = try await SidecarLoader.load(track, key: key, library: library, session: session.transport.session)
             }
+            guard owner == generation, network == session.presenceNetworkRevision, !Task.isCancelled else { return }
+            sidecar = loaded
             sidecarID = track.id
         } catch {
+            guard owner == generation, network == session.presenceNetworkRevision, !Task.isCancelled else { return }
             subtitleProblem = "\(track.label): \(Self.message(error))"
         }
     }
@@ -1058,6 +1071,7 @@ final class PlayerModel: Identifiable {
 
     private func startStream(at target: TimeInterval, generation: Int) async {
         guard let route, let part else { return }
+        let networkRevision = session.presenceNetworkRevision
         if castDevice != nil {
             await startCast(at: target, generation: generation)
             return
@@ -1078,7 +1092,9 @@ final class PlayerModel: Identifiable {
                     url = file
                 } else {
                     url = try await library.playbackURL(path: part.key)
-                    streamConnection = await library.connection.currentConnection
+                    let connection = await library.connection.currentConnection
+                    guard generation == self.generation, !Task.isCancelled else { return }
+                    streamConnection = connection
                     reporter = TimelineReporter(library: library, item: item)
                 }
                 stream = .direct
@@ -1090,7 +1106,7 @@ final class PlayerModel: Identifiable {
                     source = file
                 } else {
                     let connection = try await library.connection.connection()
-                    guard generation == self.generation else { return }
+                    guard generation == self.generation, !Task.isCancelled else { return }
                     guard let remote = PlexURL.make(base: connection.uri, path: part.key) else { throw URLError(.badURL) }
                     source = remote
                     streamConnection = connection
@@ -1101,10 +1117,12 @@ final class PlayerModel: Identifiable {
                 listen(to: remux)
                 remuxFinished = false
                 url = try await remux.start(at: target)
+                guard generation == self.generation, !Task.isCancelled else { remux.stop(); return }
                 try await handOff(remux, landing: target)
             case .serverTranscode:
                 guard request.download == nil else { throw URLError(.unsupportedURL) }
                 try await selectForServer(route, part: part)
+                guard generation == self.generation, !Task.isCancelled else { return }
                 let session = UUID().uuidString
                 stream = .transcode(session)
                 transcodeOffset = target
@@ -1112,15 +1130,23 @@ final class PlayerModel: Identifiable {
                 url = try await library.transcodeURL(
                     TranscodeRequest(item: item, mediaIndex: mediaIndex, route: route, offset: target, session: session)
                 )
-                streamConnection = await library.connection.currentConnection
+                let connection = await library.connection.currentConnection
+                guard generation == self.generation, !Task.isCancelled else {
+                    try? await library.stopTranscode(session: session)
+                    return
+                }
+                streamConnection = connection
                 loadStage = .preparing
             }
-            guard generation == self.generation else { return }
+            guard generation == self.generation, !Task.isCancelled,
+                  request.download != nil || networkRevision == session.presenceNetworkRevision else { return }
+            streamNetworkRevision = networkRevision
             applySubtitleSources()
             startTiming.mark(.stream)
             load(url)
         } catch {
-            guard generation == self.generation, !(error is CancellationError) else { return }
+            guard generation == self.generation, networkRevision == session.presenceNetworkRevision,
+                  !Task.isCancelled, !(error is CancellationError) else { return }
             streamFailed(PlaybackFailure(text: Self.message(error)))
         }
     }
@@ -1240,6 +1266,8 @@ final class PlayerModel: Identifiable {
         seekTask?.cancel()
         seekTask = nil
         measureLink()
+        lastTransfer = nil
+        longestWait = 0
         backend.load(nil)
         itemReady = false
         farSeeking = false
@@ -1260,7 +1288,8 @@ final class PlayerModel: Identifiable {
     /// Keeps what the ending stream measured of the link to its server, for the next route: the remux's
     /// reads from the file, or AVPlayer's segment downloads from the server. Direct play is not measured.
     private func measureLink() {
-        guard let address = streamConnection?.uri else { return }
+        guard streamNetworkRevision == session.presenceNetworkRevision,
+              let address = streamConnection?.uri else { return }
         var bitsPerSecond: Double?
         switch stream {
         case .remux(let remux):
@@ -1286,7 +1315,7 @@ final class PlayerModel: Identifiable {
     }
 
     /// A track change: decides again, then switches inside the stream or starts a new one.
-    private func reroute(handPick: Bool) {
+    private func reroute(handPick: Bool, reconnect: Bool = false) {
         abandonMove()
         generation += 1
         let generation = generation
@@ -1297,7 +1326,7 @@ final class PlayerModel: Identifiable {
             let previous = streamKey
             await decideRoute()
             guard generation == self.generation, let route else { return }
-            if StreamKey(route) != previous || stream == nil {
+            if reconnect || StreamKey(route) != previous || stream == nil {
                 isBuffering = true
                 await startStream(at: at, generation: generation)
             } else {
@@ -1316,17 +1345,78 @@ final class PlayerModel: Identifiable {
     private static let switchLead: TimeInterval = 8
     private static let switchBuffer: TimeInterval = 9
 
+    private var sourcePicture: AdaptiveQuality.Picture? {
+        guard let width = media?.width, let height = media?.height, width > 0, height > 0 else { return nil }
+        return AdaptiveQuality.Picture(width: width, height: height)
+    }
+
+    private var viewPicture: AdaptiveQuality.Picture? {
+        guard viewport.width > 0, viewport.height > 0 else { return nil }
+        let source = CGSize(width: CGFloat(media?.width ?? 16), height: CGFloat(media?.height ?? 9))
+        let frame = VideoFrame.rect(aspect: aspect, video: source, in: viewport, displayScale: viewportScale)
+        return AdaptiveQuality.Picture(
+            width: max(1, Int(frame.width * viewportScale)), height: max(1, Int(frame.height * viewportScale))
+        )
+    }
+
+    func viewportChanged(size: CGSize, scale: CGFloat) {
+        guard size.width > 0, size.height > 0, scale > 0 else { return }
+        viewport = size
+        viewportScale = scale
+        guard phase == .playing, let current = adaptive, let place else { return }
+        var resized = AdaptiveQuality(
+            place: place, mediaKbps: media?.bitrate, linkKbps: current.estimateKbps,
+            source: sourcePicture, view: viewPicture, now: ProcessInfo.processInfo.systemUptime
+        )
+        guard resized.floor != current.floor else { return }
+        abandonMove()
+        let target = resized.ladder.contains(autoRung) ? autoRung : resized.floor
+        resized.moved(to: target, at: ProcessInfo.processInfo.systemUptime)
+        adaptive = resized
+        belowQualityFloor = false
+        if target != autoRung { adapt(to: target) }
+    }
+
+    func invalidateNetworkMeasurements() {
+        guard request.download == nil, castDevice == nil else { return }
+        generation += 1
+        loadTask?.cancel()
+        loadTask = nil
+        if !itemReady { stopStream() }
+        abandonMove()
+        adaptive = nil
+        lastTransfer = nil
+        longestWait = 0
+        linkEstimateKbps = nil
+        belowQualityFloor = false
+        place = .unknown
+    }
+
+    func networkConnectionChanged(to connection: PlexConnection?) {
+        guard request.download == nil, castDevice == nil, let connection,
+              phase == .loading || phase == .playing else { return }
+        guard media != nil, part != nil else {
+            loadItem(item.ratingKey)
+            return
+        }
+        startAdapting(connection: connection)
+        reroute(handPick: false, reconnect: true)
+    }
+
+
     /// Auto's state for the item: where the phone is and the link as last measured set the start.
     private func startAdapting(connection: PlexConnection?) {
         adaptive = nil
         lastTransfer = nil
         longestWait = 0
         linkEstimateKbps = nil
+        belowQualityFloor = false
         autoRung = .original
         if let connection { place = networkPlace(of: connection) }
         guard qualitySetting == .auto, !forcesDirectPlay, let connection, let place else { return }
         let adaptive = AdaptiveQuality(
             place: place, mediaKbps: media?.bitrate, linkKbps: session.player.linkKbps[connection.uri],
+            source: sourcePicture, view: viewPicture,
             now: ProcessInfo.processInfo.systemUptime
         )
         self.adaptive = adaptive
@@ -1337,7 +1427,7 @@ final class PlayerModel: Identifiable {
     /// is local.
     private func networkPlace(of connection: PlexConnection) -> NetworkPlace {
         if FakePlex.isActive { return connection.isLocal ? .home : .away(.remote) }
-        let path = session.pathMetrics.path(to: connection.uri.host() ?? "")
+        let path = session.pathMetrics.path(to: connection.uri, revision: session.presenceNetworkRevision)
         return .of(
             connection, onPhoneNetwork: NetworkPath.isOnAttachedNetwork(connection.ipAddress),
             localAddress: path?.localAddress, roundTrip: path?.roundTrip
@@ -1357,12 +1447,15 @@ final class PlayerModel: Identifiable {
     /// One look for Auto: the link's speed while data moved, the media in hand and the longest wait since the
     /// last look.
     private func lookAtStream() {
-        guard var adaptive, phase == .playing, isPlaying, castDevice == nil, landing == nil, !isSeeking else {
+        guard var adaptive, phase == .playing, isPlaying, castDevice == nil, landing == nil, !isSeeking,
+              streamNetworkRevision == session.presenceNetworkRevision, !movePending else {
             lastTransfer = nil
             longestWait = 0
             return
         }
-        var look = AdaptiveQuality.Look(now: ProcessInfo.processInfo.systemUptime, waitingSeconds: longestWait)
+        var look = AdaptiveQuality.Look(
+            now: ProcessInfo.processInfo.systemUptime, waitingSeconds: longestWait, streamID: adaptive.streamID
+        )
         longestWait = 0
         switch stream {
         case .remux(let remux):
@@ -1389,6 +1482,10 @@ final class PlayerModel: Identifiable {
         let move = adaptive.observe(look)
         self.adaptive = adaptive
         linkEstimateKbps = adaptive.estimateKbps
+        if belowQualityFloor != adaptive.belowFloor {
+            belowQualityFloor = adaptive.belowFloor
+            if belowQualityFloor { showChrome() } else { scheduleHide() }
+        }
         if let move { adapt(to: move) }
     }
 
@@ -1906,7 +2003,8 @@ final class PlayerModel: Identifiable {
     /// play as it is.
     private func offerLowerQuality() {
         if case .lowerQuality? = offer { return }
-        guard adaptive == nil, !forcesDirectPlay, let lower = quality.lower(mediaKbps: media?.bitrate) else { return }
+        guard case .fixed = qualitySetting, !forcesDirectPlay,
+              let lower = quality.lower(mediaKbps: media?.bitrate) else { return }
         cancelCountdown()
         withAnimation(.easeOut(duration: 0.22)) { offer = .lowerQuality(lower) }
     }
@@ -2408,7 +2506,7 @@ final class PlayerModel: Identifiable {
 
     private func scheduleHide() {
         hideTask?.cancel()
-        guard chromeVisible, isPlaying, !isScrubbing, menusOpen == 0, phase == .playing,
+        guard chromeVisible, isPlaying, !belowQualityFloor, !isScrubbing, menusOpen == 0, phase == .playing,
               !UIAccessibility.isVoiceOverRunning, !UIAccessibility.isSwitchControlRunning else { return }
         hideTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(3))

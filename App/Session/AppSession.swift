@@ -569,12 +569,22 @@ final class AppSession {
         networkTask = Task { [weak self] in
             var last: NetworkPath?
             for await path in NetworkPath.updates() {
+                guard let self else { return }
+                let initial = last == nil
                 let changed = last.map { $0 != path } ?? false
+                guard initial || changed else { continue }
                 last = path
-                self?.invalidatePresence()
-                self?.presencePath = path
-                self?.presenceNetworkRevision += 1
-                if changed, path.isConnected { self?.networkChanged() }
+                presencePath = path
+                if initial {
+                    pathMetrics.networkChanged(to: presenceNetworkRevision)
+                    continue
+                }
+                invalidatePresence()
+                presenceNetworkRevision += 1
+                pathMetrics.networkChanged(to: presenceNetworkRevision)
+                player.linkKbps.removeAll(keepingCapacity: true)
+                player.active?.invalidateNetworkMeasurements()
+                if path.isConnected { networkChanged() }
             }
         }
     }
@@ -624,8 +634,16 @@ final class AppSession {
         networkChanges += 1
         downloads.syncWatch()
         guard let connection = library?.connection else { return }
+        let revision = presenceNetworkRevision
+        let playback = player.active
         addressTask?.cancel()
-        addressTask = Task { await keepAddress(of: connection, reprobe: true) }
+        addressTask = Task { [weak self] in
+            guard let self else { return }
+            await keepAddress(of: connection, reprobe: true)
+            let current = await connection.currentConnection
+            guard !Task.isCancelled, revision == presenceNetworkRevision, player.active === playback else { return }
+            playback?.networkConnectionChanged(to: current)
+        }
     }
 
     /// A remote address may have won while iOS asked for Local Network access, or while a VPN was on;

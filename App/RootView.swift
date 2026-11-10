@@ -7,6 +7,7 @@ private struct PresenceInputs: Equatable {
     let foreground: Bool
     let tv: PairedTV?
     let network: Int
+    let networkReady: Bool
 }
 
 /// Sign-in until a server is chosen, then the tabs the person chose (DESIGN §7), all drawn in the active theme.
@@ -83,7 +84,8 @@ struct RootView: View {
         .tint(theme.accentText)
         .preferredColorScheme(scheme)
         .task(id: PresenceInputs(enabled: remote.isEnabled, foreground: scenePhase == .active,
-                                 tv: remote.model.current, network: session.presenceNetworkRevision)) {
+                                 tv: remote.model.current, network: session.presenceNetworkRevision,
+                                 networkReady: session.presencePath != nil)) {
             await session.trackPresence(enabled: remote.isEnabled, foreground: scenePhase == .active, tv: remote.model.current)
         }
         .onChange(of: scenePhase, initial: true) { _, phase in

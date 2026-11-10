@@ -56,13 +56,6 @@ final class PathMetrics: NSObject, URLSessionTaskDelegate, Sendable {
         }
     }
 
-    /// Existing callers may only use this for diagnostics, never to establish physical route proof.
-    func path(to host: String) -> Path? {
-        state.withLock { state in
-            let matching = state.paths.filter { $0.key.host == host.lowercased() }
-            return matching.count == 1 ? matching.first?.value : nil
-        }
-    }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
         guard let transaction = metrics.transactionMetrics.last(where: { $0.resourceFetchType == .networkLoad }),

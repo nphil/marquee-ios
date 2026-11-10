@@ -131,7 +131,13 @@ struct PlayerView: View {
                     .panel(model, theme: outerTheme, scheme: outerScheme)
             }
         }
-        .onChange(of: model.phase, initial: true) { showFormatBadge() }
+        .onChange(of: model.phase, initial: true) {
+            showFormatBadge()
+            model.viewportChanged(size: screen, scale: displayScale)
+        }
+        .onChange(of: screen) { model.viewportChanged(size: screen, scale: displayScale) }
+        .onChange(of: displayScale) { model.viewportChanged(size: screen, scale: displayScale) }
+        .onChange(of: model.aspect) { model.viewportChanged(size: screen, scale: displayScale) }
         .onChange(of: session.settings.subtitleStyle) { model.styleChanged() }
         .onChange(of: voiceOver || switchControl) { _, on in
             if on { model.showChrome() }

@@ -445,6 +445,7 @@ jobs:
               -resultBundlePath "build/UITests-$UDID.xcresult" \
               -retry-tests-on-failure -test-iterations 2 \
               -only-testing:MarqueeUITests/PlayerRouteMenuScreenshots \
+              -only-testing:MarqueeUITests/PlayerScreenshotTests/testAutoBuffersInsteadOfDroppingBelowPictureFloor \
               -only-testing:MarqueeUITests/PlayerScreenshotTests/testWrongSubtitlesAndBazarr \
               -only-testing:MarqueeUITests/PlayerScreenshotTests/testWrongSubtitlesAndBazarrInLightTheme \
               -only-testing:MarqueeUITests/PlayerAccessibilityScreenshots/testWrongSubtitlesAndBazarr \
