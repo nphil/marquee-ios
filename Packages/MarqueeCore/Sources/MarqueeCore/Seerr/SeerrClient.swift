@@ -11,6 +11,8 @@ public actor SeerrClient {
     /// Every cookie Seerr set: its session, and its CSRF pair when CSRF protection is on.
     private var cookies: [String: String]
     private var signingIn: Task<SeerrUser, any Error>?
+    /// Lists that never change while Seerr runs; see `cached`.
+    private var reference: [String: any Sendable] = [:]
 
     /// `session` is a cookie header kept from an earlier sign-in; `onSession` receives each new one.
     public init(
@@ -53,7 +55,58 @@ public actor SeerrClient {
 
     /// One page of a Discover shelf; people in Trending are left out.
     public func discover(_ shelf: SeerrShelf, page: Int = 1) async throws -> [SeerrTitle] {
-        try await get(Page.self, shelf.path, query: [URLQueryItem(name: "page", value: String(page))]).titles
+        try await titlePage(shelf.path, [URLQueryItem(name: "page", value: String(page))], requested: page).titles
+    }
+
+    /// One page of a browse list: Trending, or Discover with the query's filters.
+    public func browse(_ feed: SeerrFeed, page: Int = 1) async throws -> SeerrTitlePage {
+        switch feed {
+        case .trending:
+            return try await titlePage(SeerrShelf.trending.path, [URLQueryItem(name: "page", value: String(page))], requested: page)
+        case .discover(let query):
+            return try await titlePage(query.path, query.queryItems(page: page), kind: query.kind, requested: page)
+        }
+    }
+
+    /// The genres of movies or series, for the browse screen's chips.
+    public func genres(_ kind: SeerrMediaKind) async throws -> [SeerrGenre] {
+        try await cached("genres.\(kind.rawValue)") {
+            try await get(List<GenreWire>.self, "/api/v1/genres/\(kind.rawValue)").values.compactMap(\.genre)
+        }
+    }
+
+    /// The genres again, each with a backdrop, for the cards on Discover.
+    public func genreCards(_ kind: SeerrMediaKind) async throws -> [SeerrGenre] {
+        try await get(List<GenreWire>.self, "/api/v1/discover/genreslider/\(kind.rawValue)").values.compactMap(\.genre)
+    }
+
+    /// The languages TMDB knows, by name.
+    public func languages() async throws -> [SeerrLanguage] {
+        try await cached("languages") {
+            let entries = try await get(List<LanguageWire>.self, "/api/v1/languages").values.compactMap(\.language)
+            return entries.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        }
+    }
+
+    /// The countries TMDB lists streaming services for, by name.
+    public func watchRegions() async throws -> [SeerrRegion] {
+        try await cached("regions") {
+            let entries = try await get(List<RegionWire>.self, "/api/v1/watchproviders/regions").values.compactMap(\.region)
+            return entries.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+        }
+    }
+
+    /// The streaming services of a region, the best known first.
+    public func watchProviders(_ kind: SeerrMediaKind, region: String) async throws -> [SeerrWatchProvider] {
+        try await cached("providers.\(kind.rawValue).\(region)") {
+            let path = "/api/v1/watchproviders/\(kind == .movie ? "movies" : "tv")"
+            let query = [URLQueryItem(name: "watchRegion", value: region)]
+            let entries = try await get(List<ProviderWire>.self, path, query: query).values.compactMap(\.entry)
+            var seen = Set<Int>()
+            return entries.filter { seen.insert($0.provider.id).inserted }
+                .sorted { ($0.priority, $0.provider.name) < ($1.priority, $1.provider.name) }
+                .map { $0.provider }
+        }
     }
 
     public func search(_ text: String, page: Int = 1) async throws -> [SeerrTitle] {
@@ -148,6 +201,25 @@ public actor SeerrClient {
         let decoder = JSONDecoder()
         if let kind { decoder.userInfo[Self.kindKey] = kind }
         guard let value = try? decoder.decode(T.self, from: response.body) else { throw SeerrError.notSeerr }
+        return value
+    }
+
+    /// One page of titles. `kind` stands in for a `mediaType` the list's entries do not carry; without
+    /// it, entries of other kinds, such as people, are left out.
+    private func titlePage(
+        _ path: String, _ query: [URLQueryItem], kind: SeerrMediaKind? = nil, requested: Int
+    ) async throws -> SeerrTitlePage {
+        let page = try await get(Page.self, path, query: query, kind: kind)
+        let number = page.page ?? requested
+        return SeerrTitlePage(titles: page.titles, page: number, totalPages: page.totalPages ?? number)
+    }
+
+    /// Lists that never change while Seerr runs (genres, languages, regions, streaming services) are
+    /// fetched once per client.
+    private func cached<T: Sendable>(_ key: String, _ load: () async throws -> T) async throws -> T {
+        if let value = reference[key] as? T { return value }
+        let value = try await load()
+        reference[key] = value
         return value
     }
 
@@ -270,14 +342,91 @@ public actor SeerrClient {
 
     private struct Page: Decodable {
         let titles: [SeerrTitle]
+        let page: Int?
+        let totalPages: Int?
 
-        enum CodingKeys: CodingKey { case results }
+        enum CodingKeys: CodingKey { case results, page, totalPages }
 
         init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             guard c.contains(.results) else { throw SeerrError.notSeerr }
             let results: [TitleWire] = c.list(.results)
             titles = results.compactMap(\.title)
+            page = c.int(.page)
+            totalPages = c.int(.totalPages)
+        }
+    }
+
+    /// A JSON array at the top level.
+    private struct List<Entry: Decodable>: Decodable {
+        let values: [Entry]
+
+        init(from decoder: any Decoder) throws {
+            values = try decoder.singleValueContainer().decode([Entry].self)
+        }
+    }
+
+    private struct GenreWire: Decodable {
+        let genre: SeerrGenre?
+
+        enum CodingKeys: CodingKey { case id, name, backdrops }
+
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            guard let id = c.int(.id), let name = c.string(.name), !name.isEmpty else {
+                genre = nil
+                return
+            }
+            let backdrops: [String] = c.list(.backdrops)
+            genre = SeerrGenre(id: id, name: name, backdropPath: backdrops.first { $0.hasPrefix("/") })
+        }
+    }
+
+    private struct LanguageWire: Decodable {
+        let language: SeerrLanguage?
+
+        enum CodingKeys: String, CodingKey { case code = "iso_639_1", englishName = "english_name", name }
+
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            // TMDB's "xx" stands for no language at all.
+            let name = [c.string(.englishName), c.string(.name)].compactMap { $0 }.first { !$0.isEmpty }
+            guard let code = c.string(.code), !code.isEmpty, code != "xx", let name else {
+                language = nil
+                return
+            }
+            language = SeerrLanguage(code: code, name: name)
+        }
+    }
+
+    private struct RegionWire: Decodable {
+        let region: SeerrRegion?
+
+        enum CodingKeys: String, CodingKey { case code = "iso_3166_1", englishName = "english_name", nativeName = "native_name" }
+
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            let name = [c.string(.englishName), c.string(.nativeName)].compactMap { $0 }.first { !$0.isEmpty }
+            guard let code = c.string(.code), !code.isEmpty, let name else {
+                region = nil
+                return
+            }
+            region = SeerrRegion(code: code, name: name)
+        }
+    }
+
+    private struct ProviderWire: Decodable {
+        let entry: (provider: SeerrWatchProvider, priority: Int)?
+
+        enum CodingKeys: CodingKey { case id, name, displayPriority }
+
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            guard let id = c.int(.id), let name = c.string(.name), !name.isEmpty else {
+                entry = nil
+                return
+            }
+            entry = (SeerrWatchProvider(id: id, name: name), c.int(.displayPriority) ?? Int.max)
         }
     }
 

@@ -145,6 +145,145 @@ struct SeerrTests {
         #expect(await transport.requests.first?.url.query == "query=the%20matrix&page=1")
     }
 
+    // MARK: Browse
+
+    static let noon = Calendar(identifier: .gregorian).date(from: DateComponents(year: 2026, month: 11, day: 10, hour: 12))!
+
+    static func pairs(_ items: [URLQueryItem]) -> [String] {
+        items.map { "\($0.name)=\($0.value ?? "")" }
+    }
+
+    @Test func browseSendsEveryFilterToTheMoviesEndpointAndReadsHowFarTheListGoes() async throws {
+        let query = SeerrBrowseQuery(
+            kind: .movie, genre: 28, sort: .rating, era: .y2010s, language: "ja", minRating: 7, runtime: .medium,
+            streaming: SeerrStreaming(provider: 8, region: "GB")
+        )
+        let (client, transport) = Self.client(session: "connect.sid=x") { _, _ in
+            // The entry names no media type; the list's kind stands in.
+            json(["page": 2, "totalPages": 5, "results": [["id": 603, "title": "The Matrix", "releaseDate": "1999-03-30"]]])
+        }
+        let page = try await client.browse(.discover(query), page: 2)
+        #expect(page.titles.map(\.id) == ["movie/603"] && page.page == 2 && page.totalPages == 5 && page.hasMore)
+        let sent = try #require(await transport.requests(to: "/api/v1/discover/movies").first)
+        #expect(sent.url.query == "page=2&sortBy=vote_average.desc&genre=28&language=ja&primaryReleaseDateGte=2010-01-01"
+            + "&primaryReleaseDateLte=2019-12-31&voteAverageGte=7&voteCountGte=100&withRuntimeGte=90&withRuntimeLte=120"
+            + "&watchRegion=GB&watchProviders=8")
+    }
+
+    @Test func seriesUseTheirOwnEndpointDateAndTitleFields() async throws {
+        let query = SeerrBrowseQuery(kind: .tv, sort: .release, reversed: true, era: .before1980, runtime: .short)
+        #expect(Self.pairs(query.queryItems(page: 1)) == [
+            "page=1", "sortBy=first_air_date.asc", "firstAirDateLte=1979-12-31", "withRuntimeLte=29",
+        ])
+        #expect(Self.pairs(SeerrBrowseQuery(kind: .tv, sort: .title).queryItems(page: 1)) == ["page=1", "sortBy=original_name.asc"])
+        let movieTitles = SeerrBrowseQuery(kind: .movie, sort: .title, reversed: true)
+        #expect(Self.pairs(movieTitles.queryItems(page: 1)) == ["page=1", "sortBy=original_title.desc"])
+
+        let (client, transport) = Self.client(session: "connect.sid=x") { _, _ in
+            json(["page": 1, "totalPages": 1, "results": [["id": 1399, "name": "Game of Thrones", "firstAirDate": "2011-04-17"]]])
+        }
+        let page = try await client.browse(.discover(query))
+        #expect(page.titles.map(\.id) == ["tv/1399"] && !page.hasMore)
+        #expect(await transport.requests(to: "/api/v1/discover/tv").count == 1)
+    }
+
+    @Test func upcomingMeansReleasedFromTodayOn() {
+        let movies = SeerrBrowseQuery(kind: .movie, upcoming: true)
+        #expect(Self.pairs(movies.queryItems(page: 1, today: Self.noon)) == [
+            "page=1", "sortBy=popularity.desc", "primaryReleaseDateGte=2026-11-10",
+        ])
+        let series = SeerrBrowseQuery(kind: .tv, upcoming: true, era: .y2020s)
+        #expect(Self.pairs(series.queryItems(page: 1, today: Self.noon)).suffix(2) == [
+            "firstAirDateGte=2026-11-10", "firstAirDateLte=2029-12-31",
+        ])
+    }
+
+    @Test func onlyTheViewMenusFiltersCountAsFilters() {
+        #expect(!SeerrBrowseQuery(kind: .movie, genre: 28, sort: .rating, reversed: true).hasMenuFilters)
+        #expect(SeerrBrowseQuery(kind: .movie, upcoming: true).hasMenuFilters)
+        #expect(SeerrBrowseQuery(kind: .tv, runtime: .long).hasMenuFilters)
+    }
+
+    @Test func shelvesOpenTheirListInBrowse() {
+        #expect(SeerrShelf.trending.feed == .trending)
+        #expect(SeerrShelf.popularSeries.feed == .discover(SeerrBrowseQuery(kind: .tv)))
+        #expect(SeerrShelf.upcomingMovies.feed == .discover(SeerrBrowseQuery(kind: .movie, upcoming: true)))
+    }
+
+    @Test func trendingPagesAndLeavesPeopleOut() async throws {
+        let (client, transport) = Self.client(session: "connect.sid=x") { _, _ in
+            json(["page": 3, "results": [
+                ["id": 603, "mediaType": "movie", "title": "The Matrix"], ["id": 287, "mediaType": "person", "name": "Brad Pitt"],
+            ]])
+        }
+        let page = try await client.browse(.trending, page: 3)
+        #expect(page.titles.map(\.id) == ["movie/603"])
+        // Without a page count the list ends where it is.
+        #expect(page.page == 3 && !page.hasMore)
+        #expect(await transport.requests(to: "/api/v1/discover/trending").first?.url.query == "page=3")
+    }
+
+    @Test func genresReadTheirListOncePerKind() async throws {
+        let (client, transport) = Self.client(session: "connect.sid=x") { request, _ in
+            request.url.path == "/api/v1/genres/tv"
+                ? json([["id": 18, "name": "Drama"]])
+                : json([["id": 28, "name": "Action"], ["id": 12, "name": "Adventure"], ["name": "No id"]])
+        }
+        #expect(try await client.genres(.movie) == [SeerrGenre(id: 28, name: "Action"), SeerrGenre(id: 12, name: "Adventure")])
+        _ = try await client.genres(.movie)
+        #expect(try await client.genres(.tv).map(\.name) == ["Drama"])
+        #expect(await transport.requests(to: "/api/v1/genres/movie").count == 1)
+    }
+
+    @Test func genreCardsTakeTheFirstBackdropSeerrSends() async throws {
+        let (client, transport) = Self.client(session: "connect.sid=x") { _, _ in
+            json([["id": 28, "name": "Action", "backdrops": ["/a.jpg", "/b.jpg"]], ["id": 99, "name": "Documentary", "backdrops": []]])
+        }
+        let cards = try await client.genreCards(.tv)
+        #expect(cards == [SeerrGenre(id: 28, name: "Action", backdropPath: "/a.jpg"), SeerrGenre(id: 99, name: "Documentary")])
+        #expect(await transport.requests.first?.url.path == "/api/v1/discover/genreslider/tv")
+    }
+
+    @Test func languagesAndRegionsAreListedByNameWithoutTheNoLanguageEntry() async throws {
+        let (client, transport) = Self.client(session: "connect.sid=x") { request, _ in
+            switch request.url.path {
+            case "/api/v1/languages":
+                json([
+                    ["iso_639_1": "ja", "english_name": "Japanese", "name": "日本語"],
+                    ["iso_639_1": "xx", "english_name": "No Language", "name": "No Language"],
+                    ["iso_639_1": "en", "english_name": "English", "name": "English"],
+                ])
+            default:
+                json([
+                    ["iso_3166_1": "GB", "english_name": "United Kingdom", "native_name": "United Kingdom"],
+                    ["iso_3166_1": "AU", "english_name": "Australia", "native_name": "Australia"],
+                ])
+            }
+        }
+        #expect(try await client.languages().map(\.code) == ["en", "ja"])
+        #expect(try await client.languages().first?.name == "English")
+        #expect(try await client.watchRegions().map(\.code) == ["AU", "GB"])
+        #expect(await transport.requests.count == 2)
+    }
+
+    @Test func streamingServicesComeBestKnownFirstAndAreAskedOncePerKindAndRegion() async throws {
+        let (client, transport) = Self.client(session: "connect.sid=x") { _, _ in
+            json([
+                ["id": 8, "name": "Netflix", "displayPriority": 3, "logoPath": "/n.jpg"],
+                ["id": 337, "name": "Disney Plus", "displayPriority": 1],
+                ["id": 8, "name": "Netflix", "displayPriority": 3],
+                ["id": 9, "name": "Prime Video", "displayPriority": 3],
+            ])
+        }
+        #expect(try await client.watchProviders(.movie, region: "GB").map(\.name) == ["Disney Plus", "Netflix", "Prime Video"])
+        _ = try await client.watchProviders(.movie, region: "GB")
+        _ = try await client.watchProviders(.tv, region: "GB")
+        _ = try await client.watchProviders(.movie, region: "US")
+        let sent = await transport.requests
+        #expect(sent.map(\.url.path) == ["/api/v1/watchproviders/movies", "/api/v1/watchproviders/tv", "/api/v1/watchproviders/movies"])
+        #expect(sent.map { $0.url.query("watchRegion") } == ["GB", "GB", "US"])
+    }
+
     @Test func detailsReadSeasonsPlexLinkAndTVDBID() async throws {
         let (client, _) = Self.client(session: "connect.sid=x") { _, _ in
             json([

@@ -322,6 +322,17 @@ public enum SeerrShelf: String, Sendable, Hashable, CaseIterable, Identifiable {
         case .upcomingSeries: "/api/v1/discover/tv/upcoming"
         }
     }
+
+    /// The list its "See all" opens: the same titles, with the browse screen's filters to narrow them.
+    public var feed: SeerrFeed {
+        switch self {
+        case .trending: .trending
+        case .popularMovies: .discover(SeerrBrowseQuery(kind: .movie))
+        case .popularSeries: .discover(SeerrBrowseQuery(kind: .tv))
+        case .upcomingMovies: .discover(SeerrBrowseQuery(kind: .movie, upcoming: true))
+        case .upcomingSeries: .discover(SeerrBrowseQuery(kind: .tv, upcoming: true))
+        }
+    }
 }
 
 /// A request to send: a movie, or chosen seasons of a series.
