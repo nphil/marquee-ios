@@ -69,6 +69,20 @@ public struct QualityScores: Sendable, Hashable {
 /// stream every couple of seconds; a returned rung is a move to make, after which `moved(to:at:)` says where
 /// playback ended up. No other move comes in between.
 public struct AdaptiveQuality: Sendable {
+    public struct Picture: Sendable, Hashable {
+        public let width: Int
+        public let height: Int
+
+        public init(width: Int, height: Int) {
+            self.width = width
+            self.height = height
+        }
+
+        fileprivate var shortEdge: Int? {
+            width > 0 && height > 0 ? min(width, height) : nil
+        }
+    }
+
     public struct Tuning: Sendable {
         /// A rung fits the link when its rate is at most this share of the estimate.
         public var fit = 0.7
@@ -104,23 +118,28 @@ public struct AdaptiveQuality: Sendable {
         public var bufferSeconds: TimeInterval?
         /// How long playback has waited on the network; 0 while it plays.
         public var waitingSeconds: TimeInterval
+        public var streamID: UUID?
 
         public init(
             now: TimeInterval, throughputKbps: Int? = nil, transferSeconds: TimeInterval = 0,
-            bufferSeconds: TimeInterval? = nil, waitingSeconds: TimeInterval = 0
+            bufferSeconds: TimeInterval? = nil, waitingSeconds: TimeInterval = 0, streamID: UUID? = nil
         ) {
             self.now = now
             self.throughputKbps = throughputKbps
             self.transferSeconds = transferSeconds
             self.bufferSeconds = bufferSeconds
             self.waitingSeconds = waitingSeconds
+            self.streamID = streamID
         }
     }
 
     /// The rung playing, or being moved to.
     public private(set) var rung: VideoQuality
-    /// Original, then every preset below the file's rate; best first.
+    /// Original, then watchable presets below the file's rate; best first.
     public let ladder: [VideoQuality]
+    public let floor: VideoQuality
+    public private(set) var belowFloor = false
+    public let streamID: UUID
     private let mediaKbps: Int?
     /// The highest rung a climb or an away start reaches (`QualityScores`).
     private let ceiling: VideoQuality?
@@ -137,13 +156,20 @@ public struct AdaptiveQuality: Sendable {
     /// - Parameter linkKbps: the link to the server as an earlier stream measured it.
     public init(
         place: NetworkPlace, mediaKbps: Int?, linkKbps: Int?, scores: QualityScores? = nil, tuning: Tuning = Tuning(),
-        now: TimeInterval
+        source: Picture? = nil, view: Picture? = nil, streamID: UUID = UUID(), now: TimeInterval
     ) {
+        let mediaKbps = mediaKbps.flatMap { $0 > 0 ? $0 : nil }
+        let sourceEdge = source?.shortEdge
+        let minimum: VideoQuality = (sourceEdge ?? 1080) >= 1080 && (view?.shortEdge ?? 720) >= 1080 ? .mbps8 : .mbps4
         let ladder = [VideoQuality.original] + VideoQuality.allCases.filter { preset in
             guard let rate = preset.maxBitrateKbps else { return false }
+            // A small original cannot gain detail from a higher-resolution transcode.
+            guard (sourceEdge ?? 720) >= 720, rate >= minimum.rawValue else { return false }
             return mediaKbps.map { rate < $0 } ?? true
         }
         self.ladder = ladder
+        floor = ladder.last!
+        self.streamID = streamID
         self.mediaKbps = mediaKbps
         self.tuning = tuning
         ceiling = scores?.ceiling(in: ladder)
@@ -153,10 +179,14 @@ public struct AdaptiveQuality: Sendable {
         lastDrop = now
         climbHold = tuning.climbHold
         rung = .original
+        if let linkKbps, linkKbps > 0 {
+            rung = fitting(Double(linkKbps))
+            belowFloor = rate(of: floor).map { Double($0) > Double(linkKbps) * tuning.fit } ?? false
+            return
+        }
         guard !place.isHome else { return }
         // Away with no measured link, a low rung starts fast and the climb follows.
-        rung = linkKbps.map { fitting(Double($0)) }
-            ?? climbable.first { (rate(of: $0) ?? .max) <= tuning.awayStart.rawValue }
+        rung = climbable.first { (rate(of: $0) ?? .max) <= tuning.awayStart.rawValue }
             ?? climbable.last!
     }
 
@@ -168,16 +198,19 @@ public struct AdaptiveQuality: Sendable {
 
     /// Takes in one look; returns the rung to move to, or nil to stay.
     public mutating func observe(_ look: Look) -> VideoQuality? {
-        if let kbps = look.throughputKbps, look.transferSeconds > 0 {
+        guard !moving, look.streamID == nil || look.streamID == streamID, look.now.isFinite else { return nil }
+        if let kbps = look.throughputKbps, kbps > 0, look.transferSeconds > 0, look.transferSeconds.isFinite {
             fast.add(Double(kbps), weight: look.transferSeconds)
             slow.add(Double(kbps), weight: look.transferSeconds)
         }
-        guard !moving else { return nil }
         if look.now - lastDrop >= tuning.calm { climbHold = tuning.climbHold }
         let estimate = estimateKbps.map(Double.init)
+        belowFloor = estimate.flatMap { estimate in rate(of: floor).map { Double($0) > estimate * tuning.fit } }
+            ?? (rung == floor && look.waitingSeconds >= tuning.stallWait)
 
         let behind = estimate.flatMap { estimate in rate(of: rung).map { estimate < Double($0) } } ?? false
         if look.waitingSeconds >= tuning.stallWait || (behind && (look.bufferSeconds ?? .infinity) < tuning.lowBuffer) {
+            climbSince = nil
             guard let lower = step(below: rung) else { return nil }
             // At least one step down; further when the estimate fits only a lower rung.
             let fit = estimate.map { fitting($0, in: ladder) }
