@@ -11,6 +11,7 @@ struct RootView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.legibilityWeight) private var legibilityWeight
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         @Bindable var session = session
@@ -35,11 +36,7 @@ struct RootView: View {
         .fullScreenCover(item: $player.presented, onDismiss: { session.player.dismissed() }) { model in
             PlayerView(model: model, outerTheme: theme, outerScheme: scheme ?? colorScheme)
         }
-        .sheet(isPresented: $remote.isPresented, onDismiss: {
-            if remote.isEnabled && remote.access == .miniBar && session.place == .home {
-                remote.model.activate()
-            }
-        }) {
+        .sheet(isPresented: $remote.isPresented, onDismiss: { remote.refreshLifecycle() }) {
             TVRemoteScreen()
                 .preferredColorScheme(scheme)
                 .presentationDetents([.large])
@@ -77,6 +74,13 @@ struct RootView: View {
         .scrollIndicators(store.showsScrollBars ? .automatic : .hidden)
         .tint(theme.accentText)
         .preferredColorScheme(scheme)
+        .onChange(of: scenePhase, initial: true) { _, phase in
+            switch phase {
+            case .active: remote.setForeground(true)
+            case .background: remote.setForeground(false)
+            default: break
+            }
+        }
         .onChange(of: BarInputs(theme: theme, typeSize: typeSize, boldText: legibilityWeight == .bold), initial: true) { _, inputs in
             NavigationBarStyle.apply(inputs.theme, typeSize: inputs.typeSize, boldText: inputs.boldText)
         }

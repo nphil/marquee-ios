@@ -20,6 +20,7 @@ final class TVRemote {
     private(set) var model: RemoteModel
     @ObservationIgnored private let storage: SessionStorage
     @ObservationIgnored private let inMemory: Bool
+    @ObservationIgnored private var appInForeground = false
 
     /// `inMemory` keeps the paired TVs and the remote's settings out of the Keychain and the saved
     /// defaults, so every UI test starts unpaired.
@@ -35,6 +36,20 @@ final class TVRemote {
         isEnabled = enabled
         storage.remoteEnabled = enabled
         if !enabled { isPresented = false }
+        refreshLifecycle()
+    }
+
+    func setForeground(_ foreground: Bool) {
+        appInForeground = foreground
+        refreshLifecycle()
+    }
+
+    func refreshLifecycle() {
+        if isEnabled && appInForeground {
+            model.activate()
+        } else {
+            model.deactivate()
+        }
     }
 
     func setAccess(_ access: RemoteAccess) {
@@ -55,6 +70,7 @@ final class TVRemote {
     /// Delete All Local Data: the paired TVs' keys and the remote's settings. The TVs keep listing the
     /// phone until it is removed there.
     func eraseAll() {
+        model.deactivate()
         isPresented = false
         isEnabled = false
         access = .miniBar
@@ -168,10 +184,6 @@ struct TVRemoteMiniBar: View {
         .accessibilityLabel("TV Remote, \(session.remote.model.current?.name ?? "LumaTV"), \(status)")
         .accessibilityHint("Opens the TV remote.")
         .accessibilityIdentifier("remote.miniBar")
-        .onAppear { session.remote.model.activate() }
-        .onDisappear {
-            if !session.remote.isPresented { session.remote.model.deactivate() }
-        }
     }
 
     private func open() {
