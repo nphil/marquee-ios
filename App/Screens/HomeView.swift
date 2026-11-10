@@ -19,6 +19,7 @@ struct HomeView: View {
     @State private var watchlistTitles = Remote<PlexPage<PlexMetadata>>()
     @State private var watchlistClient: ObjectIdentifier?
     @Environment(\.plexWatchlist) private var watchlist
+    @Environment(\.sheetZoomNamespace) private var sheetNamespace
 
     var body: some View {
         // Read here, not only inside the row content, so Home redraws on every layout change.
@@ -46,10 +47,12 @@ struct HomeView: View {
             if session.remote.isEnabled && session.remote.access == .homeButton && session.place == .home {
                 ToolbarItem(placement: .topBarTrailing) { TVRemoteButton() }
                     .sharedBackgroundVisibility(.hidden)
+                    .sheetZoomSource(.remote, in: sheetNamespace)
                 ToolbarSpacer(.fixed, placement: .topBarTrailing)
             }
             ToolbarItem(placement: .topBarTrailing) { ProfileButton() }
                 .sharedBackgroundVisibility(.hidden)
+                .sheetZoomSource(.settings, in: sheetNamespace)
         }
         .modifier(PlacesMenu(places: tabs.isTab(.library) ? [] : store.tabLayout.order.filter {
             !tabs.isTab($0) && $0.isAvailable(in: session)

@@ -13,8 +13,10 @@ enum RemoteAccess: String, CaseIterable, Identifiable {
 final class TVRemote {
     private(set) var isEnabled: Bool
     private(set) var access: RemoteAccess
-    /// The remote, full screen over whatever the app shows.
+    /// The remote's sheet over whatever the app shows.
     var isPresented = false
+    /// Whether the sheet opened from Home's remote button, so it zooms out of that button and back into it.
+    private(set) var zoomsFromButton = false
     var opensAfterSettings = false
     /// Made again by Delete All Local Data, so the remote's own settings start over too.
     private(set) var model: RemoteModel
@@ -57,13 +59,20 @@ final class TVRemote {
         storage.remoteAccess = access
     }
 
+    /// Opens the remote. Only Home's remote button asks for the zoom; the mini bar, a pairing link and
+    /// Settings' Open Remote use the sheet's own motion.
+    func present(fromButton: Bool = false) {
+        if !isPresented { zoomsFromButton = fromButton }
+        isPresented = true
+    }
+
     /// Opens a pairing link. Opening one asks for the remote, so it turns the remote on; the remote then
     /// asks to confirm the pairing.
     @discardableResult
     func open(_ url: URL) -> Bool {
         guard model.open(url) else { return false }
         setEnabled(true)
-        isPresented = true
+        present()
         return true
     }
 
@@ -121,14 +130,22 @@ extension RemoteTheme {
     }
 }
 
-/// The remote full screen, in the app's theme; it follows a theme change while open.
+/// The remote as a sheet, in the app's theme; it follows a theme change while open.
 struct TVRemoteScreen: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
-        LumaRemoteView(model: session.remote.model) { session.remote.isPresented = false }
+        // The app keeps the link up (TVRemote.refreshLifecycle). Left to the screen, closing the sheet would
+        // drop the link, and the mini bar would read Offline until the app asked for it again.
+        LumaRemoteView(model: session.remote.model, managesLifecycle: false) { session.remote.isPresented = false }
             .lumaRemoteTheme(RemoteTheme(theme))
+            // The kit's bar starts at the sheet's top edge, where the system's rounded corners (a 38 pt
+            // continuous curve, measured on iOS 27) crowd the 56 pt close and power buttons. The sides
+            // keep 16 pt, so the top keeps the same and the buttons clear the corner evenly. In landscape
+            // the sheet is full screen and the side safe areas keep the buttons off the display corners.
+            .safeAreaPadding(.top, verticalSizeClass == .compact ? 0 : Space.inset)
     }
 }
 
@@ -188,7 +205,7 @@ struct TVRemoteMiniBar: View {
 
     private func open() {
         withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
-            session.remote.isPresented = true
+            session.remote.present()
         }
     }
 }
@@ -202,7 +219,7 @@ struct TVRemoteButton: View {
 
     var body: some View {
         Button {
-            session.remote.isPresented = true
+            session.remote.present(fromButton: true)
         } label: {
             Image(systemName: "appletvremote.gen4.fill")
                 // 40% of the disc, the player controls' glyph proportion (Size.controlGlyph).

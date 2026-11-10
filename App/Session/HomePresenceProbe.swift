@@ -23,7 +23,6 @@ enum HomePresenceProbe {
     private static func check(address: TVAddress, tv: PairedTV, interface: NWInterface) async -> Bool {
         guard let stream = try? await TCPStream.connect(to: address, timeout: .seconds(3), requiredInterface: interface) else { return false }
         defer { stream.abort() }
-        guard let path = stream.connectionPath, isDirect(path, over: interface) else { return false }
         let deadline = Task {
             do { try await Task.sleep(for: .seconds(3)) } catch { return }
             stream.abort()
@@ -34,7 +33,11 @@ enum HomePresenceProbe {
                 // Only the TV holding this pairing's key completes the handshake. No hello follows: the TV
                 // gives a phone one session, so a hello here would end the remote's own.
                 _ = try await SecureChannel.open(stream, mode: .session, psk: tv.key)
-                return !Task.isCancelled
+                // The path is judged after the handshake, not before it: the TV counts a connection closed
+                // ahead of the handshake as a failed one, and 8 of them in 60 s make it ignore this phone,
+                // the remote's own session included.
+                guard !Task.isCancelled, let path = stream.connectionPath else { return false }
+                return isDirect(path, over: interface)
             } catch {
                 return false
             }

@@ -21,6 +21,7 @@ struct RootView: View {
     @Environment(\.legibilityWeight) private var legibilityWeight
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    @Namespace private var sheetNamespace
 
     var body: some View {
         @Bindable var session = session
@@ -44,11 +45,12 @@ struct RootView: View {
         .fullScreenCover(item: playerCover(overSettings: false), onDismiss: { session.player.dismissed() }) { model in
             PlayerView(model: model, outerTheme: theme, outerScheme: scheme ?? colorScheme)
         }
-        .sheet(isPresented: $remote.isPresented, onDismiss: { remote.refreshLifecycle() }) {
+        .sheet(isPresented: $remote.isPresented) {
             TVRemoteScreen()
                 .preferredColorScheme(scheme)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+                .sheetZoom(from: .remote, in: sheetNamespace, enabled: remote.zoomsFromButton && !reduceMotion)
         }
         // The TV's pairing QR code carries a lumaremote:// link. The remote opens from here, so Settings,
         // a sheet over the same view, closes first.
@@ -60,7 +62,7 @@ struct RootView: View {
         .sheet(isPresented: $session.showsSettings, onDismiss: {
             if remote.opensAfterSettings {
                 remote.opensAfterSettings = false
-                remote.isPresented = true
+                remote.present()
             }
         }) {
             NavigationStack {
@@ -76,7 +78,9 @@ struct RootView: View {
             .fullScreenCover(item: playerCover(overSettings: true), onDismiss: { session.player.dismissed() }) { model in
                 PlayerView(model: model, outerTheme: theme, outerScheme: scheme ?? colorScheme)
             }
+            .sheetZoom(from: .settings, in: sheetNamespace, enabled: !reduceMotion)
         }
+        .environment(\.sheetZoomNamespace, sheetNamespace)
         .environment(\.theme, theme)
         // Here rather than on the tabs, so the sheets above resolve artwork too.
         .environment(\.plexLibrary, session.library)
