@@ -40,14 +40,16 @@ final class PlayerScreenshotTests: XCTestCase {
     func testAutoBuffersInsteadOfDroppingBelowPictureFloor() throws {
         // Paused, the controls stay up, so the first look at the menu cannot race their fade.
         let app = launchPlayer(at: 61, paused: true, mode: "dark", item: "912", linkTest: true)
-        openMore(in: app)
         let quality = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Quality'")).firstMatch
-        XCTAssertTrue(quality.waitForExistence(timeout: 5))
         func shown() -> String { "\(quality.label) \(quality.value as? String ?? "")" }
+        let more = element("player.more", in: app)
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "No More button")
+        let moreFrame = more.frame
+        openMore(in: app)
         XCTAssertTrue(shown().contains("Auto · Original"), "Auto did not start at Original: \(shown())")
         dismissMenu(in: app)
         tap("player.playPause", in: app)
-        XCTAssertTrue(element("player.playPause", in: app).waitForNonExistence(timeout: 10), "Controls did not hide")
+        XCTAssertTrue(element("player.playPause", in: app).waitForNonExistence(timeout: 10), "Controls did not hide after the menu closed")
 
         notify_post("marquee.uitest.link.poor")
         let floor = element("player.qualityFloor", in: app)
@@ -70,7 +72,13 @@ final class PlayerScreenshotTests: XCTestCase {
 
         notify_post("marquee.uitest.link.healthy")
         XCTAssertTrue(floor.waitForNonExistence(timeout: 45), "The floor warning did not clear after recovery")
-        openMore(in: app)
+        // Playing with no warning, the controls fade 3 s after a touch, or after a move to a new stream has
+        // started playing. From hidden, one tap on the picture brings them back and the next lands where More
+        // stands, with no lookup between the two to outlast them; the open menu then holds them up.
+        XCTAssertTrue(element("player.close", in: app).waitForNonExistence(timeout: 15), "Controls did not hide after recovery")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: moreFrame.midX, dy: moreFrame.midY)).tap()
+        XCTAssertTrue(quality.waitForExistence(timeout: 5), "The More menu did not open")
         let climbed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             let value = shown()
             return value.contains("Auto ·") && !value.contains("4 Mbps 720p")
@@ -483,24 +491,13 @@ private extension XCTestCase {
         }
     }
 
-    /// Opens the More menu and returns once its Quality row shows. Playing chrome fades 3 s after the last
-    /// touch and a loaded runner can take longer than that to answer one query, so the button is resolved
-    /// once and tapped at that frame; when it is gone a tap on the picture brings the chrome back first.
+    /// Opens the More menu and returns once its Quality row shows, while the controls are held up: paused,
+    /// or under the floor warning.
     @MainActor
     func openMore(in app: XCUIApplication) {
-        let more = element("player.more", in: app)
+        tap("player.more", in: app)
         let quality = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Quality'")).firstMatch
-        for _ in 0..<4 {
-            if let button = try? more.snapshot() {
-                app.coordinate(withNormalizedOffset: .zero)
-                    .withOffset(CGVector(dx: button.frame.midX, dy: button.frame.midY)).tap()
-                if quality.waitForExistence(timeout: 3) { return }
-            } else {
-                app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-                _ = more.waitForExistence(timeout: 3)
-            }
-        }
-        XCTFail("The More menu did not open")
+        XCTAssertTrue(quality.waitForExistence(timeout: 5), "The More menu did not open")
     }
 
     /// An open menu lays out only the rows that fit on screen. The tracks menu hangs from the right of

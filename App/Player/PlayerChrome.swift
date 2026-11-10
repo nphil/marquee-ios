@@ -309,18 +309,21 @@ struct PlayerButtonStyle: ButtonStyle {
     var prominent = false
 
     func makeBody(configuration: Configuration) -> some View {
-        PlayerButtonLabel(configuration: configuration, prominent: prominent)
+        configuration.label
+            .modifier(PlayerControlFace(prominent: prominent, isPressed: configuration.isPressed))
+            .accessibilityShowsLargeContentViewer()
     }
 }
 
-private struct PlayerButtonLabel: View {
-    let configuration: ButtonStyleConfiguration
-    let prominent: Bool
+/// A player control's glyph in its circle, for the button style and under a UIKit control.
+struct PlayerControlFace: ViewModifier {
+    var prominent = false
+    let isPressed: Bool
     @Environment(\.theme) private var theme
     @Environment(\.isEnabled) private var isEnabled
 
-    var body: some View {
-        configuration.label
+    func body(content: Content) -> some View {
+        content
             .modifier(PlayerGlyph())
             .foregroundStyle(prominent ? theme.canvas : theme.ink)
             .frame(width: Size.control, height: Size.control)
@@ -330,8 +333,7 @@ private struct PlayerButtonLabel: View {
             }
             .contentShape(Circle())
             .opacity(isEnabled ? 1 : 0.5)
-            .pressed(configuration.isPressed, in: Circle())
-            .accessibilityShowsLargeContentViewer()
+            .pressed(isPressed, in: Circle())
     }
 }
 
@@ -713,55 +715,36 @@ struct LoadingArc: View {
 
 /// Audio choices stay in the native menu; subtitles open their own sheet.
 struct TracksMenu: View {
-    @Bindable var model: PlayerModel
-    @Environment(\.theme) private var theme
+    let model: PlayerModel
 
     var body: some View {
-        Menu {
-            if let tracks = model.tracks {
-                menuContent(tracks)
-            }
-        } label: {
-            Image(systemName: "captions.bubble")
-        }
-        // Opening upward, the automatic order reverses the list and the subtitle languages end up above
-        // the Subtitles header; fixed reads Audio, then Subtitles, top down.
-        .menuOrder(.fixed)
-        .menuStyle(.button)
-        .buttonStyle(PlayerButtonStyle())
-        .tint(theme.ink)
+        // Opening upward, the automatic order reverses the list and the Subtitles row ends up above the
+        // Audio header; fixed reads Audio, then Subtitles, top down.
+        PlayerMenuButton(
+            model: model, systemImage: "captions.bubble", label: "Audio and subtitles", identifier: "player.tracks",
+            order: .fixed, menu: menu
+        )
         .disabled(model.tracks == nil)
-        .accessibilityLabel("Audio and subtitles")
-        .accessibilityIdentifier("player.tracks")
     }
 
-    /// Sections hold toggles rather than inline pickers: an inline picker inside a section hides the
-    /// section's header, which left the audio and subtitle lists unnamed.
-    @ViewBuilder
-    private func menuContent(_ tracks: MediaTracks) -> some View {
-        if tracks.audio.count > 1 {
-            Section("Audio") {
-                ForEach(orderedAudio(tracks)) { track in
-                    choice(track.label, detail: detail(track.badges), value: Optional(track.id), selection: $model.audioPick)
-                }
+    private var menu: UIMenu {
+        var sections: [UIMenuElement] = []
+        if let tracks = model.tracks {
+            if tracks.audio.count > 1 {
+                let playing = model.audioPick
+                sections.append(UIMenu.section("player.tracks.audio", title: "Audio", orderedAudio(tracks).map { track in
+                    let id = track.id
+                    // Choosing the playing track again keeps it.
+                    return UIAction.choice(track.label, detail: detail(track.badges), isOn: playing == id) { [model] in
+                        if model.audioPick != id { model.audioPick = id }
+                    }
+                }))
             }
+            let subtitles = UIAction(title: "Subtitles…") { [model] _ in model.openSubtitleFix(.subtitles) }
+            subtitles.accessibilityIdentifier = "player.tracks.subtitles"
+            sections.append(UIMenu.section("player.tracks.more", [subtitles]))
         }
-        Section {
-            Button("Subtitles…") { model.openSubtitleFix(.subtitles) }
-                .accessibilityIdentifier("player.tracks.subtitles")
-        }
-        .onAppear { model.menuOpened() }
-        .onDisappear { model.menuClosed() }
-    }
-
-    /// A menu row with a checkmark while `selection` holds `value`; choosing it again keeps it.
-    private func choice<Value: Equatable & Sendable>(
-        _ title: String, detail: String? = nil, value: Value, selection: Binding<Value>
-    ) -> some View {
-        Toggle(isOn: Binding { selection.wrappedValue == value } set: { if $0 { selection.wrappedValue = value } }) {
-            Text(title)
-            if let detail { Text(detail) }
-        }
+        return UIMenu(identifier: UIMenu.Identifier(rawValue: "player.tracks"), children: sections)
     }
 
     /// The second line of a track row: "Captions", "Audio description", and the picture format of image
@@ -782,97 +765,84 @@ struct TracksMenu: View {
 /// Everything the chrome keeps off its edges (DESIGN §8.6): aspect, quality and speed, the audio
 /// enhancements, playback info and stats for nerds.
 struct MoreMenu: View {
-    @Bindable var model: PlayerModel
-    @Environment(\.theme) private var theme
+    let model: PlayerModel
 
     var body: some View {
-        Menu {
-            if model.castDevice == nil {
-                Section {
-                    Picker(selection: $model.aspectPick) {
-                        ForEach(VideoAspect.allCases, id: \.self) { aspect in
-                            Text(aspect.title).tag(aspect)
-                        }
-                    } label: {
-                        Label("Aspect", systemImage: "aspectratio")
-                        Text(model.aspect.title)
-                    }
-                    .pickerStyle(.menu)
-                }
-            }
-            Section {
-                Picker(selection: $model.qualityPick) {
-                    ForEach(QualitySetting.all, id: \.self) { setting in
-                        Text(setting.title).tag(setting)
-                    }
-                } label: {
-                    Label("Quality", systemImage: "dial.medium")
-                    Text(qualityValue)
-                }
-                .pickerStyle(.menu)
-                .disabled(model.forcesDirectPlay)
-                .accessibilityIdentifier("player.quality")
-                if model.quality == .original, model.isConverting {
-                    Text("Your Plex server is converting this video.")
-                }
-                if model.castDevice == nil {
-                    Picker(selection: $model.speedPick) {
-                        ForEach(Self.speeds, id: \.self) { speed in
-                            Text(Self.title(of: speed)).tag(speed)
-                        }
-                    } label: {
-                        Label("Playback Speed", systemImage: "gauge.with.dots.needle.67percent")
-                        Text(Self.title(of: model.speed))
-                    }
-                    .pickerStyle(.menu)
-                    .accessibilityIdentifier("player.speed")
-                }
-                if model.enhancements.offered {
-                    Menu {
-                        enhancementRows(model.enhancements)
-                    } label: {
-                        Label("Audio Enhancements", systemImage: "waveform")
-                        Text(enhancementValue)
-                    }
-                    .accessibilityIdentifier("player.enhancements")
-                }
-            }
-            Section {
-                Button {
-                    model.showsInfo = true
-                } label: {
-                    Label("Playback Info", systemImage: "info.circle")
-                }
-                Toggle(isOn: $model.showsStats) {
-                    Label("Stats for Nerds", systemImage: "chart.bar.xaxis")
-                }
-            }
-            .onAppear { model.menuOpened() }
-            .onDisappear { model.menuClosed() }
-        } label: {
-            Image(systemName: "ellipsis")
+        PlayerMenuButton(model: model, systemImage: "ellipsis", label: "More", identifier: "player.more", menu: menu)
+    }
+
+    private var menu: UIMenu {
+        var sections: [UIMenuElement] = []
+        if model.castDevice == nil {
+            let shown = model.aspect
+            sections.append(UIMenu.section("player.more.picture", [
+                UIMenu.submenu("player.aspect", title: "Aspect", systemImage: "aspectratio", value: shown.title, VideoAspect.allCases.map { aspect in
+                    UIAction.choice(aspect.title, isOn: shown == aspect) { [model] in model.aspectPick = aspect }
+                }),
+            ]))
         }
-        .menuStyle(.button)
-        .buttonStyle(PlayerButtonStyle())
-        .tint(theme.ink)
-        .accessibilityLabel("More")
-        .accessibilityIdentifier("player.more")
+        sections.append(UIMenu.section("player.more.playback", playback))
+        sections.append(UIMenu.section("player.more.panels", [
+            UIAction(title: "Playback Info", image: UIImage(systemName: "info.circle")) { [model] _ in model.showsInfo = true },
+            UIAction.choice("Stats for Nerds", systemImage: "chart.bar.xaxis", isOn: model.showsStats) { [model] in
+                model.showsStats.toggle()
+            },
+        ]))
+        return UIMenu(identifier: UIMenu.Identifier(rawValue: "player.more"), children: sections)
+    }
+
+    /// Quality, the note that the server converts the picture, speed and the audio enhancements.
+    private var playback: [UIMenuElement] {
+        var rows: [UIMenuElement] = []
+        if model.forcesDirectPlay {
+            // UIKit has no disabled submenu, so the quality stands as a row that opens nothing.
+            let quality = UIAction(title: "Quality", subtitle: qualityValue, image: UIImage(systemName: "dial.medium"), attributes: .disabled) { _ in }
+            quality.accessibilityIdentifier = "player.quality"
+            rows.append(quality)
+        } else {
+            let shown = model.qualitySetting
+            rows.append(UIMenu.submenu("player.quality", title: "Quality", systemImage: "dial.medium", value: qualityValue, QualitySetting.all.map { setting in
+                UIAction.choice(setting.title, isOn: shown == setting) { [model] in model.qualityPick = setting }
+            }))
+        }
+        if model.quality == .original, model.isConverting {
+            rows.append(UIAction.note("Your Plex server is converting this video."))
+        }
+        if model.castDevice == nil {
+            let shown = model.speed
+            rows.append(UIMenu.submenu(
+                "player.speed", title: "Playback Speed", systemImage: "gauge.with.dots.needle.67percent", value: Self.title(of: shown),
+                Self.speeds.map { speed in
+                    UIAction.choice(Self.title(of: speed), isOn: shown == speed) { [model] in model.speedPick = speed }
+                }
+            ))
+        }
+        if model.enhancements.offered {
+            rows.append(UIMenu.submenu(
+                "player.enhancements", title: "Audio Enhancements", systemImage: "waveform", value: enhancementValue,
+                enhancementRows(model.enhancements)
+            ))
+        }
+        return rows
     }
 
     /// Boost dialog and Normalize loudness, shown only for a Plex Pass server; the reason they cannot
     /// apply to this video stands under them.
-    @ViewBuilder
-    private func enhancementRows(_ state: PlayerModel.EnhancementState) -> some View {
-        enhancementToggle("Boost dialog", .boostDialog, state)
-        enhancementToggle("Normalize loudness", .normalizeLoudness, state)
+    private func enhancementRows(_ state: PlayerModel.EnhancementState) -> [UIMenuElement] {
+        var rows: [UIMenuElement] = [
+            enhancementToggle("Boost dialog", .boostDialog, state),
+            enhancementToggle("Normalize loudness", .normalizeLoudness, state),
+        ]
         if let text = state.unavailable ?? state.note {
-            Text(text)
+            rows.append(UIAction.note(text))
         }
+        return rows
     }
 
-    private func enhancementToggle(_ title: String, _ enhancement: AudioEnhancements, _ state: PlayerModel.EnhancementState) -> some View {
-        Toggle(title, isOn: Binding { state.asked.contains(enhancement) } set: { _ in model.toggleEnhancement(enhancement) })
-            .disabled(state.unavailable != nil)
+    private func enhancementToggle(_ title: String, _ enhancement: AudioEnhancements, _ state: PlayerModel.EnhancementState) -> UIAction {
+        UIAction.choice(title, isOn: state.asked.contains(enhancement), isEnabled: state.unavailable == nil) { [model] in
+            model.toggleEnhancement(enhancement)
+        }
     }
 
     /// The enhancements asked for, or Off.
