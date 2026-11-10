@@ -316,7 +316,7 @@ jobs:
         env:
           UDID: ${{ steps.simulator.outputs.udid }}
         run: |
-          mkdir -p screens
+          mkdir -p screens xcresults
           xcrun simctl bootstatus "$UDID" -b
           xcrun simctl ui "$UDID" appearance light
           xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
@@ -348,6 +348,12 @@ jobs:
                 | sed -E 's#^(.+):([0-9]+):([0-9]+): error: (.*)$#::error file=\1,line=\2,col=\3::\4#'
             fi
             if [ "$STATUS" -ne 0 ]; then FAILED=1; fi
+            # A bundle is final once its xcodebuild has exited on its own (a signal gives 128 or more).
+            # Only those are moved into xcresults/; an interrupted one stays in build/ and is uploaded
+            # apart, so a half-written bundle cannot fail the upload of the finished ones.
+            if [ "$STATUS" -lt 128 ] && [ -d "build/UITests-$NAME.xcresult" ]; then
+              mv "build/UITests-$NAME.xcresult" xcresults/
+            fi
           }
 
           run_pass standard "$STANDARD"
@@ -365,10 +371,30 @@ jobs:
           path: screens/
           if-no-files-found: warn
 
+      # The raw logs travel on their own, so a bundle that cannot be zipped does not take them along.
       - uses: actions/upload-artifact@v7
-        if: failure()
+        if: failure() || cancelled()
+        with:
+          name: UITests-logs-${{ matrix.shard }}
+          path: |
+            xcodebuild-build.log
+            xcodebuild-test-*.log
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v7
+        if: failure() || cancelled()
         with:
           name: UITests-xcresult-${{ matrix.shard }}
+          path: xcresults/*.xcresult
+          if-no-files-found: ignore
+
+      # Bundles of an xcodebuild that was interrupted, for example by the job timeout. Best effort:
+      # the process may still be writing them.
+      - uses: actions/upload-artifact@v7
+        if: failure() || cancelled()
+        continue-on-error: true
+        with:
+          name: UITests-xcresult-interrupted-${{ matrix.shard }}
           path: build/UITests*.xcresult
           if-no-files-found: ignore
 
@@ -430,7 +456,7 @@ jobs:
           SMALL: ${{ steps.simulators.outputs.small }}
           LARGE: ${{ steps.simulators.outputs.large }}
         run: |
-          mkdir -p screens
+          mkdir -p screens xcresults
           FAILED=0
           for UDID in "$SMALL" "$LARGE"; do
             xcrun simctl bootstatus "$UDID" -b
@@ -456,7 +482,14 @@ jobs:
               -only-testing:MarqueeUITests/HeaderScreenshotTests/testAlphabetRailRosePine \
               -only-testing:MarqueeUITests/HeaderScreenshotTests/testAlphabetRailDawn \
               2>&1 | tee "xcodebuild-test-$UDID.log" | xcbeautify
-            if [ "${PIPESTATUS[0]}" -ne 0 ]; then FAILED=1; fi
+            STATUS=${PIPESTATUS[0]}
+            if [ "$STATUS" -ne 0 ]; then FAILED=1; fi
+            # A bundle is final once its xcodebuild has exited on its own (a signal gives 128 or more).
+            # Only those are moved into xcresults/; an interrupted one stays in build/ and is uploaded
+            # apart, so a half-written bundle cannot fail the upload of the finished ones.
+            if [ "$STATUS" -lt 128 ] && [ -d "build/UITests-$UDID.xcresult" ]; then
+              mv "build/UITests-$UDID.xcresult" xcresults/
+            fi
             set -e
             xcrun simctl shutdown "$UDID"
           done
@@ -469,10 +502,30 @@ jobs:
           path: screens/
           if-no-files-found: warn
 
+      # The raw logs travel on their own, so a bundle that cannot be zipped does not take them along.
+      - uses: actions/upload-artifact@v7
+        if: failure() || cancelled()
+        with:
+          name: UITests-logs-sizes
+          path: |
+            xcodebuild-build.log
+            xcodebuild-test-*.log
+          if-no-files-found: ignore
+
       - uses: actions/upload-artifact@v7
         if: failure() || cancelled()
         with:
           name: UITests-xcresult-sizes
+          path: xcresults/*.xcresult
+          if-no-files-found: ignore
+
+      # Bundles of an xcodebuild that was interrupted, for example by the job timeout. Best effort:
+      # the process may still be writing them.
+      - uses: actions/upload-artifact@v7
+        if: failure() || cancelled()
+        continue-on-error: true
+        with:
+          name: UITests-xcresult-interrupted-sizes
           path: build/UITests*.xcresult
           if-no-files-found: ignore
 
