@@ -31,18 +31,16 @@ final class LiveDirectScreenshotTests: XCTestCase {
         XCTAssertTrue(goLive.waitForExistence(timeout: 3), "Pause did not leave live")
         try snap("livetv-direct-03-paused-rose-pine")
         goLive.tap()
-        // The controls may fade while the screenshot and test runner are processing.
-        if !pause.exists {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
-            XCTAssertTrue(pause.waitForExistence(timeout: 3), "The live player's controls did not come back")
-        }
         XCTAssertTrue(goLive.waitForNonExistence(timeout: 5), "LIVE did not go back to live")
-        if !pause.exists {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
-            XCTAssertTrue(pause.waitForExistence(timeout: 3), "The live player's controls did not come back")
-            XCTAssertFalse(goLive.exists, "LIVE did not go back to live")
-        }
-        tap("liveplayer.skipBack", in: app)
+        // LIVE rearms the 3 s fade, which two lookups on the CI runner do not reliably beat (skip back was
+        // found 3.18 s after the tap and gone by 3.24 s). Let the controls fade, bring them back, and act
+        // on them within the fresh window.
+        XCTAssertTrue(pause.waitForNonExistence(timeout: 6), "The live player's controls did not fade")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        let skipBack = element("liveplayer.skipBack", in: app)
+        XCTAssertTrue(skipBack.waitForExistence(timeout: 3), "The live player's controls did not come back")
+        XCTAssertFalse(goLive.exists, "LIVE did not go back to live")
+        skipBack.tap()
         XCTAssertTrue(goLive.waitForExistence(timeout: 5), "Skip back did not go back in the buffer")
         try snap("livetv-direct-04-behind-rose-pine")
     }

@@ -193,8 +193,11 @@ extension XCTestCase {
         let grabber = app.descendants(matching: .any)
             .matching(NSPredicate(format: "label == %@", "Sheet Grabber")).firstMatch
         XCTAssertTrue(grabber.waitForExistence(timeout: 5))
+        // The sheet has only the large detent, so a short pull springs back up (a 300 pt pull of the
+        // 812 pt sheet did); the grabber goes most of the way down the window.
         let start = grabber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 300)))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9))
+        start.press(forDuration: 0.05, thenDragTo: end)
         XCTAssertTrue(element("remote.close", in: app).waitForNonExistence(timeout: 5))
         waitFor("remote.miniBar", in: app)
         bar.tap()
