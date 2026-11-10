@@ -448,6 +448,7 @@ jobs:
               -only-testing:MarqueeUITests/PlayerScreenshotTests/testWrongSubtitlesAndBazarr \
               -only-testing:MarqueeUITests/PlayerScreenshotTests/testWrongSubtitlesAndBazarrInLightTheme \
               -only-testing:MarqueeUITests/PlayerAccessibilityScreenshots/testWrongSubtitlesAndBazarr \
+              -only-testing:MarqueeUITests/SubtitleSearchScreenshots \
               -only-testing:MarqueeUITests/SubtitleAppearanceScreenshots \
               -only-testing:MarqueeUITests/AccountAccessibilityScreenshots/testSubtitleAppearance \
               -only-testing:MarqueeUITests/HeaderScreenshotTests/testAlphabetRailRosePine \
