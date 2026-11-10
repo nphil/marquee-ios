@@ -27,7 +27,7 @@
 ## Server address (`Connection/`)
 
 - `PlexServer`, `PlexConnection`: a server with this user's token and its addresses. Codable, for the Keychain only. `PlexConnection.displayAddress` is the address as a person reads it: the IP a plex.direct name spells, and the port when it is not 32400. `ipAddress`: that IP, or nil for a host name.
-- `NetworkPlace.of(_:onPhoneNetwork:localAddress:roundTrip:)`: `.home` or `.away(.relay | .remote | .tunnel)` for the connection in use; a LAN address reached through a VPN (Tailscale) is away. Rules in docs/adaptive-playback.md.
+- `NetworkPlace.of(_:onPhoneNetwork:localAddress:roundTrip:)`: `.unknown` when route evidence is inconclusive; relay and tunnel addresses are classified as away. Unknown never counts as home. Rules in docs/adaptive-playback.md.
 - `ConnectionRanking.ordered(_:httpsRequired:)`: local, then remote, then relay; https before http, IPv4 before IPv6; duplicates dropped.
 - `HomeNetwork.contains(_:)`: the hosts the app's transport security lets through without TLS (private, link-local and tailnet addresses, `.local` and single-label names); integrations allow plain http only to these.
 - `ConnectionRanking.pick(_:graceExpired:)`: `use`, `wait` or `noneReachable` from probe outcomes so far.

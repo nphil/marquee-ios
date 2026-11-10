@@ -6,6 +6,8 @@ import Foundation
 public enum NetworkPlace: Sendable, Hashable, CustomStringConvertible {
     /// On the server's own network, reaching it directly.
     case home
+    /// The available evidence does not establish where the phone is.
+    case unknown
     case away(Away)
 
     public enum Away: String, Sendable {
@@ -23,6 +25,7 @@ public enum NetworkPlace: Sendable, Hashable, CustomStringConvertible {
     public var description: String {
         switch self {
         case .home: "Home"
+        case .unknown: "Unknown"
         case .away(let reason): "Away (\(reason.rawValue))"
         }
     }
@@ -37,8 +40,7 @@ public enum NetworkPlace: Sendable, Hashable, CustomStringConvertible {
     ) -> NetworkPlace {
         if connection.isRelay { return .away(.relay) }
         if [localAddress, connection.ipAddress].contains(where: { $0.map(isTunnel) ?? false }) { return .away(.tunnel) }
-        if onPhoneNetwork == false && connection.isLocal { return .away(.tunnel) }
-        return .away(.remote)
+        return .unknown
     }
 
     /// Tailscale's addresses: carrier-grade NAT space and its IPv6 prefix, fd7a:115c:a1e0::/48.

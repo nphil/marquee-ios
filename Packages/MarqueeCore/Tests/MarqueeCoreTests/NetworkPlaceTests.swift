@@ -17,10 +17,11 @@ struct NetworkPlaceTests {
                 }
             }
         }
-        #expect(NetworkPlace.of(Self.lan, onPhoneNetwork: true, localAddress: nil, roundTrip: nil) == .away(.remote))
-        #expect(NetworkPlace.of(Self.lan, onPhoneNetwork: false, localAddress: nil, roundTrip: nil) == .away(.tunnel))
-        #expect(NetworkPlace.of(Self.wan, onPhoneNetwork: false, localAddress: nil, roundTrip: nil) == .away(.remote))
-        #expect(NetworkPlace.of(Self.named, onPhoneNetwork: nil, localAddress: nil, roundTrip: nil) == .away(.remote))
+        #expect(NetworkPlace.of(Self.lan, onPhoneNetwork: true, localAddress: nil, roundTrip: nil) == .unknown)
+        #expect(NetworkPlace.of(Self.lan, onPhoneNetwork: false, localAddress: nil, roundTrip: nil) == .unknown)
+        #expect(NetworkPlace.of(Self.wan, onPhoneNetwork: false, localAddress: nil, roundTrip: nil) == .unknown)
+        #expect(NetworkPlace.of(Self.named, onPhoneNetwork: nil, localAddress: nil, roundTrip: nil) == .unknown)
+        #expect(!NetworkPlace.unknown.isHome)
     }
 
     @Test func relayAndTunnelClassificationTakesPrecedence() {
