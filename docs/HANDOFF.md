@@ -8,6 +8,8 @@ The complete batch is integrated on `main` for one unsigned Feather release. Rel
 
 Included: player controls and episode navigation; configurable tabs, alphabet rail and theme music; Seerr requests; durable downloads and offline playback; Live TV timeshift; unified subtitle controls, fonts and Bazarr/Plex search; optional remote mini bar/Home button with authenticated home presence; source/view-aware Auto quality, recovery and network invalidation; DVR recordings selected only from completed DVR-marked media across the full library.
 
+The Home watchlist loads only while its shelf is shown; new subtitle requests scroll their progress into view. LumaRemoteKit retains the closing connection until the peer hangs up, bounded to five seconds, so the last pairing reply can finish delivery.
+
 The combined simulator run and screenshot review remain required. Real-iPhone decoding, offline audio/subtitles, background downloads, watch-state reconciliation, tuner timeshift, network handovers and power/heat remain device checks; simulated playback is not acceptance evidence for these. Native picture scaling is retained because extra enhancement has no measured device benefit.
 
 Double-tap only remains the default skip gesture. The server-side VMAF map and remuxed Picture in Picture LIVE-label change are deferred; the latter needs an upstream engine change (`docs/adaptive-playback.md`).
