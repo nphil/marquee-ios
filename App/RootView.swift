@@ -141,10 +141,8 @@ private struct MainTabs: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .tabViewBottomAccessory {
-            if session.remote.isEnabled && session.remote.access == .miniBar && session.place == .home {
-                TVRemoteMiniBar()
-            }
+        .tabViewBottomAccessory(isEnabled: session.remote.isEnabled && session.remote.access == .miniBar && session.place == .home) {
+            TVRemoteMiniBar()
         }
         // Minimise on Scroll shrinks the bar while a page scrolls down; Hide on Scroll is each browse stack's
         // own (BrowseStack). Search keeps the bar still while its results scroll and the keyboard comes and goes.
