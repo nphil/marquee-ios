@@ -17,8 +17,14 @@ struct VideoPlaybackSettingsView: View {
                     }
                 }
                 .accessibilityIdentifier("video.skipInterval")
+                Picker("Skip Gesture", selection: $session.settings.skipTaps) {
+                    ForEach(SkipTapMode.allCases, id: \.self) { mode in
+                        Text(mode.title).tag(mode)
+                    }
+                }
+                .accessibilityIdentifier("video.skipTaps")
             } footer: {
-                Text("Skip back and skip forward jump by this much.")
+                Text("Skip back and skip forward jump by this much. Double-tap the left or right of the picture to skip. With Double-Tap, a single tap always shows or hides the controls.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)

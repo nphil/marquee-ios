@@ -82,6 +82,7 @@ SECONDS = {
     "PlayerRouteMenuScreenshots/testRouteMenuLandscape": 40,
     "PlayerRouteMenuScreenshots/testRouteMenuPortrait": 40,
     "PlayerAccessibilityScreenshots/testRouteMenu": 45,
+    "PlayerScreenshotTests/testFormatBadgeShowsOnFirstStart": 25,
     "PlayerScreenshotTests/testNetworkWaitOffersALowerQuality": 33,
     "PlayerScreenshotTests/testPanelsInLightTheme": 35,
     "PlayerScreenshotTests/testPausedControlsAndPanels": 66,

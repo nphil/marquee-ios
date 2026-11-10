@@ -1,14 +1,18 @@
 import MarqueeCore
 import SwiftUI
 
-/// The show's episodes, opened from the player over the playing picture: a season menu and rows as on the
-/// show's page (DESIGN §8.4). The playing episode is marked and scrolled into view. A tap plays the
-/// episode from where it was left; the menu offers the beginning.
+/// The show's episodes, opened from the player over the playing picture and listed as on the show's page
+/// (DESIGN §8.4). The season menu sits in a header above the list, so changing season never needs a scroll
+/// up. The playing episode is marked and scrolled into view. A tap plays the episode from where it was
+/// left; the menu offers the beginning. `side` is the compact panel on the trailing edge of a landscape
+/// screen; otherwise the same content fills a half-height sheet.
 struct EpisodeSheet: View {
     let model: PlayerModel
+    var side = false
+    let close: () -> Void
     @Environment(\.theme) private var theme
-    @Environment(\.dismiss) private var dismiss
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var seasons: [PlexMetadata] = []
     @State private var season: String?
     @State private var episodes: [PlexMetadata]?
@@ -19,17 +23,16 @@ struct EpisodeSheet: View {
     private static let prefetchAhead = 6
 
     private var stillSize: CGSize {
-        typeSize.isAccessibilitySize ? CGSize(width: 256, height: 144) : CGSize(width: 128, height: 72)
+        if typeSize.isAccessibilitySize { return CGSize(width: 256, height: 144) }
+        return side ? CGSize(width: 104, height: 58) : CGSize(width: 128, height: 72)
     }
 
     var body: some View {
-        NavigationStack {
+        VStack(spacing: 0) {
+            header
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: Space.s2) {
-                        if seasons.count > 1 {
-                            seasonMenu
-                        }
                         if let episodes {
                             ForEach(Array(episodes.enumerated()), id: \.element.ratingKey) { position, episode in
                                 row(episode)
@@ -38,10 +41,9 @@ struct EpisodeSheet: View {
                             }
                         }
                     }
-                    .padding(.horizontal, Space.inset)
-                    .padding(.bottom, Space.s4)
+                    .padding(.horizontal, Space.s3)
+                    .padding(.vertical, Space.s2)
                 }
-                .background(theme.sheet)
                 .overlay {
                     if failed {
                         EmptyState(
@@ -65,24 +67,51 @@ struct EpisodeSheet: View {
                     }
                 }
             }
-            .navigationTitle(model.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
         }
         .task { await loadSeasons() }
         .task(id: season) { await loadEpisodes() }
         .accessibilityIdentifier("player.episodeSheet")
     }
 
-    private var seasonTitle: String {
-        seasons.first { $0.ratingKey == season }?.title ?? "Season"
+    /// Pinned above the list: the season menu (the season's name when the show has one season) and Close.
+    private var header: some View {
+        HStack(spacing: Space.s2) {
+            if seasons.count > 1 {
+                seasonMenu
+            } else {
+                Text(seasonTitle)
+                    .textRole(.headline)
+                    .foregroundStyle(theme.ink)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, Space.s2)
+                    .accessibilityAddTraits(.isHeader)
+            }
+            Button(action: close) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(theme.ink2)
+                    .frame(width: Size.target, height: Size.target)
+                    .background(theme.glass, in: Circle())
+                    .contentShape(Circle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close")
+            .accessibilityIdentifier("player.episodes.close")
+        }
+        .padding(.horizontal, Space.s3)
+        .padding(.top, side ? Space.s2 : Space.s4)
+        .padding(.bottom, Space.s2)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(theme.edge).frame(height: 1)
+        }
     }
 
-    /// Full width and wrapping, so a long season name never clips at large text.
+    private var seasonTitle: String {
+        seasons.first { $0.ratingKey == season }?.title ?? (model.item.parentTitle ?? "Episodes")
+    }
+
+    /// Wrapping, so a long season name never clips at large text.
     private var seasonMenu: some View {
         Menu {
             Picker("Season", selection: $season) {
@@ -107,6 +136,7 @@ struct EpisodeSheet: View {
         }
         .accessibilityLabel("Season")
         .accessibilityValue(seasonTitle)
+        .accessibilityIdentifier("player.episodes.season")
     }
 
     private func row(_ episode: PlexMetadata) -> some View {
@@ -117,7 +147,7 @@ struct EpisodeSheet: View {
         return Button {
             Haptics.impact(.light)
             model.play(episode: episode, fromStart: false)
-            dismiss()
+            close()
         } label: {
             layout {
                 EpisodeStill(episode: episode, size: stillSize)
@@ -129,6 +159,7 @@ struct EpisodeSheet: View {
                     HStack(spacing: Space.s1) {
                         if playing {
                             Image(systemName: "speaker.wave.2.fill")
+                                .symbolEffect(.variableColor.iterative, isActive: model.isPlaying && !reduceMotion)
                             Text("Now playing")
                         } else if episode.isWatched {
                             Image(systemName: "checkmark.circle.fill")
@@ -153,7 +184,7 @@ struct EpisodeSheet: View {
             .frame(minHeight: Size.rowMin)
             .background {
                 if playing {
-                    RoundedRectangle(cornerRadius: Radius.control, style: .continuous).fill(theme.glass)
+                    RoundedRectangle(cornerRadius: Radius.control, style: .continuous).fill(theme.glassRaised)
                 }
             }
             .overlay {
@@ -168,7 +199,7 @@ struct EpisodeSheet: View {
         .contextMenu {
             Button {
                 model.play(episode: episode, fromStart: true)
-                dismiss()
+                close()
             } label: {
                 Label("Play from Beginning", systemImage: "arrow.counterclockwise")
             }
@@ -178,7 +209,7 @@ struct EpisodeSheet: View {
         .accessibilityAddTraits(playing ? .isSelected : [])
         .accessibilityAction(named: "Play from beginning") {
             model.play(episode: episode, fromStart: true)
-            dismiss()
+            close()
         }
         .accessibilityIdentifier("player.episode.\(episode.ratingKey)")
     }

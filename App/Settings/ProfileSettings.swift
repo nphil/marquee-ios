@@ -6,6 +6,8 @@ import MarqueeCore
 struct ProfileSettings: Equatable, Sendable {
     /// Seconds for both skip directions.
     var skipInterval = 10
+    /// Whether taps after a skip keep skipping, or only a double-tap skips.
+    var skipTaps = SkipTapMode.chained
     /// Seconds before an intro skips itself; 0 skips only when asked.
     var introSkipDelay = 5
     /// Seconds of countdown at the credits before the next episode; 0 turns auto-next off.
@@ -39,7 +41,7 @@ struct ProfileSettings: Equatable, Sendable {
 
 extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
-        case skipInterval, introSkipDelay, nextEpisodeDelay, directPlay, aspect, readsTunerDirectly
+        case skipInterval, skipTaps, introSkipDelay, nextEpisodeDelay, directPlay, aspect, readsTunerDirectly
         case audioLanguage, subtitles, remembersTracks, subtitleStyle, homeRows
         case posterLabels, quality, audioEnhancements, hiddenLibraries, playsTrailers
     }
@@ -49,6 +51,7 @@ extension ProfileSettings: Codable {
         func value<T: Decodable>(_ key: CodingKeys) -> T? { try? c.decodeIfPresent(T.self, forKey: key) }
         self.init()
         skipInterval = value(.skipInterval) ?? skipInterval
+        skipTaps = value(.skipTaps) ?? skipTaps
         introSkipDelay = value(.introSkipDelay) ?? introSkipDelay
         nextEpisodeDelay = value(.nextEpisodeDelay) ?? nextEpisodeDelay
         directPlay = value(.directPlay) ?? directPlay

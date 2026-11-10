@@ -25,14 +25,23 @@ struct PlayerView: View {
     /// The bottom controls' frame on screen, so subtitles and offers clear them.
     @State private var bottomControls: CGRect = .zero
     @State private var tapTask: Task<Void, Never>?
-    @State private var lastTap: (at: Date, side: TapSide)?
-    @State private var skipRun: (side: TapSide, until: Date)?
+    @State private var taps = SkipTaps(mode: .chained)
+    /// The format badge of the item that has started, and the item it was shown for: seeks, stalls and
+    /// restarts of the same item never show it again.
+    @State private var formatBadge: FormatBadge?
+    @State private var badgedItem: String?
+    @State private var badgeTask: Task<Void, Never>?
+    /// The whole screen, safe areas included. A landscape screen gets the episodes as a side panel.
+    @State private var screen: CGSize = .zero
+
+    private var sideLayout: Bool { screen.width > screen.height }
 
     var body: some View {
         let theme = store.selected(for: .dark)
             .adjusted(increaseContrast: contrast == .increased, reduceTransparency: reduceTransparency)
         ZStack {
             Color.black.ignoresSafeArea()
+                .onGeometryChange(for: CGSize.self) { $0.size } action: { screen = $0 }
             GeometryReader { proxy in
                 picture(in: proxy.size)
             }
@@ -68,11 +77,21 @@ struct PlayerView: View {
             if model.showsTiming, model.canTimeSubtitles, model.phase == .playing {
                 timingCapsule
             }
+            if let formatBadge {
+                GeometryReader { proxy in
+                    FormatBadgeView(badge: formatBadge, screenShortSide: min(proxy.size.width, proxy.size.height))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .padding(.top, 76)
+                }
+                .allowsHitTesting(false)
+                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.94, anchor: .top)))
+            }
             if model.fallback != nil {
                 FallbackBanner(model: model)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
                     .padding(.top, model.chromeVisible ? 76 : Space.s3)
             }
+            episodePanel
         }
         .environment(\.theme, theme)
         .environment(\.plexLibrary, model.library)
@@ -81,9 +100,13 @@ struct PlayerView: View {
         .persistentSystemOverlays(model.chromeVisible ? .automatic : .hidden)
         .accessibilityAction(.escape) { close() }
         .accessibilityAction(.magicTap) { model.togglePlay() }
-        .sheet(isPresented: $model.showsEpisodes) {
-            EpisodeSheet(model: model)
-                .panel(model, theme: outerTheme, scheme: outerScheme, detents: [.fraction(0.55), .large])
+        .sheet(isPresented: Binding(get: { model.showsEpisodes && !sideLayout }, set: { if !$0 { model.showsEpisodes = false } })) {
+            EpisodeSheet(model: model) { model.showsEpisodes = false }
+                .panel(model, theme: outerTheme, scheme: outerScheme, detents: [.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(Radius.sheet)
+                // The picture above the sheet keeps playing and answers taps.
+                .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
         .sheet(isPresented: $model.showsInfo) {
             NavigationStack {
@@ -108,6 +131,7 @@ struct PlayerView: View {
                     .panel(model, theme: outerTheme, scheme: outerScheme)
             }
         }
+        .onChange(of: model.phase, initial: true) { showFormatBadge() }
         .onChange(of: session.settings.subtitleStyle) { model.styleChanged() }
         .onChange(of: voiceOver || switchControl) { _, on in
             if on { model.showChrome() }
@@ -167,50 +191,113 @@ struct PlayerView: View {
         .accessibilityHidden(true)
     }
 
+    // MARK: Episodes
+
+    /// On a landscape screen the episodes are a compact panel on the trailing edge, about 40% of the
+    /// width, and the picture stays visible and playing beside it; a portrait screen gets the sheet.
+    private var episodePanel: some View {
+        let width = min(max(screen.width * 0.4, 340), screen.width * 0.5)
+        let shape = UnevenRoundedRectangle(topLeadingRadius: Radius.sheet, bottomLeadingRadius: Radius.sheet, style: .continuous)
+        return Group {
+            if model.showsEpisodes, sideLayout {
+                GeometryReader { proxy in
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        EpisodeSheet(model: model, side: true) { model.showsEpisodes = false }
+                            .frame(width: max(280, width - proxy.safeAreaInsets.trailing))
+                            .simultaneousGesture(
+                                DragGesture(minimumDistance: 30).onEnded { value in
+                                    if value.translation.width > 80, value.translation.width > abs(value.translation.height) * 2 {
+                                        model.showsEpisodes = false
+                                    }
+                                }
+                            )
+                            .background {
+                                ZStack {
+                                    shape.fill(outerTheme.sheet)
+                                    shape.strokeBorder(outerTheme.edge, lineWidth: 1)
+                                }
+                                .ignoresSafeArea()
+                            }
+                    }
+                }
+                .environment(\.theme, outerTheme)
+                .environment(\.colorScheme, outerScheme)
+                .tint(outerTheme.accent)
+                .onAppear { model.menuOpened() }
+                .onDisappear { model.menuClosed() }
+                .accessibilityAddTraits(.isModal)
+                .accessibilityAction(.escape) { model.showsEpisodes = false }
+                .transition(reduceMotion ? .opacity : .move(edge: .trailing))
+            }
+        }
+        .animation(reduceMotion ? .easeOut(duration: 0.12) : .smooth(duration: 0.3), value: model.showsEpisodes)
+    }
+
+    // MARK: Format badge
+
+    /// When an item first plays, its format shows for 1.4 s and fades.
+    private func showFormatBadge() {
+        guard model.phase == .playing, badgedItem != model.item.ratingKey else { return }
+        badgedItem = model.item.ratingKey
+        let audio = model.audio.flatMap { track in model.part?.streams.first { $0.id == track.id } }
+        let badge = FormatBadge.make(video: model.part?.videoStream, media: model.media, audio: audio, route: model.route)
+        guard !badge.isEmpty else { return }
+        let fade: Animation = reduceMotion ? .easeOut(duration: 0.15) : .easeOut(duration: 0.3)
+        badgeTask?.cancel()
+        withAnimation(fade) { formatBadge = badge }
+        #if DEBUG
+        // A UI test lengthens the hold so a slow runner can still see the badge.
+        let override = UserDefaults.standard.double(forKey: "marquee.uitest.badgeSeconds")
+        let hold = override > 0 ? override : 1.4
+        #else
+        let hold = 1.4
+        #endif
+        badgeTask = Task {
+            try? await Task.sleep(for: .seconds(hold))
+            guard !Task.isCancelled else { return }
+            withAnimation(fade) { formatBadge = nil }
+        }
+    }
+
     // MARK: Gestures
 
-    /// Taps are told apart by hand: a single tap waits 0.3 s for a second one, and after a skip more taps
-    /// on the same side keep skipping at once (repeat taps within 1.5 s add up, behaviour spec §4).
+    /// Taps are told apart by hand (`SkipTaps`): a single tap waits 0.3 s for a second one. In the
+    /// chained mode more taps on the same side keep skipping at once after a skip (repeat taps within
+    /// 1.5 s add up, behaviour spec §4); in the double-tap mode only a true double-tap skips.
     private func tapped(at point: CGPoint, width: CGFloat) {
         let side = TapSide(x: point.x, width: width)
-        let now = Date.now
-        if let run = skipRun, now < run.until, run.side == side {
-            tapTask?.cancel()
-            skip(side)
+        taps.mode = session.settings.skipTaps
+        // A tap on the picture beside the episodes panel closes it.
+        if model.showsEpisodes, sideLayout {
+            model.showsEpisodes = false
             return
         }
         // A still picture invites taps to wake it; while playback waits on data they bring the controls
         // and never skip.
         if model.isStalled {
             tapTask?.cancel()
-            lastTap = nil
+            taps.reset()
             model.showChrome()
             return
         }
-        if let last = lastTap, now.timeIntervalSince(last.at) < 0.3, last.side == side {
+        switch taps.tap(side, at: ProcessInfo.processInfo.systemUptime) {
+        case .skip(let side):
             tapTask?.cancel()
-            lastTap = nil
-            if side == .centre {
-                Haptics.impact(.light)
-                model.setAspect(model.aspect == .fit ? .fill : .fit)
-            } else {
-                skip(side)
+            Haptics.impact(.light)
+            model.skip(by: side == .back ? -model.skipInterval : model.skipInterval)
+        case .toggleAspect:
+            tapTask?.cancel()
+            Haptics.impact(.light)
+            model.setAspect(model.aspect == .fit ? .fill : .fit)
+        case .single:
+            tapTask?.cancel()
+            tapTask = Task {
+                try? await Task.sleep(for: .seconds(SkipTaps.doubleTapWindow))
+                guard !Task.isCancelled else { return }
+                model.tapped()
             }
-            return
         }
-        lastTap = (now, side)
-        tapTask?.cancel()
-        tapTask = Task {
-            try? await Task.sleep(for: .milliseconds(300))
-            guard !Task.isCancelled else { return }
-            model.tapped()
-        }
-    }
-
-    private func skip(_ side: TapSide) {
-        Haptics.impact(.light)
-        model.skip(by: side == .back ? -model.skipInterval : model.skipInterval)
-        skipRun = (side, .now.addingTimeInterval(1.5))
     }
 
     /// A mostly vertical drag down moves the picture with the finger and closes past 140 pt or on a flick.
@@ -249,15 +336,6 @@ struct PlayerView: View {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else { return }
         scene.requestGeometryUpdate(UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: orientations))
-    }
-}
-
-/// Which third of the picture a tap landed in.
-enum TapSide: Equatable {
-    case back, centre, forward
-
-    init(x: CGFloat, width: CGFloat) {
-        self = x < width / 3 ? .back : x > width * 2 / 3 ? .forward : .centre
     }
 }
 

@@ -61,10 +61,10 @@ struct PlayerChrome: View {
     private var topBar: some View {
         HStack(spacing: Space.s3) {
             Button(action: close) {
-                Image(systemName: "chevron.down")
+                Image(systemName: "xmark")
             }
             .buttonStyle(PlayerButtonStyle())
-            .accessibilityLabel("Close player")
+            .accessibilityLabel("Close")
             .accessibilityIdentifier("player.close")
 
             VStack(alignment: .leading, spacing: 2) {

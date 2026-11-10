@@ -15,6 +15,16 @@ final class PlayerScreenshotTests: XCTestCase {
         try panelsFlow(mode: "light", suffix: "paper")
     }
 
+    /// The first start shows the file's format for a moment. The hold is lengthened for this launch so a
+    /// loaded runner can catch it; Sintel is 4K Dolby Vision with Atmos.
+    @MainActor
+    func testFormatBadgeShowsOnFirstStart() throws {
+        let app = launchPlayer(at: 0, paused: false, mode: "dark", item: "108", badgeSeconds: 6)
+        waitFor("player.formatBadge", in: app)
+        try snap("player-11-format-badge-rose-pine")
+        XCTAssertTrue(element("player.formatBadge", in: app).waitForNonExistence(timeout: 15), "The badge did not fade")
+    }
+
     @MainActor
     func testSkipIntroCountsDownThenSkips() throws {
         try skipIntroFlow(suffix: "rose-pine")
@@ -192,7 +202,10 @@ private extension XCTestCase {
         let playing = element("player.episode.212", in: app)
         XCTAssertTrue(playing.wait(for: \.isHittable, toEqual: true, timeout: 10), "The list did not open on episode 2")
         try snap("player-05-episodes-\(suffix)")
-        app.navigationBars["Caminandes"].buttons["Done"].tap()
+        // The season menu is pinned in the panel's header, above the list.
+        waitFor("player.episodes.close", in: app)
+        tap("player.episodes.close", in: app)
+        XCTAssertTrue(element("player.episodeSheet", in: app).waitForNonExistence(timeout: 5), "The episode list did not close")
     }
 
     /// The chrome holds close, title, the route button, the transport, the scrubber, restart, episodes,
@@ -446,7 +459,7 @@ private extension XCTestCase {
     @MainActor
     func launchPlayer(
         at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, bazarr: Bool = false, speechDock: Bool = false,
-        scrub: Double? = nil, cast: Bool = false, stall: Bool = false
+        scrub: Double? = nil, cast: Bool = false, stall: Bool = false, item: String = "212", badgeSeconds: Double? = nil
     ) -> XCUIApplication {
         XCUIDevice.shared.orientation = .landscapeLeft
         // A failed step ends the test early; the next test still has to start upright.
@@ -455,7 +468,7 @@ private extension XCTestCase {
         }
         var arguments = [
             "-marquee.fakeSignedIn", "YES",
-            "-marquee.uitest.play", "212",
+            "-marquee.uitest.play", item,
             "-marquee.uitest.playerTime", String(seconds),
             "-marquee.uitest.paused", paused ? "YES" : "NO",
             "-marquee.uitest.frame", "art/caminandes-backdrop.jpg",
@@ -466,6 +479,7 @@ private extension XCTestCase {
         if let scrub { arguments += ["-marquee.uitest.scrub", String(scrub)] }
         if cast { arguments += ["-marquee.uitest.cast", "YES"] }
         if stall { arguments += ["-marquee.uitest.stall", "YES"] }
+        if let badgeSeconds { arguments += ["-marquee.uitest.badgeSeconds", String(badgeSeconds)] }
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", light: "paper", arguments: arguments, waitingFor: nil)
         // Up Next hides the transport, so whichever control shows first means the player is up.
         // The scrub hold hides the transport, so the preview stands for it.
