@@ -23,7 +23,7 @@ struct LibraryView: View {
                 if let section = browsable.first(where: { $0.key == chosenKey }) ?? browsable.first {
                     SectionBrowser(section: section, width: width)
                         .id(section.key)
-                        .toolbarTitleMenu {
+                        .titleMenu(section.title) {
                             Picker("Library", selection: Binding(get: { section.key }, set: { chosenKey = $0 })) {
                                 ForEach(browsable) { Text($0.title).tag($0.key) }
                             }

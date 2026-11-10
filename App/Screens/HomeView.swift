@@ -208,7 +208,7 @@ private struct PlacesMenu: ViewModifier {
         if places.isEmpty {
             content
         } else {
-            content.toolbarTitleMenu {
+            content.titleMenu("Home") {
                 ForEach(places) { place in
                     Button(place.title, systemImage: place.systemImage) { open(place) }
                 }
