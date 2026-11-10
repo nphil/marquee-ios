@@ -17,7 +17,7 @@ public struct DownloadStore: Sendable {
 
     /// The video while it arrives; renamed to `mediaFile` once complete.
     public func partialFile(for record: DownloadRecord) -> URL {
-        folder(for: record).appending(path: "download.part")
+        folder(for: record).appending(path: record.partialID.map { "download-\($0.uuidString).part" } ?? "download.part")
     }
 
     public func mediaFile(for record: DownloadRecord) -> URL? {

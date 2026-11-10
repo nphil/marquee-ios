@@ -31,6 +31,8 @@ final class DownloadCenter {
     private let meter = TransferMeter()
     private let keepAlive = DownloadKeepAlive()
     @ObservationIgnored private var worker: Task<Void, Never>?
+    @ObservationIgnored private var transferOwner = UUID()
+    @ObservationIgnored private var transferRecordID: String?
     @ObservationIgnored private var syncTask: Task<Void, Never>?
     @ObservationIgnored private var foregroundObserver: (any NSObjectProtocol)?
     @ObservationIgnored private var backgroundObserver: (any NSObjectProtocol)?
@@ -60,6 +62,7 @@ final class DownloadCenter {
     }
 
     func connect(library: PlexLibrary?, scope: DownloadScope?) {
+        transferOwner = UUID()
         worker?.cancel()
         keepAlive.stop()
         self.library = library
@@ -100,10 +103,11 @@ final class DownloadCenter {
 
     func pause(_ id: String) {
         guard let index = index(id), allRecords[index].phase.isActive else { return }
+        let part = relativePart(for: allRecords[index])
         allRecords[index].phase = .paused
         persist()
         worker?.cancel()
-        Task { await background.cancel(id: id) }
+        Task { await background.cancel(part: part) }
     }
 
     func resume(_ id: String) {
@@ -115,13 +119,14 @@ final class DownloadCenter {
 
     func remove(_ id: String) {
         guard let index = index(id) else { return }
+        if transferRecordID == id { transferOwner = UUID() }
         let record = allRecords.remove(at: index)
         removing.insert(id)
         worker?.cancel()
         persist()
         do { try store.remove(record) } catch { self.error = error.localizedDescription }
         Task {
-            await background.cancel(id: id)
+            await background.cancel(part: relativePart(for: record))
             removing.remove(id)
             if let library, record.scope == scope, let conversion = record.conversion {
                 try? await library.removeFromDownloadQueue(conversion.queue, item: conversion.item)
@@ -148,17 +153,22 @@ final class DownloadCenter {
     }
 
     func eraseAll() {
+        transferOwner = UUID()
         worker?.cancel()
         keepAlive.stop()
         let old = allRecords
         allRecords = []
+        do { try store.eraseAll() } catch { self.error = error.localizedDescription }
         Task {
-            for record in old { await background.cancel(id: record.id) }
-            do { try store.eraseAll() } catch { self.error = error.localizedDescription }
+            for record in old { await background.cancel(part: relativePart(for: record)) }
         }
     }
 
     private func index(_ id: String) -> Int? { allRecords.firstIndex { $0.scope == scope && $0.id == id } }
+    private func transferIndex(_ id: String, scope: DownloadScope, owner: UUID) -> Int? {
+        guard self.scope == scope, transferOwner == owner else { return nil }
+        return allRecords.firstIndex { $0.scope == scope && $0.id == id }
+    }
     private func persist() {
         do { try store.saveIndex(allRecords) } catch { self.error = error.localizedDescription }
     }
@@ -205,13 +215,16 @@ final class DownloadCenter {
 
     private func run() async -> Bool {
         guard let library, let scope else { return false }
+        let owner = transferOwner
         let running = await background.running()
-        guard !Task.isCancelled, self.scope == scope else { return false }
-        guard let record = records.first(where: { record in record.phase.isActive && !running.contains(where: { $0.id == record.id }) }) else { return false }
-        do { try await transfer(record.id, library: library, scope: scope) }
+        guard !Task.isCancelled, self.scope == scope, transferOwner == owner else { return false }
+        guard let record = records.first(where: { record in record.phase.isActive && !running.contains(where: { $0.part == relativePart(for: record) }) }) else { return false }
+        transferRecordID = record.id
+        defer { if transferOwner == owner { transferRecordID = nil } }
+        do { try await transfer(record.id, library: library, scope: scope, owner: owner) }
         catch is CancellationError { }
         catch {
-            if let i = index(record.id), allRecords[i].phase.isActive {
+            if !Task.isCancelled, let i = transferIndex(record.id, scope: scope, owner: owner), allRecords[i].phase.isActive {
                 allRecords[i].phase = .failed(error.localizedDescription)
                 persist()
             }
@@ -219,8 +232,8 @@ final class DownloadCenter {
         return true
     }
 
-    private func transfer(_ id: String, library: PlexLibrary, scope: DownloadScope) async throws {
-        guard var i = index(id) else { return }
+    private func transfer(_ id: String, library: PlexLibrary, scope: DownloadScope, owner: UUID) async throws {
+        guard var i = transferIndex(id, scope: scope, owner: owner), allRecords[i].phase.isActive else { return }
         var record = allRecords[i]
         let item = try PlexMetadata.fromSnapshot(Data(contentsOf: store.metadataFile(for: record)))
         guard item.media.indices.contains(record.mediaIndex), let part = item.media[record.mediaIndex].parts.first else { throw DownloadFailure.message("The saved media description is missing.") }
@@ -229,18 +242,20 @@ final class DownloadCenter {
             if record.conversion == nil {
                 let target = PresetTarget.target(for: preset, media: item.media[record.mediaIndex])
                 let queue = try await library.downloadQueue()
+                try Task.checkCancellation()
+                guard let queuedIndex = transferIndex(id, scope: scope, owner: owner), allRecords[queuedIndex].phase.isActive else { return }
                 let queueItem = try await library.addToDownloadQueue(queue, ratingKey: id, mediaIndex: record.mediaIndex, target: target)
                 try Task.checkCancellation()
-                guard let current = index(id), self.scope == scope else { return }
+                guard let current = transferIndex(id, scope: scope, owner: owner), allRecords[current].phase.isActive else { return }
                 allRecords[current].conversion = .init(queue: queue, item: queueItem, target: target)
                 allRecords[current].phase = .converting
                 persist()
             }
-            guard let current = index(id), let conversion = allRecords[current].conversion else { return }
+            guard let conversionIndex = transferIndex(id, scope: scope, owner: owner), allRecords[conversionIndex].phase.isActive, let conversion = allRecords[conversionIndex].conversion else { return }
             while true {
                 try Task.checkCancellation()
                 let state = try await library.downloadQueueItem(conversion.queue, item: conversion.item)
-                guard let current = index(id), self.scope == scope, allRecords[current].phase.isActive else { return }
+                guard let current = transferIndex(id, scope: scope, owner: owner), allRecords[current].phase.isActive, !Task.isCancelled else { return }
                 allRecords[current].conversion?.status = state.status
                 allRecords[current].conversion?.progress = state.progress
                 allRecords[current].conversion?.speed = state.speed
@@ -250,14 +265,18 @@ final class DownloadCenter {
                 if state.status == .error { throw DownloadFailure.message(state.error ?? "The server could not convert this title.") }
                 try await Task.sleep(for: .seconds(5))
             }
+            try Task.checkCancellation()
+            guard let decisionIndex = transferIndex(id, scope: scope, owner: owner), allRecords[decisionIndex].phase.isActive else { return }
             let decision = try await library.downloadDecision(conversion.queue, item: conversion.item)
-            try decision.data.write(to: store.decisionFile(for: allRecords[current]), options: .atomic)
+            try Task.checkCancellation()
+            guard let writeIndex = transferIndex(id, scope: scope, owner: owner), allRecords[writeIndex].phase.isActive else { return }
+            try decision.data.write(to: store.decisionFile(for: allRecords[writeIndex]), options: .atomic)
             url = try await library.downloadURL(queue: conversion.queue, item: conversion.item)
         } else {
             url = try await library.downloadURL(part: part)
         }
         while !Task.isCancelled {
-            guard let current = index(id), self.scope == scope, allRecords[current].phase.isActive else { return }
+            guard let current = transferIndex(id, scope: scope, owner: owner), allRecords[current].phase.isActive else { return }
             i = current
             record = allRecords[i]
             if let length = record.length, record.received.isComplete(length: length) {
@@ -278,13 +297,13 @@ final class DownloadCenter {
                 return
             }
             let outcome = await fetcher.fetch(url, headers: library.authorizationHeaders(), range: range, into: file, id: id, cellular: settings.cellular)
-            guard let current = index(id), self.scope == scope else { return }
-            if case .whole = outcome.reply { allRecords[current].received = ByteSpans() }
-            allRecords[current].received.insert(outcome.written)
+            guard let outcomeIndex = transferIndex(id, scope: scope, owner: owner) else { return }
+            if case .whole = outcome.reply { allRecords[outcomeIndex].received = ByteSpans() }
+            allRecords[outcomeIndex].received.insert(outcome.written)
             meter.commit(Int64(outcome.written.count), for: id)
             switch outcome.reply {
-            case .partial(let length): allRecords[current].length = length
-            case .whole(let length): allRecords[current].length = length ?? (outcome.error == nil ? outcome.written.upperBound : nil)
+            case .partial(let length): allRecords[outcomeIndex].length = length
+            case .whole(let length): allRecords[outcomeIndex].length = length ?? (outcome.error == nil ? outcome.written.upperBound : nil)
             case .notReady(let delay): persist(); try await Task.sleep(for: .seconds(delay)); continue
             case .failed(let status): throw DownloadFailure.message("The server answered \(status).")
             case nil: break
@@ -314,7 +333,7 @@ final class DownloadCenter {
         switch result {
         case .saved(let value, _, _), .notReady(let value), .failed(let value, _), .stopped(let value): slice = value
         }
-        guard let i = allRecords.firstIndex(where: { relativePart(for: $0) == slice.part && $0.phase.isActive }) else { return }
+        guard let i = allRecords.firstIndex(where: { $0.id == slice.id && relativePart(for: $0) == slice.part && $0.phase.isActive }) else { return }
         switch result {
         case .saved(_, let written, let length):
             allRecords[i].received.insert(written)

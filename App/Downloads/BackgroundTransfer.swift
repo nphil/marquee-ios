@@ -81,9 +81,9 @@ final class BackgroundTransfer: Sendable {
     }
 
     /// Stops every slice of a download that is removed or paused.
-    func cancel(id: String) async {
+    func cancel(part: String) async {
         guard let session else { return }
-        for task in await session.allTasks where Self.slice(of: task)?.id == id { task.cancel() }
+        for task in await session.allTasks where Self.slice(of: task)?.part == part { task.cancel() }
     }
 
     fileprivate static func slice(of task: URLSessionTask) -> Slice? {
