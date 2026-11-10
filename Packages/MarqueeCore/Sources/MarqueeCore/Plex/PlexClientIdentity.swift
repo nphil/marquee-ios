@@ -81,6 +81,8 @@ public enum PlexHeader {
     public static let containerSize = "X-Plex-Container-Size"
     /// Ties requests to one playback session, e.g. timeline reports to their transcode.
     public static let sessionIdentifier = "X-Plex-Session-Identifier"
+    /// Adds to the client profile the server converts for, e.g. the download queue's target format.
+    public static let profileExtra = "X-Plex-Client-Profile-Extra"
 }
 
 extension URL {
