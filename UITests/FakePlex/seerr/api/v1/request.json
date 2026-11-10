@@ -1,0 +1,23 @@
+{
+  "page": 1,
+  "totalPages": 1,
+  "totalResults": 1,
+  "results": [
+    {
+      "id": 501,
+      "status": 1,
+      "type": "movie",
+      "is4k": false,
+      "requestedBy": {
+        "id": 1,
+        "displayName": "Jordan"
+      },
+      "createdAt": "2026-01-12T12:00:00.000Z",
+      "media": {
+        "tmdbId": 9103,
+        "mediaType": "movie",
+        "status": 2
+      }
+    }
+  ]
+}

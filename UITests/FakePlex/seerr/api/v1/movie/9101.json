@@ -1,0 +1,20 @@
+{
+  "id": 9101,
+  "mediaType": "movie",
+  "title": "Wing It!",
+  "releaseDate": "2023-04-01",
+  "posterPath": "/art/wing-it-poster.jpg",
+  "backdropPath": "/art/wing-it-backdrop.jpg",
+  "overview": "A young inventor takes flight in an unlikely machine.",
+  "runtime": 9,
+  "genres": [
+    {
+      "id": 16,
+      "name": "Animation"
+    },
+    {
+      "id": 12,
+      "name": "Adventure"
+    }
+  ]
+}

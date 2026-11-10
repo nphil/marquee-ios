@@ -1,0 +1,41 @@
+{
+  "id": 9101,
+  "mediaType": "movie",
+  "title": "Wing It!",
+  "releaseDate": "2023-04-01",
+  "posterPath": "/art/wing-it-poster.jpg",
+  "backdropPath": "/art/wing-it-backdrop.jpg",
+  "overview": "A young inventor takes flight in an unlikely machine.",
+  "mediaInfo": {
+    "status": 2,
+    "requests": [
+      {
+        "id": 502,
+        "status": 1,
+        "type": "movie",
+        "is4k": false,
+        "requestedBy": {
+          "id": 1,
+          "displayName": "Jordan"
+        },
+        "createdAt": "2026-01-13T12:00:00.000Z",
+        "media": {
+          "tmdbId": 9101,
+          "mediaType": "movie",
+          "status": 2
+        }
+      }
+    ]
+  },
+  "runtime": 9,
+  "genres": [
+    {
+      "id": 16,
+      "name": "Animation"
+    },
+    {
+      "id": 12,
+      "name": "Adventure"
+    }
+  ]
+}

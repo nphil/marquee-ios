@@ -24,6 +24,10 @@ final class SessionStorage {
         static let speechDockAddress = "marquee.speechDock.address"
         static let bazarrAddress = "marquee.bazarr.address"
         static let bazarrKey = "marquee.bazarr.key"
+        static let seerrAddress = "marquee.seerr.address"
+        static let seerrKey = "marquee.seerr.key"
+        static let seerrSession = "marquee.seerr.session"
+        static let seerrPulsarr = "marquee.seerr.pulsarr"
         static let castEnabled = "marquee.cast.enabled"
         static let remoteEnabled = "marquee.remote.enabled"
         static let tracksPrefix = "marquee."
@@ -114,17 +118,47 @@ final class SessionStorage {
         }
     }
 
+    /// Seerr's address, and its API key when it signs in with one rather than the Plex profile; the key
+    /// is a secret like Bazarr's. Kept through sign-out.
+    var seerr: SeerrConfig? {
+        get {
+            guard let address = defaults.url(forKey: Key.seerrAddress) else { return nil }
+            let key = secret(Key.seerrKey).map { String(decoding: $0, as: UTF8.self) }
+            return SeerrConfig(address: address, auth: key.map { .apiKey($0) } ?? .plex)
+        }
+        set {
+            defaults.set(newValue?.address, forKey: Key.seerrAddress)
+            var key: String?
+            if case .apiKey(let value) = newValue?.auth { key = value }
+            setSecret(key.map { Data($0.utf8) }, for: Key.seerrKey)
+        }
+    }
+
+    /// Seerr's cookie from the last sign-in with Plex, so a launch need not sign in again.
+    var seerrSession: SeerrSession? {
+        get { secret(Key.seerrSession).flatMap { try? JSONDecoder().decode(SeerrSession.self, from: $0) } }
+        set { setSecret(newValue.flatMap { try? JSONEncoder().encode($0) }, for: Key.seerrSession) }
+    }
+
+    /// Pulsarr also requests what goes on a Plex Watchlist.
+    var seerrPulsarr: Bool {
+        get { defaults.bool(forKey: Key.seerrPulsarr) }
+        set { defaults.set(newValue, forKey: Key.seerrPulsarr) }
+    }
+
     /// Whether the LumaTV remote is on. Its paired TVs and settings are LumaRemoteKit's own.
     var remoteEnabled: Bool {
         get { defaults.bool(forKey: Key.remoteEnabled) }
         set { defaults.set(newValue, forKey: Key.remoteEnabled) }
     }
 
-    /// Sign-out: the token and servers leave the Keychain; settings and themes stay.
+    /// Sign-out: the token, the servers and the Seerr session made with the token leave the Keychain;
+    /// settings and themes stay.
     func clearSignIn() {
         accountToken = nil
         setSecret(nil, for: Key.servers)
         serverID = nil
+        seerrSession = nil
         profile = nil
         for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(Key.addressPrefix) {
             defaults.removeObject(forKey: key)
@@ -135,6 +169,7 @@ final class SessionStorage {
     /// identifier, each profile's settings, remembered tracks, themes and Live TV lists.
     func eraseAll() {
         clearSignIn()
+        seerr = nil
         defaults.removePersistentDomain(forName: domain)
     }
 

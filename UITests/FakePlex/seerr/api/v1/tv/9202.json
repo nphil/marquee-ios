@@ -1,0 +1,25 @@
+{
+  "id": 9202,
+  "mediaType": "tv",
+  "name": "The Mountain Workshop",
+  "firstAirDate": "2024-04-01",
+  "posterPath": "/art/hero-poster.jpg",
+  "backdropPath": "/art/hero-backdrop.jpg",
+  "overview": "Artists and inventors bring remarkable stories to life.",
+  "genres": [
+    {
+      "id": 16,
+      "name": "Animation"
+    }
+  ],
+  "externalIds": {
+    "tvdbId": 9202
+  },
+  "seasons": [
+    {
+      "seasonNumber": 1,
+      "name": "Season 1",
+      "episodeCount": 6
+    }
+  ]
+}

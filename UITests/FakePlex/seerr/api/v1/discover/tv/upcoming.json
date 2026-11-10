@@ -1,0 +1,16 @@
+{
+  "page": 1,
+  "totalPages": 1,
+  "totalResults": 1,
+  "results": [
+    {
+      "id": 9202,
+      "mediaType": "tv",
+      "name": "The Mountain Workshop",
+      "firstAirDate": "2024-04-01",
+      "posterPath": "/art/hero-poster.jpg",
+      "backdropPath": "/art/hero-backdrop.jpg",
+      "overview": "Artists and inventors bring remarkable stories to life."
+    }
+  ]
+}

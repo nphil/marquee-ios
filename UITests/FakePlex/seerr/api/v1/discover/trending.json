@@ -1,0 +1,73 @@
+{
+  "page": 1,
+  "totalPages": 1,
+  "totalResults": 5,
+  "results": [
+    {
+      "id": 9101,
+      "mediaType": "movie",
+      "title": "Wing It!",
+      "releaseDate": "2023-04-01",
+      "posterPath": "/art/wing-it-poster.jpg",
+      "backdropPath": "/art/wing-it-backdrop.jpg",
+      "overview": "A young inventor takes flight in an unlikely machine."
+    },
+    {
+      "id": 9201,
+      "mediaType": "tv",
+      "name": "Caminandes",
+      "firstAirDate": "2013-04-01",
+      "posterPath": "/art/caminandes-poster.jpg",
+      "backdropPath": "/art/caminandes-backdrop.jpg",
+      "overview": "A determined llama finds adventure in Patagonia.",
+      "mediaInfo": {
+        "status": 4,
+        "seasons": [
+          {
+            "seasonNumber": 1,
+            "status": 5
+          },
+          {
+            "seasonNumber": 2,
+            "status": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": 9102,
+      "mediaType": "movie",
+      "title": "Spring",
+      "releaseDate": "2019-04-01",
+      "posterPath": "/art/spring-poster.jpg",
+      "backdropPath": "/art/spring-backdrop.jpg",
+      "overview": "A shepherd and her dog face the spirits of the mountain.",
+      "mediaInfo": {
+        "status": 5,
+        "ratingKey": "110",
+        "iOSPlexUrl": "plex://preplay/?metadataKey=110&server=fake-server"
+      }
+    },
+    {
+      "id": 9103,
+      "mediaType": "movie",
+      "title": "Sintel",
+      "releaseDate": "2010-04-01",
+      "posterPath": "/art/sintel-poster.jpg",
+      "backdropPath": "/art/sintel-backdrop.jpg",
+      "overview": "A traveller searches for a lost dragon.",
+      "mediaInfo": {
+        "status": 2
+      }
+    },
+    {
+      "id": 9202,
+      "mediaType": "tv",
+      "name": "The Mountain Workshop",
+      "firstAirDate": "2024-04-01",
+      "posterPath": "/art/hero-poster.jpg",
+      "backdropPath": "/art/hero-backdrop.jpg",
+      "overview": "Artists and inventors bring remarkable stories to life."
+    }
+  ]
+}

@@ -131,6 +131,14 @@ The endpoints and the route rules are in `docs/LIVE-TV.md`.
 - `SubtitleTiming`: a subtitle offset in 0.1 s steps, up to 60 s either way.
 - `SubtitleReveal.estimate(_:duration:by:)`, `visibility(of:at:)`: Reveal as Spoken timing estimated from a cue's text and length. `measured(_:starts:by:)` takes SpeechDock's word starts instead; `spoken(_:)` is about how long a text takes to say.
 
+## Seerr (`Seerr/`)
+
+- `SeerrConfig.parse(address:apiKey:)` validates an HTTP(S) service address and optional key; plain HTTP is limited to home-network addresses. `Auth.plex` uses the Plex profile token; `Auth.apiKey` acts as the key’s owner. `SeerrError` distinguishes connection, authentication, permission, quota, duplicate request, missing title and service failures.
+- `SeerrClient` (actor) takes a config, transport, optional Plex token and saved session, plus an `onSession` callback. `version()`, `signIn()`, `me()` and `serverSettings()` check the service, account and request settings. It maintains its own session and CSRF cookies; a Plex session rejected with 401 or 403 is renewed once and the call retried.
+- `discover(_:page:)`, `search(_:page:)` and `details(_:tmdbID:)` return movies and series. `SeerrShelf` names Trending, Popular Movies, Popular Series, Upcoming Movies and Upcoming Series. `requests(of:take:)` returns the account’s latest requests, newest first, with optional title details. `request(_:)` submits a `SeerrOrder`; HTTP 202 and 409 mean `alreadyRequested`.
+- `SeerrUser`, `SeerrPermissions`, `SeerrServerSettings`, `SeerrTitle`, `SeerrDetails`, `SeerrMedia`, `SeerrRequest` and `SeerrSeason` describe the account, catalogue and request state. Permission and server settings control standard and 4K requests, partial season requests and specials.
+- `SeerrMedia.badge(is4K:)`, `SeerrRequest.badge` and `openRequest(is4K:)` describe status and the latest open request. `plexLink(serverID:)` returns a matching Plex item or an unconfirmed rating key that must be checked against the TMDB identifier before use. `SeerrDetails.seasonChoices(is4K:settings:)`, `canRequest(is4K:user:settings:)` and `order(seasons:is4K:settings:)` enforce quality and season choices; `watchlistAddRequests(user:pulsarr:)` detects automatic Watchlist requests. `TMDBImage.url(_:pixels:)` selects an image size.
+
 ## Navigation (`Navigation/`)
 
 - `Destination`: Home, Library, Live TV, Watchlist, Search, Requests, Downloads.
@@ -141,6 +149,7 @@ The endpoints and the route rules are in `docs/LIVE-TV.md`.
 - The status codes for a wrong profile PIN (the live Plex Home has no protected profile). `/api/v2/resources`, `/api/v2/user` and `/api/v2/home/users` were decoded from a live account on 2026-11-06 with no mismatch.
 - The watchlist add and remove calls and `removeFromContinueWatching`, which have not been sent to a live account; likewise `MediaDeletion`'s reads of `grandparentGuid` and `allLeaves`, and its recheck after a 5xx or timeout.
 - The universal transcode parameters, including identity sent as query items and the offset format.
+- The Seerr API and request flow, which use fixtures and have not been checked against a live Seerr server.
 - The Keychain store, which has no tests.
 - Dolby Vision, HEVC level and HDR limits, and CEA-608 captions on the actual phone.
 - The live endpoints: fixtures follow the server's API spec and the shapes recorded in `docs/LIVE-TV.md` §1, not a captured response.

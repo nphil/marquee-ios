@@ -1,0 +1,16 @@
+{
+  "page": 1,
+  "totalPages": 1,
+  "totalResults": 1,
+  "results": [
+    {
+      "id": 9101,
+      "mediaType": "movie",
+      "title": "Wing It!",
+      "releaseDate": "2023-04-01",
+      "posterPath": "/art/wing-it-poster.jpg",
+      "backdropPath": "/art/wing-it-backdrop.jpg",
+      "overview": "A young inventor takes flight in an unlikely machine."
+    }
+  ]
+}

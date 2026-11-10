@@ -60,6 +60,8 @@ final class AppSession {
     private var settingsLoaded = false
     /// Bazarr (DESIGN §8.7 Integrations), kept per iPhone.
     let bazarr: BazarrSettings
+    /// Seerr (DESIGN §8.7 Integrations, §8.8 Requests), kept per iPhone.
+    let seerr: SeerrSettings
     /// The Chromecast plugin (DESIGN §8.7 Integrations), kept per iPhone.
     let cast: CastCenter
     /// The LumaTV remote (DESIGN §8.7 Integrations), kept per iPhone.
@@ -91,6 +93,7 @@ final class AppSession {
         self.pathMetrics = pathMetrics
         transport = URLSessionTransport(session: URLSession(configuration: configuration, delegate: pathMetrics, delegateQueue: nil))
         bazarr = BazarrSettings(storage: storage, transport: transport)
+        seerr = SeerrSettings(storage: storage)
         speechDock = SpeechDockSettings(storage: storage, transport: transport)
         cast = CastCenter(storage: storage)
         remote = TVRemote(storage: storage, inMemory: FakePlex.isActive)
@@ -345,13 +348,18 @@ final class AppSession {
     /// UI-test launches start signed out unless `-marquee.fakeSignedIn YES` (open on the first server)
     /// or `-marquee.fakeServerList YES` (open on the server list) is passed. `-marquee.uitest.bazarr`
     /// with an address saves a Bazarr there, answered by the fake Plex's `bazarr` fixtures;
-    /// `-marquee.uitest.speechDock` does the same for SpeechDock and its `speechdock` fixtures, and
-    /// `-marquee.uitest.remote YES` turns the LumaTV remote on.
+    /// `-marquee.uitest.seerr` saves a Seerr signing in with an API key, answered by the `seerr`
+    /// fixtures; `-marquee.uitest.speechDock` does the same for SpeechDock and its `speechdock`
+    /// fixtures, and `-marquee.uitest.remote YES` turns the LumaTV remote on.
     private func restoreUITest() {
         let arguments = UserDefaults.standard
         if let address = arguments.string(forKey: "marquee.uitest.bazarr").flatMap(URL.init(string:)) {
             // Bazarr's page offers Test Connection only for a key of Bazarr's format, 16 to 64 letters and digits.
             bazarr.save(BazarrConfig(address: address, apiKey: "fakefakefakefakefakefakefakefake"))
+        }
+        if let address = arguments.string(forKey: "marquee.uitest.seerr").flatMap(URL.init(string:)) {
+            // The fake server cannot set Seerr's session cookie, so the tests sign in with a key.
+            seerr.save(SeerrConfig(address: address, auth: .apiKey("fakefakefakefakefakefakefakefake")))
         }
         if let origin = arguments.string(forKey: "marquee.uitest.speechDock").flatMap({ try? SpeechDock.origin($0).get() }) {
             speechDock.save(origin)

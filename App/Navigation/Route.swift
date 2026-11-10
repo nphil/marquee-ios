@@ -14,10 +14,12 @@ enum Route: Hashable {
     case person(id: String, name: String, thumb: String?)
     /// A top-level place without a tab, opened from another page (DESIGN §7).
     case destination(Destination)
+    /// A title on Seerr, to request or, once it is in Plex, to play.
+    case seerrTitle(SeerrTitle, zoomID: String? = nil)
 
     var zoomID: String? {
         switch self {
-        case .item(_, let zoomID), .watchlist(_, let zoomID): zoomID
+        case .item(_, let zoomID), .watchlist(_, let zoomID), .seerrTitle(_, let zoomID): zoomID
         case .hub, .person, .destination: nil
         }
     }

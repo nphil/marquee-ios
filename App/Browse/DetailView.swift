@@ -479,8 +479,10 @@ private struct DetailPage: View {
 /// (DESIGN §8.3). Above it, under the status and navigation bars, the art runs on as a blurred mirror of its
 /// top edge, so it bleeds to the top of the screen without the bars hiding a third of it. With `bleeds`
 /// off, a rounded card beside the title (landscape). Without a backdrop the poster stands in, blurred.
-private struct DetailHero: View {
-    let item: PlexMetadata
+/// Seerr's title pages use it too.
+struct DetailHero: View {
+    let backdrop: String?
+    let poster: String?
     let size: CGSize
     /// The trailer that plays over the art once the page has been in view for a moment.
     var trailer: PlexMetadata?
@@ -537,10 +539,10 @@ private struct DetailHero: View {
 
     private var art: some View {
         ZStack {
-            if let path = item.type == .episode ? (item.thumb ?? item.backdropPath) : item.backdropPath {
-                PlexArtView(path: path, size: size)
+            if let backdrop {
+                PlexArtView(path: backdrop, size: size)
             } else {
-                PlexArtView(path: item.posterPath, size: size)
+                PlexArtView(path: poster, size: size)
                     .blur(radius: Space.s6, opaque: true)
             }
         }
@@ -549,9 +551,21 @@ private struct DetailHero: View {
     }
 }
 
+extension DetailHero {
+    /// An episode shows its own still before the show's backdrop.
+    init(item: PlexMetadata, size: CGSize, trailer: PlexMetadata? = nil, reach: CGFloat = 0, bleeds: Bool = true) {
+        let backdrop = item.type == .episode ? (item.thumb ?? item.backdropPath) : item.backdropPath
+        self.init(backdrop: backdrop, poster: item.posterPath, size: size, trailer: trailer, reach: reach, bleeds: bleeds)
+    }
+}
+
 /// Body text, three lines, with a chevron to show the rest (DESIGN §8.3).
-private struct Synopsis: View {
+struct Synopsis: View {
     let text: String
+
+    init(text: String) {
+        self.text = text
+    }
 
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -1128,7 +1142,7 @@ private struct RelatedShelves: View {
 }
 
 /// The page's shape while it loads, in the layout the page will have.
-private struct DetailSkeleton: View {
+struct DetailSkeleton: View {
     let width: CGFloat
 
     @Environment(\.theme) private var theme

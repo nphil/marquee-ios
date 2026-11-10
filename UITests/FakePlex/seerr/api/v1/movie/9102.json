@@ -1,0 +1,21 @@
+{
+  "id": 9102,
+  "mediaType": "movie",
+  "title": "Spring",
+  "releaseDate": "2019-04-01",
+  "posterPath": "/art/spring-poster.jpg",
+  "backdropPath": "/art/spring-backdrop.jpg",
+  "overview": "A shepherd and her dog face the spirits of the mountain.",
+  "mediaInfo": {
+    "status": 5,
+    "ratingKey": "110",
+    "iOSPlexUrl": "plex://preplay/?metadataKey=110&server=fake-server"
+  },
+  "runtime": 8,
+  "genres": [
+    {
+      "id": 16,
+      "name": "Animation"
+    }
+  ]
+}

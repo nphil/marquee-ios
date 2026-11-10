@@ -1,0 +1,19 @@
+{
+  "id": 9103,
+  "mediaType": "movie",
+  "title": "Sintel",
+  "releaseDate": "2010-04-01",
+  "posterPath": "/art/sintel-poster.jpg",
+  "backdropPath": "/art/sintel-backdrop.jpg",
+  "overview": "A traveller searches for a lost dragon.",
+  "mediaInfo": {
+    "status": 2
+  },
+  "runtime": 15,
+  "genres": [
+    {
+      "id": 16,
+      "name": "Animation"
+    }
+  ]
+}

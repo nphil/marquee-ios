@@ -13,6 +13,8 @@ public struct PlexRequest: Sendable, CustomStringConvertible {
     public var timeout: TimeInterval
     /// Safe to send twice. Only these are retried after a dropped connection.
     public var isIdempotent: Bool
+    /// Keep credentials and redirects confined to the request origin; cookie handling stays with the caller.
+    public var restrictToOrigin: Bool
 
     public init(
         method: HTTPMethod = .get,
@@ -20,7 +22,8 @@ public struct PlexRequest: Sendable, CustomStringConvertible {
         headers: [String: String] = [:],
         body: Data? = nil,
         timeout: TimeInterval = 20,
-        isIdempotent: Bool? = nil
+        isIdempotent: Bool? = nil,
+        restrictToOrigin: Bool = false
     ) {
         self.method = method
         self.url = url
@@ -28,6 +31,7 @@ public struct PlexRequest: Sendable, CustomStringConvertible {
         self.body = body
         self.timeout = timeout
         self.isIdempotent = isIdempotent ?? (method == .get)
+        self.restrictToOrigin = restrictToOrigin
     }
 
     /// Method and URL without any token; headers are left out because they carry it.
@@ -38,10 +42,17 @@ public struct PlexRequest: Sendable, CustomStringConvertible {
 public struct PlexHTTPResponse: Sendable {
     public var status: Int
     public var body: Data
+    public var headers: [String: String]
 
-    public init(status: Int, body: Data) {
+    public init(status: Int, body: Data, headers: [String: String] = [:]) {
         self.status = status
         self.body = body
+        self.headers = headers
+    }
+
+    /// One header's value; header names are case-insensitive.
+    public func header(_ name: String) -> String? {
+        headers.first { $0.key.caseInsensitiveCompare(name) == .orderedSame }?.value
     }
 }
 

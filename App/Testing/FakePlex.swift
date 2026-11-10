@@ -6,9 +6,9 @@ import Synchronization
 /// folder and nothing reaches the network. Release builds never activate it.
 ///
 /// Fixture rules (`UITests/FakePlex/README.md` has them with examples):
-/// - `plex.tv` reads `plextv/<path>.json`, `discover.provider.plex.tv` reads `discover/<path>.json`, a
-///   host starting with `bazarr` reads `bazarr/<path>.json`, one starting with `speechdock`
-///   `speechdock/<path>.json`, any other host `pms/<path>.json`.
+/// - `plex.tv` reads `plextv/<path>.json`, `discover.provider.plex.tv` reads `discover/<path>.json`,
+///   hosts starting with `bazarr`, `seerr` or `speechdock` read their corresponding fixture folders,
+///   and any other host reads `pms/<path>.json`.
 ///   `<path>@<name>=<value>.json` wins for a request with that query item.
 /// - After a write (any method but GET) to `/a/b`, `<path>@after=a_b.json` wins over every other
 ///   fixture of the path; of several, the one for the latest write.
@@ -21,7 +21,8 @@ import Synchronization
 ///   Without a fixture, `firstCharacter` is counted from the `all` list beside it and `/library/all`
 ///   joins the `all` lists of the sections in `library/sections.json`.
 /// - Images are files under the folder: `/photo/:/transcode` serves the path of its `url` item, and
-///   any URL ending in an image extension serves its own path.
+///   any URL ending in an image extension serves its own path; TMDB image URLs omit `/t/p/<size>`.
+/// - A PMS GET with a `.bin` fixture serves binary data and supports single byte ranges.
 /// - A write, or a path with `/:/` in it or under `/actions/`, without a fixture is answered 200 `{}`.
 ///   A `DELETE` always is, and the title stays in the fixtures.
 /// - The server root `/` reads `pms/root.json`.
@@ -102,7 +103,7 @@ final class FakePlexProtocol: URLProtocol {
         case .failure(let error):
             client?.urlProtocol(self, didFailWithError: error)
         case .success(let reply):
-            let headers = ["Content-Type": reply.contentType, "Content-Length": String(reply.body.count)]
+            let headers = ["Content-Type": reply.contentType, "Content-Length": String(reply.body.count)].merging(reply.headers) { _, value in value }
             guard let response = HTTPURLResponse(url: url, statusCode: reply.status, httpVersion: "HTTP/1.1", headerFields: headers) else {
                 client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
                 return
@@ -119,6 +120,7 @@ struct FakePlexRouter {
         var status: Int
         var body: Data
         var contentType: String
+        var headers: [String: String] = [:]
     }
 
     let root: URL
@@ -142,6 +144,13 @@ struct FakePlexRouter {
             return .success(image(at: query.first { $0.name == "url" }?.value ?? ""))
         }
         if Self.imageExtensions.contains(url.pathExtension.lowercased()) {
+            if host == "image.tmdb.org" {
+                let components = path.split(separator: "/", omittingEmptySubsequences: true)
+                guard components.count >= 4, components[0] == "t", components[1] == "p" else {
+                    return .success(Reply(status: 404, body: Data(), contentType: "text/plain"))
+                }
+                return .success(image(at: "/" + components.dropFirst(3).joined(separator: "/")))
+            }
             return .success(image(at: path))
         }
         // Scene thumbnails are a binary BIF file beside the JSON fixtures.
@@ -160,6 +169,9 @@ struct FakePlexRouter {
             return .success(json([String: Any]()))
         }
         let base = prefix(for: host) + (path == "/" ? "/root" : path)
+        if method == "GET", prefix(for: host) == "pms", let data = file("\(base).bin") {
+            return .success(Self.binary(data, range: request.value(forHTTPHeaderField: "Range")))
+        }
         if let found = fixture(base, query: query) ?? derived(base, query: query) {
             guard var object = found as? [String: Any] else { return .success(json(found)) }
             let status = object.removeValue(forKey: "__status") as? Int ?? 200
@@ -257,6 +269,7 @@ struct FakePlexRouter {
         case "plex.tv": "plextv"
         case "discover.provider.plex.tv": "discover"
         case _ where host.hasPrefix("bazarr"): "bazarr"
+        case _ where host.hasPrefix("seerr"): "seerr"
         case _ where host.hasPrefix("speechdock"): "speechdock"
         default: "pms"
         }
@@ -325,6 +338,27 @@ struct FakePlexRouter {
         }
         let directories = counts.map { ["key": $0.character, "title": $0.character, "size": $0.size] as [String: Any] }
         return ["MediaContainer": ["size": directories.count, "Directory": directories] as [String: Any]]
+    }
+
+    private static func binary(_ data: Data, range: String?) -> Reply {
+        guard let range else { return Reply(status: 200, body: data, contentType: "application/octet-stream") }
+        let parts = range.hasPrefix("bytes=") ? range.dropFirst(6).split(separator: "-", omittingEmptySubsequences: false) : []
+        guard parts.count == 2, !data.isEmpty else {
+            return Reply(status: 416, body: Data(), contentType: "application/octet-stream", headers: ["Content-Range": "bytes */\(data.count)"])
+        }
+        let start: Int
+        let end: Int
+        if parts[0].isEmpty, let suffix = Int(parts[1]), suffix > 0 {
+            start = max(0, data.count - suffix)
+            end = data.count - 1
+        } else if let first = Int(parts[0]), first >= 0, first < data.count,
+                  parts[1].isEmpty || Int(parts[1]).map({ $0 >= first }) == true {
+            start = first
+            end = min(Int(parts[1]) ?? data.count - 1, data.count - 1)
+        } else {
+            return Reply(status: 416, body: Data(), contentType: "application/octet-stream", headers: ["Content-Range": "bytes */\(data.count)"])
+        }
+        return Reply(status: 206, body: data.subdata(in: start..<(end + 1)), contentType: "application/octet-stream", headers: ["Content-Range": "bytes \(start)-\(end)/\(data.count)"])
     }
 
     private func image(at path: String) -> Reply {
