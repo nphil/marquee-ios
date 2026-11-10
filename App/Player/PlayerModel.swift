@@ -79,6 +79,7 @@ final class PlayerModel: Identifiable {
 
     /// The current-subtitle manager and provider-neutral search.
     enum SubtitleSheet: Identifiable {
+        case subtitles
         case wrong
         case search
 

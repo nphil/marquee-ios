@@ -112,6 +112,11 @@ final class SubtitleFix {
         downloads.values.contains(where: \.isBusy) || plexDownloads.values.contains(where: \.isBusy)
     }
 
+    /// A Plex add may still complete after a timeout; keep its search keys valid until discovery succeeds.
+    var plexAddUnresolved: Bool {
+        plexDownloads.values.contains { $0.isBusy || $0.canCheckPlex }
+    }
+
     // MARK: Remove
 
     /// Deletes a subtitle file from the server. The video file is never touched.
@@ -133,8 +138,8 @@ final class SubtitleFix {
             // A downloaded file that was just removed is no longer in Plex; its result can be had again.
             downloads = downloads.filter { $0.value.track != track.id }
             plexDownloads = plexDownloads.filter { $0.value.track != track.id }
-            requestedBazarr.removeAll { downloads[$0.id] == nil }
-            requestedPlex.removeAll { plexDownloads[$0.id] == nil }
+            requestedBazarr.removeAll { self.downloads[$0.id] == nil }
+            requestedPlex.removeAll { self.plexDownloads[$0.id] == nil }
             await model.removed(track)
         }
     }
@@ -158,8 +163,6 @@ final class SubtitleFix {
     func searchAgain() {
         guard let model, let client = model.bazarr else { return }
         searchTask?.cancel()
-        plexSearchTask?.cancel()
-        plexSearch = nil
         search = .searching
         searchTask = Task { [weak self] in
             let outcome: Search
@@ -175,7 +178,7 @@ final class SubtitleFix {
             }
             guard !Task.isCancelled else { return }
             self?.search = outcome
-            if let self, self.results.isEmpty { self.searchPlex(in: self.language) }
+            if let self, self.results.isEmpty, self.plexSearch == nil { self.searchPlex(in: self.language) }
         }
     }
 
@@ -188,7 +191,7 @@ final class SubtitleFix {
 
     /// Never one result twice.
     func canDownload(_ result: BazarrSubtitle) -> Bool {
-        downloads[result.id] == nil && !isDownloading && target != nil
+        downloads[result.id] == nil && !isDownloading && !plexAddUnresolved && target != nil
     }
 
     func download(_ result: BazarrSubtitle) {
@@ -239,7 +242,7 @@ final class SubtitleFix {
 
     /// Search without discarding outcomes from earlier requests.
     func searchPlex(in language: TrackLanguage) {
-        guard let model, let code = language.code else { return }
+        guard !plexAddUnresolved, let model, let code = language.code else { return }
         plexSearchTask?.cancel()
         plexSearch = .searching
         let key = ratingKey
@@ -258,15 +261,16 @@ final class SubtitleFix {
     /// Plex issues fresh keys for each search; compare its identifying fields as well.
     func plexAttempt(for candidate: PlexSubtitleCandidate) -> Download? {
         if let exact = plexDownloads[candidate.id] { return exact }
-        guard let previous = requestedPlex.first(where: {
-            $0.title == candidate.title && $0.provider == candidate.provider
-                && $0.language.matches(candidate.language)
-        }) else { return nil }
+        guard let title = candidate.title, !title.isEmpty,
+              let provider = candidate.provider, !provider.isEmpty,
+              let previous = requestedPlex.first(where: {
+                  $0.title == title && $0.provider == provider && $0.language.matches(candidate.language)
+              }) else { return nil }
         return plexDownloads[previous.id]
     }
 
     func canAdd(_ candidate: PlexSubtitleCandidate) -> Bool {
-        plexAttempt(for: candidate) == nil && !isDownloading && model?.tracks?.listed(candidate) == nil
+        plexAttempt(for: candidate) == nil && !isDownloading && !plexAddUnresolved && model?.tracks?.listed(candidate) == nil
     }
 
     func add(_ candidate: PlexSubtitleCandidate) {
