@@ -8,6 +8,7 @@ import VideoEngine
 /// What Play asked for.
 struct PlaybackRequest {
     var item: PlexMetadata
+    var download: DownloadRecord?
     var mediaIndex = 0
     var fromStart = false
     /// A movie time to start at instead of the resume point.
@@ -465,6 +466,7 @@ final class PlayerModel: Identifiable {
     // MARK: Lifecycle
 
     func start() {
+        session.downloads.setPlaybackActive(true)
         backend.onEvent = { [weak self] event in self?.handle(event) }
         pictureInPicture?.onPossibleChange = { [weak self] possible in self?.canPictureInPicture = possible }
         pictureInPicture?.onActiveChange = { [weak self] _ in self?.textRendererChanged() }
@@ -489,16 +491,19 @@ final class PlayerModel: Identifiable {
                 MainActor.assumeIsolated { self?.enteringForeground() }
             },
         ]
-        session.cast.player = self
-        session.cast.beginSearch()
+        if request.download == nil {
+            session.cast.player = self
+            session.cast.beginSearch()
+        }
         loadItem(request.item.ratingKey)
-        watchQuality()
+        if request.download == nil { watchQuality() }
     }
 
     func close() {
         guard !closed else { return }
         closed = true
         report(.stopped)
+        session.downloads.setPlaybackActive(false)
         generation += 1
         wordTiming?.stop()
         wordTiming = nil
@@ -516,9 +521,11 @@ final class PlayerModel: Identifiable {
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         observers = []
         // Nothing would control the receiver once the player is gone.
-        if session.cast.player === self { session.cast.player = nil }
-        session.cast.disconnect()
-        session.cast.endSearch()
+        if request.download == nil {
+            if session.cast.player === self { session.cast.player = nil }
+            session.cast.disconnect()
+            session.cast.endSearch()
+        }
     }
 
     func retry() {
@@ -801,12 +808,17 @@ final class PlayerModel: Identifiable {
         loadTask = Task { [weak self] in
             guard let self else { return }
             do {
-                var full = try await library.metadata(ratingKey)
+                var full: PlexMetadata
+                if let download = request.download {
+                    full = try session.downloads.store.offlineItem(for: download)
+                } else {
+                    full = try await library.metadata(ratingKey)
+                }
                 guard generation == self.generation else { return }
                 startTiming.mark(.metadata)
                 if let queued = queue?.items.first(where: { $0.ratingKey == full.ratingKey }) {
                     full.playQueueItemID = queued.playQueueItemID
-                } else if queue == nil {
+                } else if queue == nil && request.download == nil {
                     makeQueue(for: full)
                 }
                 await begin(full, generation: generation)
@@ -863,7 +875,7 @@ final class PlayerModel: Identifiable {
             subtitleFix = nil
             subtitleSheet = nil
         }
-        mediaIndex = isFirstItem ? request.mediaIndex : 0
+        mediaIndex = isFirstItem && (request.download == nil || request.download?.quality == .original) ? request.mediaIndex : 0
         guard let media = full.media.indices.contains(mediaIndex) ? full.media[mediaIndex] : full.media.first,
               let part = media.parts.first else {
             fail("This item has no file to play.")
@@ -892,9 +904,11 @@ final class PlayerModel: Identifiable {
         publishItem()
         nextFromStart = false
         // Where the phone is sets Auto's start and whether the remux may read the file over the link.
-        let connection = try? await library.connection.connection()
-        guard generation == self.generation else { return }
-        startAdapting(connection: connection)
+        if request.download == nil {
+            let connection = try? await library.connection.connection()
+            guard generation == self.generation else { return }
+            startAdapting(connection: connection)
+        }
         // Scene thumbnails load after the first picture (`arrived`).
         await decideRoute()
         startTiming.mark(.route)
@@ -955,8 +969,8 @@ final class PlayerModel: Identifiable {
         let memory = settings.remembersTracks ? session.trackMemory(for: item) : nil
         let picked = AudioPicker.pick(in: tracks, handPick: handAudio, remembered: memory?.audio, preferredLanguage: settings.audioLanguage)
         let device = await capabilities.current()
-        let connection = try? await library.connection.connection()
-        var limits = routeLimits(connection: connection, quality: quality)
+        let connection = request.download == nil ? try? await library.connection.connection() : nil
+        var limits = request.download == nil ? routeLimits(connection: connection, quality: quality) : RouteLimits()
         func decide(drawsImages: Bool) -> (SubtitleDecision, PlaybackRoute) {
             let decision = SubtitlePicker.decide(
                 tracks: tracks, audio: picked, handPick: handSubtitle, remembered: memory?.subtitle,
@@ -968,7 +982,7 @@ final class PlayerModel: Identifiable {
             return (decision, route)
         }
         var (decision, route) = decide(drawsImages: true)
-        if route.kind == .remux, isExternalPlayback, settings.directPlay != .force {
+        if request.download == nil, route.kind == .remux, isExternalPlayback, settings.directPlay != .force {
             limits.serverReason = .airPlay
             (decision, route) = decide(drawsImages: true)
         }
@@ -982,7 +996,7 @@ final class PlayerModel: Identifiable {
         }
         // Boost dialog and Normalize loudness are the server's: it copies the video and reworks the sound.
         // They never ride on a stream it re-encodes anyway.
-        let offered = session.serverInfo.hasPlexPass
+        let offered = request.download == nil && session.serverInfo.hasPlexPass
         var block = enhancementBlock(base: route, audio: picked, quality: quality)
         if offered, !settings.audioEnhancements.isEmpty, block == nil {
             limits.audioEnhancements = settings.audioEnhancements
@@ -1019,7 +1033,12 @@ final class PlayerModel: Identifiable {
         sidecarID = nil
         let key = part?.streams.first(where: { $0.id == track.id })?.key ?? "/library/streams/\(track.id)"
         do {
-            sidecar = try await SidecarLoader.load(track, key: key, library: library, session: session.transport.session)
+            if let download = request.download {
+                guard let saved = download.subtitles.first(where: { $0.streamID == track.id }) else { throw CocoaError(.fileNoSuchFile) }
+                sidecar = try await SidecarLoader.load(track, fileURL: session.downloads.store.subtitleFile(for: download, saved))
+            } else {
+                sidecar = try await SidecarLoader.load(track, key: key, library: library, session: session.transport.session)
+            }
             sidecarID = track.id
         } catch {
             subtitleProblem = "\(track.label): \(Self.message(error))"
@@ -1045,24 +1064,37 @@ final class PlayerModel: Identifiable {
             let url: URL
             switch route.kind {
             case .directPlay:
-                url = try await library.playbackURL(path: part.key)
-                streamConnection = await library.connection.currentConnection
+                if let download = request.download {
+                    guard let file = session.downloads.store.mediaFile(for: download) else { throw CocoaError(.fileNoSuchFile) }
+                    url = file
+                } else {
+                    url = try await library.playbackURL(path: part.key)
+                    streamConnection = await library.connection.currentConnection
+                    reporter = TimelineReporter(library: library, item: item)
+                }
                 stream = .direct
                 origin = 0
-                reporter = TimelineReporter(library: library, item: item)
             case .remux:
-                let connection = try await library.connection.connection()
-                guard generation == self.generation else { return }
-                guard let source = PlexURL.make(base: connection.uri, path: part.key) else { throw URLError(.badURL) }
-                streamConnection = connection
+                let source: URL
+                if let download = request.download {
+                    guard let file = session.downloads.store.mediaFile(for: download) else { throw CocoaError(.fileNoSuchFile) }
+                    source = file
+                } else {
+                    let connection = try await library.connection.connection()
+                    guard generation == self.generation else { return }
+                    guard let remote = PlexURL.make(base: connection.uri, path: part.key) else { throw URLError(.badURL) }
+                    source = remote
+                    streamConnection = connection
+                    reporter = TimelineReporter(library: library, item: item)
+                }
                 let remux = makeRemux(source: source, part: part, route: route)
                 stream = .remux(remux)
                 listen(to: remux)
-                reporter = TimelineReporter(library: library, item: item)
                 remuxFinished = false
                 url = try await remux.start(at: target)
                 try await handOff(remux, landing: target)
             case .serverTranscode:
+                guard request.download == nil else { throw URLError(.unsupportedURL) }
                 try await selectForServer(route, part: part)
                 let session = UUID().uuidString
                 stream = .transcode(session)
@@ -1148,7 +1180,10 @@ final class PlayerModel: Identifiable {
         let headers = library.authorizationHeaders()
         let length = part.size.map(Int64.init)
         return RemuxSession(
-            sourceFactory: { HTTPRangeSource(url: source, headers: headers, knownLength: length) },
+            sourceFactory: {
+                if source.isFileURL { return try FileRangeSource(fileURL: source) }
+                return HTTPRangeSource(url: source, headers: headers, knownLength: length)
+            },
             options: options,
             logger: EngineLog.logger
         )
@@ -1515,6 +1550,7 @@ final class PlayerModel: Identifiable {
     }
 
     private func streamFailed(_ failure: PlaybackFailure) {
+        if request.download != nil { fail(failure); return }
         guard !closed, phase != .finished, let route else {
             fail(failure)
             return
@@ -2007,6 +2043,7 @@ final class PlayerModel: Identifiable {
     /// SpeechDock times an English text file over English audio while Reveal as Spoken is on; any other
     /// subtitle keeps the estimate.
     private func updateWordTiming() {
+        guard request.download == nil else { return }
         guard session.settings.subtitleStyle.reveal != .off, let client = session.speechDock.client,
               case .sidecar(let track)? = route?.subtitle, sidecarID == track.id, sidecar?.bitmaps == nil,
               let media, let audio = route?.audio,
@@ -2241,6 +2278,12 @@ final class PlayerModel: Identifiable {
     // MARK: Server
 
     private func report(_ state: PlaybackState? = nil) {
+        if let download = request.download {
+            guard duration > 0 else { return }
+            lastReport = .now
+            session.downloads.updateWatch(id: download.id, position: Int(time * 1000), duration: Int(duration * 1000))
+            return
+        }
         guard let reporter, duration > 0 else { return }
         lastReport = .now
         let state = state ?? (isBuffering ? .buffering : isPlaying ? .playing : .paused)
@@ -2250,6 +2293,7 @@ final class PlayerModel: Identifiable {
 
     private func markWatched() {
         markedWatched = true
+        if request.download != nil { report(); return }
         let library = library, key = item.ratingKey
         Task { try? await library.markWatched(key) }
     }
@@ -2257,6 +2301,7 @@ final class PlayerModel: Identifiable {
     /// Saves the playing tracks as the part's selection, once per fresh playback on the phone and per
     /// hand pick. Server streams set it before they start.
     private func writeBack() {
+        guard request.download == nil else { return }
         guard let route, route.kind != .serverTranscode, let part else { return }
         let audioID = route.audioIsStandIn ? serverAudio : route.audio?.id ?? serverAudio
         let subtitleID: Int? = switch route.subtitle {
@@ -2283,6 +2328,12 @@ final class PlayerModel: Identifiable {
     private func publishItem() {
         nowPlaying?.setItem(title: title, subtitle: subtitleLine, duration: duration)
         nowPlaying?.setQueue(hasNext: hasNext, hasPrevious: hasPreviousItem)
+        if let download = request.download {
+            if let image = UIImage(contentsOfFile: session.downloads.store.posterFile(for: download).path) {
+                nowPlaying?.setArtwork(image)
+            }
+            return
+        }
         let path = item.type == .episode ? (item.grandparentThumb ?? item.thumb) : item.thumb
         guard let path else { return }
         let request = ArtRequest(source: path, pointSize: CGSize(width: 300, height: 450), scale: 2, server: library.server.id)
@@ -2301,6 +2352,7 @@ final class PlayerModel: Identifiable {
     /// share the link with the start: one episode's index was 7.3 MB, 8.8 s over a 10 Mbit/s path. A scrub
     /// fetches them at once.
     private func loadTrickplay(now: Bool) {
+        guard request.download == nil else { return }
         guard trickplay == nil, let part, part.hasSceneThumbnails else { return }
         if let load = trickplayLoad, load.part == part.id, !(now && load.waits) { return }
         trickplayLoad?.task.cancel()
@@ -2379,6 +2431,18 @@ final class PlayerModel: Identifiable {
 
     private static func message(_ error: any Error) -> String {
         (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+    }
+}
+
+extension AppSession {
+    func playDownload(_ record: DownloadRecord) {
+        guard record.phase == .done else { return }
+        do {
+            let item = try downloads.store.offlineItem(for: record)
+            player.play(PlaybackRequest(item: item, download: record, startAt: Double(record.watch.offset) / 1000), session: self)
+        } catch {
+            downloads.error = error.localizedDescription
+        }
     }
 }
 

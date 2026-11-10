@@ -75,7 +75,7 @@ final class RangeFetcher: Sendable {
     /// server that sends the whole file instead, everything from the first byte.
     func fetch(_ url: URL, headers: [String: String], range: Range<Int64>, into file: URL, id: String, cellular: Bool) async -> Outcome {
         let nothing = range.lowerBound..<range.lowerBound
-        let descriptor = open(file.path(percentEncoded: false), O_WRONLY | O_CREAT, 0o644)
+        let descriptor = open(file.path(percentEncoded: false), O_WRONLY)
         guard descriptor >= 0 else {
             return Outcome(written: nothing, error: POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO))
         }
@@ -85,13 +85,20 @@ final class RangeFetcher: Sendable {
         request.allowsCellularAccess = cellular
         request.timeoutInterval = 30
         let task = session.dataTask(with: request)
+        let cancellation = Mutex((registered: false, cancelled: false))
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 delegate.add(Job(id: id, descriptor: descriptor, requested: range, start: range.lowerBound, offset: range.lowerBound, continuation: continuation), for: task.taskIdentifier)
-                task.resume()
+                cancellation.withLock { state in
+                    state.registered = true
+                    if state.cancelled { task.cancel() } else { task.resume() }
+                }
             }
         } onCancel: {
-            task.cancel()
+            cancellation.withLock { state in
+                state.cancelled = true
+                if state.registered { task.cancel() }
+            }
         }
     }
 
@@ -200,9 +207,9 @@ final class RangeFetcher: Sendable {
             var done = 0
             while done < buffer.count {
                 let count = pwrite(descriptor, base + done, buffer.count - done, off_t(offset) + off_t(done))
-                if count < 0 {
-                    if errno == EINTR { continue }
-                    return POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
+                if count <= 0 {
+                    if count < 0 && errno == EINTR { continue }
+                    return POSIXError(count == 0 ? .EIO : (POSIXErrorCode(rawValue: errno) ?? .EIO))
                 }
                 done += count
             }

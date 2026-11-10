@@ -1,6 +1,7 @@
 import Foundation
 import MarqueeCore
 import OSLog
+import Synchronization
 import UIKit
 
 /// Hands one 64 MB slice of a download at a time to iOS, which fetches it while the app is suspended
@@ -15,6 +16,7 @@ final class BackgroundTransfer: Sendable {
     /// slice that lands after a relaunch still finds its file.
     struct Slice: Codable, Sendable, Hashable {
         let id: String
+        /// Relative to Application Support, whose container path may change after relaunch.
         let part: String
         let lower: Int64
         let upper: Int64
@@ -40,7 +42,7 @@ final class BackgroundTransfer: Sendable {
 
     /// Off under the UI tests' fake server, which iOS's transfer daemon cannot reach, and on an iOS
     /// version that refused a hand-over.
-    init(onResult: @escaping @Sendable (Result) -> Void) {
+    init(onResult: @escaping @Sendable (Result) async -> Void) {
         guard !FakePlex.isActive, UserDefaults.standard.string(forKey: Self.brokenKey) != Self.systemVersion else {
             session = nil
             return
@@ -51,13 +53,17 @@ final class BackgroundTransfer: Sendable {
         let delegate = Delegate(onResult: onResult) {
             UserDefaults.standard.set(Self.systemVersion, forKey: Self.brokenKey)
         }
-        session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = 1
+        session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: queue)
     }
 
-    var isAvailable: Bool { session != nil }
+    var isAvailable: Bool {
+        session != nil && UserDefaults.standard.string(forKey: Self.brokenKey) != Self.systemVersion
+    }
 
     func start(_ slice: Slice, url: URL, headers: [String: String], cellular: Bool) {
-        guard let session else { return }
+        guard isAvailable, let session else { return }
         var request = URLRequest(url: url)
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("bytes=\(slice.lower)-\(slice.upper - 1)", forHTTPHeaderField: "Range")
@@ -88,11 +94,12 @@ final class BackgroundTransfer: Sendable {
     private static var systemVersion: String { ProcessInfo.processInfo.operatingSystemVersionString }
 
     private final class Delegate: NSObject, URLSessionDownloadDelegate, Sendable {
-        private let onResult: @Sendable (Result) -> Void
+        private let onResult: @Sendable (Result) async -> Void
+        private let delivery = Mutex<Task<Void, Never>?>(nil)
         private let refused: @Sendable () -> Void
         private let log = Logger(subsystem: "com.nphil.marquee", category: "downloads")
 
-        init(onResult: @escaping @Sendable (Result) -> Void, refused: @escaping @Sendable () -> Void) {
+        init(onResult: @escaping @Sendable (Result) async -> Void, refused: @escaping @Sendable () -> Void) {
             self.onResult = onResult
             self.refused = refused
         }
@@ -109,13 +116,13 @@ final class BackgroundTransfer: Sendable {
             )
             switch reply {
             case .partial(let length):
-                onResult(save(location, into: slice, at: slice.lower, limit: slice.upper, length: length))
+                deliver(save(location, into: slice, at: slice.lower, limit: slice.upper, length: length))
             case .whole(let length):
-                onResult(save(location, into: slice, at: 0, limit: nil, length: length))
+                deliver(save(location, into: slice, at: 0, limit: nil, length: length))
             case .notReady:
-                onResult(.notReady(slice))
+                deliver(.notReady(slice))
             case .failed(let status):
-                onResult(.failed(slice, "The server answered \(status)."))
+                deliver(.failed(slice, "The server answered \(status)."))
             }
         }
 
@@ -124,27 +131,44 @@ final class BackgroundTransfer: Sendable {
             guard let error, let slice = BackgroundTransfer.slice(of: task) else { return }
             let code = (error as NSError).code
             if code == NSURLErrorCancelled {
-                onResult(.stopped(slice))
+                deliver(.stopped(slice))
                 return
             }
             if code == NSURLErrorCannotCreateFile {
                 log.error("dl-background refused code=-3000; transport off for this iOS version")
                 refused()
             }
-            onResult(.failed(slice, error.localizedDescription))
+            deliver(.failed(slice, error.localizedDescription))
         }
 
         func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-            Task { @MainActor in
-                BackgroundTransfer.completionHandler?()
-                BackgroundTransfer.completionHandler = nil
+            enqueue {
+                await MainActor.run {
+                    BackgroundTransfer.completionHandler?()
+                    BackgroundTransfer.completionHandler = nil
+                }
+            }
+        }
+
+        private func deliver(_ result: Result) {
+            enqueue { [onResult] in await onResult(result) }
+        }
+
+        private func enqueue(_ work: @escaping @Sendable () async -> Void) {
+            delivery.withLock { previous in
+                let earlier = previous
+                previous = Task {
+                    await earlier?.value
+                    await work()
+                }
             }
         }
 
         /// Copies the landed file into the part at `offset`, up to `limit`, and flushes it.
         private func save(_ location: URL, into slice: Slice, at offset: Int64, limit: Int64?, length: Int64?) -> Result {
             let input = open(location.path(percentEncoded: false), O_RDONLY)
-            let output = open(slice.part, O_WRONLY | O_CREAT, 0o644)
+            let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            let output = open(support.appending(path: slice.part).path(percentEncoded: false), O_WRONLY)
             defer {
                 if input >= 0 { close(input) }
                 if output >= 0 { close(output) }
@@ -164,9 +188,9 @@ final class BackgroundTransfer: Sendable {
                 var done = 0
                 while done < count {
                     let wrote = pwrite(output, buffer.baseAddress! + done, count - done, off_t(position) + off_t(done))
-                    if wrote < 0 {
-                        if errno == EINTR { continue }
-                        return .failed(slice, errno == ENOSPC ? "The iPhone is out of space." : "The download could not be saved.")
+                    if wrote <= 0 {
+                        if wrote < 0 && errno == EINTR { continue }
+                        return .failed(slice, wrote < 0 && errno == ENOSPC ? "The iPhone is out of space." : "The download could not be saved.")
                     }
                     done += wrote
                 }

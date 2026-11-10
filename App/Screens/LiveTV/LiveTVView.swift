@@ -307,7 +307,8 @@ private struct LiveGuideScreen: View {
         session.player.stopAll()
         playing = LivePlaybackModel(
             store: store, channel: channel, readsTunerDirectly: session.settings.readsTunerDirectly,
-            skipInterval: TimeInterval(session.settings.skipInterval)
+            skipInterval: TimeInterval(session.settings.skipInterval),
+            playbackActive: { session.downloads.setPlaybackActive($0) }
         )
     }
 

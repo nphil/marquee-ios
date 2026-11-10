@@ -37,6 +37,7 @@ final class DownloadKeepAlive {
         guard !isRunning, needed() else { return }
         guard let tone = Self.toneURL() else {
             log.error("dl-keepalive start=no-tone")
+            onSurrender?()
             return
         }
         isRunning = true

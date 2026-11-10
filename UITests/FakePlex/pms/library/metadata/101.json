@@ -46,7 +46,7 @@
         "key": "/library/parts/1011/file.mp4",
         "duration": 596000,
         "file": "/media/movies/Big Buck Bunny.mp4",
-        "size": 596000000,
+        "size": 32,
         "container": "mp4",
         "Stream": [
          {

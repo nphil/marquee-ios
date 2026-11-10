@@ -325,6 +325,9 @@ private struct DetailPage: View {
                     .accessibilityIdentifier("detail.notOnServer")
             }
             HStack(spacing: Space.s4) {
+                if isOnServer, item.type == .movie || item.type == .episode {
+                    DownloadButton(item: item, mediaIndex: version)
+                }
                 if let guid = item.guid, actions.canWatchlist(guid) {
                     watchlistButton(guid: guid)
                 }

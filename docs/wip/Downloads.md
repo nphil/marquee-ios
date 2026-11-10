@@ -1,4 +1,3 @@
-Downloads (WIP, branch `downloads`, squash before landing on `batch`).
-Done: Core `Packages/MarqueeCore/Sources/MarqueeCore/Downloads/` (DownloadQuality + VMAF seam, ByteSpans/TransferPlan/RangeReply, DownloadRecord/OfflineWatch, PlexDownloadQueue API, DownloadStore) with `DownloadTests` passing on Linux. Contracts agreed with AppChrome (`DownloadsView()`, `session.downloads.activeCount`, Settings row pushes `DownloadSettingsView()`) and Streaming (offline seam in PlayerModel).
-Next: App `App/Downloads/` (DownloadCenter, RangeFetcher, BackgroundTransfer, DownloadsView, DownloadButton, DownloadSettingsView), PlayerModel offline seam, AppSession wiring, FakePlex bytes + fixtures, UI tests, docs.
-Decisions: server conversions use Plex's download queue (PMS 1.41.2+), files fetched with byte ranges; one connection (a second only away from home, kept when a trial proves it 25% faster); background URLSession in 64 MB slices, first -3000 disables it for that iOS version; downloads scoped by server and profile; no GitHub CI on this branch (Main runs one combined run).
+Downloads are implemented in the core, app and player, with FakePlex fixtures and UI coverage. The combined build and device behavior remain unverified.
+
+Server conversions use the Plex download queue; originals use file byte ranges. Downloads are scoped by server and profile.
