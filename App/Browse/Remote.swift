@@ -142,8 +142,13 @@ struct PagedContent<Item: Identifiable & Sendable, Content: View, Skeleton: View
 
 /// Words over a skeleton (DESIGN §11): none for the first second, then "Loading", then after a real wait
 /// "Still loading" with Retry.
-private struct LoadingNote: View {
+struct LoadingNote: View {
     let retry: @MainActor () -> Void
+
+    init(retry: @escaping @MainActor () -> Void) {
+        self.retry = retry
+    }
+
     @State private var stage = Stage.quiet
     @Environment(\.theme) private var theme
 

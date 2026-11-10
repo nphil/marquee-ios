@@ -97,6 +97,8 @@ private struct RouteDestination: View {
             PersonView(id: id, name: name, thumb: thumb)
         case .destination(let destination):
             destination.page(pushed: true)
+        case .seerrTitle(let title, _):
+            SeerrTitleView(title: title)
         }
     }
 }
