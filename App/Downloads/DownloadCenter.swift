@@ -41,6 +41,12 @@ final class DownloadCenter {
     private var removing: Set<String> = []
     private var backgroundHandoff = false
     @ObservationIgnored private lazy var fetcher = RangeFetcher(meter: meter)
+    /// Poster and subtitle fetches; the UI tests' fake Plex answers them, which `.shared` would bypass.
+    @ObservationIgnored private lazy var metadataSession: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        FakePlex.install(into: configuration)
+        return URLSession(configuration: configuration)
+    }()
     @ObservationIgnored private lazy var background = BackgroundTransfer { [weak self] result in
         await self?.receivedBackground(result)
     }
@@ -93,13 +99,13 @@ final class DownloadCenter {
             if case .converted(let preset) = quality { target = PresetTarget.target(for: preset, media: media) } else { target = nil }
             var record = DownloadRecord(item: snapshot.item, scope: scope, quality: quality, mediaIndex: mediaIndex, addedAt: .now, expectedLength: quality.estimatedBytes(media: media, target: target))
             let poster: Data?
-            if let thumb = record.thumb { poster = try? await PlexFetch.data(thumb, library: library, session: .shared) }
+            if let thumb = record.thumb { poster = try? await PlexFetch.data(thumb, library: library, session: metadataSession) }
             else { poster = nil }
             guard self.scope == scope, enqueueOwner == owner else { return }
             var subtitles: [(DownloadRecord.Subtitle, Data)] = []
             for stream in media.parts.flatMap(\.streams) where stream.kind == .subtitle {
                 guard let key = stream.key else { continue }
-                let data = try? await PlexFetch.data(key, library: library, session: .shared)
+                let data = try? await PlexFetch.data(key, library: library, session: metadataSession)
                 guard self.scope == scope, enqueueOwner == owner else { return }
                 guard let data else { continue }
                 let ext = (stream.format ?? stream.codec ?? "srt").filter { $0.isLetter || $0.isNumber }

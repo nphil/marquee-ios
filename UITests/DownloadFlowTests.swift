@@ -31,13 +31,18 @@ final class DownloadFlowTests: XCTestCase {
         let play = app.buttons["downloads.play.101"]
         XCTAssertTrue(play.waitForExistence(timeout: 10), "Saved download has no Play button")
         play.tap()
-        let title = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "identifier == 'player.title' AND label CONTAINS 'Big Buck Bunny'")).firstMatch
-        if !title.waitForExistence(timeout: 6), !element("player.playPause", in: app).exists {
+        waitFor("player", in: app)
+        let playPause = element("player.playPause", in: app)
+        if !playPause.waitForExistence(timeout: 2) {
+            // The controls, title included, hide 3 s after playback starts; a tap brings them back.
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
         }
+        XCTAssertTrue(playPause.waitForExistence(timeout: 5), "No element player.playPause")
+        // Pausing keeps the controls up for the close button.
+        playPause.tap()
+        let title = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == 'player.title' AND label CONTAINS 'Big Buck Bunny'")).firstMatch
         XCTAssertTrue(title.waitForExistence(timeout: 5), "Saved title is not shown in the player")
-        waitFor("player.playPause", in: app)
         tap("player.close", in: app)
         waitFor("downloads.row.101", in: app)
 
