@@ -46,10 +46,11 @@ final class PlayerScreenshotTests: XCTestCase {
         XCTAssertTrue(more.waitForExistence(timeout: 10), "No More button")
         let moreFrame = more.frame
         // Playing, the controls fade 3 s after a touch, or after a move to a new stream has started playing.
-        // From hidden, one tap on the picture brings them back and the next lands where More stands, with no
-        // lookup between the two to outlast them; the open menu then holds them up.
+        // From hidden, a tap on the picture brings them back once the double-tap window has passed; the next
+        // tap lands where More stands, and the open menu then holds them up.
         func openMoreFromHidden() {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            XCTAssertTrue(more.waitForExistence(timeout: 3), "The controls did not come back")
             app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: moreFrame.midX, dy: moreFrame.midY)).tap()
             XCTAssertTrue(quality.waitForExistence(timeout: 5), "The More menu did not open")
         }

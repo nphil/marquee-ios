@@ -280,6 +280,8 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var seekSerial = 0
     @ObservationIgnored private var isSeeking = false
+    /// When the wait for a seek or a new stream to land began; past 2 s the controls come back.
+    @ObservationIgnored private var seekWaitStart: TimeInterval?
     @ObservationIgnored private var reporter: TimelineReporter?
     @ObservationIgnored private var lastReport = Date.distantPast
     @ObservationIgnored private var sidecarID: Int?
@@ -551,6 +553,7 @@ final class PlayerModel: Identifiable {
 
     func play() {
         wantsPlay = true
+        resumesAfterInterruption = false
         if phase == .finished {
             replay()
         } else if phase == .playing {
@@ -560,6 +563,7 @@ final class PlayerModel: Identifiable {
 
     func pause() {
         wantsPlay = false
+        resumesAfterInterruption = false
         abandonMove()
         if castDevice != nil { session.cast.pause() } else { backend.pause() }
         interruptCountdown()
@@ -663,21 +667,19 @@ final class PlayerModel: Identifiable {
 
     // MARK: Screen
 
-    func toggleChrome() {
-        if chromeVisible { setChrome(false) } else { showChrome() }
-    }
-
     func showChrome() {
         if !chromeVisible { setChrome(true) }
         scheduleHide()
     }
 
     /// A tap on the picture: the first one only brings the controls back. A tap reaching the picture
-    /// means no menu is open, whatever the menus reported.
+    /// means no menu is open, whatever the menus reported. Only a tap hides the controls from a paused
+    /// picture, to look at it or zoom in; while the picture loads or waits they stay, as they carry the
+    /// loading ring.
     func tapped() {
         menusOpen = 0
         userActed()
-        toggleChrome()
+        if chromeVisible, phase == .playing, !isWaiting { setChrome(false) } else { showChrome() }
     }
 
     /// Input stops the Up Next countdown for good.
@@ -1393,7 +1395,6 @@ final class PlayerModel: Identifiable {
         guard let connection else {
             // A playing stream stalls or fails by itself; a load would only wait out its requests.
             guard phase == .loading else { return }
-            generation += 1
             loadTask?.cancel()
             stopStream(measured: false)
             fail("\(library.server.name) could not be reached after the network changed.")
@@ -1731,6 +1732,8 @@ final class PlayerModel: Identifiable {
     private func fail(_ failure: PlaybackFailure) {
         failureDetail = failure.detail
         let message = failure.text
+        // Work still under way for the failed stream, a landing among it, ends here.
+        generation += 1
         stopStream()
         report(.stopped)
         stageTask?.cancel()
@@ -1745,6 +1748,8 @@ final class PlayerModel: Identifiable {
 
     private func enterLoading() {
         phase = .loading
+        // Whatever the last item left, the next one loads with its controls up.
+        showChrome()
         loadStage = route == nil ? .connecting : .opening
         showsStage = false
         stageTask?.cancel()
@@ -1818,7 +1823,8 @@ final class PlayerModel: Identifiable {
         }
     }
 
-    /// Moves a new stream to where playback should be, once it is ready and its origin known.
+    /// Moves a new stream to where playback should be, once it is ready and its origin known, and picks its
+    /// tracks. Only then does it show as playing, in the same turn as play is asked for.
     private func land() {
         guard itemReady, let origin, let target = landing else { return }
         if farSeeking, case .remux(let remux) = stream, target < origin - 0.5 {
@@ -1833,17 +1839,20 @@ final class PlayerModel: Identifiable {
             guard let self else { return }
             // AVPlayer can join a growing playlist part-way rather than at its start.
             if abs(backend.itemTime - local) > 0.5 { _ = await backend.seek(to: local, precise: true) }
-            guard generation == self.generation, serial == seekSerial else { return }
+            guard generation == self.generation, serial == seekSerial, !Task.isCancelled else { return }
+            await applySelection()
+            guard generation == self.generation, serial == seekSerial, !Task.isCancelled else { return }
+            // A seek made meanwhile moved the target.
+            guard landing == target else { return land() }
             landing = nil
             farSeeking = false
             isBuffering = false
-            await arrived()
+            arrived()
         }
     }
 
-    private func arrived() async {
+    private func arrived() {
         retries = 0
-        let wasLoading = phase != .playing
         phase = .playing
         stageTask?.cancel()
         showsStage = false
@@ -1851,7 +1860,6 @@ final class PlayerModel: Identifiable {
             backend.player?.currentItem?.preferredForwardBufferDuration = RemuxSession.recommendedForwardBufferDuration
         }
         loadTrickplay(now: false)
-        await applySelection()
         if !wroteBack {
             wroteBack = true
             writeBack()
@@ -1861,7 +1869,8 @@ final class PlayerModel: Identifiable {
         if let origin { time = backend.itemTime + origin }
         publishPosition()
         report()
-        if wasLoading { scheduleHide() }
+        // A picture left paused, by a call during the load say, keeps its controls.
+        if wantsPlay { scheduleHide() } else { showChrome() }
     }
 
     private func seekItem(_ local: TimeInterval) {
@@ -1931,6 +1940,7 @@ final class PlayerModel: Identifiable {
     }
 
     private func stateChanged(playing: Bool, buffering: Bool) {
+        let wasPlaying = isPlaying
         isPlaying = playing
         isBuffering = buffering || landing != nil
         if case .remux(let remux) = stream { remux.setPlayerWaiting(buffering) }
@@ -1942,7 +1952,9 @@ final class PlayerModel: Identifiable {
         }
         report()
         publishPosition()
-        if playing { scheduleHide() } else { hideTask?.cancel() }
+        // A pause from anywhere, the lock screen, a call or a lost route among them, brings the controls
+        // back over the still picture.
+        if playing { scheduleHide() } else if wasPlaying { showChrome() } else { hideTask?.cancel() }
     }
 
     /// While playback waits in mid-play, looks at once and then every half second (`StallWatch`).
@@ -1962,6 +1974,7 @@ final class PlayerModel: Identifiable {
         stallTask?.cancel()
         stallTask = nil
         isStalled = false
+        seekWaitStart = nil
         forgetWait()
     }
 
@@ -1974,11 +1987,20 @@ final class PlayerModel: Identifiable {
 
     private func checkStall() {
         guard !closed, phase == .playing, castDevice == nil, isPlaying, isBuffering else { return endStall() }
-        // A seek's own wait is the user's doing; the watch starts again once it is over.
+        // A seek's own wait is the user's doing; the watch starts again once it is over. Past 2 s the
+        // controls come back all the same, with the loading ring.
         guard landing == nil, !isSeeking else {
             waitsForNetwork = false
+            let now = ProcessInfo.processInfo.systemUptime
+            let start = seekWaitStart ?? now
+            seekWaitStart = start
+            if now - start >= 2 {
+                hideTask?.cancel()
+                if !chromeVisible { setChrome(true) }
+            }
             return stallWatch.resume()
         }
+        seekWaitStart = nil
         isStalled = true
         var run: StallWatch.Run?
         var paced = false
@@ -2032,6 +2054,7 @@ final class PlayerModel: Identifiable {
         offer = nil
         isPlaying = false
         phase = .finished
+        showChrome()
         publishPosition()
     }
 
@@ -2258,11 +2281,12 @@ final class PlayerModel: Identifiable {
         updateSubtitles(at: time)
     }
 
-    /// The controls step aside, so the lines being matched show where they always do.
+    /// Over a moving picture the controls step aside, so the lines being matched show where they always
+    /// do; a paused picture keeps them.
     func openTiming() {
         guard canTimeSubtitles else { return }
         showsTiming = true
-        if !UIAccessibility.isVoiceOverRunning, !UIAccessibility.isSwitchControlRunning { setChrome(false) }
+        if pictureMoves, !assistiveTechnologyRuns { setChrome(false) }
     }
 
     func closeTiming() {
@@ -2516,23 +2540,38 @@ final class PlayerModel: Identifiable {
         if !visible { hideTask?.cancel() }
     }
 
+    /// The controls fade 3 s after the last input, only while the picture moves and nothing holds them. A
+    /// still picture keeps them whatever stopped it, until a tap hides them.
     private func scheduleHide() {
         hideTask?.cancel()
-        guard chromeVisible, isPlaying, !isScrubbing, menusOpen == 0, phase == .playing,
-              !UIAccessibility.isVoiceOverRunning, !UIAccessibility.isSwitchControlRunning else { return }
+        guard chromeVisible, canFade else { return }
         hideTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(3))
-            guard let self, !Task.isCancelled else { return }
+            // A pause, a wait or a new stream may have stopped the picture meanwhile.
+            guard let self, !Task.isCancelled, canFade else { return }
             setChrome(false)
         }
     }
 
+    private var canFade: Bool { pictureMoves && !isScrubbing && menusOpen == 0 && !assistiveTechnologyRuns }
+
+    /// Playing, and not loading, waiting for data or landing a new stream.
+    private var pictureMoves: Bool { phase == .playing && isPlaying && !isWaiting }
+
+    /// With VoiceOver or Switch Control on, the controls never leave by themselves.
+    private var assistiveTechnologyRuns: Bool { UIAccessibility.isVoiceOverRunning || UIAccessibility.isSwitchControlRunning }
+
     private func interrupted(began: Bool, shouldResume: Bool) {
         if began {
-            resumesAfterInterruption = isPlaying
+            // The wish to play is kept, not the player's state: a stream still loading, or one AVPlayer
+            // paused before the news arrived, plays on all the same.
+            let resumes = resumesAfterInterruption || wantsPlay
             pause()
-        } else if shouldResume, resumesAfterInterruption {
-            play()
+            resumesAfterInterruption = resumes
+        } else {
+            let resumes = resumesAfterInterruption
+            resumesAfterInterruption = false
+            if shouldResume, resumes { play() }
         }
     }
 
@@ -2678,6 +2717,7 @@ extension PlayerModel: CastPlayer {
         castReceiverFailed = false
         wantsPlay = false
         isPlaying = false
+        showChrome()
         guard route != nil else { return }
         if case .failed = phase { return }
         isBuffering = true

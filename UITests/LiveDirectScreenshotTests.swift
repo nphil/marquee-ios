@@ -37,6 +37,8 @@ final class LiveDirectScreenshotTests: XCTestCase {
         // further lookup takes over a second of the 3 s on the CI runner.
         XCTAssertTrue(pause.waitForNonExistence(timeout: 6), "The live player's controls did not fade")
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        // The tap counts once the double-tap window has passed.
+        XCTAssertTrue(pause.waitForExistence(timeout: 3), "The live player's controls did not come back")
         let controls = try app.snapshot()
         let skipBack = try XCTUnwrap(frame(of: "liveplayer.skipBack", in: controls), "The live player's controls did not come back")
         XCTAssertNil(frame(of: "liveplayer.goLive", in: controls), "LIVE did not go back to live")
