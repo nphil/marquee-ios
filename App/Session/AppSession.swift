@@ -582,8 +582,6 @@ final class AppSession {
                 invalidatePresence()
                 presenceNetworkRevision += 1
                 pathMetrics.networkChanged(to: presenceNetworkRevision)
-                player.linkKbps.removeAll(keepingCapacity: true)
-                player.active?.invalidateNetworkMeasurements()
                 if path.isConnected { networkChanged() }
             }
         }
@@ -605,9 +603,12 @@ final class AppSession {
         #endif
         guard enabled, foreground, let tv, let path = presencePath, path.isConnected,
               let interface = path.wifiInterface else { return }
-        let phone = PhoneInfo(name: remote.model.settings.phoneName, model: PhoneInfo.hardwareModel, app: "Marquee")
         while !Task.isCancelled {
-            let proved = await HomePresenceProbe.check(tv: tv, interface: interface, phone: phone)
+            // The remote's own session with this TV is the same proof while it is open, so the TV is asked
+            // only without one.
+            var proved = remote.model.current?.id == tv.id
+                && remote.model.connectionPath.map { HomePresenceProbe.isDirect($0, over: interface) } ?? false
+            if !proved { proved = await HomePresenceProbe.check(tv: tv, interface: interface) }
             guard !Task.isCancelled, generation == presenceGeneration else { return }
             if proved { presence.proofSucceeded(at: Date()) } else { presence.proofFailed(at: Date()) }
             setPlace(presence.verdict(at: Date()))
@@ -630,6 +631,8 @@ final class AppSession {
 
 
     /// A phone that comes home should move back to the LAN address, and one that leaves to a remote one.
+    /// The player is then told which address answered; it starts its item again only on another address or
+    /// place (`PlayerModel.networkChanged`).
     private func networkChanged() {
         networkChanges += 1
         downloads.syncWatch()
@@ -642,7 +645,7 @@ final class AppSession {
             await keepAddress(of: connection, reprobe: true)
             let current = await connection.currentConnection
             guard !Task.isCancelled, revision == presenceNetworkRevision, player.active === playback else { return }
-            playback?.networkConnectionChanged(to: current)
+            playback?.networkChanged(to: current)
         }
     }
 

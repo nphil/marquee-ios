@@ -174,6 +174,7 @@ final class PlayerModel: Identifiable {
     private(set) var place: NetworkPlace?
     /// Auto's estimate of the link to the server, for stats for nerds.
     private(set) var linkEstimateKbps: Int?
+    /// Auto holds its lowest rung on a link that cannot sustain it; a wait on the network then says why.
     private(set) var belowQualityFloor = false
     var showsInfo = false
     var showsStyle = false
@@ -322,7 +323,10 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var longestWait: TimeInterval = 0
     @ObservationIgnored private var viewport = CGSize.zero
     @ObservationIgnored private var viewportScale: CGFloat = 1
-    @ObservationIgnored private var streamNetworkRevision = -1
+    /// The item `loadItem` is fetching, until `begin` takes it: `item` is still the one before it.
+    @ObservationIgnored private var loadingKey: String?
+    /// The server address `place` was read for.
+    @ObservationIgnored private var linkAddress: URL?
 
     init(request: PlaybackRequest, session: AppSession, library: PlexLibrary, capabilities: PlaybackCapabilities) {
         self.request = request
@@ -536,7 +540,7 @@ final class PlayerModel: Identifiable {
     func retry() {
         retries = 0
         if route == nil {
-            loadItem(item.ratingKey)
+            loadItem(loadingKey ?? item.ratingKey)
         } else {
             enterLoading()
             restart(at: time)
@@ -796,6 +800,7 @@ final class PlayerModel: Identifiable {
         stopStream()
         generation += 1
         let generation = generation
+        loadingKey = ratingKey
         enterLoading()
         #if DEBUG
         if let held = Self.heldStage {
@@ -873,6 +878,7 @@ final class PlayerModel: Identifiable {
 
     private func begin(_ full: PlexMetadata, generation: Int) async {
         item = full
+        loadingKey = nil
         stallWatch = StallWatch()
         recoveries = nil
         if subtitleFix?.ratingKey != full.ratingKey {
@@ -944,7 +950,7 @@ final class PlayerModel: Identifiable {
                 // Plex calls a LAN address reached through a VPN local; the place knows better.
                 remoteConnection: place.map { !$0.isHome } ?? connection.map { !$0.isLocal } ?? false,
                 // Auto's rung already fits the link.
-                linkKbps: adaptive == nil ? connection.flatMap { session.player.linkKbps[$0.uri] } : nil
+                linkKbps: adaptive == nil ? connection.flatMap { measuredKbps(over: $0) } : nil
             )
         }
     }
@@ -968,13 +974,12 @@ final class PlayerModel: Identifiable {
     private func decideRoute() async {
         guard let tracks, let media, let part else { return }
         let owner = generation
-        let network = session.presenceNetworkRevision
         if let castDevice {
             decideCastRoute(castDevice, tracks: tracks, media: media, part: part)
             return
         }
         let choice = await chooseRoute(tracks: tracks, media: media, part: part, quality: quality)
-        guard owner == generation, network == session.presenceNetworkRevision, !Task.isCancelled else { return }
+        guard owner == generation, !Task.isCancelled else { return }
         take(choice)
         if case .sidecar(let track) = choice.route.subtitle { await loadSidecar(track) }
     }
@@ -986,7 +991,8 @@ final class PlayerModel: Identifiable {
         let picked = AudioPicker.pick(in: tracks, handPick: handAudio, remembered: memory?.audio, preferredLanguage: settings.audioLanguage)
         let device = await capabilities.current()
         let connection = request.download == nil ? try? await library.connection.connection() : nil
-        var limits = request.download == nil ? routeLimits(connection: connection, quality: quality) : RouteLimits()
+        // A download plays on the phone or not at all: offline there is no server to convert it.
+        var limits = request.download == nil ? routeLimits(connection: connection, quality: quality) : RouteLimits(phoneOnly: true)
         func decide(drawsImages: Bool) -> (SubtitleDecision, PlaybackRoute) {
             let decision = SubtitlePicker.decide(
                 tracks: tracks, audio: picked, handPick: handSubtitle, remembered: memory?.subtitle,
@@ -1039,14 +1045,15 @@ final class PlayerModel: Identifiable {
         audio = choice.route.audio
         subtitleProblem = nil
         if case .notShown(let track) = choice.route.subtitle {
-            subtitleProblem = "\(track.label) needs the server to burn it in; pick it again to allow that."
+            subtitleProblem = request.download == nil
+                ? "\(track.label) needs the server to burn it in; pick it again to allow that."
+                : "\(track.label) needs the server to burn it in, so it can't be shown offline."
         }
     }
 
     private func loadSidecar(_ track: SubtitleTrack) async {
         guard sidecarID != track.id else { return }
         let owner = generation
-        let network = session.presenceNetworkRevision
         sidecar = nil
         sidecarID = nil
         let key = part?.streams.first(where: { $0.id == track.id })?.key ?? "/library/streams/\(track.id)"
@@ -1058,11 +1065,11 @@ final class PlayerModel: Identifiable {
             } else {
                 loaded = try await SidecarLoader.load(track, key: key, library: library, session: session.transport.session)
             }
-            guard owner == generation, network == session.presenceNetworkRevision, !Task.isCancelled else { return }
+            guard owner == generation, !Task.isCancelled else { return }
             sidecar = loaded
             sidecarID = track.id
         } catch {
-            guard owner == generation, network == session.presenceNetworkRevision, !Task.isCancelled else { return }
+            guard owner == generation, !Task.isCancelled else { return }
             subtitleProblem = "\(track.label): \(Self.message(error))"
         }
     }
@@ -1071,7 +1078,6 @@ final class PlayerModel: Identifiable {
 
     private func startStream(at target: TimeInterval, generation: Int) async {
         guard let route, let part else { return }
-        let networkRevision = session.presenceNetworkRevision
         if castDevice != nil {
             await startCast(at: target, generation: generation)
             return
@@ -1138,15 +1144,12 @@ final class PlayerModel: Identifiable {
                 streamConnection = connection
                 loadStage = .preparing
             }
-            guard generation == self.generation, !Task.isCancelled,
-                  request.download != nil || networkRevision == session.presenceNetworkRevision else { return }
-            streamNetworkRevision = networkRevision
+            guard generation == self.generation, !Task.isCancelled else { return }
             applySubtitleSources()
             startTiming.mark(.stream)
             load(url)
         } catch {
-            guard generation == self.generation, networkRevision == session.presenceNetworkRevision,
-                  !Task.isCancelled, !(error is CancellationError) else { return }
+            guard generation == self.generation, !Task.isCancelled, !(error is CancellationError) else { return }
             streamFailed(PlaybackFailure(text: Self.message(error)))
         }
     }
@@ -1259,13 +1262,16 @@ final class PlayerModel: Identifiable {
         }
     }
 
-    private func stopStream() {
+    /// - Parameter measured: false when the stream's last reads say nothing of its link.
+    private func stopStream(measured: Bool = true) {
         abandonMove()
         eventsTask?.cancel()
         eventsTask = nil
         seekTask?.cancel()
         seekTask = nil
-        measureLink()
+        // A seek let go with its task never reports back.
+        isSeeking = false
+        if measured { measureLink() }
         lastTransfer = nil
         longestWait = 0
         backend.load(nil)
@@ -1288,21 +1294,23 @@ final class PlayerModel: Identifiable {
     /// Keeps what the ending stream measured of the link to its server, for the next route: the remux's
     /// reads from the file, or AVPlayer's segment downloads from the server. Direct play is not measured.
     private func measureLink() {
-        guard streamNetworkRevision == session.presenceNetworkRevision,
-              let address = streamConnection?.uri else { return }
+        // A stream from another address than the place was read for says nothing of that link.
+        guard let place, let address = streamConnection?.uri, address == linkAddress else { return }
         var bitsPerSecond: Double?
         switch stream {
         case .remux(let remux):
             bitsPerSecond = remux.progress.sourceBytesPerSecond.map { $0 * 8 }
         case .transcode:
             bitsPerSecond = backend.player?.currentItem?.accessLog()?.events.last?.observedBitrate
-        case .direct, nil:
+        case .direct:
             break
+        case nil:
+            return
         }
         // Auto's estimate spans every stream of the item, not only this one's last reads.
         if let estimate = adaptive?.estimateKbps { bitsPerSecond = Double(estimate) * 1000 }
         guard let bitsPerSecond, bitsPerSecond > 0 else { return }
-        session.player.linkKbps[address] = Int(bitsPerSecond / 1000)
+        session.player.linkKbps[PlayerCenter.Link(address: address, place: place)] = Int(bitsPerSecond / 1000)
     }
 
     /// A new stream at `target` on the same route, keeping the screen as it is.
@@ -1377,32 +1385,31 @@ final class PlayerModel: Identifiable {
         if target != autoRung { adapt(to: target) }
     }
 
-    func invalidateNetworkMeasurements() {
-        guard request.download == nil, castDevice == nil else { return }
-        generation += 1
-        loadTask?.cancel()
-        loadTask = nil
-        if !itemReady { stopStream() }
-        abandonMove()
-        adaptive = nil
-        lastTransfer = nil
-        longestWait = 0
-        linkEstimateKbps = nil
-        belowQualityFloor = false
-        place = .unknown
-    }
-
-    func networkConnectionChanged(to connection: PlexConnection?) {
-        guard request.download == nil, castDevice == nil, let connection,
-              phase == .loading || phase == .playing else { return }
-        guard media != nil, part != nil else {
-            loadItem(item.ratingKey)
+    /// The network changed and the server's addresses were asked again: `connection` is the one that
+    /// answered, if any. Playback and what Auto learned go on while it is the same address reached from the
+    /// same place; otherwise the item starts again on the new link.
+    func networkChanged(to connection: PlexConnection?) {
+        guard request.download == nil, castDevice == nil, phase == .loading || phase == .playing else { return }
+        guard let connection else {
+            // A playing stream stalls or fails by itself; a load would only wait out its requests.
+            guard phase == .loading else { return }
+            generation += 1
+            loadTask?.cancel()
+            stopStream(measured: false)
+            fail("\(library.server.name) could not be reached after the network changed.")
             return
         }
+        guard connection.uri != linkAddress || networkPlace(of: connection) != place else { return }
+        if let loadingKey {
+            loadItem(loadingKey)
+            return
+        }
+        // The stream's last reads span the change, so they measure neither link.
+        stopStream(measured: false)
+        streamConnection = connection
         startAdapting(connection: connection)
         reroute(handPick: false, reconnect: true)
     }
-
 
     /// Auto's state for the item: where the phone is and the link as last measured set the start.
     private func startAdapting(connection: PlexConnection?) {
@@ -1412,10 +1419,13 @@ final class PlayerModel: Identifiable {
         linkEstimateKbps = nil
         belowQualityFloor = false
         autoRung = .original
-        if let connection { place = networkPlace(of: connection) }
+        if let connection {
+            place = networkPlace(of: connection)
+            linkAddress = connection.uri
+        }
         guard qualitySetting == .auto, !forcesDirectPlay, let connection, let place else { return }
         let adaptive = AdaptiveQuality(
-            place: place, mediaKbps: media?.bitrate, linkKbps: session.player.linkKbps[connection.uri],
+            place: place, mediaKbps: media?.bitrate, linkKbps: measuredKbps(over: connection),
             source: sourcePicture, view: viewPicture,
             now: ProcessInfo.processInfo.systemUptime
         )
@@ -1423,15 +1433,16 @@ final class PlayerModel: Identifiable {
         autoRung = adaptive.rung
     }
 
-    /// Where the phone is from the server at `connection`. The UI tests' fake server is at home when its address
-    /// is local.
+    /// Where the phone is from the server at `connection`.
     private func networkPlace(of connection: PlexConnection) -> NetworkPlace {
-        if FakePlex.isActive { return connection.isLocal ? .home : .away(.remote) }
-        let path = session.pathMetrics.path(to: connection.uri, revision: session.presenceNetworkRevision)
-        return .of(
-            connection, onPhoneNetwork: NetworkPath.isOnAttachedNetwork(connection.ipAddress),
-            localAddress: path?.localAddress, roundTrip: path?.roundTrip
-        )
+        let local = session.pathMetrics.localAddress(to: connection.uri, revision: session.presenceNetworkRevision)
+        return .of(connection, localAddress: local)
+    }
+
+    /// The link to `connection` from where the phone is, as the last stream over it measured.
+    private func measuredKbps(over connection: PlexConnection) -> Int? {
+        guard let place, connection.uri == linkAddress else { return nil }
+        return session.player.linkKbps[PlayerCenter.Link(address: connection.uri, place: place)]
     }
 
     private func watchQuality() {
@@ -1448,7 +1459,7 @@ final class PlayerModel: Identifiable {
     /// last look.
     private func lookAtStream() {
         guard var adaptive, phase == .playing, isPlaying, castDevice == nil, landing == nil, !isSeeking,
-              streamNetworkRevision == session.presenceNetworkRevision, !movePending else {
+              !movePending else {
             lastTransfer = nil
             longestWait = 0
             return
@@ -1482,10 +1493,7 @@ final class PlayerModel: Identifiable {
         let move = adaptive.observe(look)
         self.adaptive = adaptive
         linkEstimateKbps = adaptive.estimateKbps
-        if belowQualityFloor != adaptive.belowFloor {
-            belowQualityFloor = adaptive.belowFloor
-            if belowQualityFloor { showChrome() } else { scheduleHide() }
-        }
+        belowQualityFloor = adaptive.belowFloor
         if let move { adapt(to: move) }
     }
 
@@ -1879,6 +1887,8 @@ final class PlayerModel: Identifiable {
         seekSerial += 1
         let serial = seekSerial
         seekTask?.cancel()
+        // An in-buffer seek this one overtakes never reports back: its serial is stale.
+        isSeeking = false
         seekTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(350))
             guard let self, serial == seekSerial, !Task.isCancelled, case .remux(let current) = stream, current === remux else { return }
@@ -1901,7 +1911,9 @@ final class PlayerModel: Identifiable {
     }
 
     private func tick(_ itemTime: TimeInterval) {
-        guard let origin, landing == nil else { return }
+        // AVPlayer's observer fires once more as a stream is let go, with `origin` still that stream's.
+        // Outside playback a time is not this item's, and would raise the last item's offers again.
+        guard phase == .playing, let origin, landing == nil else { return }
         if case .remux(let remux) = stream { remux.updatePlayhead(itemTime) }
         guard !isSeeking else { return }
         let movie = itemTime + origin
@@ -2506,7 +2518,7 @@ final class PlayerModel: Identifiable {
 
     private func scheduleHide() {
         hideTask?.cancel()
-        guard chromeVisible, isPlaying, !belowQualityFloor, !isScrubbing, menusOpen == 0, phase == .playing,
+        guard chromeVisible, isPlaying, !isScrubbing, menusOpen == 0, phase == .playing,
               !UIAccessibility.isVoiceOverRunning, !UIAccessibility.isSwitchControlRunning else { return }
         hideTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(3))
@@ -2572,8 +2584,13 @@ final class PlayerCenter {
     let capabilities = PlaybackCapabilities()
     /// Parts that failed to play on the phone in this run; reopening one goes straight to the server.
     @ObservationIgnored var phoneFailures: Set<Int> = []
-    /// The link to each server address as the last stream from it measured, in kbit/s.
-    @ObservationIgnored var linkKbps: [URL: Int] = [:]
+    /// A link's key: a tunnel that routes the home network reaches the same LAN address at another speed.
+    struct Link: Hashable {
+        let address: URL
+        let place: NetworkPlace
+    }
+    /// Each link as the last stream over it measured, in kbit/s.
+    @ObservationIgnored var linkKbps: [Link: Int] = [:]
 
     init() {
         RemuxSession.sweepStaleFiles()

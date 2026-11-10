@@ -1,8 +1,7 @@
 import Foundation
 
-/// Where the phone is from the server it plays from (docs/adaptive-playback.md). Plex's local flag says only
-/// which address answered: away from home, a VPN that routes the home subnet makes the LAN address answer
-/// through the tunnel.
+/// Where the phone is from the server it plays from (docs/adaptive-playback.md): home while it reaches the
+/// server at one of its LAN addresses directly, away through Plex's relay or a tunnel.
 public enum NetworkPlace: Sendable, Hashable, CustomStringConvertible {
     /// On the server's own network, reaching it directly.
     case home
@@ -13,8 +12,6 @@ public enum NetworkPlace: Sendable, Hashable, CustomStringConvertible {
     public enum Away: String, Sendable {
         /// Plex's relay, which caps bandwidth.
         case relay
-        /// The server's public address.
-        case remote
         /// A VPN tunnel such as Tailscale's.
         case tunnel
     }
@@ -30,17 +27,15 @@ public enum NetworkPlace: Sendable, Hashable, CustomStringConvertible {
         }
     }
 
-    /// The place of a phone that reaches the server at `connection`.
-    /// - Parameters:
-    ///   - onPhoneNetwork: whether the server's IP is on an attached non-tunnel network, or nil if unknown.
-    ///   - localAddress: the phone's address the last request to the server left from.
-    ///   - roundTrip: that request's round trip; latency does not prove presence at home.
-    public static func of(
-        _ connection: PlexConnection, onPhoneNetwork: Bool?, localAddress: String?, roundTrip: TimeInterval?
-    ) -> NetworkPlace {
+    /// The place of a phone that reaches the server at `connection`: home at an address Plex lists as local,
+    /// reached without the relay or a tunnel. Plex lists the server's tailnet address as local too, and a
+    /// tunnel that routes the home network makes the LAN address answer from anywhere, so a tunnel's address
+    /// on either end is away. Any other address leaves the place unknown.
+    /// - Parameter localAddress: the phone's address the last request to the server left from.
+    public static func of(_ connection: PlexConnection, localAddress: String?) -> NetworkPlace {
         if connection.isRelay { return .away(.relay) }
         if [localAddress, connection.ipAddress].contains(where: { $0.map(isTunnel) ?? false }) { return .away(.tunnel) }
-        return .unknown
+        return connection.isLocal ? .home : .unknown
     }
 
     /// Tailscale's addresses: carrier-grade NAT space and its IPv6 prefix, fd7a:115c:a1e0::/48.

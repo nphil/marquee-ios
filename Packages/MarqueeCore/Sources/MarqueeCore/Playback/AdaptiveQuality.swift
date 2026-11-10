@@ -138,6 +138,8 @@ public struct AdaptiveQuality: Sendable {
     /// Original, then watchable presets below the file's rate; best first.
     public let ladder: [VideoQuality]
     public let floor: VideoQuality
+    /// The link cannot sustain the floor: the estimate falls short of its rate, or playback at the floor
+    /// waits on the network.
     public private(set) var belowFloor = false
     public let streamID: UUID
     private let mediaKbps: Int?
@@ -205,8 +207,10 @@ public struct AdaptiveQuality: Sendable {
         }
         if look.now - lastDrop >= tuning.calm { climbHold = tuning.climbHold }
         let estimate = estimateKbps.map(Double.init)
-        belowFloor = estimate.flatMap { estimate in rate(of: floor).map { Double($0) > estimate * tuning.fit } }
-            ?? (rung == floor && look.waitingSeconds >= tuning.stallWait)
+        // A wait at the floor counts whatever the estimate says: no data moves while it lasts, so the
+        // estimate is from before it.
+        belowFloor = (rung == floor && look.waitingSeconds >= tuning.stallWait)
+            || (estimate.flatMap { estimate in rate(of: floor).map { Double($0) > estimate * tuning.fit } } ?? false)
 
         let behind = estimate.flatMap { estimate in rate(of: rung).map { estimate < Double($0) } } ?? false
         if look.waitingSeconds >= tuning.stallWait || (behind && (look.bufferSeconds ?? .infinity) < tuning.lowBuffer) {

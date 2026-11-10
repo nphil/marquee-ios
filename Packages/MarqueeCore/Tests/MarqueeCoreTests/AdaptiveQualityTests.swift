@@ -42,12 +42,12 @@ struct AdaptiveQualityTests {
         #expect(make(.home, link: 3_000).rung == .mbps4)
         #expect(make(.home, link: 3_000).belowFloor)
         // 70% of 14 Mbit/s is 9.8, short of the file's 10.
-        #expect(make(.away(.remote), link: 14_000).rung == .mbps8)
+        #expect(make(.unknown, link: 14_000).rung == .mbps8)
         #expect(make(.away(.tunnel)).rung == .mbps4)
     }
 
     @Test func aFallingLinkMovesDownOnceTheBufferRunsLow() {
-        var abr = make(.away(.remote), link: 30_000)
+        var abr = make(.unknown, link: 30_000)
         #expect(abr.rung == .original)
         #expect(play(&abr, from: 0, to: 60, kbps: 30_000) { _ in 30 }.isEmpty)
         // 5 Mbit/s drains a 10 Mbit/s buffer at half a second a second; it is under 12 s at 98 s.
@@ -67,20 +67,20 @@ struct AdaptiveQualityTests {
     }
 
     @Test func aRecoveredLinkClimbsAfterTheHoldAndTheDwell() {
-        var abr = make(.away(.remote), link: 3_000)
+        var abr = make(.unknown, link: 3_000)
         #expect(abr.rung == .mbps4)
         #expect(play(&abr, from: 0, to: 60, kbps: 30_000) { _ in 20 } == [Move(at: 20, to: .original)])
     }
 
     @Test func anEstimateBetweenTheRateAndItsMarginChangesNothing() {
-        var abr = make(.away(.remote))
+        var abr = make(.unknown)
         #expect(abr.rung == .mbps4)
         // 5 Mbit/s keeps up with the rung's 4 and is far from the 11.4 a climb to 8 needs (8 / 0.7).
         #expect(play(&abr, from: 0, to: 600, kbps: 5_000) { $0 < 300 ? 8 : 30 }.isEmpty)
     }
 
     @Test func repeatedDropsHoldTheFloorUntilTheLinkRecovers() {
-        var abr = make(.away(.remote), link: 3_000)
+        var abr = make(.unknown, link: 3_000)
         var moves: [Move] = []
         for cycle in 0..<5 {
             let start = TimeInterval(cycle * 60)
@@ -98,16 +98,16 @@ struct AdaptiveQualityTests {
 
     @Test func scoresStopTheClimbWhereMoreRateLooksNoBetter() {
         let scores = QualityScores([.original: 96, .mbps8: 95, .mbps4: 92, .mbps2: 85])
-        var abr = make(.away(.remote), link: 50_000, scores: scores)
+        var abr = make(.unknown, link: 50_000, scores: scores)
         #expect(abr.rung == .mbps8)
         #expect(play(&abr, from: 0, to: 120, kbps: 50_000) { _ in 30 }.isEmpty)
     }
 
     @Test func largeViewKeepsHDWhileSmallViewUses720p() {
         let source = AdaptiveQuality.Picture(width: 3840, height: 2160)
-        let large = AdaptiveQuality(place: .away(.remote), mediaKbps: 40_000, linkKbps: 1_000,
+        let large = AdaptiveQuality(place: .unknown, mediaKbps: 40_000, linkKbps: 1_000,
             source: source, view: .init(width: 1920, height: 1080), now: 0)
-        let small = AdaptiveQuality(place: .away(.remote), mediaKbps: 40_000, linkKbps: 1_000,
+        let small = AdaptiveQuality(place: .unknown, mediaKbps: 40_000, linkKbps: 1_000,
             source: source, view: .init(width: 390, height: 844), now: 0)
         #expect(large.floor == .mbps8)
         #expect(large.rung == .mbps8)
@@ -118,27 +118,30 @@ struct AdaptiveQualityTests {
 
     @Test func smallOrLowRateOriginalNeverNeedsAnUpscale() {
         for source in [AdaptiveQuality.Picture(width: 426, height: 240), .init(width: 720, height: 480)] {
-            let abr = AdaptiveQuality(place: .away(.remote), mediaKbps: 10_000, linkKbps: 500,
+            let abr = AdaptiveQuality(place: .unknown, mediaKbps: 10_000, linkKbps: 500,
                 source: source, view: .init(width: 1920, height: 1080), now: 0)
             #expect(abr.ladder == [.original])
             #expect(abr.rung == .original)
             #expect(abr.belowFloor)
         }
-        let lowRate = AdaptiveQuality(place: .away(.remote), mediaKbps: 2_000, linkKbps: nil, now: 0)
+        let lowRate = AdaptiveQuality(place: .unknown, mediaKbps: 2_000, linkKbps: nil, now: 0)
         #expect(lowRate.ladder == [.original])
         #expect(lowRate.rung == .original)
-        let hd = AdaptiveQuality(place: .away(.remote), mediaKbps: 10_000, linkKbps: nil,
+        let hd = AdaptiveQuality(place: .unknown, mediaKbps: 10_000, linkKbps: nil,
             source: .init(width: 1280, height: 720), view: .init(width: 1920, height: 1080), now: 0)
         #expect(hd.floor == .mbps4)
     }
 
     @Test func atTheFloorWaitingWarnsWithoutAnotherQualityMove() {
-        var abr = make(.away(.remote))
+        var abr = make(.unknown)
         #expect(abr.observe(.init(now: 2, bufferSeconds: 0, waitingSeconds: 2)) == nil)
         #expect(abr.belowFloor)
         #expect(abr.rung == .mbps4)
         #expect(abr.observe(.init(now: 4, throughputKbps: 10_000, transferSeconds: 2, bufferSeconds: 8)) == nil)
         #expect(!abr.belowFloor)
+        // The 10 Mbit/s estimate fits the floor, but it is from before this wait.
+        #expect(abr.observe(.init(now: 6, bufferSeconds: 0, waitingSeconds: 2)) == nil)
+        #expect(abr.belowFloor)
     }
 
     @Test func anotherStreamsTelemetryCannotChangeThePolicy() {

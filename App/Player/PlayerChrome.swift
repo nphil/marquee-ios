@@ -151,7 +151,7 @@ struct PlayerChrome: View {
     /// text sizes or on a small phone.
     @ViewBuilder
     private var networkWait: some View {
-        if model.waitsForNetwork || model.belowQualityFloor, model.offer == nil {
+        if model.waitsForNetwork, model.offer == nil {
             Text(model.belowQualityFloor ? "Keeping picture quality; buffering may be needed." : "Waiting for the network")
                 .textRole(.label)
                 .foregroundStyle(theme.ink)

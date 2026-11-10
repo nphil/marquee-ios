@@ -4,22 +4,26 @@ import Network
 
 /// A home proof requires both the paired TV's key and a direct connection over the selected Wi-Fi interface.
 enum HomePresenceProbe {
-    static func check(tv: PairedTV, interface: NWInterface, phone: PhoneInfo) async -> Bool {
+    /// Whether a connection to the TV on `path` runs directly over `interface`.
+    static func isDirect(_ path: ConnectionPath, over interface: NWInterface) -> Bool {
+        path.usesWiFi && !path.usesOther
+            && NetworkPath.isDirectWiFi(local: path.localAddress, remote: path.remoteAddress, interface: interface.name)
+    }
+
+    static func check(tv: PairedTV, interface: NWInterface) async -> Bool {
         var addresses: [TVAddress] = [.host(tv.host, port: tv.port)]
         if let service = tv.service { addresses.append(.service(name: service)) }
         for address in addresses {
             guard !Task.isCancelled else { return false }
-            if await check(address: address, tv: tv, interface: interface, phone: phone) { return true }
+            if await check(address: address, tv: tv, interface: interface) { return true }
         }
         return false
     }
 
-    private static func check(address: TVAddress, tv: PairedTV, interface: NWInterface, phone: PhoneInfo) async -> Bool {
+    private static func check(address: TVAddress, tv: PairedTV, interface: NWInterface) async -> Bool {
         guard let stream = try? await TCPStream.connect(to: address, timeout: .seconds(3), requiredInterface: interface) else { return false }
         defer { stream.abort() }
-        guard let path = stream.connectionPath, path.usesWiFi, !path.usesOther,
-              NetworkPath.isDirectWiFi(local: path.localAddress, remote: path.remoteAddress, interface: interface.name)
-        else { return false }
+        guard let path = stream.connectionPath, isDirect(path, over: interface) else { return false }
         let deadline = Task {
             do { try await Task.sleep(for: .seconds(3)) } catch { return }
             stream.abort()
@@ -27,11 +31,10 @@ enum HomePresenceProbe {
         defer { deadline.cancel() }
         return await withTaskCancellationHandler {
             do {
-                let channel = try await SecureChannel.open(stream, mode: .session, psk: tv.key)
-                try channel.send(.hello(phone, kit: "LumaRemoteKit \(LumaRemote.version)"))
-                let message: ServerMessage = try await channel.receive()
-                guard case .welcome(let welcome) = message else { return false }
-                return !Task.isCancelled && welcome.tv.id == tv.id
+                // Only the TV holding this pairing's key completes the handshake. No hello follows: the TV
+                // gives a phone one session, so a hello here would end the remote's own.
+                _ = try await SecureChannel.open(stream, mode: .session, psk: tv.key)
+                return !Task.isCancelled
             } catch {
                 return false
             }

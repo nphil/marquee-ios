@@ -4,9 +4,9 @@ Auto quality is the default and adapts to the measured link. Plex converts on th
 
 ## Where the phone is (`NetworkPlace`)
 
-Plex's local flag, subnet membership and a short round trip do not prove the phone is home: a VPN can route the home subnet from elsewhere. `NetworkPlace.of` classifies a relay as away (relay) and a Tailscale address on either end as away (tunnel); otherwise it returns unknown. Request metrics belong to the exact server origin and current network revision. Unknown never counts as home.
+`NetworkPlace.of` classifies a relay as away (relay), a Tailscale address on either end as away (tunnel), and a server address Plex lists as local as home; other addresses are unknown. Request metrics belong to the exact server origin and current network revision. Unknown never counts as home. A non-Tailscale VPN routing the home subnet can still appear as home.
 
-`HomePresence` is independent proof for the optional TV remote, not proof of the Plex playback route. An authenticated paired-TV connection over Wi-Fi establishes home; failed probes retain it for at most 30 seconds from the last success. A network change invalidates proof immediately. Probes run only while the plugin is enabled and the app is foregrounded.
+`HomePresence` is independent proof for the optional TV remote, not proof of the Plex playback route. The remote's open session directly over Wi-Fi establishes home. Without one, a probe completes the paired TV's encrypted handshake and closes without opening a remote session. Failed probes retain home for at most 30 seconds from the last success. A network change invalidates proof immediately. Probes run only while the plugin is enabled and the app is foregrounded.
 
 Away or unknown turns a file that needs the remux into a server stream (`RouteLimits.remoteConnection`).
 
@@ -19,7 +19,9 @@ The ladder is Original plus watchable presets below the file's bitrate. For a so
 - **Up.** The estimate fits a higher rung for 10 s straight, the buffer holds 10 s, and the last switch was 20 s ago: up to the highest rung that fits.
 - **Hysteresis.** Down needs the estimate below the rate; up needs it at 1/0.7 of the target's, so estimates in between change nothing. A drop within 60 s of a climb doubles the wait before the next climb (once per climb, to 160 s at most); 5 minutes without a drop resets it.
 
-When the floor's known rate exceeds 70% of the link estimate, or a network wait reaches 2 s at the floor without an estimate, `belowFloor` reports that the connection cannot sustain the floor. The player shows a quality warning rather than selecting a lower preset. Each accepted look recalculates this flag. A network change discards saved link measurements and the active policy before choosing a connection again; a replacement policy starts with fresh averages. Looks carrying a different stream ID are ignored; callers may omit the ID.
+When the floor's known rate exceeds 70% of the link estimate, or a network wait reaches 2 s at the floor, `belowFloor` reports that the connection cannot sustain the floor. Each accepted look recalculates this flag. The player explains a network wait with the quality warning rather than selecting a lower preset; the flag alone neither shows the warning nor holds the controls up. Looks carrying a different stream ID are ignored; callers may omit the ID.
+
+Saved link measurements belong to the server address and network place. A network change that leaves both unchanged keeps playback and its policy. Otherwise playback restarts on a fresh policy without measuring the ending stream; an item still loading starts again. A load fails if no server address answers.
 
 Picking a fixed quality turns Auto off for the profile; Settings and the player's quality menu both offer Auto, and the menu shows the rung playing ("Auto · 8 Mbps 1080p"). The lower-quality offer after a long wait is for fixed qualities only: Auto steps down by itself. Force Direct Play never adapts. Stats for nerds shows the place and Auto's rung and link estimate.
 

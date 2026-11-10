@@ -45,24 +45,36 @@ final class PlayerScreenshotTests: XCTestCase {
         let more = element("player.more", in: app)
         XCTAssertTrue(more.waitForExistence(timeout: 10), "No More button")
         let moreFrame = more.frame
+        // Playing, the controls fade 3 s after a touch, or after a move to a new stream has started playing.
+        // From hidden, one tap on the picture brings them back and the next lands where More stands, with no
+        // lookup between the two to outlast them; the open menu then holds them up.
+        func openMoreFromHidden() {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: moreFrame.midX, dy: moreFrame.midY)).tap()
+            XCTAssertTrue(quality.waitForExistence(timeout: 5), "The More menu did not open")
+        }
         openMore(in: app)
         XCTAssertTrue(shown().contains("Auto · Original"), "Auto did not start at Original: \(shown())")
         dismissMenu(in: app)
         tap("player.playPause", in: app)
-        XCTAssertTrue(element("player.playPause", in: app).waitForNonExistence(timeout: 10), "Controls did not hide after the menu closed")
+        let playPause = element("player.playPause", in: app)
+        XCTAssertTrue(playPause.waitForNonExistence(timeout: 10), "Controls did not hide after the menu closed")
 
+        // A poor link still plays, so Auto goes down to the floor with nothing said and the controls fade as ever.
         notify_post("marquee.uitest.link.poor")
+        openMoreFromHidden()
+        let atFloor = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in shown().contains("Auto · 4 Mbps 720p") }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [atFloor], timeout: 90), .completed, "Auto did not reach the 720p floor: \(shown())")
+        dismissMenu(in: app)
+        XCTAssertTrue(playPause.waitForNonExistence(timeout: 10), "Controls did not hide at the floor")
+
+        // A wait on the network at the floor is where the warning shows.
+        notify_post("marquee.uitest.link.stall")
         let floor = element("player.qualityFloor", in: app)
-        XCTAssertTrue(floor.waitForExistence(timeout: 90), "Poor throughput did not surface the floor warning")
-        XCTAssertTrue(element("player.playPause", in: app).exists, "The warning did not reveal hidden controls")
+        XCTAssertTrue(floor.waitForExistence(timeout: 10), "A stall at the floor did not surface the floor warning")
+        XCTAssertTrue(playPause.exists, "The warning did not reveal hidden controls")
         XCTAssertFalse(element("player.lowerQuality", in: app).exists)
         try snap("player-43-auto-quality-floor")
-        openMore(in: app)
-        let atFloor = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in shown().contains("Auto · 4 Mbps 720p") }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [atFloor], timeout: 30), .completed, "Auto did not reach the 720p floor: \(shown())")
-        dismissMenu(in: app)
-
-        notify_post("marquee.uitest.link.stall")
         Thread.sleep(forTimeInterval: 8)
         XCTAssertTrue(floor.exists, "The floor warning disappeared while stalled")
         XCTAssertFalse(element("player.lowerQuality", in: app).exists)
@@ -72,13 +84,8 @@ final class PlayerScreenshotTests: XCTestCase {
 
         notify_post("marquee.uitest.link.healthy")
         XCTAssertTrue(floor.waitForNonExistence(timeout: 45), "The floor warning did not clear after recovery")
-        // Playing with no warning, the controls fade 3 s after a touch, or after a move to a new stream has
-        // started playing. From hidden, one tap on the picture brings them back and the next lands where More
-        // stands, with no lookup between the two to outlast them; the open menu then holds them up.
         XCTAssertTrue(element("player.close", in: app).waitForNonExistence(timeout: 15), "Controls did not hide after recovery")
-        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
-        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: moreFrame.midX, dy: moreFrame.midY)).tap()
-        XCTAssertTrue(quality.waitForExistence(timeout: 5), "The More menu did not open")
+        openMoreFromHidden()
         let climbed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             let value = shown()
             return value.contains("Auto ·") && !value.contains("4 Mbps 720p")
@@ -494,7 +501,7 @@ private extension XCTestCase {
     }
 
     /// Opens the More menu and returns once its Quality row shows, while the controls are held up: paused,
-    /// or under the floor warning.
+    /// or waiting on the network.
     @MainActor
     func openMore(in app: XCUIApplication) {
         tap("player.more", in: app)
