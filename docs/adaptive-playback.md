@@ -1,6 +1,6 @@
 # Adaptive playback
 
-Auto quality, the default, plays Original when home is established and adapts otherwise. Plex converts on the fly, so there is no ready-made ladder of aligned streams to hop between: each step is a new server stream at one of the `VideoQuality` presets, opened beside the playing one and swapped in at a movie time ahead of the playhead.
+Auto quality is the default and adapts to the measured link. Plex converts on the fly, so there is no ready-made ladder of aligned streams to hop between: each step is a new server stream at one of the `VideoQuality` presets, opened beside the playing one and swapped in at a movie time ahead of the playhead.
 
 ## Where the phone is (`NetworkPlace`)
 
@@ -12,14 +12,20 @@ Away also turns a file that needs the remux into a server stream (`RouteLimits.r
 
 ## Choosing a rung (`AdaptiveQuality`)
 
-The ladder is Original plus every preset below the file's bitrate. Throughput is two moving averages of the link speed (half-lives 3 s and 10 s), the lower of them counting: bytes over active transfer time from AVPlayer's access log, or the remux's source rate. Buffer is media on the phone ahead of the playhead.
+The ladder is Original plus watchable presets below the file's bitrate. For a source and viewing picture both at least 1080 pixels on their short edge, the lowest preset is 8 Mbps; otherwise it is 4 Mbps. A source below 720 pixels on its short edge has only Original, as does a file whose bitrate leaves no eligible preset. With missing dimensions, the source defaults to 1080 for floor selection and 720 for ladder eligibility, and the view defaults to 720. Throughput is two moving averages of the link speed (half-lives 3 s and 10 s), the lower of them counting: bytes over active transfer time from AVPlayer's access log, or the remux's source rate. Buffer is media on the phone ahead of the playhead.
 
-- **Start.** Home: Original. Away: the highest rung that fits the last measured link, or 4 Mbps with no measurement, climbing from there. A rung fits when its rate is at most 70% of the estimate.
+- **Start.** A measured link selects the highest eligible rung that fits, at home or away, subject to any quality-score ceiling. Without a measurement, home starts at Original and away starts at the lowest eligible rung at or below 4 Mbps, or the lowest eligible rung if none does. A rung fits when its rate is at most 70% of the estimate; if none fits, the floor is retained.
 - **Down.** A wait on the network of 2 s, or under 12 s of buffer with the estimate below the rung's rate: down to the highest rung that fits, at least one step.
 - **Up.** The estimate fits a higher rung for 10 s straight, the buffer holds 10 s, and the last switch was 20 s ago: up to the highest rung that fits.
 - **Hysteresis.** Down needs the estimate below the rate; up needs it at 1/0.7 of the target's, so estimates in between change nothing. A drop within 60 s of a climb doubles the wait before the next climb (once per climb, to 160 s at most); 5 minutes without a drop resets it.
 
+When the floor's known rate exceeds 70% of the link estimate, or a network wait reaches 2 s at the floor without an estimate, `belowFloor` reports that the connection cannot sustain the floor. The player shows a quality warning rather than selecting a lower preset. Each accepted look recalculates this flag. A network change discards saved link measurements and the active policy before choosing a connection again; a replacement policy starts with fresh averages. Looks carrying a different stream ID are ignored; callers may omit the ID.
+
 Picking a fixed quality turns Auto off for the profile; Settings and the player's quality menu both offer Auto, and the menu shows the rung playing ("Auto · 8 Mbps 1080p"). The lower-quality offer after a long wait is for fixed qualities only: Auto steps down by itself. Force Direct Play never adapts. Stats for nerds shows the place and Auto's rung and link estimate.
+
+## Picture scaling
+
+Movie playback uses the platform's AVPlayerLayer to fill the picture surface; Live TV uses AVPlayerLayer or AVSampleBufferDisplayLayer. No separate enhancement or AI upscaler is present. Keep native scaling: additional processing is not justified without device comparisons showing a visible benefit and acceptable startup, playback reliability, latency, heat and battery cost. Those costs and image quality have not been measured here; scaling cannot restore detail absent from the source.
 
 ## Switching without a stop
 
