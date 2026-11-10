@@ -6,7 +6,7 @@ Source key used in citations:
 
 - **M** `marquee-ios` at 450fc94. **PB** the player branch at 7aaa2be, since merged to `main`.
 - **T** `lumaglass`: `docs/plugins/live-tv-tuner.md`, `docs/research/live-tv-capture.md` (capture.md), `docs/research/tuner-slates.md`, `helper/tuner/src/*.rs`.
-- **E** `stashy-videoengine` v2.0.0: `docs/ENGINE.md`, `Package.swift`, `scripts/build-ffmpeg.sh`.
+- **E** `videoengine` v2.0.0: `docs/ENGINE.md`, `Package.swift`, `scripts/build-ffmpeg.sh`.
 - **O** observed on the home Plex Media Server 1.43.5 with GET requests on 2026-11-06, plus the server's log of a Plex for iPhone Live TV session the same day (16:43-16:48, 8 tunes). Call signs are written WXXX.
 - **Spec** the OpenAPI document embedded in https://developer.plex.tv/pms/.
 

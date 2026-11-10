@@ -66,7 +66,7 @@ private struct Notice: Identifiable {
     ]
 
     #if canImport(Libavutil)
-    /// `Licences/engine` is the LICENSES.zip of the linked stashy-videoengine release; update the two together.
+    /// `Licences/engine` is the LICENSES.zip of the linked VideoEngine release; update the two together.
     static let engine = [
         Notice(id: "ffmpeg", name: "FFmpeg", licence: "LGPL 2.1 or later", files: [
             "Licences/engine/NOTICE.txt", "Licences/engine/BUILDINFO.txt",
@@ -80,7 +80,7 @@ private struct Notice: Identifiable {
         Notice(id: "harfbuzz", name: "HarfBuzz", licence: "MIT", files: ["Licences/engine/harfbuzz/COPYING"]),
         Notice(id: "libass", name: "libass", licence: "ISC", files: ["Licences/engine/libass/COPYING"]),
         Notice(id: "zimg", name: "zimg", licence: "WTFPL", files: ["Licences/engine/zimg/COPYING"]),
-        Notice(id: "videoengine", name: "stashy-videoengine", licence: "MIT", files: ["Licences/engine/stashy-videoengine/LICENSE"]),
+        Notice(id: "videoengine", name: "VideoEngine", licence: "MIT", files: ["Licences/engine/videoengine/LICENSE"]),
     ]
 
     /// FFmpeg's own account of the build that is linked in, e.g. "FFmpeg n9.0.2, LGPL version 2.1 or later".

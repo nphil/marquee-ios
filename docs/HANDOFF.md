@@ -23,6 +23,6 @@ Nitin wants this whole batch to ship as ONE release, never piecemeal, and wants 
 
 ## Standing rules (also in AGENTS.md)
 
-- Video engine changes go upstream to `nphil/stashy-videoengine` and its release flow; Marquee pins the tag; the Stashy Cody session is told the tag and the change.
+- Video engine changes go upstream to `nphil/videoengine` and its release flow; Marquee pins the tag; the Stashy Cody session is told the tag and the change.
 - Clean room, real-server safety and token rules in AGENTS.md "Rules that bite" apply to every part.
 - Nitin is not a programmer: report to him in plain words, briefly.

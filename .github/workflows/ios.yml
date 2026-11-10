@@ -48,7 +48,7 @@ jobs:
 
       # The engine's FFmpeg has iOS slices only, so the package tests run on a simulator. Tests
       # launched right after the simulator booted stalled for 5-40 s on this runner image
-      # (stashy-videoengine, 2026-11); booting first lets the boot overlap resolution and the build,
+      # (VideoEngine, 2026-11); booting first lets the boot overlap resolution and the build,
       # and the tests start at least two minutes after it.
       - name: Boot simulator
         id: simulator

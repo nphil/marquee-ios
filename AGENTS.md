@@ -36,7 +36,7 @@ Read first: `docs/HANDOFF.md` (unfinished work, how it lands, decisions already 
 
 Reveal as Spoken gets its word timing from SpeechDock through `App/Player/WordTiming.swift`. Remote server content in the App is `App/Browse/Remote.swift`.
 
-`Packages/MarqueeLive` (iOS only, FFmpeg through stashy-videoengine): `LiveEngine` (demux, decode, playout, tuner connection; no AVFoundation), `MarqueeLive` (`LiveStreamPlayer`, sample-buffer output, Picture in Picture and Now Playing types that the app does not use yet), `LiveFixtures` (synthetic tuner and stream).
+`Packages/MarqueeLive` (iOS only, FFmpeg through VideoEngine): `LiveEngine` (demux, decode, playout, tuner connection; no AVFoundation), `MarqueeLive` (`LiveStreamPlayer`, sample-buffer output, Picture in Picture and Now Playing types that the app does not use yet), `LiveFixtures` (synthetic tuner and stream).
 
 `App/`: `Account/` and `Session/` (sign-in, `AppSession`, `SessionStorage`), `RootView.swift` (root switch and `MainTabs`: Home, Library, Live TV, Watchlist, Search; Settings is a sheet from Home), `Navigation/` (`Route`, `BrowseStack`), `Browse/` (routes, detail, `Remote`, `LibraryChanges`, item actions, toasts), `Screens/` (Home, Library, Search, Watchlist, `LiveTV/`), `Player/` (`PlayerModel`, backends, chrome, trickplay, sidecar subtitles, `Live/` router and sources), `Settings/`, `Remote/` (the LumaTV remote integration around LumaRemoteKit; its UI tests pair with the kit's `LumaRemoteFakeTV`), `Images/` (`ImagePipeline`), `Theme/`, `DesignSystem/`, `Testing/` (Debug-only `FakePlex`, `FakeTuner`).
 
@@ -68,7 +68,7 @@ Other: `UITests/` (UI tests; `UITests/FakePlex/` fixtures and rules in its `READ
   - The accessibility pass runs on every push to `main`. On other branches it runs only when the branch differs from `main` in `App`, `UITests`, `Resources`, `Packages`, `project.yml`, `tools` or `.github`; otherwise it is skipped (`--no-accessibility`).
   - `ui-sizes`: one runner, the smallest and the largest iPhone simulator of the image (`tools/size-simulators.py` picks them by screen size) running `PlayerRouteMenuScreenshots`, one simulator at a time; its shots are named with the screen size and land in the `screens` artifact.
   - `screens`: merges the shard artifacts `screens-N` into the one `screens` artifact. `UITests-xcresult-N` stays per shard.
-  - `release` (`main` only) needs `core`, `live`, `app`, `ui-sizes` and every `ui` shard to be green. The engine is `stashy-videoengine` pinned to exact 2.0.3 in `project.yml` and `Packages/MarqueeLive/Package.swift`; change both together.
+  - `release` (`main` only) needs `core`, `live`, `app`, `ui-sizes` and every `ui` shard to be green. The engine is `videoengine` pinned to exact 2.0.3 in `project.yml` and `Packages/MarqueeLive/Package.swift`; change both together.
 - Running CI: batch the work. When a run fails, fix every failure on a branch and push the combined change once; do not push `main` a fix per failure, and do not push `main` while another `main` run is in progress (each run takes 4 runners). Rebase on `main` right before pushing.
 - A UI change is reviewed from the `screens` artifact: dark, light and large-text screenshots must be checked for overlap and contrast. UI tests run against FakePlex.
 

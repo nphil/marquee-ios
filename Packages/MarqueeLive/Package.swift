@@ -2,7 +2,7 @@
 import PackageDescription
 
 // The engine's FFmpeg ships iOS slices only, so the tests run on an iOS simulator (xcodebuild), not `swift test`.
-let ffmpeg: Target.Dependency = .product(name: "FFmpeg", package: "stashy-videoengine")
+let ffmpeg: Target.Dependency = .product(name: "FFmpeg", package: "videoengine")
 
 let package = Package(
     name: "MarqueeLive",
@@ -14,7 +14,7 @@ let package = Package(
     ],
     dependencies: [
         // The same pin as the app's VideoEngine, so both resolve to one checkout.
-        .package(url: "https://github.com/nphil/stashy-videoengine.git", exact: "2.0.3"),
+        .package(url: "https://github.com/nphil/videoengine.git", exact: "2.0.3"),
     ],
     targets: [
         // Platform-neutral: no AVFoundation, so a scratch package can test it on Linux.
