@@ -2,7 +2,7 @@
 
 Marquee for iPhone is a native SwiftUI Plex client for iOS 27 (Swift 6, Liquid Glass, 40 colour themes), sideloaded as an unsigned IPA through a Feather/AltStore source. It matches the behaviour of Nitin's Marquee TV app (webOS) on a phone, plus Live TV. There is no local Mac: everything that needs Xcode runs on GitHub Actions.
 
-Read first: `docs/ARCHITECTURE.md` (layers and why), then the file for the area you touch (table below).
+Read first: `docs/HANDOFF.md` (unfinished work, how it lands, decisions already made), then `docs/ARCHITECTURE.md` (layers and why), then the file for the area you touch (table below).
 
 ## Rules that bite
 
@@ -14,7 +14,7 @@ Read first: `docs/ARCHITECTURE.md` (layers and why), then the file for the area 
 - **A route is decided in Core, performed in the App.** Do not put codec, container or tuner rules in a view or in `PlayerModel`; add them to `PlaybackRouteDecider` / `LiveRouteDecider` with a Linux test.
 - **Themes and tokens.** Every colour comes from the theme (`@Environment(\.theme)`, roles in `Resources/themes.json`); space, size and radius from `App/DesignSystem/Tokens.swift`. No hex or raw numbers in views, and plugins/integrations supply data, never styling. A new surface must read in all 40 themes at default and accessibility text sizes.
 - **Integrations are plugins.** Off until enabled in Settings, each with its own page; the core stays minimal.
-- **Push straight to `main`.** No feature branches or PRs (`/data/home/lgtv/CLAUDE.md`). Before pushing run the touched package's tests; docs-only commits use `[skip ci]`. Fetch and rebase right before push, because several agents land work on `main` at once.
+- **Push straight to `main`.** No feature branches or PRs (`/data/home/lgtv/CLAUDE.md`). Before pushing run the touched package's tests; docs-only commits use `[skip ci]`. Fetch and rebase right before push, because several agents land work on `main` at once. Exception: while `docs/HANDOFF.md` describes an open batch, its work lands on the batch's branch and `main` is pushed once for the whole batch.
 - **`apps.json` and the release job are CI-owned.** The release job creates the GitHub release and commits `Update the Feather source for vX.Y.Z [skip ci]`; never hand-edit `apps.json`, tag, or bump a version. The version comes from the newest tag plus one patch.
 - **Measure before claiming.** "Faster" or "fixed" needs a frame or video result; "accepted" means checked on the actual iPhone with the receipt recorded; untested cases are listed as untested.
 - **Writing.** Commit messages, docs and release notes are short and third person ("the iPhone", never "you"). State what changed and why, not the route taken.
