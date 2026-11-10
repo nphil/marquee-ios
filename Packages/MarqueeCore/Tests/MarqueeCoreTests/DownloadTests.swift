@@ -51,6 +51,14 @@ struct DownloadTests {
         #expect((1...7).map(TransferPlan.retryDelay) == [2, 4, 8, 16, 32, 60, 60])
     }
 
+    @Test func secondConnectionOnlyAwayFromHomeAndOnlyWhenClearlyFaster() {
+        #expect(!TransferPlan.triesSecondConnection(isLocal: true))
+        #expect(TransferPlan.triesSecondConnection(isLocal: false))
+        #expect(TransferPlan.keepsSecondConnection(single: 10, dual: 13))
+        #expect(!TransferPlan.keepsSecondConnection(single: 10, dual: 12))
+        #expect(!TransferPlan.keepsSecondConnection(single: 0, dual: 5))
+    }
+
     @Test func rangeAnswersAreJudged() {
         let asked: Range<Int64> = 100..<200
         #expect(RangeReply.judge(status: 206, contentRange: "bytes 100-199/4096", contentLength: 100, retryAfter: nil, requested: asked) == .partial(length: 4096))

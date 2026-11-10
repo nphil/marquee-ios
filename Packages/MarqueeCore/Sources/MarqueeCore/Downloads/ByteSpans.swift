@@ -66,10 +66,15 @@ public struct ByteSpans: Hashable, Sendable, Codable {
 
 /// How a title's bytes are fetched.
 public enum TransferPlan {
-    /// Connections at once. On the home network one connection fills the link and more only compete:
-    /// Stashy measured 32 MB/s on one against 14 MB/s on eight. Away from home, parallel ranges add up
-    /// where each connection is held back on its own.
-    public static func connections(isLocal: Bool) -> Int { isLocal ? 1 : 4 }
+    /// One connection by default: against the owner's server one filled the link and more only made
+    /// the disks seek (Stashy measured 32 MB/s on one against 14 MB/s on eight). Away from home the
+    /// distance can hold one connection back, so there a second is tried once.
+    public static func triesSecondConnection(isLocal: Bool) -> Bool { !isLocal }
+
+    /// The second connection stays only when the trial moved clearly more, in bytes per second.
+    public static func keepsSecondConnection(single: Double, dual: Double) -> Bool {
+        single > 0 && dual >= single * 1.25
+    }
 
     /// One request's range in the foreground: small enough that the connections finish together.
     public static let foregroundChunk: Int64 = 16 << 20
