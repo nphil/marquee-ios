@@ -30,6 +30,7 @@ final class SessionStorage {
         static let seerrPulsarr = "marquee.seerr.pulsarr"
         static let castEnabled = "marquee.cast.enabled"
         static let remoteEnabled = "marquee.remote.enabled"
+        static let remoteAccess = "marquee.remote.access"
         static let tracksPrefix = "marquee."
     }
 
@@ -150,6 +151,11 @@ final class SessionStorage {
     var remoteEnabled: Bool {
         get { defaults.bool(forKey: Key.remoteEnabled) }
         set { defaults.set(newValue, forKey: Key.remoteEnabled) }
+    }
+
+    var remoteAccess: RemoteAccess {
+        get { defaults.string(forKey: Key.remoteAccess).flatMap(RemoteAccess.init(rawValue:)) ?? .miniBar }
+        set { defaults.set(newValue.rawValue, forKey: Key.remoteAccess) }
     }
 
     /// Sign-out: the token, the servers and the Seerr session made with the token leave the Keychain;
