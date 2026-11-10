@@ -32,6 +32,7 @@ final class DownloadCenter {
     private let keepAlive = DownloadKeepAlive()
     @ObservationIgnored private var worker: Task<Void, Never>?
     @ObservationIgnored private var transferOwner = UUID()
+    @ObservationIgnored private var enqueueOwner = UUID()
     @ObservationIgnored private var transferRecordID: String?
     @ObservationIgnored private var syncTask: Task<Void, Never>?
     @ObservationIgnored private var foregroundObserver: (any NSObjectProtocol)?
@@ -63,6 +64,7 @@ final class DownloadCenter {
 
     func connect(library: PlexLibrary?, scope: DownloadScope?) {
         transferOwner = UUID()
+        enqueueOwner = UUID()
         worker?.cancel()
         keepAlive.stop()
         self.library = library
@@ -73,32 +75,43 @@ final class DownloadCenter {
 
     func enqueue(item: PlexMetadata, quality: DownloadQuality, mediaIndex: Int) async {
         guard let library, let scope, !removing.contains(item.ratingKey), !records.contains(where: { $0.ratingKey == item.ratingKey }) else { return }
+        let owner = enqueueOwner
         do {
             let snapshot = try await library.metadataSnapshot(item.ratingKey)
-            guard self.scope == scope, snapshot.item.media.indices.contains(mediaIndex) else { return }
+            guard self.scope == scope, enqueueOwner == owner, snapshot.item.media.indices.contains(mediaIndex) else { return }
             let media = snapshot.item.media[mediaIndex]
             guard !media.parts.isEmpty else { throw DownloadFailure.message("No media file is available.") }
             guard quality != .original || media.parts.count == 1 else { throw DownloadFailure.message("Original downloads with multiple parts are not supported. Choose a converted quality.") }
             let target: DownloadTarget?
             if case .converted(let preset) = quality { target = PresetTarget.target(for: preset, media: media) } else { target = nil }
             var record = DownloadRecord(item: snapshot.item, scope: scope, quality: quality, mediaIndex: mediaIndex, addedAt: .now, expectedLength: quality.estimatedBytes(media: media, target: target))
+            let poster: Data?
+            if let thumb = record.thumb { poster = try? await PlexFetch.data(thumb, library: library, session: .shared) }
+            else { poster = nil }
+            guard self.scope == scope, enqueueOwner == owner else { return }
+            var subtitles: [(DownloadRecord.Subtitle, Data)] = []
+            for stream in media.parts.flatMap(\.streams) where stream.kind == .subtitle {
+                guard let key = stream.key else { continue }
+                let data = try? await PlexFetch.data(key, library: library, session: .shared)
+                guard self.scope == scope, enqueueOwner == owner else { return }
+                guard let data else { continue }
+                let ext = (stream.format ?? stream.codec ?? "srt").filter { $0.isLetter || $0.isNumber }
+                subtitles.append((DownloadRecord.Subtitle(streamID: stream.id, fileName: "subtitle-\(stream.id).\(ext)"), data))
+            }
+            guard self.scope == scope, enqueueOwner == owner, !removing.contains(item.ratingKey), !records.contains(where: { $0.ratingKey == item.ratingKey }) else { return }
             try store.makeFolder(for: record)
             try snapshot.data.write(to: store.metadataFile(for: record), options: .atomic)
-            if let thumb = record.thumb, let data = try? await PlexFetch.data(thumb, library: library, session: .shared) {
-                try? data.write(to: store.posterFile(for: record), options: .atomic)
-            }
-            for stream in media.parts.flatMap(\.streams) where stream.kind == .subtitle {
-                guard let key = stream.key, let data = try? await PlexFetch.data(key, library: library, session: .shared) else { continue }
-                let ext = (stream.format ?? stream.codec ?? "srt").filter { $0.isLetter || $0.isNumber }
-                let subtitle = DownloadRecord.Subtitle(streamID: stream.id, fileName: "subtitle-\(stream.id).\(ext)")
+            if let poster { try? poster.write(to: store.posterFile(for: record), options: .atomic) }
+            for (subtitle, data) in subtitles {
                 try data.write(to: store.subtitleFile(for: record, subtitle), options: .atomic)
                 record.subtitles.append(subtitle)
             }
-            guard self.scope == scope else { try? store.remove(record); return }
             allRecords.append(record)
             persist()
             kick()
-        } catch { self.error = error.localizedDescription }
+        } catch {
+            if self.scope == scope, enqueueOwner == owner { self.error = error.localizedDescription }
+        }
     }
 
     func pause(_ id: String) {
@@ -154,6 +167,7 @@ final class DownloadCenter {
 
     func eraseAll() {
         transferOwner = UUID()
+        enqueueOwner = UUID()
         worker?.cancel()
         keepAlive.stop()
         let old = allRecords
