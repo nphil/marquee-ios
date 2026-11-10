@@ -91,6 +91,8 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
     /// The video's name in the download's folder once complete, such as `media.mkv`.
     public var fileName: String?
     public var subtitles: [Subtitle] = []
+    /// Identifies this copy's partial file; absent on downloads saved by older versions.
+    public let partialID: UUID?
     public var addedAt: Date
     public var finishedAt: Date?
     public var watch: OfflineWatch
@@ -112,6 +114,7 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
         self.mediaIndex = mediaIndex
         phase = .waiting
         self.expectedLength = expectedLength
+        partialID = UUID()
         self.addedAt = addedAt
         watch = OfflineWatch(offset: item.viewOffset, watched: item.viewCount > 0)
     }

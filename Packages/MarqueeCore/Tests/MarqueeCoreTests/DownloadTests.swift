@@ -166,6 +166,23 @@ struct DownloadTests {
 
     // MARK: Store
 
+    @Test func partialPathsSurvivePersistenceAndDistinguishReaddedRecords() throws {
+        let store = DownloadStore(root: URL(fileURLWithPath: "/downloads"))
+        let original = try Self.record()
+        let replacement = try Self.record()
+        #expect(original.id == replacement.id)
+        #expect(store.partialFile(for: original) != store.partialFile(for: replacement))
+        let restored = try JSONDecoder().decode(DownloadRecord.self, from: JSONEncoder().encode(original))
+        #expect(store.partialFile(for: restored) == store.partialFile(for: original))
+
+        var legacyJSON = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? [String: Any])
+        legacyJSON.removeValue(forKey: "partialID")
+        let legacy = try JSONDecoder().decode(DownloadRecord.self, from: JSONSerialization.data(withJSONObject: legacyJSON))
+        #expect(legacy.partialID == nil)
+        #expect(store.partialFile(for: legacy).lastPathComponent == "download.part")
+        #expect(store.partialFile(for: legacy) != store.partialFile(for: replacement))
+    }
+
     @Test func storeKeepsRecordsAndBuildsTheOfflineTitle() throws {
         let root = FileManager.default.temporaryDirectory.appending(path: "downloads-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
