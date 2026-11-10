@@ -29,6 +29,7 @@ final class LivePlaybackModel: Identifiable {
 
     @ObservationIgnored private let audio = AudioSession()
     @ObservationIgnored private var surfCommit: Task<Void, Never>?
+    @ObservationIgnored private var tuneTask: Task<Void, Never>?
     @ObservationIgnored private var chromeTimer: Task<Void, Never>?
     @ObservationIgnored private var holderCheck: Task<Void, Never>?
     @ObservationIgnored private var started = false
@@ -97,6 +98,7 @@ final class LivePlaybackModel: Identifiable {
         closed = true
         holderCheck?.cancel()
         surfCommit?.cancel()
+        tuneTask?.cancel()
         chromeTimer?.cancel()
         source.stop()
         audio.deactivate()
@@ -114,7 +116,11 @@ final class LivePlaybackModel: Identifiable {
         }
         store.noteWatched(next)
         let source = source
-        Task { await source.play(next) }
+        tuneTask?.cancel()
+        tuneTask = Task {
+            guard !Task.isCancelled else { return }
+            await source.play(next)
+        }
         showChrome()
     }
 

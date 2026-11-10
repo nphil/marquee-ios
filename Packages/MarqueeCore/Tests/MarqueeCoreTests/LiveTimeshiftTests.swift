@@ -2,6 +2,40 @@ import Testing
 @testable import MarqueeCore
 
 struct LiveTimeshiftTests {
+    @Test @MainActor func delayedSeekDoesNotUndoPauseOrResumeANewStream() async {
+        let intent = LivePlaybackIntent()
+        var finishSeek: CheckedContinuation<Void, Never>?
+        var playCount = 0
+        var seekTask: Task<Void, Never>?
+        await withCheckedContinuation { (started: CheckedContinuation<Void, Never>) in
+            seekTask = intent.seek({
+                await withCheckedContinuation { continuation in
+                    finishSeek = continuation
+                    started.resume()
+                }
+            }, play: { playCount += 1 })
+        }
+        intent.pause()
+        finishSeek?.resume()
+        await seekTask?.value
+        #expect(intent.isPaused)
+        #expect(playCount == 0)
+        await withCheckedContinuation { (started: CheckedContinuation<Void, Never>) in
+            seekTask = intent.seek({
+                await withCheckedContinuation { continuation in
+                    finishSeek = continuation
+                    started.resume()
+                }
+            }, play: { playCount += 1 })
+        }
+        intent.reset()
+        finishSeek?.resume()
+        await seekTask?.value
+        #expect(playCount == 0)
+        await intent.seek({}, play: { playCount += 1 }).value
+        #expect(playCount == 1)
+    }
+
     @Test func liveIsWithinTheToleranceAndAPauseIsAlwaysBehind() {
         #expect(!LiveTimeshift(behindLive: 2.9, reach: 60).isBehindLive)
         #expect(LiveTimeshift(behindLive: 3, reach: 60).isBehindLive)

@@ -36,7 +36,8 @@ final class PlexLiveSource: LiveVideoSource {
     @ObservationIgnored private var observers: [any NSObjectProtocol] = []
     @ObservationIgnored private var isExternal = false
     @ObservationIgnored private var saidThroughPlex = false
-    @ObservationIgnored private var isPaused = false
+    @ObservationIgnored private let intent = LivePlaybackIntent()
+    private var isPaused: Bool { intent.isPaused }
 
     private static let signposter = OSSignposter(subsystem: "com.nphil.marquee", category: "LiveTV")
     private static let log = Logger(subsystem: "com.nphil.marquee", category: "LiveTV")
@@ -117,17 +118,17 @@ final class PlexLiveSource: LiveVideoSource {
     /// AVPlayer holds the position while the server's HLS window moves on (§6.7); the paused timeline keeps the
     /// session open.
     func pause() {
-        guard loaded == generation, !isPaused else { return }
-        isPaused = true
+        guard (loaded == generation || state == .opening), !isPaused else { return }
+        intent.pause()
         backend.pause()
         refreshTimeshift()
         Task { await report() }
     }
 
     func resume() {
-        guard loaded == generation, isPaused else { return }
-        isPaused = false
-        backend.play()
+        guard (loaded == generation || state == .opening), isPaused else { return }
+        intent.resume()
+        if loaded == generation { backend.play() }
         refreshTimeshift()
         Task { await report() }
     }
@@ -140,14 +141,13 @@ final class PlexLiveSource: LiveVideoSource {
             return
         }
         let target = LiveTimeshift.hlsPosition(behindLive: delay, seekable: seekable, liveOffset: Self.liveOffset(item))
-        let mine = generation
-        isPaused = false
-        Task {
+        intent.seek({ [backend] in
             _ = await backend.seek(to: target, precise: false)
-            guard mine == generation else { return }
-            backend.play()
-            refreshTimeshift()
-        }
+        }, play: { [weak self] in
+            guard let self else { return }
+            self.backend.play()
+            self.refreshTimeshift()
+        })
     }
 
     /// Waits until the session a `stop()` let go of has ended on the server. A one-tuner device refuses
@@ -181,7 +181,7 @@ final class PlexLiveSource: LiveVideoSource {
             guard mine == generation else { return }
             loaded = mine
             backend.load(AVPlayerItem(asset: AVURLAsset(url: url)))
-            backend.play()
+            if !isPaused { backend.play() }
             startTimeline()
         } catch {
             guard mine == generation else { return }
@@ -302,7 +302,7 @@ final class PlexLiveSource: LiveVideoSource {
     }
 
     private func endTimeshift() {
-        isPaused = false
+        intent.reset()
         timeshift = LiveTimeshift()
     }
 

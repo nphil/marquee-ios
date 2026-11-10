@@ -48,3 +48,29 @@ public struct LiveTimeshift: Sendable, Equatable {
         max(seekable.lowerBound, seekable.upperBound - max(0, liveOffset))
     }
 }
+
+/// Keeps an in-flight seek from resuming playback after a pause or a new stream.
+@MainActor public final class LivePlaybackIntent {
+    public private(set) var isPaused = false
+    private var generation = 0
+
+    public init() {}
+
+    public func pause() { isPaused = true }
+    public func resume() { isPaused = false }
+    public func reset() {
+        generation += 1
+        isPaused = false
+    }
+
+    @discardableResult
+    public func seek(_ operation: @escaping @MainActor () async -> Void, play: @escaping @MainActor () -> Void) -> Task<Void, Never> {
+        isPaused = false
+        let mine = generation
+        return Task {
+            await operation()
+            guard mine == generation, !isPaused else { return }
+            play()
+        }
+    }
+}

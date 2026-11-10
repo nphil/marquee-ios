@@ -80,13 +80,14 @@ final class LiveRouter: LiveVideoSource {
         Self.log.info("live-route \(channel.number, privacy: .public) \(Self.describe(route), privacy: .public)")
         switch route {
         case .direct:
-            await show(direct)
+            await show(direct, generation: mine)
             guard mine == generation else { return }
             ownState = nil
             await direct.play(channel)
+            guard mine == generation, ownState == nil, active === direct else { return }
             guardRecordings(channel, generation: mine)
         case .plex:
-            await show(plex)
+            await show(plex, generation: mine)
             guard mine == generation else { return }
             ownState = nil
             await plex.play(channel)
@@ -110,6 +111,7 @@ final class LiveRouter: LiveVideoSource {
 
     func stop() {
         generation += 1
+        channel = nil
         recordingGuard?.cancel()
         active?.stop()
         ownState = nil
@@ -187,17 +189,20 @@ final class LiveRouter: LiveVideoSource {
 
     /// Puts `next` on screen. The source before it stops first, and a Plex session lets go of the tuner before the
     /// phone asks for it: a one-tuner device refuses a second client.
-    private func show(_ next: any LiveVideoSource) async {
+    private func show(_ next: any LiveVideoSource, generation mine: Int) async {
+        guard mine == generation else { return }
         if let current = active, current !== next {
             current.stop()
             if current === plex { await plex.finishEnding() }
         }
+        guard mine == generation else { return }
         active = next
         container.show(next.videoView)
     }
 
     private func fallBack(_ channel: LiveChannel, after error: LiveError) {
-        guard active === direct, fellBack != generation else { return }
+        guard active === direct, ownState == nil, self.channel?.id == channel.id,
+              fellBack != generation else { return }
         fellBack = generation
         let mine = generation
         if case .network = error {
@@ -208,7 +213,7 @@ final class LiveRouter: LiveVideoSource {
         ownState = .opening
         say("Couldn't play from the tuner; playing through Plex", for: .seconds(8))
         Task {
-            await show(plex)
+            await show(plex, generation: mine)
             guard mine == generation else { return }
             route = .plex(.tunerUnreachable)
             ownState = nil
@@ -277,7 +282,7 @@ final class LiveRouter: LiveVideoSource {
             say("Recording \(number) now; playing through Plex", for: .seconds(8))
             let mine = generation
             Task {
-                await show(plex)
+                await show(plex, generation: mine)
                 guard mine == generation else { return }
                 route = .plex(.recording)
                 await plex.play(channel)

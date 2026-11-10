@@ -209,6 +209,7 @@ final class PlayerModel: Identifiable {
         /// The server stream's offset; 0 for the file.
         var offset: TimeInterval
         var origin: TimeInterval
+        var preparationDeadline: TimeInterval?
     }
 
     /// A route decided at one quality, taken on when its stream plays (`take`).
@@ -1391,12 +1392,13 @@ final class PlayerModel: Identifiable {
         do {
             if choice.route.kind == .serverTranscode {
                 try await selectForServer(choice.route, part: part)
-                guard !Task.isCancelled else { return false }
+                guard !Task.isCancelled, time < at - 1 else { return false }
                 let id = UUID().uuidString
                 // Held before the request, so that a move given up stops the server's work.
                 standby = Standby(
                     rung: rung, choice: choice, stream: .transcode(id),
-                    reporter: TimelineReporter(library: library, item: item, sessionIdentifier: id), offset: at, origin: at
+                    reporter: TimelineReporter(library: library, item: item, sessionIdentifier: id), offset: at, origin: at,
+                    preparationDeadline: at - 1
                 )
                 url = try await library.transcodeURL(
                     TranscodeRequest(item: item, mediaIndex: mediaIndex, route: choice.route, offset: at, session: id)
@@ -1404,13 +1406,14 @@ final class PlayerModel: Identifiable {
             } else {
                 standby = Standby(
                     rung: rung, choice: choice, stream: .direct, reporter: TimelineReporter(library: library, item: item),
-                    offset: 0, origin: 0
+                    offset: 0, origin: 0, preparationDeadline: at - 1
                 )
                 url = try await library.playbackURL(path: part.key)
             }
         } catch {
             return failed()
         }
+        guard !Task.isCancelled, standby != nil, time < at - 1 else { return failed() }
         let playerItem = makeItem(url)
         guard !Task.isCancelled, await backend.openStandby(playerItem), !Task.isCancelled, var next = standby else {
             return failed()
@@ -1421,9 +1424,11 @@ final class PlayerModel: Identifiable {
         }
         next.connection = await library.connection.currentConnection
         await applySelection(choice.route, to: playerItem)
-        guard !Task.isCancelled, time < at - 1, let player = await backend.prerollStandby(at: at - next.origin),
-              !Task.isCancelled, time < at - 0.5
+        guard !Task.isCancelled, standby != nil, time < at - 1,
+              let player = await backend.prerollStandby(at: at - next.origin),
+              !Task.isCancelled, standby != nil, time < at - 0.5
         else { return failed() }
+        next.preparationDeadline = nil
         standby = next
         layerView.prepareStandby(player)
         backend.armSwitch(at: at - playingOrigin)
@@ -1760,6 +1765,12 @@ final class PlayerModel: Identifiable {
         guard !isSeeking else { return }
         let movie = itemTime + origin
         if !isScrubbing { time = movie }
+        if let next = standby, let deadline = next.preparationDeadline, movie >= deadline {
+            moveTask?.cancel()
+            moveTask = nil
+            dropStandby()
+            restartForMove(next.choice, rung: next.rung)
+        }
         updateSubtitles(at: movie)
         updateOffers(at: movie)
         if !markedWatched, duration > 0, movie >= duration * 0.9 { markWatched() }

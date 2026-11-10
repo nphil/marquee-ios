@@ -171,7 +171,7 @@ final class AVPlayerBackend: VideoBackend {
         next.isMuted = true
         next.allowsExternalPlayback = true
         standby = next
-        // The model discards the standby once the playhead passes the switch, which ends the wait.
+        // The model discards a standby that misses its preparation deadline.
         while item.status == .unknown {
             try? await Task.sleep(for: .milliseconds(100))
             guard standby === next, !Task.isCancelled else { return false }

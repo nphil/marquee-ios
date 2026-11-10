@@ -1,3 +1,4 @@
+import Foundation
 import LiveFixtures
 import Testing
 @testable import LiveEngine
@@ -6,6 +7,24 @@ import Testing
 private let tuned: [SyntheticTS.Segment] = [.slate(seconds: 1.5), .station(seconds: 5)]
 
 struct LiveCoreTests {
+    @Test func pauseAndResumeReachTheStreamBeingReplaced() {
+        let clock = TestClock()
+        let buffer = TimeshiftBuffer(folder: nil, limits: .inMemory, segmentBytes: nil) { clock.now }
+        buffer.write(Data(repeating: 0, count: 188))
+        let feed = LiveFeed(buffer: buffer)
+        let output = RecordingOutput { clock.now }
+        let previous = LivePipeline(feed: feed, output: output) { _ in }
+        let replacement = LivePipeline(feed: feed, output: output, replacing: previous) { _ in }
+
+        replacement.setPaused(true)
+        clock.now = 5
+        #expect(previous.behindLive == 5)
+        replacement.setPaused(false)
+        clock.now = 8
+        #expect(previous.behindLive == 5)
+        replacement.stop()
+    }
+
     @Test func slateThenStationStartsMotionAndSoundTogether() throws {
         let sim = try Simulation.run(tuned, tail: 0)
         #expect(sim.phases == [.slate, .picture, .playing])

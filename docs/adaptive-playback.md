@@ -32,6 +32,8 @@ The new stream opens on a second, muted AVPlayer at the playhead plus 8 s, is po
 
 A plain restart at the playhead, the old behaviour, is used instead when Picture in Picture or AirPlay is active (both follow one player), when the app is in the background, when the new route is a remux or changes the sound or subtitle, when less than 9 s is buffered, or when the new stream is not ready by the switch time. A pause, a seek, a track change or a 2 s wait on the network gives the standby up; Auto looks again 2 s later.
 
+The preparation deadline is checked against playback even while the standby player is still opening or prerolling; a late completion cannot replace the fallback.
+
 ## Per-title quality scores
 
 `QualityScores` holds a title's VMAF score per rung. With scores, Auto climbs no higher than the lowest rung within 1.5 points of the best score, so a cartoon that looks the same at 8 Mbps does not pull 20. Nothing supplies scores yet; a server-side analysis would fill them per title.

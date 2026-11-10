@@ -73,9 +73,12 @@ public final class LivePipeline: @unchecked Sendable {
     /// Paused, the picture and sound hold and the feed's bytes wait in its buffer; playing again goes on from the same
     /// picture, as much further behind live as the pause lasted.
     public func setPaused(_ paused: Bool) {
-        wake.withLock { self.paused = paused }
-        reader.setPaused(paused)
-        core.setPaused(paused, now: monotonicNow())
+        wake.withLock {
+            self.paused = paused
+            replacing?.setPaused(paused)
+            reader.setPaused(paused)
+            core.setPaused(paused, now: monotonicNow())
+        }
     }
 
     public func start() {
