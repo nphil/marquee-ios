@@ -201,7 +201,24 @@ struct SubtitleSearchView: View {
     private var bazarrRows: BazarrSearchRows { .init(model: model, fix: fix, theme: theme) }
     private var plexRows: PlexSearchRows { .init(model: model, fix: fix, theme: theme) }
 
+    /// Scroll targets for the requests list, one per request. A tapped result leaves its provider's
+    /// section and is listed under "Subtitle requests" at the top, which can be far from the list's offset.
+    private var requestTargets: [String] {
+        fix.requestedBazarr.map { "request.bazarr.\($0.id)" } + fix.requestedPlex.map { "request.plex.\($0.id)" }
+    }
+
     var body: some View {
+        ScrollViewReader { proxy in
+            list
+                .onChange(of: requestTargets) { old, new in
+                    // Only a request that was not listed before; removals and reopening keep the offset.
+                    guard let added = new.last(where: { !old.contains($0) }) else { return }
+                    proxy.scrollTo(added, anchor: .top)
+                }
+        }
+    }
+
+    private var list: some View {
         List {
             Section {
                 NavigationLink {
@@ -217,8 +234,8 @@ struct SubtitleSearchView: View {
 
             if !fix.requestedBazarr.isEmpty || !fix.requestedPlex.isEmpty {
                 Section("Subtitle requests") {
-                    ForEach(fix.requestedBazarr) { bazarrRows.row($0) }
-                    ForEach(fix.requestedPlex) { plexRows.row($0) }
+                    ForEach(fix.requestedBazarr) { bazarrRows.row($0).id("request.bazarr.\($0.id)") }
+                    ForEach(fix.requestedPlex) { plexRows.row($0).id("request.plex.\($0.id)") }
                 }.listRowBackground(theme.sheet)
             }
             if fix.plexAddUnresolved {
