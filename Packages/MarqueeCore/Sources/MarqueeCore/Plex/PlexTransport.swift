@@ -11,9 +11,11 @@ public protocol PlexTransport: Sendable {
 
 public struct URLSessionTransport: PlexTransport {
     public let session: URLSession
+    private let restricted: RestrictedSession
 
     public init(session: URLSession = .shared) {
         self.session = session
+        self.restricted = RestrictedSession(configuration: session.configuration)
     }
 
     public func send(_ request: PlexRequest) async throws -> PlexHTTPResponse {
@@ -25,9 +27,39 @@ public struct URLSessionTransport: PlexTransport {
             urlRequest.setValue(value, forHTTPHeaderField: name)
         }
         do {
-            let delegate = request.restrictToOrigin ? OriginRedirectDelegate(origin: request.url) : nil
-            let (data, response) = try await session.data(for: urlRequest, delegate: delegate)
-            guard let http = response as? HTTPURLResponse else { throw NetworkFailure.other }
+            let data: Data
+            let http: HTTPURLResponse
+            if request.restrictToOrigin {
+                var redirects = 0
+                while true {
+                    let (bytes, response) = try await restricted.session.data(for: urlRequest)
+                    guard let answer = response as? HTTPURLResponse else { throw NetworkFailure.other }
+                    guard [301, 302, 303, 307, 308].contains(answer.statusCode),
+                          let location = answer.value(forHTTPHeaderField: "Location"),
+                          let current = urlRequest.url,
+                          let destination = URL(string: location, relativeTo: current)?.absoluteURL,
+                          OriginRedirectDelegate.sameOrigin(request.url, destination) else {
+                        data = bytes
+                        http = answer
+                        break
+                    }
+                    redirects += 1
+                    guard redirects <= 20 else { throw URLError(.httpTooManyRedirects) }
+                    if answer.statusCode == 303 ||
+                        ((answer.statusCode == 301 || answer.statusCode == 302) && urlRequest.httpMethod == "POST") {
+                        urlRequest.httpMethod = "GET"
+                        urlRequest.httpBody = nil
+                        urlRequest.setValue(nil, forHTTPHeaderField: "Content-Type")
+                        urlRequest.setValue(nil, forHTTPHeaderField: "Content-Length")
+                    }
+                    urlRequest.url = destination
+                }
+            } else {
+                let (bytes, response) = try await session.data(for: urlRequest)
+                guard let answer = response as? HTTPURLResponse else { throw NetworkFailure.other }
+                data = bytes
+                http = answer
+            }
             var headers: [String: String] = [:]
             for case let (name as String, value as String) in http.allHeaderFields {
                 headers[name] = value
@@ -40,23 +72,27 @@ public struct URLSessionTransport: PlexTransport {
     }
 }
 
+private final class RestrictedSession: Sendable {
+    let session: URLSession
+
+    init(configuration: URLSessionConfiguration) {
+        configuration.httpShouldSetCookies = false
+        configuration.httpCookieStorage = nil
+        configuration.urlCredentialStorage = nil
+        configuration.urlCache = nil
+        session = URLSession(configuration: configuration, delegate: OriginRedirectDelegate(), delegateQueue: nil)
+    }
+
+    deinit { session.invalidateAndCancel() }
+}
+
 /// URLSession may otherwise forward custom credential headers and POST bodies to a redirect target.
 final class OriginRedirectDelegate: NSObject, URLSessionTaskDelegate {
-    private let origin: URL
-
-    init(origin: URL) { self.origin = origin }
-
     func urlSession(
         _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
         newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void
     ) {
-        guard let url = request.url, Self.sameOrigin(origin, url) else {
-            completionHandler(nil)
-            return
-        }
-        var request = request
-        request.httpShouldHandleCookies = false
-        completionHandler(request)
+        completionHandler(nil)
     }
 
     static func sameOrigin(_ lhs: URL, _ rhs: URL) -> Bool {
