@@ -16,9 +16,30 @@ struct DownloadTests {
         ],
     ] }
 
-    static func record(quality: DownloadQuality = .original) throws -> DownloadRecord {
-        let item = try decode(PlexMetadata.self, episode)
+    static func record(_ json: [String: Any]? = nil, quality: DownloadQuality = .original) throws -> DownloadRecord {
+        let item = try decode(PlexMetadata.self, json ?? episode)
         return DownloadRecord(item: item, scope: DownloadScope(server: "machine-1", profile: ""), quality: quality, mediaIndex: 0, addedAt: Date(timeIntervalSince1970: 0))
+    }
+
+    /// An episode of show `show`, or a movie without one, in `phase`; finished at `finished` seconds.
+    static func entry(_ key: String, show: String? = nil, episode: Int = 1, phase: DownloadRecord.Phase = .done, finished: TimeInterval = 0) throws -> DownloadRecord {
+        var json = Self.episode
+        json["ratingKey"] = key
+        json["title"] = "Title \(key)"
+        json["index"] = episode
+        if let show {
+            json["grandparentRatingKey"] = show
+            json["grandparentTitle"] = "Show \(show)"
+        } else {
+            json["type"] = "movie"
+            json.removeValue(forKey: "grandparentRatingKey")
+            json.removeValue(forKey: "grandparentTitle")
+        }
+        var record = try Self.record(json)
+        record.phase = phase
+        record.length = 100
+        if phase == .done { record.finishedAt = Date(timeIntervalSince1970: finished) }
+        return record
     }
 
     // MARK: Bytes
@@ -259,5 +280,107 @@ struct DownloadTests {
         #expect(store.bytesOnDisk() > 0)
         try store.remove(record)
         #expect(!FileManager.default.fileExists(atPath: store.folder(for: record).path()))
+    }
+
+    @Test func downloadsFolderStaysOutOfBackups() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "downloads-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        try DownloadStore(root: root).prepareRoot()
+        #if canImport(Darwin)
+        #expect(try root.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
+        #endif
+        #expect(FileManager.default.fileExists(atPath: root.path(percentEncoded: false)))
+    }
+
+    @Test func sizeAndStillOfAnOlderDownloadComeFromItsSavedTitle() throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: "downloads-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = DownloadStore(root: root)
+        var json = Self.episode
+        json["thumb"] = "/library/metadata/301/thumb/1"
+        var record = try Self.record(json, quality: .converted(.mbps4))
+        record.frame = nil
+        try store.makeFolder(for: record)
+        #expect(store.savedFrame(for: record) == nil && store.savedStillPath(for: record) == nil)
+        try JSONSerialization.data(withJSONObject: ["MediaContainer": ["Metadata": [json]]]).write(to: store.metadataFile(for: record))
+        #expect(store.savedFrame(for: record) == DownloadRecord.Frame(width: 1280, height: 720))
+        #expect(store.savedStillPath(for: record) == "/library/metadata/301/thumb/1")
+        #expect(store.stillFile(for: record).lastPathComponent == "still.jpg" && store.stillFile(for: record).path().hasPrefix(store.folder(for: record).path()))
+    }
+
+    // MARK: Lists
+
+    @Test func pictureSizeIsTheConversionsTargetOrTheVersionsOwn() throws {
+        let original = try Self.record()
+        #expect(original.frame == DownloadRecord.Frame(width: 1920, height: 800) && original.resolution == "1080p")
+        let converted = try Self.record(quality: .converted(.mbps4))
+        #expect(converted.frame == DownloadRecord.Frame(width: 1280, height: 720) && converted.resolution == "720p")
+        var sizeless = Self.episode
+        sizeless["Media"] = [["id": 1, "Part": [["id": 11, "key": "/library/parts/11/1700000000/file.mkv"]]]]
+        let unknown = try Self.record(sizeless)
+        #expect(unknown.frame == nil && unknown.resolution == nil)
+    }
+
+    @Test func indexesFromBeforeThePictureSizeStillLoad() throws {
+        var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(Self.record())) as? [String: Any])
+        #expect(json["frame"] != nil)
+        json.removeValue(forKey: "frame")
+        let old = try JSONDecoder().decode(DownloadRecord.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(old.frame == nil)
+    }
+
+    @Test func rowFactsComeFromTheRecord() throws {
+        var record = try Self.record()
+        #expect(record.showID == "300" && record.seasonEpisode == "S1 E1")
+        #expect(record.watchedFraction == 60_000.0 / 3_600_000)
+        record.watch.finished(at: .now, told: true)
+        #expect(record.watchedFraction == nil)
+        record.seasonIndex = nil
+        #expect(record.seasonEpisode == "E1")
+        record.episodeIndex = nil
+        #expect(record.seasonEpisode == nil)
+        #expect(try Self.entry("9").showID == nil)
+    }
+
+    @Test func stillIsAnEpisodesOwnPictureOrAMoviesBackdrop() throws {
+        var json = Self.episode
+        #expect(DownloadRecord.stillPath(of: try decode(PlexMetadata.self, json)) == nil)
+        json["grandparentArt"] = "/library/metadata/300/art/1"
+        #expect(DownloadRecord.stillPath(of: try decode(PlexMetadata.self, json)) == "/library/metadata/300/art/1")
+        json["thumb"] = "/library/metadata/301/thumb/1"
+        #expect(DownloadRecord.stillPath(of: try decode(PlexMetadata.self, json)) == "/library/metadata/301/thumb/1")
+        json["type"] = "movie"
+        #expect(DownloadRecord.stillPath(of: try decode(PlexMetadata.self, json)) == nil)
+        json["art"] = "/library/metadata/301/art/1"
+        #expect(DownloadRecord.stillPath(of: try decode(PlexMetadata.self, json)) == "/library/metadata/301/art/1")
+    }
+
+    @Test func listGroupsEpisodesUnderTheirShowAndKeepsMoviesApart() throws {
+        let library = DownloadLibrary([
+            try Self.entry("1", show: "A", episode: 2, finished: 10),
+            try Self.entry("2", show: "B", finished: 30),
+            try Self.entry("3", show: "A", episode: 1, finished: 20),
+            try Self.entry("4", finished: 5),
+            try Self.entry("5", finished: 40),
+            try Self.entry("6", show: "C", phase: .downloading),
+            try Self.entry("7", show: "B", episode: 2, phase: .paused),
+        ])
+        #expect(library.shows.map(\.id) == ["B", "A"])
+        #expect(library.shows.map(\.title) == ["Show B", "Show A"])
+        #expect(library.show("A")?.records.map(\.id) == ["3", "1"] && library.show("A")?.bytes == 200)
+        #expect(library.show("B")?.records.map(\.id) == ["2", "7"] && library.show("B")?.bytes == 100)
+        #expect(library.show("B")?.poster.id == "2" && library.show("C")?.poster.id == "6")
+        #expect(library.show("C") != nil && !library.shows.map(\.id).contains("C") && library.show("D") == nil)
+        #expect(library.movies.map(\.id) == ["5", "4"])
+        #expect(library.unfinished.map(\.id) == ["6", "7"])
+    }
+
+    @Test func storageBarSplitsDownloadsOtherAndFree() {
+        let usage = StorageUsage(total: 100, free: 40, downloads: 10)
+        #expect(usage.other == 50 && usage.downloadsShare == 0.1 && usage.otherShare == 0.5 && usage.freeShare == 0.4)
+        // The free figure counts space iOS can reclaim, so it can leave less in use than the downloads take.
+        let squeezed = StorageUsage(total: 100, free: 95, downloads: 20)
+        #expect(squeezed.other == 0 && squeezed.downloadsShare == 0.05 && squeezed.freeShare == 0.95)
+        #expect(!StorageUsage(total: 0, free: 0, downloads: 5).isKnown)
     }
 }

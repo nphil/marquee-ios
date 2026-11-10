@@ -1,94 +1,86 @@
 import MarqueeCore
 import SwiftUI
 
+/// Downloads, grouped as Netflix groups them: what is still on its way, shows with their episodes inside,
+/// then movies; the iPhone's storage along the bottom. Select removes several at once.
 struct DownloadsView: View {
+    var body: some View {
+        DownloadsContent()
+            .downloadErrorAlert()
+            .removeDownloadConfirmation()
+    }
+}
+
+/// Its own view: the environment set by `removeDownloadConfirmation()` reaches views below it, not the one
+/// it modifies.
+private struct DownloadsContent: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
 
     var body: some View {
+        let records = session.downloads.records
+        let library = DownloadLibrary(records)
         List {
-            if session.downloads.records.isEmpty {
-                ContentUnavailableView("No Downloads", systemImage: "arrow.down.circle", description: Text("Download a movie or episode to watch it without a connection."))
-                    .listRowBackground(Color.clear)
-            } else {
-                ForEach(session.downloads.records) { record in
-                    row(record)
+            if !library.unfinished.isEmpty {
+                Section {
+                    ForEach(library.unfinished) { record in
+                        DownloadRow(record: record)
+                    }
+                } header: {
+                    DownloadSectionTitle(title: "Downloading")
                 }
-                .listRowBackground(theme.sheet)
+            }
+            if !library.shows.isEmpty {
+                Section {
+                    ForEach(library.shows) { show in
+                        DownloadShowRow(show: show)
+                    }
+                } header: {
+                    DownloadSectionTitle(title: "Shows")
+                }
+            }
+            if !library.movies.isEmpty {
+                Section {
+                    ForEach(library.movies) { record in
+                        DownloadRow(record: record)
+                    }
+                } header: {
+                    DownloadSectionTitle(title: "Movies")
+                }
             }
         }
-        .themedList(theme)
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .scrollHeader()
+        .tabBarFollowsScroll()
+        .environment(\.defaultMinListRowHeight, Size.rowMin)
+        .background(theme.canvas)
+        .overlay {
+            if records.isEmpty {
+                EmptyState(
+                    title: "No Downloads",
+                    message: "Download a movie or episode to watch it without a connection.",
+                    systemImage: "arrow.down.circle"
+                )
+            }
+        }
         .navigationTitle("Downloads")
-        .downloadErrorAlert()
-        .removeDownloadConfirmation()
-    }
-
-    private func row(_ record: DownloadRecord) -> some View {
-        VStack(alignment: .leading, spacing: Space.s2) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: Space.s1) {
-                    if let show = record.showTitle {
-                        Text(show).textRole(.caption).foregroundStyle(theme.ink2)
-                    }
-                    Text(record.title).textRole(.headline).foregroundStyle(theme.ink)
-                        .accessibilityIdentifier("downloads.row.\(record.ratingKey)")
-                    Text(status(record)).textRole(.caption).foregroundStyle(theme.ink2)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                if record.phase == .done {
-                    Button { session.playDownload(record) } label: {
-                        Image(systemName: "play.fill")
-                    }
-                    .accessibilityLabel("Play \(record.title)")
-                    .accessibilityIdentifier("downloads.play.\(record.id)")
-                } else if record.phase.isActive {
-                    Button { session.downloads.pause(record.id) } label: {
-                        Image(systemName: "pause.fill")
-                    }
-                    .accessibilityLabel("Pause \(record.title)")
-                    .accessibilityIdentifier("downloads.pause.\(record.id)")
-                } else {
-                    Button { session.downloads.resume(record.id) } label: {
-                        Image(systemName: "arrow.clockwise")
-                    }
-                    .accessibilityLabel("Resume \(record.title)")
-                    .accessibilityIdentifier("downloads.resume.\(record.id)")
-                }
-                RemoveButton(record: record)
-            }
-            .buttonStyle(.borderless)
-            if record.phase != .done, let fraction = record.fraction {
-                ProgressView(value: fraction)
-                    .accessibilityLabel("Download progress")
-            }
-        }
-        .padding(.vertical, Space.s1)
-    }
-
-    private func status(_ record: DownloadRecord) -> String {
-        switch record.phase {
-        case .waiting: "Waiting"
-        case .converting:
-            record.conversion?.progress.map { "Converting · \(Int($0 * 100))%" } ?? "Converting"
-        case .downloading:
-            record.fraction.map { "Downloading · \(Int($0 * 100))%" } ?? "Downloading"
-        case .paused: "Paused"
-        case .failed(let reason): "Failed · \(reason)"
-        case .done: "Downloaded · \(record.quality.title)"
+        .toolbarTitleDisplayMode(.inlineLarge)
+        .selectingDownloads(records) {
+            if !records.isEmpty { DownloadStorageBar() }
         }
     }
 }
 
-/// Its own view: the environment set by `removeDownloadConfirmation()` reaches views below it, not the one it modifies.
-private struct RemoveButton: View {
-    let record: DownloadRecord
-    @Environment(\.confirmDownloadRemoval) private var confirmRemoval
+/// A heading over a group of downloads.
+struct DownloadSectionTitle: View {
+    let title: String
+    @Environment(\.theme) private var theme
 
     var body: some View {
-        Button(role: .destructive) { confirmRemoval(record) } label: {
-            Image(systemName: "trash")
-        }
-        .accessibilityLabel("Remove \(record.title)")
-        .accessibilityIdentifier("downloads.remove.\(record.id)")
+        Text(title)
+            .textRole(.headline)
+            .foregroundStyle(theme.ink)
+            .accessibilityAddTraits(.isHeader)
     }
 }

@@ -25,11 +25,17 @@ final class DownloadFlowTests: XCTestCase {
         reveal("settings.downloads", in: app).tap()
         tap("downloads.open", in: app)
         waitFor("downloads.row.101", in: app)
-        XCTAssertTrue(app.staticTexts["Downloaded · Original"].waitForExistence(timeout: 10))
-        try snap("downloads-\(mode)")
-
         let play = app.buttons["downloads.play.101"]
         XCTAssertTrue(play.waitForExistence(timeout: 10), "Saved download has no Play button")
+        XCTAssertTrue(play.label.contains("Original"), "The row does not say how the download was made")
+        try snap("downloads-\(mode)")
+
+        tap("downloads.select", in: app)
+        tap("downloads.row.101", in: app)
+        XCTAssertTrue(app.buttons["Remove 1 download"].waitForExistence(timeout: 10), "Ticking a download did not enable Remove")
+        try snap("downloads-select-\(mode)")
+        tap("downloads.select", in: app)
+
         play.tap()
         waitFor("player", in: app)
         // The controls, title included, are up while the player loads and hide 3 s into playback, sooner
@@ -45,7 +51,9 @@ final class DownloadFlowTests: XCTestCase {
         tap("player.close", in: app)
         waitFor("downloads.row.101", in: app)
 
-        app.buttons["Remove Big Buck Bunny"].tap()
+        app.buttons["More for Big Buck Bunny"].tap()
+        app.buttons["Remove Download"].tap()
+        XCTAssertTrue(app.staticTexts["Remove Download?"].waitForExistence(timeout: 10))
         app.buttons["Remove Download"].tap()
         XCTAssertTrue(app.staticTexts["No Downloads"].waitForExistence(timeout: 10))
     }

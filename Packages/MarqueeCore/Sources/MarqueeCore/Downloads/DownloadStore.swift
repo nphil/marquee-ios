@@ -32,6 +32,12 @@ public struct DownloadStore: Sendable {
         folder(for: record).appending(path: "poster.jpg")
     }
 
+    /// The title's picture for lists: an episode's still or a movie's backdrop, which the lists draw
+    /// without the server.
+    public func stillFile(for record: DownloadRecord) -> URL {
+        folder(for: record).appending(path: "still.jpg")
+    }
+
     /// The server's answer for the title, with markers and chapters.
     public func metadataFile(for record: DownloadRecord) -> URL {
         folder(for: record).appending(path: "metadata.json")
@@ -62,6 +68,21 @@ public struct DownloadStore: Sendable {
         return item
     }
 
+    /// The picture's size of a download saved by an older version, read from its saved description;
+    /// nil when that is missing or does not say.
+    public func savedFrame(for record: DownloadRecord) -> DownloadRecord.Frame? {
+        guard let data = try? Data(contentsOf: metadataFile(for: record)),
+              let item = try? PlexMetadata.fromSnapshot(data),
+              item.media.indices.contains(record.mediaIndex) else { return nil }
+        return DownloadRecord.Frame(media: item.media[record.mediaIndex], quality: record.quality)
+    }
+
+    /// The artwork path to keep as the title's still, from its saved description.
+    public func savedStillPath(for record: DownloadRecord) -> String? {
+        guard let data = try? Data(contentsOf: metadataFile(for: record)), let item = try? PlexMetadata.fromSnapshot(data) else { return nil }
+        return DownloadRecord.stillPath(of: item)
+    }
+
     /// `file`'s path below `base`, joined by "/", built from path components so a trailing slash on
     /// either URL changes nothing. Nil when `file` is not inside `base`. The background transfer keeps
     /// this instead of an absolute path because the app container's path can change between launches.
@@ -86,8 +107,21 @@ public struct DownloadStore: Sendable {
     }
 
     public func saveIndex(_ records: [DownloadRecord]) throws {
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try prepareRoot()
         try JSONEncoder().encode(records).write(to: indexFile, options: .atomic)
+    }
+
+    /// Makes the downloads folder and keeps it out of iCloud and device backups: the videos come from
+    /// the server and can be fetched again. The folder is under Application Support, so iOS counts it
+    /// as the app's Documents & Data in iPhone Storage. Backup exclusion is a property of the folder,
+    /// so it is set again whenever the folder is made anew.
+    public func prepareRoot() throws {
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        guard (try? root.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup) != true else { return }
+        var folder = root
+        var values = URLResourceValues()
+        values.isExcludedFromBackup = true
+        try folder.setResourceValues(values)
     }
 
     public func makeFolder(for record: DownloadRecord) throws {

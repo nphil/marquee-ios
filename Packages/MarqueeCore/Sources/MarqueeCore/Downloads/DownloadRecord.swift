@@ -63,6 +63,32 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
         }
     }
 
+    /// The picture's size in pixels: the conversion's target, or the version's own.
+    public struct Frame: Hashable, Sendable, Codable {
+        public var width: Int
+        public var height: Int
+
+        public init(width: Int, height: Int) {
+            self.width = width
+            self.height = height
+        }
+
+        /// Nil when the server did not say how large the original is.
+        public init?(media: PlexMedia, quality: DownloadQuality) {
+            switch quality {
+            case .converted(let preset):
+                let target = PresetTarget.target(for: preset, media: media)
+                self.init(width: target.width, height: target.height)
+            case .original:
+                let video = media.parts.first?.videoStream
+                guard let width = media.width ?? video?.width, let height = media.height ?? video?.height, width > 0, height > 0 else {
+                    return nil
+                }
+                self.init(width: width, height: height)
+            }
+        }
+    }
+
     public var id: String { ratingKey }
     public var scope: DownloadScope
     public var ratingKey: String
@@ -96,6 +122,9 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
     public var addedAt: Date
     public var finishedAt: Date?
     public var watch: OfflineWatch
+    /// The picture's size; absent on downloads saved by older versions until the screen reads it from
+    /// the saved description.
+    public var frame: Frame?
 
     public init(item: PlexMetadata, scope: DownloadScope, quality: DownloadQuality, mediaIndex: Int, addedAt: Date, expectedLength: Int64? = nil) {
         self.scope = scope
@@ -117,6 +146,7 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
         partialID = UUID()
         self.addedAt = addedAt
         watch = OfflineWatch(offset: item.viewOffset, watched: item.viewCount > 0)
+        frame = item.media.indices.contains(mediaIndex) ? Frame(media: item.media[mediaIndex], quality: quality) : nil
     }
 
     /// The share on the iPhone, 0…1; nil before the length is known in any way.
@@ -124,6 +154,42 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
         if phase == .done { return 1 }
         guard let total = length ?? expectedLength, total > 0 else { return nil }
         return min(1, Double(received.byteCount) / Double(total))
+    }
+
+    /// "1080p", "4K": the picture's size as a person names it; nil until it is known.
+    public var resolution: String? {
+        frame.map { FormatBadge.resolution(width: $0.width).rawValue }
+    }
+
+    /// What the download comes to: the file once it is finished, else the length the server gave or the
+    /// estimate.
+    public var totalBytes: Int64? {
+        length ?? expectedLength
+    }
+
+    /// What groups an episode under its show: the show's rating key, else its name. Nil for a movie, and
+    /// for an episode that names no show.
+    public var showID: String? {
+        type == .episode ? showRatingKey ?? showTitle : nil
+    }
+
+    /// "S1 E5", "E5" without a season; nil without an episode number.
+    public var seasonEpisode: String? {
+        guard let episodeIndex else { return nil }
+        return seasonIndex.map { "S\($0) E\(episodeIndex)" } ?? "E\(episodeIndex)"
+    }
+
+    /// How far into the title the viewer left it, 0…1; nil without a resume point.
+    public var watchedFraction: Double? {
+        guard watch.offset > 0, duration > 0 else { return nil }
+        return min(1, Double(watch.offset) / Double(duration))
+    }
+
+    /// The server artwork worth keeping as the title's still: an episode's own picture, else its show's
+    /// backdrop; a movie's backdrop. A poster is no still, so a movie without a backdrop has none.
+    public static func stillPath(of item: PlexMetadata) -> String? {
+        let path = item.type == .episode ? item.thumb ?? item.grandparentArt : item.art
+        return path?.isEmpty == false ? path : nil
     }
 
     /// A finished download Auto-delete takes away: finished on this iPhone, and not the one playing.

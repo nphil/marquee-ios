@@ -23,6 +23,8 @@ final class DownloadCenter {
     var error: String?
     var records: [DownloadRecord] { allRecords.filter { $0.scope == scope } }
     var activeCount: Int { records.filter { $0.phase.isActive }.count }
+    /// Counts up when a still is saved after its row was first drawn, so lists show it without a relaunch.
+    private(set) var artVersion = 0
 
     private static let settingsKey = "marquee.downloads.settings"
     private let defaults: UserDefaults
@@ -36,6 +38,7 @@ final class DownloadCenter {
     @ObservationIgnored private var enqueueOwner = UUID()
     /// Seasons and shows being queued, so a second tap does not walk the same episodes again.
     @ObservationIgnored private var batches: Set<String> = []
+    @ObservationIgnored private var backfillTask: Task<Void, Never>?
     @ObservationIgnored private var transferRecordID: String?
     @ObservationIgnored private var syncTask: Task<Void, Never>?
     @ObservationIgnored private var foregroundObserver: (any NSObjectProtocol)?
@@ -77,6 +80,8 @@ final class DownloadCenter {
                 .appending(path: "Downloads", directoryHint: .isDirectory)
         }
         store = DownloadStore(root: root)
+        // The folder is app data in iPhone Storage but never a backup: the videos can be fetched again.
+        try? store.prepareRoot()
         allRecords = store.loadIndex()
         settings = defaults.data(forKey: Self.settingsKey).flatMap { try? JSONDecoder().decode(DownloadSettings.self, from: $0) } ?? DownloadSettings()
         keepAlive.onSurrender = { [weak self] in self?.handoff() }
@@ -91,7 +96,10 @@ final class DownloadCenter {
             var previous: NetworkPath?
             for await path in NetworkPath.updates() {
                 guard let self else { return }
-                if path.isConnected, path != previous { self.wake() }
+                if path.isConnected, path != previous {
+                    self.wake()
+                    self.backfill()
+                }
                 previous = path
             }
         }
@@ -113,6 +121,7 @@ final class DownloadCenter {
         if UIApplication.shared.applicationState == .background { backgroundHandoff = true }
         kick()
         syncWatch()
+        backfill()
     }
 
     func enqueue(item: PlexMetadata, quality: DownloadQuality, mediaIndex: Int, capabilities: DeviceCapabilities) async {
@@ -165,6 +174,9 @@ final class DownloadCenter {
             let poster: Data?
             if let thumb = record.thumb { poster = try? await PlexFetch.data(thumb, library: library, session: metadataSession) }
             else { poster = nil }
+            let still: Data?
+            if let path = DownloadRecord.stillPath(of: snapshot.item) { still = await fetchStill(path, library: library) }
+            else { still = nil }
             guard self.scope == scope, enqueueOwner == owner else { return nil }
             var subtitles: [(DownloadRecord.Subtitle, Data)] = []
             for stream in media.parts.flatMap(\.streams) where stream.kind == .subtitle {
@@ -179,6 +191,7 @@ final class DownloadCenter {
             try store.makeFolder(for: record)
             try snapshot.data.write(to: store.metadataFile(for: record), options: .atomic)
             if let poster { try? poster.write(to: store.posterFile(for: record), options: .atomic) }
+            if let still { try? still.write(to: store.stillFile(for: record), options: .atomic) }
             for (subtitle, data) in subtitles {
                 try data.write(to: store.subtitleFile(for: record, subtitle), options: .atomic)
                 record.subtitles.append(subtitle)
@@ -297,6 +310,61 @@ final class DownloadCenter {
         do { try store.saveIndex(allRecords) } catch { self.error = error.localizedDescription }
     }
 
+    /// The title's still at the size the lists draw it, for showing offline; nil when the server has none or does not answer.
+    private func fetchStill(_ path: String, library: PlexLibrary) async -> Data? {
+        guard let url = try? await library.imageURL(path, width: 640, height: 360, scale: 1) else { return nil }
+        var request = URLRequest(url: url)
+        for (name, value) in library.authorizationHeaders() { request.setValue(value, forHTTPHeaderField: name) }
+        guard let (data, response) = try? await metadataSession.data(for: request),
+              let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else { return nil }
+        return data
+    }
+
+    /// What an older download lacks for the Downloads screen: the picture's size and the still.
+    private struct Missing: Sendable {
+        let id: String
+        var frame: DownloadRecord.Frame?
+        var stillPath: String?
+    }
+
+    /// Downloads saved before the screen drew stills have neither: the size is read from each saved
+    /// description, the still is fetched again. Retried when the network returns, as a first launch
+    /// may be offline.
+    private func backfill() {
+        guard backfillTask == nil, let library, let scope else { return }
+        let store = store
+        let candidates = records
+        backfillTask = Task { [weak self] in
+            let missing = await Self.survey(candidates, in: store)
+            guard let self else { return }
+            defer { self.backfillTask = nil }
+            guard self.scope == scope else { return }
+            var sized = false
+            for found in missing {
+                guard let frame = found.frame, let i = self.index(found.id), self.allRecords[i].frame == nil else { continue }
+                self.allRecords[i].frame = frame
+                sized = true
+            }
+            if sized { self.persist() }
+            for found in missing {
+                guard let path = found.stillPath, let data = await self.fetchStill(path, library: library) else { continue }
+                guard self.scope == scope, let i = self.index(found.id) else { continue }
+                try? data.write(to: self.store.stillFile(for: self.allRecords[i]), options: .atomic)
+                self.artVersion += 1
+            }
+        }
+    }
+
+    @concurrent private static func survey(_ records: [DownloadRecord], in store: DownloadStore) async -> [Missing] {
+        records.compactMap { record in
+            var found = Missing(id: record.id)
+            if record.frame == nil { found.frame = store.savedFrame(for: record) }
+            if !FileManager.default.fileExists(atPath: store.stillFile(for: record).path(percentEncoded: false)) {
+                found.stillPath = store.savedStillPath(for: record)
+            }
+            return found.frame == nil && found.stillPath == nil ? nil : found
+        }
+    }
 
     func syncWatch() {
         guard syncTask == nil, let library, let scope else { return }

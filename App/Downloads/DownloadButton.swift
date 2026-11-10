@@ -119,25 +119,48 @@ extension View {
 }
 
 extension EnvironmentValues {
-    /// Asks before removing a download; set by `removeDownloadConfirmation()`.
-    @Entry var confirmDownloadRemoval: @MainActor (DownloadRecord) -> Void = { _ in }
+    /// Asks before removing downloads; set by `removeDownloadConfirmation()`.
+    @Entry var confirmDownloadRemoval: ConfirmDownloadRemoval = ConfirmDownloadRemoval { _ in }
 }
 
-/// "Remove Download?" for every remove button below it, which call `confirmDownloadRemoval`.
+struct ConfirmDownloadRemoval {
+    let ask: @MainActor ([DownloadRecord]) -> Void
+
+    @MainActor
+    func callAsFunction(_ record: DownloadRecord) {
+        ask([record])
+    }
+
+    @MainActor
+    func callAsFunction(_ records: [DownloadRecord]) {
+        ask(records)
+    }
+}
+
+/// "Remove Download?" for every remove button below it, which call `confirmDownloadRemoval`, for one
+/// download or several at once.
 private struct RemoveDownloadConfirmation: ViewModifier {
     @Environment(AppSession.self) private var session
-    @State private var removing: DownloadRecord?
+    @State private var asking: [DownloadRecord] = []
+    @State private var isAsking = false
+
+    private var title: String {
+        asking.count > 1 ? "Remove \(asking.count) Downloads?" : "Remove Download?"
+    }
 
     func body(content: Content) -> some View {
         content
-            .environment(\.confirmDownloadRemoval) { removing = $0 }
-            .confirmationDialog("Remove Download?", isPresented: Binding(
-                get: { removing != nil },
-                set: { if !$0 { removing = nil } }
-            ), titleVisibility: .visible, presenting: removing) { record in
-                Button("Remove Download", role: .destructive) { session.downloads.remove(record.id) }
-            } message: { record in
-                Text("Remove \(record.title) from this iPhone?")
+            .environment(\.confirmDownloadRemoval, ConfirmDownloadRemoval { records in
+                guard !records.isEmpty else { return }
+                asking = records
+                isAsking = true
+            })
+            .confirmationDialog(title, isPresented: $isAsking, titleVisibility: .visible, presenting: asking) { records in
+                Button(records.count > 1 ? "Remove \(records.count) Downloads" : "Remove Download", role: .destructive) {
+                    for record in records { session.downloads.remove(record.id) }
+                }
+            } message: { records in
+                Text(records.count > 1 ? "Remove \(records.count) downloads from this iPhone?" : "Remove \(records.first?.title ?? "this download") from this iPhone?")
             }
     }
 }
