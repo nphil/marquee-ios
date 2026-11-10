@@ -85,11 +85,21 @@ extension XCTestCase {
             return !visible.isNull && visible.width >= min(44, frame.width / 2)
                 && visible.height >= min(44, frame.height / 2)
         }
+        // One drag covers the span between the navigation bar and the tab bar, so the row count a drag
+        // moves does not depend on the screen's height (an inline theme grid is ~20 rows at AX2).
+        let tabBar = app.tabBars.firstMatch
+        let navBar = app.navigationBars.firstMatch
+        let bottom = tabBar.exists ? tabBar.frame.minY - 8 : app.frame.height * 0.9
+        let top = (navBar.exists ? navBar.frame.maxY : app.frame.height * 0.15) + 12
+        let span = bottom > top + 200 ? (top: top, bottom: bottom) : (top: app.frame.height * 0.25, bottom: app.frame.height * 0.7)
+        func point(_ y: CGFloat) -> XCUICoordinate {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: y / app.frame.height))
+        }
         for _ in 0..<8 {
             if isVisible() { return target }
             let up = !(target.exists && target.frame.midY < viewport.midY)
-            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.7 : 0.25))
-            let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.25 : 0.7))
+            let from = point(up ? span.bottom : span.top)
+            let to = point(up ? span.top : span.bottom)
             from.press(forDuration: 0.1, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0)
         }
         XCTAssertTrue(target.waitForExistence(timeout: 5), "No element \(identifier)")
