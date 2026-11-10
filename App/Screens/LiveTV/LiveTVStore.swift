@@ -325,16 +325,9 @@ final class LiveTVStore {
         recordings.scheduled.filter { $0.isUpcoming || $0.status == .error }
     }
 
-    /// The newest items of the libraries the DVR records into, newest first.
+    /// Completed DVR recordings across the server’s movie and TV libraries.
     func recorded() async throws -> [PlexMetadata] {
-        let sections = Set(recordings.rules.compactMap(\.targetLibrarySectionID))
-        var items: [PlexMetadata] = []
-        for section in sections.sorted() {
-            let type: PlexMediaType = recordings.rules.contains { $0.targetLibrarySectionID == section && $0.type == RecordOption.Kind.movie.rawValue } ? .movie : .episode
-            let page = try await live.library.items(in: String(section), query: SectionQuery(type: type, sort: .recentlyAdded), start: 0, size: 30)
-            items += page.items
-        }
-        return items.sorted { ($0.addedAt ?? .distantPast) > ($1.addedAt ?? .distantPast) }
+        try await live.library.recordedItems()
     }
 
     private static var cacheDirectory: URL {

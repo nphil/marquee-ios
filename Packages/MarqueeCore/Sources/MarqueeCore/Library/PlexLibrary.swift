@@ -35,6 +35,35 @@ public struct PlexLibrary: Sendable {
         return PlexPage(items: result.metadata, totalSize: result.totalSize ?? start + result.metadata.count)
     }
 
+    /// Completed DVR versions across all movie and TV libraries, including libraries without an active rule.
+    public func recordedItems() async throws -> [PlexMetadata] {
+        var recordings: [PlexMetadata] = []
+        for section in try await sections() {
+            let type: PlexMediaType
+            switch section.type {
+            case .movie: type = .movie
+            case .show: type = .episode
+            default: continue
+            }
+            let query = SectionQuery(type: type).queryItems
+            var start = 0
+            while true {
+                try Task.checkCancellation()
+                let headers = [PlexHeader.containerStart: String(start), PlexHeader.containerSize: "200"]
+                let page = try await container("/library/sections/\(section.key)/all", query, headers: headers)
+                guard !page.metadata.isEmpty else { break }
+                recordings.append(contentsOf: page.metadata.filter(\.isDVRRecording))
+                start += page.metadata.count
+                if let total = page.totalSize, start >= total { break }
+            }
+        }
+        return recordings.sorted {
+            let left = $0.recordedAt ?? .distantPast
+            let right = $1.recordedAt ?? .distantPast
+            return left == right ? $0.ratingKey < $1.ratingKey : left > right
+        }
+    }
+
     /// The A–Z jump bar for a grid with the same query.
     public func alphabetIndex(in sectionKey: String, query: SectionQuery) async throws -> [AlphabetIndexEntry] {
         let result = try await container("/library/sections/\(sectionKey)/firstCharacter", query.queryItems)

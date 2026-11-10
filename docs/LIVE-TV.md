@@ -429,7 +429,7 @@ While surfing a card (`Radius.card`, `glassRaised` over `scrim`) follows the fin
 
 ### 6.10 Recordings
 
-Recordings (header button) has Scheduled | Recorded. Scheduled lists upcoming airings by day from `/media/subscriptions/scheduled`, swipe to cancel one, with series rules at the top (edit, delete; deleting a rule stops its running airings first). Recorded lists the newest items in the DVR's target library sections; they are ordinary library items and play in the normal player.
+Recordings (header button) has Scheduled | Recorded. Scheduled lists upcoming airings by day from `/media/subscriptions/scheduled`, with series rules above them. Recorded scans movie and TV libraries for completed DVR versions and uses the recording start as its date. Plex can lose recording markers after a rematch; those recordings cannot be identified and are omitted.
 
 | State | Glyph | Role |
 |---|---|---|

@@ -33,6 +33,78 @@ struct PlexLibraryTests {
         #expect(request.url.query("unwatchedLeaves") == "1")
     }
 
+    @Test func recordingsUseCompletedDVRMediaAcrossEveryLibraryPage() async throws {
+        let (library, transport) = Self.library { request in
+            switch request.url.path {
+            case "/library/sections":
+                return container(["Directory": [
+                    ["key": "1", "title": "Movies", "type": "movie"],
+                    ["key": "2", "title": "Shows", "type": "show"],
+                    ["key": "3", "title": "Music", "type": "artist"],
+                ]])
+            case "/library/sections/1/all":
+                return container(["totalSize": 1, "Metadata": [
+                    ["ratingKey": "movie", "Media": [["origin": "dvr", "mediaGrabStatus": "complete", "mediaGrabBeginsAt": 100]]],
+                ]])
+            case "/library/sections/2/all" where request.headers[PlexHeader.containerStart] == "0":
+                return container(["totalSize": 4, "Metadata": [
+                    ["ratingKey": "ordinary", "addedAt": 999, "Media": [["id": 1]]],
+                    ["ratingKey": "incomplete", "Media": [["origin": "dvr", "mediaGrabStatus": "recording"]]],
+                    ["ratingKey": "mixed", "Media": [["id": 2, "mediaGrabBeginsAt": 999], ["id": 3, "origin": "dvr", "mediaGrabStatus": "complete", "mediaGrabBeginsAt": 200]]],
+                ]])
+            case "/library/sections/2/all":
+                return container(["totalSize": 4, "Metadata": [
+                    ["ratingKey": "undated", "addedAt": 1000, "Media": [["origin": "dvr", "mediaGrabStatus": "complete"]]],
+                ]])
+            case "/library/metadata/mixed":
+                return container(["Metadata": [["ratingKey": "mixed", "Media": [["id": 3], ["id": 2]]]]])
+            default:
+                return container([:])
+            }
+        }
+
+        let recordings = try await library.recordedItems()
+
+        #expect(recordings.map(\.ratingKey) == ["mixed", "movie", "undated"])
+        #expect(recordings[0].recordedAt == Date(timeIntervalSince1970: 200))
+        #expect(recordings[2].recordedAt == nil)
+        let recordedIndex = try #require(recordings[0].recordedMediaIndex)
+        #expect(recordedIndex == 1)
+        let refreshed = try await library.metadata("mixed")
+        #expect(refreshed.index(ofMediaID: recordings[0].media[recordedIndex].id) == 0)
+        #expect(refreshed.index(ofMediaID: 0) == nil)
+        #expect(refreshed.index(ofMediaID: 999) == nil)
+        let movie = try #require(await transport.requests(to: "/library/sections/1/all").first)
+        let episodes = await transport.requests(to: "/library/sections/2/all")
+        #expect(movie.url.query("type") == "1")
+        #expect(episodes.map { $0.headers[PlexHeader.containerStart] } == ["0", "3"])
+        #expect(episodes.allSatisfy { $0.url.query("type") == "4" })
+        #expect(await transport.requests(to: "/library/sections/3/all").isEmpty)
+    }
+
+    @Test func recordingsStayEmptyWithoutDVRProvenance() async throws {
+        let (library, _) = Self.library { request in
+            if request.url.path == "/library/sections" {
+                return container(["Directory": [["key": "1", "title": "Shows", "type": "show"]]])
+            }
+            return container(["totalSize": 2, "Metadata": [
+                ["ratingKey": "ordinary", "addedAt": 999, "Media": [["id": 1]]],
+                ["ratingKey": "unknown", "Media": []],
+            ]])
+        }
+        #expect(try await library.recordedItems().isEmpty)
+    }
+
+    @Test func recordingsPropagateLibraryFailure() async {
+        let (library, _) = Self.library { request in
+            if request.url.path == "/library/sections" {
+                return container(["Directory": [["key": "1", "title": "Shows", "type": "show"]]])
+            }
+            return PlexHTTPResponse(status: 503, body: Data())
+        }
+        await #expect(throws: PlexError.self) { try await library.recordedItems() }
+    }
+
     @Test func jumpBarLettersStartWhereEarlierLettersEnd() async throws {
         let (library, transport) = Self.library { _ in
             container(["Directory": [

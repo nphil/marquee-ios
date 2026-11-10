@@ -159,6 +159,7 @@ extension XCTestCase {
         XCTAssertTrue(recorded.waitForExistence(timeout: 5), "No Recorded page")
         recorded.tap()
         waitFor("livetv.recorded.2102", in: app)
+        XCTAssertFalse(element("livetv.recorded.2199", in: app).exists, "Ordinary episodes are not recordings")
         try snap("livetv-12-recorded-\(suffix)")
     }
 

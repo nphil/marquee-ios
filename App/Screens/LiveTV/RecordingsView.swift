@@ -444,8 +444,8 @@ private struct RecordedList: View {
                 RecordedSkeleton()
             case .ready(let items) where items.isEmpty:
                 EmptyState(
-                    title: "Nothing recorded yet",
-                    message: "Finished recordings show here and in your library.",
+                    title: "No identifiable recordings",
+                    message: "Only recordings Plex still identifies as DVR appear here. Others may be in your library.",
                     systemImage: "film.stack"
                 )
                 .accessibilityIdentifier("livetv.recorded.empty")
@@ -453,7 +453,9 @@ private struct RecordedList: View {
                 List {
                     ForEach(items) { item in
                         Button {
-                            sessionActions.play(item)
+                            if let index = item.recordedMediaIndex {
+                                sessionActions.play(item, mediaIndex: index)
+                            }
                         } label: {
                             RecordedRow(item: item)
                         }
@@ -543,7 +545,7 @@ private struct RecordedRow: View {
 
     /// "28 min · Recorded 6 Nov".
     private var detail: String? {
-        let recorded = item.addedAt.map { "Recorded \($0.formatted(.dateTime.day().month(.abbreviated)))" }
+        let recorded = item.recordedAt.map { "Recorded \($0.formatted(.dateTime.day().month(.abbreviated)))" }
         let line = [ItemText.runtime(item.duration), recorded].compactMap(\.self).joined(separator: " · ")
         return line.isEmpty ? nil : line
     }
