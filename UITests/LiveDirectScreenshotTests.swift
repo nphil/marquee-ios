@@ -32,16 +32,26 @@ final class LiveDirectScreenshotTests: XCTestCase {
         try snap("livetv-direct-03-paused-rose-pine")
         goLive.tap()
         XCTAssertTrue(goLive.waitForNonExistence(timeout: 5), "LIVE did not go back to live")
-        // LIVE rearms the 3 s fade, which two lookups on the CI runner do not reliably beat (skip back was
-        // found 3.18 s after the tap and gone by 3.24 s). Let the controls fade, bring them back, and act
-        // on them within the fresh window.
+        // LIVE rearms the 3 s fade, so the controls are left to fade and brought back. One snapshot of the
+        // screen then answers for skip back and LIVE together, and skip back is tapped where it stood: each
+        // further lookup takes over a second of the 3 s on the CI runner.
         XCTAssertTrue(pause.waitForNonExistence(timeout: 6), "The live player's controls did not fade")
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
-        let skipBack = element("liveplayer.skipBack", in: app)
-        XCTAssertTrue(skipBack.waitForExistence(timeout: 3), "The live player's controls did not come back")
-        XCTAssertFalse(goLive.exists, "LIVE did not go back to live")
-        skipBack.tap()
+        let controls = try app.snapshot()
+        let skipBack = try XCTUnwrap(frame(of: "liveplayer.skipBack", in: controls), "The live player's controls did not come back")
+        XCTAssertNil(frame(of: "liveplayer.goLive", in: controls), "LIVE did not go back to live")
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: skipBack.midX, dy: skipBack.midY)).tap()
         XCTAssertTrue(goLive.waitForExistence(timeout: 5), "Skip back did not go back in the buffer")
         try snap("livetv-direct-04-behind-rose-pine")
+    }
+
+    /// Where the element with `identifier` stands in a snapshot, if it holds one.
+    @MainActor
+    private func frame(of identifier: String, in snapshot: any XCUIElementSnapshot) -> CGRect? {
+        if snapshot.identifier == identifier { return snapshot.frame }
+        for child in snapshot.children {
+            if let found = frame(of: identifier, in: child) { return found }
+        }
+        return nil
     }
 }
