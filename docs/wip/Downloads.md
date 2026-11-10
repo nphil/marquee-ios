@@ -1,0 +1,4 @@
+Downloads (WIP, branch `downloads`, squash before landing on `batch`).
+Done: research (Stashy download lessons, Plex /downloadQueue API, VideoEngine FileRangeSource), contracts with AppChrome (`DownloadsView()`, `session.downloads.activeCount`, Settings row pushes `DownloadSettingsView()`) and Streaming (small offline seam in PlayerModel, agreed).
+Next: Core `Downloads/` (DownloadQuality, records, range plan, queue API, offline sync rules, store) with Linux tests; then App DownloadCenter/transport/views, PlayerModel seam, FakePlex bytes + fixtures, UI tests, docs.
+Decisions: server conversions use Plex's download queue (PMS 1.41.2+), files fetched with byte ranges; 1 connection on LAN, 4 remote; background URLSession in 64 MB slices, first -3000 disables it for that iOS version; downloads scoped by server and profile; no GitHub CI on this branch (Main runs one combined run).
