@@ -424,7 +424,7 @@ jobs:
             2>&1 | tee xcodebuild-build.log | xcbeautify
 
       # One simulator at a time: two on a runner double every test's time. A failed test runs once more.
-      - name: Route menu and A–Z rail screenshots
+      - name: Player controls, subtitles and A–Z rail screenshots
         env:
           SMALL: ${{ steps.simulators.outputs.small }}
           LARGE: ${{ steps.simulators.outputs.large }}
@@ -445,6 +445,11 @@ jobs:
               -resultBundlePath "build/UITests-$UDID.xcresult" \
               -retry-tests-on-failure -test-iterations 2 \
               -only-testing:MarqueeUITests/PlayerRouteMenuScreenshots \
+              -only-testing:MarqueeUITests/PlayerScreenshotTests/testWrongSubtitlesAndBazarr \
+              -only-testing:MarqueeUITests/PlayerScreenshotTests/testWrongSubtitlesAndBazarrInLightTheme \
+              -only-testing:MarqueeUITests/PlayerAccessibilityScreenshots/testWrongSubtitlesAndBazarr \
+              -only-testing:MarqueeUITests/SubtitleAppearanceScreenshots \
+              -only-testing:MarqueeUITests/AccountAccessibilityScreenshots/testSubtitleAppearance \
               -only-testing:MarqueeUITests/HeaderScreenshotTests/testAlphabetRailRosePine \
               -only-testing:MarqueeUITests/HeaderScreenshotTests/testAlphabetRailDawn \
               2>&1 | tee "xcodebuild-test-$UDID.log" | xcbeautify
