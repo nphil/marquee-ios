@@ -26,7 +26,11 @@ public struct URLSessionTransport: PlexTransport {
         do {
             let (data, response) = try await session.data(for: urlRequest)
             guard let http = response as? HTTPURLResponse else { throw NetworkFailure.other }
-            return PlexHTTPResponse(status: http.statusCode, body: data)
+            var headers: [String: String] = [:]
+            for case let (name as String, value as String) in http.allHeaderFields {
+                headers[name] = value
+            }
+            return PlexHTTPResponse(status: http.statusCode, body: data, headers: headers)
         } catch let error as URLError {
             if error.code == .cancelled { throw CancellationError() }
             throw NetworkFailure(error.code)

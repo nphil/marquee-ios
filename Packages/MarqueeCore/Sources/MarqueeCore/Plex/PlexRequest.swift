@@ -38,10 +38,17 @@ public struct PlexRequest: Sendable, CustomStringConvertible {
 public struct PlexHTTPResponse: Sendable {
     public var status: Int
     public var body: Data
+    public var headers: [String: String]
 
-    public init(status: Int, body: Data) {
+    public init(status: Int, body: Data, headers: [String: String] = [:]) {
         self.status = status
         self.body = body
+        self.headers = headers
+    }
+
+    /// One header's value; header names are case-insensitive.
+    public func header(_ name: String) -> String? {
+        headers.first { $0.key.caseInsensitiveCompare(name) == .orderedSame }?.value
     }
 }
 

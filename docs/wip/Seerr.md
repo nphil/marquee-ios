@@ -1,7 +1,7 @@
 # Seerr — resume here
 
-1. Done: design settled (Core folder `Packages/MarqueeCore/Sources/MarqueeCore/Seerr/`: config, client with cookie jar + CSRF, models, badge/request/play rules; App: Settings › Integrations › Seerr page, Requests page in BrowseStack, `Route.seerrTitle`, FakePlex `seerr*` host fixtures). No code written yet.
-2. Next: write Core (SeerrConfig/SeerrClient/SeerrModels/SeerrRules) + tests in `Tests/MarqueeCoreTests/SeerrTests.swift`, run `swift test --filter Seerr`.
-3. Then App: `App/Settings/SeerrView.swift` (SeerrSettings like BazarrSettings), `App/Screens/RequestsView.swift`, title page, AppSession wiring (`session.seerr`, launch arg `-marquee.uitest.seerr`), FakePlex fixtures, UI test.
-4. Decisions: Plex sign-in posts the profile's Plex token to `/api/v1/auth/plex`, cookie kept in Keychain tied to the profile uuid; badges from media status (+ latest request for declined/failed); Play only when Seerr's ratingKey is on the signed-in server; Watchlist note when Pulsarr toggle on or the user has Seerr auto-request permission.
-5. Rules: never push main; no GitHub CI per branch (Main runs one); land by rebasing on origin/batch and pushing HEAD:batch, then message AppChrome.
+1. Done: Core `Packages/MarqueeCore/Sources/MarqueeCore/Seerr/` (Seerr.swift models/config/errors, SeerrClient.swift with cookie jar + CSRF + re-sign-in, SeerrRules.swift badges/seasons/requestability/Play link/Watchlist note/TMDB images), `PlexHTTPResponse.headers`; 19 tests in `SeerrTests.swift` pass on Linux.
+2. Next: App: `App/Settings/SeerrView.swift` (SeerrSettings like BazarrSettings, Keychain session tied to profile uuid), SessionStorage keys, AppSession wiring (`session.seerr`, launch arg `-marquee.uitest.seerr`), Settings row.
+3. Then: `App/Screens/RequestsView.swift` (Discover shelves, Search, My Requests), `SeerrTitleView` (Request/seasons/4K/Play/Watchlist note), `Route.seerrTitle`, FakePlex `seerr*` fixtures, UI test, docs (DESIGN/ARCHITECTURE/core-api).
+4. Decisions: App URL session for Seerr must not handle cookies (client keeps its own); badges from media status (+ latest request for declined/failed); Play only when Seerr's ratingKey is on the signed-in server (or verified by TMDB id); Watchlist note when Pulsarr toggle on or Seerr auto-request permission.
+5. Rules: never push main; "[skip ci]" in every commit; land by squashing, rebasing on origin/batch, pushing HEAD:batch, then message AppChrome.
