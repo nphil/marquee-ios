@@ -109,7 +109,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 |---|---|---|---|
 | Video & playback page | Done | Direct Play mode, default aspect. | local [code] |
 | Audio & subtitles page | Done | Preferred audio, subtitle mode, remember choices, style. | local [code] |
-| Downloads | Partial | Download a movie or episode in original or converted quality; Settings › Downloads lists downloads, controls transfers and playback, and sets cellular, background and watched-deletion preferences. Device and server behavior remains unverified. | Plex download queue and file byte ranges [code] |
+| Downloads | Partial | Download a movie or episode in original or converted quality from its page or the … menu, or a season or show's episodes at the default quality; Settings › Downloads lists downloads, controls transfers and playback, and sets cellular, background and watched-deletion preferences. Device and server behavior remains unverified. | Plex download queue and file byte ranges [code] |
 | Intro skip (manual/3/5/10/15/30s) | Done | Intro skip delay. | local [code] |
 | Credits countdown | Done | Up Next delay. | local [code] |
 | Auto sign-in | N/A | The iPhone keeps its session in the Keychain and opens straight to the last profile, so there is no sign-in step to skip. | local |

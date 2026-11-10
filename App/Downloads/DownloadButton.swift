@@ -28,24 +28,70 @@ struct DownloadButton: View {
             .accessibilityIdentifier("detail.download")
         } else {
             Menu {
-                ForEach(DownloadQuality.choices, id: \.self) { quality in
-                    Button {
-                        Task { await session.downloads.enqueue(item: item, quality: quality, mediaIndex: mediaIndex, capabilities: await session.player.capabilities.current()) }
-                    } label: {
-                        if quality == session.downloads.settings.quality {
-                            Label(quality.title, systemImage: "checkmark")
-                        } else {
-                            Text(quality.title)
-                        }
-                    }
-                }
+                DownloadQualityChoices(item: item, mediaIndex: mediaIndex)
             } label: {
                 Image(systemName: "arrow.down.circle")
             }
             .buttonStyle(.round)
             .accessibilityLabel("Download")
             .accessibilityIdentifier("detail.download")
-            .downloadErrorAlert()
+        }
+    }
+}
+
+/// The same choices as the round button, in the three-dot menus: Download with its quality choices, or
+/// the state of the download already there.
+struct DownloadMenuItems: View {
+    let item: PlexMetadata
+    let mediaIndex: Int
+    @Environment(AppSession.self) private var session
+
+    var body: some View {
+        if let record = session.downloads.records.first(where: { $0.ratingKey == item.ratingKey }) {
+            if record.phase == .done {
+                Button("Play Download", systemImage: "play.fill") { session.playDownload(record) }
+            } else if record.phase.isActive {
+                Button("Pause Download", systemImage: "pause.fill") { session.downloads.pause(record.id) }
+            } else {
+                Button("Resume Download", systemImage: "arrow.clockwise") { session.downloads.resume(record.id) }
+            }
+            Button("Remove Download", systemImage: "trash", role: .destructive) { session.downloads.remove(record.id) }
+        } else {
+            Menu("Download", systemImage: "arrow.down.circle") {
+                DownloadQualityChoices(item: item, mediaIndex: mediaIndex)
+            }
+        }
+    }
+}
+
+/// "Download Season" or "Download Show": every episode not already downloaded or queued, at the default quality.
+struct DownloadEpisodesItem: View {
+    let item: PlexMetadata
+    @Environment(AppSession.self) private var session
+
+    var body: some View {
+        Button(item.type == .show ? "Download Show" : "Download Season", systemImage: "arrow.down.circle") {
+            Task { await session.downloads.enqueueEpisodes(under: item, capabilities: await session.player.capabilities.current()) }
+        }
+    }
+}
+
+private struct DownloadQualityChoices: View {
+    let item: PlexMetadata
+    let mediaIndex: Int
+    @Environment(AppSession.self) private var session
+
+    var body: some View {
+        ForEach(DownloadQuality.choices, id: \.self) { quality in
+            Button {
+                Task { await session.downloads.enqueue(item: item, quality: quality, mediaIndex: mediaIndex, capabilities: await session.player.capabilities.current()) }
+            } label: {
+                if quality == session.downloads.settings.quality {
+                    Label(quality.title, systemImage: "checkmark")
+                } else {
+                    Text(quality.title)
+                }
+            }
         }
     }
 }

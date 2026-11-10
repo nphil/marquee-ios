@@ -224,6 +224,8 @@ private struct DetailPage: View {
         .deleteConfirmation($deleting) { target in
             if case .title = target { dismiss() }
         }
+        // One alert for the round button and every download item on the page.
+        .downloadErrorAlert()
     }
 
     /// Everything between the actions and the cast: the version, synopsis, tracks and episodes.
@@ -413,6 +415,11 @@ private struct DetailPage: View {
             }
             if tracks != nil {
                 Button("Audio & Subtitles", systemImage: "captions.bubble") { showsTracks = true }
+            }
+            if item.type == .movie || item.type == .episode {
+                DownloadMenuItems(item: item, mediaIndex: version)
+            } else if item.type == .show || item.type == .season {
+                DownloadEpisodesItem(item: item)
             }
             if let url = shareURL {
                 ShareLink(item: url, subject: Text(item.title)) {
@@ -841,6 +848,7 @@ private struct SeasonsSection: View {
                 }
             }
             .accessibilityIdentifier("detail.seasonWatched")
+            DownloadEpisodesItem(item: season)
         } label: {
             Image(systemName: "ellipsis")
                 .font(.body.weight(.semibold))
@@ -1014,6 +1022,7 @@ private struct EpisodeRow: View {
         Button("Play from Beginning", systemImage: "arrow.counterclockwise") {
             session.play(episode, fromStart: true)
         }
+        DownloadMenuItems(item: episode, mediaIndex: 0)
         Button("Details", systemImage: "info.circle") {
             openRoute(.item(ratingKey: episode.ratingKey))
         }

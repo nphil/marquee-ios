@@ -34,6 +34,8 @@ final class DownloadCenter {
     @ObservationIgnored private var worker: Task<Void, Never>?
     @ObservationIgnored private var transferOwner = UUID()
     @ObservationIgnored private var enqueueOwner = UUID()
+    /// Seasons and shows being queued, so a second tap does not walk the same episodes again.
+    @ObservationIgnored private var batches: Set<String> = []
     @ObservationIgnored private var transferRecordID: String?
     @ObservationIgnored private var syncTask: Task<Void, Never>?
     @ObservationIgnored private var foregroundObserver: (any NSObjectProtocol)?
@@ -114,11 +116,42 @@ final class DownloadCenter {
     }
 
     func enqueue(item: PlexMetadata, quality: DownloadQuality, mediaIndex: Int, capabilities: DeviceCapabilities) async {
-        guard let library, let scope, !removing.contains(item.ratingKey), !records.contains(where: { $0.ratingKey == item.ratingKey }) else { return }
+        if let message = await add(item: item, quality: quality, mediaIndex: mediaIndex, capabilities: capabilities) { error = message }
+    }
+
+    /// Queues each episode of a season or show that is not already downloaded or queued, in episode order, at
+    /// the default quality. The queue then runs them one at a time. Failures are reported once, together,
+    /// since a phone that cannot play one Original episode cannot play the next.
+    func enqueueEpisodes(under item: PlexMetadata, capabilities: DeviceCapabilities) async {
+        guard let library, let scope, batches.insert(item.ratingKey).inserted else { return }
+        defer { batches.remove(item.ratingKey) }
+        let owner = enqueueOwner
+        do {
+            let leaves = item.type == .show ? try await library.allLeaves(of: item.ratingKey) : try await library.children(of: item.ratingKey)
+            var messages: [String] = []
+            var failed = 0
+            for episode in leaves where episode.type == .episode {
+                guard self.scope == scope, enqueueOwner == owner else { return }
+                guard !records.contains(where: { $0.ratingKey == episode.ratingKey }) else { continue }
+                guard let message = await add(item: episode, quality: settings.quality, mediaIndex: 0, capabilities: capabilities) else { continue }
+                failed += 1
+                if !messages.contains(message) { messages.append(message) }
+            }
+            guard self.scope == scope, enqueueOwner == owner, !messages.isEmpty else { return }
+            if failed > 1 { messages.append("\(failed) episodes were not added.") }
+            error = messages.joined(separator: "\n")
+        } catch {
+            if self.scope == scope, enqueueOwner == owner { self.error = error.localizedDescription }
+        }
+    }
+
+    /// Queues one title; returns why it was refused, or nil when queued or when the sign-in changed meanwhile.
+    private func add(item: PlexMetadata, quality: DownloadQuality, mediaIndex: Int, capabilities: DeviceCapabilities) async -> String? {
+        guard let library, let scope, !removing.contains(item.ratingKey), !records.contains(where: { $0.ratingKey == item.ratingKey }) else { return nil }
         let owner = enqueueOwner
         do {
             let snapshot = try await library.metadataSnapshot(item.ratingKey)
-            guard self.scope == scope, enqueueOwner == owner, snapshot.item.media.indices.contains(mediaIndex) else { return }
+            guard self.scope == scope, enqueueOwner == owner, snapshot.item.media.indices.contains(mediaIndex) else { return nil }
             let media = snapshot.item.media[mediaIndex]
             guard !media.parts.isEmpty else { throw DownloadFailure.message("No media file is available.") }
             guard quality != .original || media.parts.count == 1 else { throw DownloadFailure.message("Original downloads with multiple parts are not supported. Choose a converted quality.") }
@@ -132,17 +165,17 @@ final class DownloadCenter {
             let poster: Data?
             if let thumb = record.thumb { poster = try? await PlexFetch.data(thumb, library: library, session: metadataSession) }
             else { poster = nil }
-            guard self.scope == scope, enqueueOwner == owner else { return }
+            guard self.scope == scope, enqueueOwner == owner else { return nil }
             var subtitles: [(DownloadRecord.Subtitle, Data)] = []
             for stream in media.parts.flatMap(\.streams) where stream.kind == .subtitle {
                 guard let key = stream.key else { continue }
                 let data = try? await PlexFetch.data(key, library: library, session: metadataSession)
-                guard self.scope == scope, enqueueOwner == owner else { return }
+                guard self.scope == scope, enqueueOwner == owner else { return nil }
                 guard let data else { continue }
                 let ext = (stream.format ?? stream.codec ?? "srt").filter { $0.isLetter || $0.isNumber }
                 subtitles.append((DownloadRecord.Subtitle(streamID: stream.id, fileName: "subtitle-\(stream.id).\(ext)"), data))
             }
-            guard self.scope == scope, enqueueOwner == owner, !removing.contains(item.ratingKey), !records.contains(where: { $0.ratingKey == item.ratingKey }) else { return }
+            guard self.scope == scope, enqueueOwner == owner, !removing.contains(item.ratingKey), !records.contains(where: { $0.ratingKey == item.ratingKey }) else { return nil }
             try store.makeFolder(for: record)
             try snapshot.data.write(to: store.metadataFile(for: record), options: .atomic)
             if let poster { try? poster.write(to: store.posterFile(for: record), options: .atomic) }
@@ -153,8 +186,9 @@ final class DownloadCenter {
             allRecords.append(record)
             persist()
             kick()
+            return nil
         } catch {
-            if self.scope == scope, enqueueOwner == owner { self.error = error.localizedDescription }
+            return self.scope == scope && enqueueOwner == owner ? error.localizedDescription : nil
         }
     }
 
