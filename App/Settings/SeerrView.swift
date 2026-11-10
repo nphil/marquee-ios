@@ -315,7 +315,7 @@ struct SeerrView: View {
         case .alreadyRequested: "Already requested. Everything asked for is requested or available."
         case .notFound: "Seerr no longer has this title."
         case .failed(let message?): "Seerr answered with an error: \(message)"
-        case .failed(nil): "Seerr answered with an error."
+        case .failed: "Seerr answered with an error."
         }
     }
 }
