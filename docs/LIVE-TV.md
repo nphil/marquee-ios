@@ -146,6 +146,7 @@ The engine's `ByteRangeSource`/`HTTPRangeSource` need 206 range responses (E ENG
 9. **Clock.** `LiveClockServo` compares buffered seconds with J: rate 0.995-1.005 for small errors, 0.98-1.02 beyond 0.5 s, with the audio renderer's time-pitch algorithm keeping voices natural. More than 2 s off re-anchors (drop to the newest picture and restart the clock). An underrun sets rate 0, keeps the picture, and resumes at J.
 10. **Channel change.** The new request goes out first (same-client takeover, T stream.rs:409); the old task is cancelled when the new response's headers arrive. Decoders are flushed, not closed; the filter graph stays if the shape matches; renderers flush while keeping the displayed image, so the old channel's last frame stays until the slate replaces it.
 11. **Background.** With PiP: unchanged. Without PiP: audio continues, video packets are dropped, and decoding resumes at the next intra picture on return.
+12. **End of input.** Queued pictures and sound finish before the stream reports ended. Finite input starts or resumes with the data remaining rather than waiting for the jitter target; natural completion is not an underrun. Paused playback waits for resume before ending.
 
 ### 3.3 PiP, AirPlay, Now Playing, audio session
 
