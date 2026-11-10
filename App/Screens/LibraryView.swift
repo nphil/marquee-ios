@@ -24,8 +24,15 @@ struct LibraryView: View {
                     SectionBrowser(section: section, width: width)
                         .id(section.key)
                         .titleMenu(section.title) {
-                            Picker("Library", selection: Binding(get: { section.key }, set: { chosenKey = $0 })) {
-                                ForEach(browsable) { Label($0.title, systemImage: $0.type.libraryImage).tag($0.key) }
+                            Section {
+                                ForEach(browsable) { library in
+                                    MenuChoice(
+                                        title: library.title,
+                                        systemImage: library.type.libraryImage,
+                                        value: library.key,
+                                        selection: Binding(get: { section.key }, set: { chosenKey = $0 })
+                                    )
+                                }
                             }
                             // Search and Requests have their own buttons in the header.
                             let places = [Destination.liveTV, .watchlist, .downloads].filter {
@@ -77,6 +84,22 @@ extension PlexMediaType {
         case .collection: "square.stack"
         case .playlist: "music.note.list"
         case .unknown: "folder"
+        }
+    }
+}
+
+extension SectionQuery.Sort {
+    /// The glyph beside the name in the View menu.
+    var systemImage: String {
+        switch self {
+        case .title: "textformat"
+        case .recentlyAdded: "calendar.badge.plus"
+        case .releaseDate: "calendar"
+        case .rating: "star"
+        case .audienceRating: "person.2"
+        case .recentlyWatched: "clock"
+        case .plays: "play.circle"
+        case .random: "shuffle"
         }
     }
 }
@@ -235,16 +258,17 @@ private struct SectionBrowser: View {
 
     private var viewMenu: some View {
         Menu {
-            Picker("Sort By", selection: sortField) {
-                ForEach(SectionQuery.Sort.allCases, id: \.self) { Text($0.title).tag($0) }
-            }
-            .pickerStyle(.inline)
-            if let orders = sort.orders {
-                Picker("Order", selection: $reversed) {
-                    Text(orders.first).tag(false)
-                    Text(orders.reversed).tag(true)
+            Section {
+                ForEach(SectionQuery.Sort.allCases, id: \.self) { field in
+                    MenuChoice(title: field.title, systemImage: field.systemImage, value: field, selection: sortField)
                 }
-                .pickerStyle(.inline)
+            }
+            if let orders = sort.orders {
+                // Both read downward from the first item: A to Z, newest to oldest, highest to lowest.
+                Section {
+                    MenuChoice(title: orders.first, systemImage: "arrow.down", value: false, selection: $reversed)
+                    MenuChoice(title: orders.reversed, systemImage: "arrow.up", value: true, selection: $reversed)
+                }
             }
             if let genres = genres.value, !genres.isEmpty {
                 Picker("Genre", systemImage: "theatermasks", selection: $genre) {
