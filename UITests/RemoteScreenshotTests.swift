@@ -190,7 +190,11 @@ extension XCTestCase {
         try snap("remote-mini-bar-\(swipe ? "swipe" : "tap")-\(suffix)")
         if swipe { bar.swipeUp() } else { bar.tap() }
         waitFor("remote.close", in: app)
-        element("remote.close", in: app).swipeDown()
+        let grabber = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", "Sheet Grabber")).firstMatch
+        XCTAssertTrue(grabber.waitForExistence(timeout: 5))
+        let start = grabber.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: 300)))
         XCTAssertTrue(element("remote.close", in: app).waitForNonExistence(timeout: 5))
         waitFor("remote.miniBar", in: app)
         bar.tap()

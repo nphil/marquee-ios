@@ -47,8 +47,15 @@ final class DownloadCenter {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appending(path: "Downloads", directoryHint: .isDirectory)
+        let root: URL
+        if FakePlex.isActive {
+            let fixtures = FileManager.default.temporaryDirectory.appending(path: "MarqueeUITestDownloads", directoryHint: .isDirectory)
+            try? FileManager.default.removeItem(at: fixtures)
+            root = fixtures.appending(path: UUID().uuidString, directoryHint: .isDirectory)
+        } else {
+            root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+                .appending(path: "Downloads", directoryHint: .isDirectory)
+        }
         store = DownloadStore(root: root)
         allRecords = store.loadIndex()
         settings = defaults.data(forKey: Self.settingsKey).flatMap { try? JSONDecoder().decode(DownloadSettings.self, from: $0) } ?? DownloadSettings()

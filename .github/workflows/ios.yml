@@ -379,7 +379,8 @@ jobs:
   ui-sizes:
     name: UI tests on the smallest and largest iPhone
     runs-on: xcode-27
-    timeout-minutes: 45
+    # The expanded suite took 20 min on one size after a 13 min build; both sizes share this job.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v5
 
@@ -469,7 +470,7 @@ jobs:
           if-no-files-found: warn
 
       - uses: actions/upload-artifact@v7
-        if: failure()
+        if: failure() || cancelled()
         with:
           name: UITests-xcresult-sizes
           path: build/UITests*.xcresult

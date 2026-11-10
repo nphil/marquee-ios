@@ -14,7 +14,6 @@ struct DownloadsView: View {
             } else {
                 ForEach(session.downloads.records) { record in
                     row(record)
-                        .accessibilityIdentifier("downloads.row.\(record.ratingKey)")
                 }
                 .listRowBackground(theme.sheet)
             }
@@ -39,6 +38,7 @@ struct DownloadsView: View {
                         Text(show).textRole(.caption).foregroundStyle(theme.ink2)
                     }
                     Text(record.title).textRole(.headline).foregroundStyle(theme.ink)
+                        .accessibilityIdentifier("downloads.row.\(record.ratingKey)")
                     Text(status(record)).textRole(.caption).foregroundStyle(theme.ink2)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

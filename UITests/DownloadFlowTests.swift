@@ -28,7 +28,9 @@ final class DownloadFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Downloaded · Original"].waitForExistence(timeout: 10))
         try snap("downloads-\(mode)")
 
-        tap("downloads.play.101", in: app)
+        let play = app.buttons["downloads.play.101"]
+        XCTAssertTrue(play.waitForExistence(timeout: 10), "Saved download has no Play button")
+        play.tap()
         let title = app.descendants(matching: .any)
             .matching(NSPredicate(format: "identifier == 'player.title' AND label CONTAINS 'Big Buck Bunny'")).firstMatch
         if !title.waitForExistence(timeout: 6), !element("player.playPause", in: app).exists {

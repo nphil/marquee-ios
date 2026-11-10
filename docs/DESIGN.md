@@ -277,7 +277,7 @@ Apple's rule: Liquid Glass is the navigation layer, not the content layer; use r
 - **Sheets** hold short self-contained tasks: Settings, profile switcher (over Settings), subtitle style, subtitle timing, version picker, tracks info. Long tasks (subtitle search) are full pages pushed inside the sheet (`L:160`). **Menus** hold short choices: sort, filter, season, tracks, more. **Confirmation dialog** for sign-out and removals. **Alert** only for blocking errors.
 - **Search tab:** the standard variant (a landing page with recents), not the prominent variant that opens the keyboard at once (`W26-292`, `W26-269`).
 - **Rotation and size:** browse screens work in every orientation [INFERENCE: WCAG 1.3.4]; the player follows the phone, and in portrait the picture is letterboxed on black with the same chrome over it. Tabs become a sidebar in iPhone landscape (`sidebarAdaptable`) [INFERENCE: first-beta]. Layout uses size classes, layout margins and safe areas, never device or `UIScreen.main` checks, so resizable windows and the foldable iPhone Duo (on sale 2026-10-23; the inner display can be regular width) work (`W26-269`, Apple developer news 2026-10-05).
-- **Unused:** the tab-bar bottom accessory (`tabViewBottomAccessory`) is kept free for a possible mini-player or a future TV-remote strip [INFERENCE: no design exists for either].
+- **Bottom accessory:** the optional TV-remote mini bar appears only when its plugin is enabled, Mini Bar is selected and home presence is confirmed. Otherwise the accessory container is disabled, leaving no empty glass strip.
 
 ### 7.1 Headers
 

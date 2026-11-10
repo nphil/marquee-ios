@@ -71,6 +71,7 @@ struct EpisodeSheet: View {
         }
         .task { await loadSeasons() }
         .task(id: season) { await loadEpisodes() }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("player.episodeSheet")
     }
 
