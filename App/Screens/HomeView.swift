@@ -17,6 +17,7 @@ struct HomeView: View {
     @State private var rows = Remote<[HomeRow]>()
     @State private var editing = false
     @State private var watchlistTitles = Remote<PlexPage<PlexMetadata>>()
+    @State private var watchlistClient: ObjectIdentifier?
     @Environment(\.plexWatchlist) private var watchlist
 
     var body: some View {
@@ -61,13 +62,13 @@ struct HomeView: View {
         ))) {
             await load()
         }
-        // Each profile has its own watchlist, reached with its own token.
-        .task(id: watchlist.map { ObjectIdentifier($0.http) }) {
-            watchlistTitles = Remote()
+        // Each profile has its own watchlist, reached with its own token; it is asked for only while the shelf shows.
+        .task(id: WatchlistLoad(
+            client: watchlist.map { ObjectIdentifier($0.http) },
+            revision: changes.watchlistRevision,
+            shelf: !tabs.isTab(.watchlist)
+        )) {
             await loadWatchlist()
-        }
-        .onChange(of: changes.watchlistRevision) {
-            Task { await loadWatchlist() }
         }
         .sheet(isPresented: $editing) {
             EditHomeSheet()
@@ -136,8 +137,24 @@ struct HomeView: View {
         await rows.load { try await HomeRows.load(from: library, libraries: libraries, hidden: hidden) }
     }
 
+    private struct WatchlistLoad: Hashable {
+        let client: ObjectIdentifier?
+        let revision: Int
+        let shelf: Bool
+    }
+
+    /// Keeps the page through a refresh for the same profile; another profile, or no shelf, starts empty.
     private func loadWatchlist() async {
-        guard let watchlist else { return }
+        let client = watchlist.map { ObjectIdentifier($0.http) }
+        guard let watchlist, !tabs.isTab(.watchlist) else {
+            watchlistClient = nil
+            watchlistTitles = Remote()
+            return
+        }
+        if watchlistClient != client {
+            watchlistClient = client
+            watchlistTitles = Remote()
+        }
         await watchlistTitles.load { try await watchlist.items(start: 0, size: 20) }
     }
 
