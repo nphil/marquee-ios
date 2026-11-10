@@ -1,3 +1,4 @@
+import Darwin
 import XCTest
 
 /// The player on the fake server's Caminandes episode 2 (intro 0:05–0:35, final credits from 2:10).
@@ -33,6 +34,48 @@ final class PlayerScreenshotTests: XCTestCase {
     @MainActor
     func testNetworkWaitOffersALowerQuality() throws {
         try networkWaitFlow(suffix: "rose-pine")
+    }
+
+    @MainActor
+    func testAutoBuffersInsteadOfDroppingBelowPictureFloor() throws {
+        let app = launchPlayer(at: 61, paused: false, mode: "dark", item: "912", linkTest: true)
+        tap("player.more", in: app)
+        let quality = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Quality'")).firstMatch
+        XCTAssertTrue(quality.waitForExistence(timeout: 5))
+        func shown() -> String { "\(quality.label) \(quality.value as? String ?? "")" }
+        XCTAssertTrue(shown().contains("Auto · Original"), "Auto did not start at Original: \(shown())")
+        dismissMenu(in: app)
+        XCTAssertTrue(element("player.playPause", in: app).waitForNonExistence(timeout: 10), "Controls did not hide")
+
+        notify_post("marquee.uitest.link.poor")
+        let floor = element("player.qualityFloor", in: app)
+        XCTAssertTrue(floor.waitForExistence(timeout: 90), "Poor throughput did not surface the floor warning")
+        XCTAssertTrue(element("player.playPause", in: app).exists, "The warning did not reveal hidden controls")
+        XCTAssertFalse(element("player.lowerQuality", in: app).exists)
+        try snap("player-43-auto-quality-floor")
+        tap("player.more", in: app)
+        let atFloor = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in shown().contains("Auto · 4 Mbps 720p") }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [atFloor], timeout: 30), .completed, "Auto did not reach the 720p floor: \(shown())")
+        dismissMenu(in: app)
+
+        notify_post("marquee.uitest.link.stall")
+        Thread.sleep(forTimeInterval: 8)
+        XCTAssertTrue(floor.exists, "The floor warning disappeared while stalled")
+        XCTAssertFalse(element("player.lowerQuality", in: app).exists)
+        if !element("player.more", in: app).exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
+        tap("player.more", in: app)
+        XCTAssertTrue(shown().contains("Auto · 4 Mbps 720p"), "Auto dropped below the floor while stalled: \(shown())")
+        dismissMenu(in: app)
+
+        notify_post("marquee.uitest.link.healthy")
+        XCTAssertTrue(floor.waitForNonExistence(timeout: 45), "The floor warning did not clear after recovery")
+        if !element("player.more", in: app).exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
+        tap("player.more", in: app)
+        let climbed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            let value = shown()
+            return value.contains("Auto ·") && !value.contains("4 Mbps 720p")
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [climbed], timeout: 60), .completed, "Auto did not climb after recovery: \(shown())")
     }
 
     /// "Watch Intro" stops the countdown; Skip Intro stays as a plain button. The offer drops to the
@@ -479,7 +522,7 @@ private extension XCTestCase {
     func launchPlayer(
         at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, bazarr: Bool = false, speechDock: Bool = false,
         scrub: Double? = nil, cast: Bool = false, stall: Bool = false, quality: Int? = nil, item: String = "212",
-        badgeSeconds: Double? = nil
+        badgeSeconds: Double? = nil, linkTest: Bool = false
     ) -> XCUIApplication {
         XCUIDevice.shared.orientation = .landscapeLeft
         // A failed step ends the test early; the next test still has to start upright.
@@ -501,6 +544,7 @@ private extension XCTestCase {
         if stall { arguments += ["-marquee.uitest.stall", "YES"] }
         if let quality { arguments += ["-marquee.uitest.quality", String(quality)] }
         if let badgeSeconds { arguments += ["-marquee.uitest.badgeSeconds", String(badgeSeconds)] }
+        if linkTest { arguments += ["-marquee.uitest.linkTest", "YES"] }
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", light: "paper", arguments: arguments, waitingFor: nil)
         // Up Next hides the transport, so whichever control shows first means the player is up.
         // The scrub hold hides the transport, so the preview stands for it.

@@ -1,5 +1,6 @@
 #if DEBUG
 import AVFoundation
+import Darwin
 import UIKit
 
 /// The UI tests' frame source. The simulator decodes no video, so a fixture picture (the path in the
@@ -16,10 +17,24 @@ final class StillFrameBackend: VideoBackend {
     var rate: Float = 1
     private var clock: Task<Void, Never>?
     private let stalls = UserDefaults.standard.bool(forKey: "marquee.uitest.stall")
+    private let linkTest = UserDefaults.standard.bool(forKey: "marquee.uitest.linkTest")
+    private var linkKbps = 40_000
+    private var transferred = 0.0
+    private var measuredAt = ProcessInfo.processInfo.systemUptime
+    private var linkTokens: [Int32] = []
 
     init(root: URL) {
         let frame = UserDefaults.standard.string(forKey: "marquee.uitest.frame") ?? ""
         image = frame.isEmpty ? nil : UIImage(contentsOfFile: root.appending(path: frame).path(percentEncoded: false))
+        if linkTest {
+            for (name, speed) in [("poor", 1_000), ("stall", 0), ("healthy", 40_000)] {
+                var token: Int32 = 0
+                notify_register_dispatch("marquee.uitest.link.\(name)", &token, .main) { [weak self] _ in
+                    Task { @MainActor [weak self] in self?.changeLink(speed) }
+                }
+                linkTokens.append(token)
+            }
+        }
     }
 
     func load(_ item: AVPlayerItem?) {
@@ -36,7 +51,7 @@ final class StillFrameBackend: VideoBackend {
 
     func play() {
         guard clock == nil else { return }
-        if stalls {
+        if stalls || (linkTest && linkKbps == 0) {
             onEvent?(.state(isPlaying: true, isBuffering: true))
             return
         }
@@ -67,8 +82,14 @@ final class StillFrameBackend: VideoBackend {
         return true
     }
 
-    var transfer: (bytes: Int64, seconds: TimeInterval)? { nil }
-    var bufferedAhead: TimeInterval? { nil }
+    var transfer: (bytes: Int64, seconds: TimeInterval)? {
+        guard linkTest else { return nil }
+        let now = ProcessInfo.processInfo.systemUptime
+        transferred += (now - measuredAt) * Double(linkKbps) * 125
+        measuredAt = now
+        return (Int64(transferred), now)
+    }
+    var bufferedAhead: TimeInterval? { linkTest ? (linkKbps >= 40_000 ? 30 : 5) : nil }
 
     // One stream only: Auto's moves restart at the playhead.
     func openStandby(_ item: AVPlayerItem) async -> Bool { false }
@@ -79,7 +100,21 @@ final class StillFrameBackend: VideoBackend {
 
     func tearDown() {
         stopClock()
+        linkTokens.forEach { notify_cancel($0) }
+        linkTokens.removeAll()
         onEvent = nil
+    }
+
+    private func changeLink(_ speed: Int) {
+        _ = transfer
+        let wasStalled = linkKbps == 0
+        linkKbps = speed
+        if speed == 0 {
+            stopClock()
+            onEvent?(.state(isPlaying: true, isBuffering: true))
+        } else if wasStalled {
+            play()
+        }
     }
 
     private func stopClock() {
