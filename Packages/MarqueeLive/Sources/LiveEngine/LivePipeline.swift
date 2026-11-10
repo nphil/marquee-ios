@@ -175,8 +175,10 @@ public final class LivePipeline: @unchecked Sendable {
             let result = demuxer.read(into: packet.pointer)
             if result == FF.eagain { continue }
             guard result >= 0 else {
-                // The tuner closed the stream and everything it sent has played. FF.exit is a stop.
-                if result == FF.eof { onEvent(feed.ending ?? .ended) }
+                if result == FF.eof {
+                    core.finishInput()
+                    signal()
+                }
                 return
             }
             if demuxer.programShape != shape {
@@ -216,6 +218,10 @@ public final class LivePipeline: @unchecked Sendable {
                 return
             }
             wait = core.step(now: now)
+            if core.inputDrained {
+                onEvent(feed.ending ?? .ended)
+                return
+            }
         }
     }
 
