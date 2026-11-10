@@ -405,8 +405,9 @@ jobs:
   ui-sizes:
     name: UI tests on the smallest and largest iPhone
     runs-on: xcode-27
-    # The expanded suite took 20 min on one size after a 13 min build; both sizes share this job.
-    timeout-minutes: 75
+    # Measured 2026-11-10 with every test passing: about 33 min per size (the three subtitle flows take 5-7 min
+    # each) after a 10 min build; 75 min cut the second size two tests short.
+    timeout-minutes: 100
     steps:
       - uses: actions/checkout@v5
 
