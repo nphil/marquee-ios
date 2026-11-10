@@ -1,8 +1,7 @@
 import MarqueeCore
 import SwiftUI
 
-/// What "Wrong Subtitles?" and "Search Subtitles" open (DESIGN §8.6). A search is a page pushed inside the
-/// sheet, as long tasks are (DESIGN §7).
+/// Search and current-subtitle management share the item-scoped state.
 struct SubtitleFixSheet: View {
     let model: PlayerModel
     let fix: SubtitleFix
@@ -13,15 +12,16 @@ struct SubtitleFixSheet: View {
         NavigationStack(path: $path) {
             Group {
                 switch start {
-                case .wrong: WrongSubtitlesView(model: model, fix: fix) { path = [.bazarr] }
-                case .plex: PlexSearchView(model: model, fix: fix)
-                case .bazarr: BazarrSearchView(model: model, fix: fix)
+                case .subtitles: SubtitlesView(model: model, fix: fix)
+                case .wrong: WrongSubtitlesView(model: model, fix: fix)
+                case .search: SubtitleSearchView(model: model, fix: fix)
                 }
             }
             .navigationDestination(for: SubtitleFixPage.self) { page in
                 switch page {
-                case .plex: PlexSearchView(model: model, fix: fix)
-                case .bazarr: BazarrSearchView(model: model, fix: fix)
+                case .wrong: WrongSubtitlesView(model: model, fix: fix)
+                case .appearance: SubtitleStyleView(imageSubtitles: model.subtitleIsImage)
+                case .search: SubtitleSearchView(model: model, fix: fix)
                 }
             }
         }
@@ -29,15 +29,79 @@ struct SubtitleFixSheet: View {
 }
 
 enum SubtitleFixPage: Hashable {
-    case plex
-    case bazarr
+    case wrong
+    case appearance
+    case search
+}
+struct SubtitlesView: View {
+    @Bindable var model: PlayerModel
+    let fix: SubtitleFix
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        List {
+            Section("Subtitles") {
+                choice("Off", .off)
+                if let tracks = model.tracks {
+                    if tracks.visibleSubtitles.contains(where: { $0.kind == .onScreenText }) {
+                        choice("On-Screen Text Only", .onScreenTextOnly)
+                    }
+                    ForEach(tracks.visibleSubtitles) { track in
+                        choice(track.label, .track(track.id), detail: (track.badges.map(\.rawValue) + [track.imageFormat].compactMap { $0 }).joined(separator: " · "))
+                    }
+                }
+            }.listRowBackground(theme.sheet)
+            Section {
+                if model.canTimeSubtitles || model.subtitleDrawnByServer != nil {
+                    Button {
+                        model.subtitleSheet = nil
+                        model.openTiming()
+                    } label: {
+                        LabeledContent("Timing", value: model.timingText)
+                    }
+                    .disabled(model.subtitleDrawnByServer != nil)
+                    .accessibilityIdentifier("player.tracks.timing")
+                }
+                NavigationLink("Search Subtitles", value: SubtitleFixPage.search)
+                    .accessibilityIdentifier("player.tracks.search")
+                NavigationLink("Appearance", value: SubtitleFixPage.appearance)
+                    .disabled(model.subtitleDrawnByServer != nil)
+                    .accessibilityIdentifier("player.tracks.style")
+                if model.subtitle?.track != nil {
+                    NavigationLink("Manage Current Subtitle", value: SubtitleFixPage.wrong)
+                        .accessibilityIdentifier("player.tracks.wrong")
+                }
+                if let reason = model.subtitleDrawnByServer { Text(reason).foregroundStyle(theme.ink2) }
+                if let problem = model.subtitleProblem { Text(problem).foregroundStyle(theme.ink2) }
+            }.listRowBackground(theme.sheet)
+        }
+        .themedList(theme)
+        .navigationTitle("Subtitles")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar { SubtitleFixDone(model: model) }
+        .accessibilityIdentifier("player.subtitles")
+    }
+
+    private func choice(_ title: String, _ value: SubtitleChoice, detail: String = "") -> some View {
+        Button { model.subtitlePick = value } label: {
+            HStack {
+                VStack(alignment: .leading) {
+                    Text(title).foregroundStyle(theme.ink)
+                    if !detail.isEmpty { Text(detail).foregroundStyle(theme.ink2).font(.caption) }
+                }
+                Spacer()
+                if model.subtitlePick == value { Image(systemName: "checkmark").foregroundStyle(theme.ink) }
+            }
+            .contentShape(Rectangle())
+        }
+        .accessibilityAddTraits(model.subtitlePick == value ? .isSelected : [])
+    }
 }
 
 /// The subtitle on screen, removing its file from Plex, and a search for another.
 struct WrongSubtitlesView: View {
     let model: PlayerModel
     let fix: SubtitleFix
-    let findAnother: @MainActor () -> Void
     @Environment(\.theme) private var theme
     @State private var confirmsRemove = false
 
@@ -73,16 +137,8 @@ struct WrongSubtitlesView: View {
             .listRowBackground(theme.sheet)
 
             Section {
-                NavigationLink("Find Another with Plex", value: SubtitleFixPage.plex)
-                    .accessibilityIdentifier("subtitleFix.searchPlex")
-                NavigationLink("Find Another with Bazarr", value: SubtitleFixPage.bazarr)
-                    .disabled(model.bazarr == nil)
+                NavigationLink("Search Subtitles", value: SubtitleFixPage.search)
                     .accessibilityIdentifier("subtitleFix.findAnother")
-            } footer: {
-                if model.bazarr == nil {
-                    Text("Set up Bazarr in Settings, Integrations.")
-                        .foregroundStyle(theme.ink2)
-                }
             }
             .listRowBackground(theme.sheet)
         }
@@ -97,9 +153,6 @@ struct WrongSubtitlesView: View {
             .accessibilityIdentifier("subtitleFix.confirmRemove")
         } message: {
             Text("The file next to “\(model.item.title)” is deleted from Plex. The video file is not changed.")
-        }
-        .onChange(of: fix.removal) { _, removal in
-            if removal == .removed, model.bazarr != nil { findAnother() }
         }
         .accessibilityIdentifier("subtitleFix.wrong")
     }
@@ -129,8 +182,6 @@ struct WrongSubtitlesView: View {
                     Text("Part of the video file, so it can't be removed.")
                 } else if track == nil {
                     Text("No subtitle is showing.")
-                } else if model.bazarr != nil {
-                    Text("Deletes the file from Plex, then looks for another with Bazarr. It can't be undone.")
                 } else {
                     Text("Deletes the file from Plex. It can't be undone.")
                 }
@@ -140,12 +191,13 @@ struct WrongSubtitlesView: View {
     }
 }
 
-/// Plex's own subtitle agents (OpenSubtitles and the like) for the playing item, one language per search,
-/// best match first. A tap adds one to Plex; once Plex lists it, it shows.
-struct PlexSearchView: View {
+struct SubtitleSearchView: View {
     let model: PlayerModel
     let fix: SubtitleFix
     @Environment(\.theme) private var theme
+
+    private var bazarrRows: BazarrSearchRows { .init(model: model, fix: fix, theme: theme) }
+    private var plexRows: PlexSearchRows { .init(model: model, fix: fix, theme: theme) }
 
     var body: some View {
         List {
@@ -154,75 +206,102 @@ struct PlexSearchView: View {
                     LanguagePickerView(title: "Language", noneTitle: nil, selection: language)
                 } label: {
                     LabeledContent("Language") {
-                        Text(fix.plexLanguage.name ?? "")
-                            .foregroundStyle(theme.ink2)
+                        Text(fix.language.name ?? "Unknown").foregroundStyle(theme.ink2)
                     }
                 }
-                .disabled(fix.isDownloading)
-                .accessibilityIdentifier("plex.language")
-            }
-            .listRowBackground(theme.sheet)
+                .disabled(fix.plexAddUnresolved)
+                .accessibilityIdentifier("subtitleSearch.language")
+            }.listRowBackground(theme.sheet)
 
-            results
-                .listRowBackground(theme.sheet)
+            if !fix.requestedBazarr.isEmpty || !fix.requestedPlex.isEmpty {
+                Section("Subtitle requests") {
+                    ForEach(fix.requestedBazarr) { bazarrRows.row($0) }
+                    ForEach(fix.requestedPlex) { plexRows.row($0) }
+                }.listRowBackground(theme.sheet)
+            }
+            if fix.plexAddUnresolved {
+                Section {
+                    Text("Finish checking the requested subtitle in Plex before changing language or searching Plex again.")
+                        .foregroundStyle(theme.ink2)
+                }.listRowBackground(theme.sheet)
+            } else if fix.plexSearch == nil && fix.results.isEmpty && (fix.search != nil || model.bazarr == nil) {
+                Section {
+                    Button("Search Plex") { fix.searchPlex(in: fix.language) }
+                }.listRowBackground(theme.sheet)
+            }
+
+            if model.bazarr != nil {
+                bazarrResults.listRowBackground(theme.sheet)
+            }
+            if fix.plexSearch != nil {
+                plexResults.listRowBackground(theme.sheet)
+            }
         }
         .themedList(theme)
-        .navigationTitle("Plex")
+        .navigationTitle("Search Subtitles")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { SubtitleFixDone(model: model) }
-        .onAppear { fix.searchPlexIfNeeded() }
-        .accessibilityIdentifier("subtitleFix.plex")
+        .onAppear { fix.searchIfNeeded() }
+        .accessibilityIdentifier("subtitleFix.search")
     }
 
     private var language: Binding<TrackLanguage?> {
-        Binding { fix.plexLanguage } set: { if let language = $0 { fix.searchPlex(in: language) } }
+        Binding { fix.language } set: { if let selected = $0 { fix.selectLanguage(selected) } }
     }
 
-    @ViewBuilder
-    private var results: some View {
-        switch fix.plexSearch {
+    @ViewBuilder private var bazarrResults: some View {
+        switch fix.search {
         case nil, .searching?:
-            Section {
-                HStack(spacing: Space.s2) {
-                    ProgressView()
-                    Text("Searching Plex…")
-                        .foregroundStyle(theme.ink2)
-                }
-                .accessibilityElement(children: .combine)
-            } footer: {
-                Text("Plex asks its subtitle agents, such as OpenSubtitles.")
-                    .foregroundStyle(theme.ink2)
+            Section { ProgressView("Searching subtitles…") }
+        case .failed?:
+            Section("Bazarr") {
+                ProblemLine(text: fix.plexAddUnresolved ? "Bazarr couldn't search." : "Bazarr couldn't search. Trying Plex instead.")
+                Button("Retry Bazarr") { fix.searchAgain() }
+                    .accessibilityIdentifier("bazarr.retry")
             }
-        case .failed(let unreachable)?:
-            Section {
-                ProblemLine(text: unreachable ? "Couldn't reach the server." : "The server couldn't search for subtitles.")
-                Button("Try Again") { fix.searchPlex(in: fix.plexLanguage) }
-                    .accessibilityIdentifier("plex.retry")
-            }
-        case .found(let candidates)?:
-            Section {
-                if candidates.isEmpty {
-                    Text("Plex found nothing in \(fix.plexLanguage.name ?? "this language").")
-                        .foregroundStyle(theme.ink2)
+        case .found?:
+            Section("Bazarr") {
+                if fix.results.isEmpty {
+                    Text(fix.plexAddUnresolved ? "No results in this language." : "No results in this language. Searching Plex instead.").foregroundStyle(theme.ink2)
                 }
-                ForEach(candidates) { candidate in
-                    row(candidate)
-                }
-            } header: {
-                Text(candidates.count == 1 ? "1 Result" : "\(candidates.count) Results")
-            } footer: {
-                if !candidates.isEmpty {
-                    Text("Best match first. Plex adds the file to this video, then it shows here.")
-                        .foregroundStyle(theme.ink2)
+                ForEach(fix.results.filter { fix.downloads[$0.id] == nil }) { bazarrRows.row($0) }
+                if !fix.results.isEmpty && fix.plexSearch == nil {
+                    Button("Search more") { fix.searchPlex(in: fix.language) }
+                        .accessibilityIdentifier("subtitleSearch.more")
                 }
             }
         }
     }
 
-    @ViewBuilder
-    private func row(_ candidate: PlexSubtitleCandidate) -> some View {
+    @ViewBuilder private var plexResults: some View {
+        switch fix.plexSearch {
+        case nil: EmptyView()
+        case .searching?:
+            Section("Plex") { ProgressView("Searching Plex…") }
+        case .failed(let unreachable)?:
+            Section("Plex") {
+                ProblemLine(text: unreachable ? "Couldn't reach Plex." : "Plex couldn't search for subtitles.")
+                Button("Retry Plex") { fix.searchPlex(in: fix.language) }
+                    .accessibilityIdentifier("plex.retry")
+            }
+        case .found(let candidates)?:
+            Section("Plex") {
+                if candidates.isEmpty { Text("No results in this language.").foregroundStyle(theme.ink2) }
+                ForEach(candidates.filter { fix.plexAttempt(for: $0) == nil }) { plexRows.row($0) }
+            }
+        }
+    }
+}
+
+/// Provider result rows used by the shared search page.
+struct PlexSearchRows {
+    let model: PlayerModel
+    let fix: SubtitleFix
+    let theme: Theme
+
+    @ViewBuilder func row(_ candidate: PlexSubtitleCandidate) -> some View {
         let listed = model.tracks?.listed(candidate).map { SubtitleFix.Download.listed(track: $0.id) }
-        if let download = fix.plexDownloads[candidate.id] ?? listed {
+        if let download = fix.plexAttempt(for: candidate) ?? listed {
             VStack(alignment: .leading, spacing: Space.s2) {
                 label(candidate)
                 DownloadStatus(model: model, download: download, source: "plex") { fix.checkPlexAgain(candidate) }
@@ -253,75 +332,12 @@ struct PlexSearchView: View {
     }
 }
 
-/// Bazarr's search for the playing item: the results in one language, best match first. A tap downloads
-/// one; once Plex lists the file, it shows.
-struct BazarrSearchView: View {
+struct BazarrSearchRows {
     let model: PlayerModel
-    @Bindable var fix: SubtitleFix
-    @Environment(\.theme) private var theme
+    let fix: SubtitleFix
+    let theme: Theme
 
-    var body: some View {
-        content
-            .navigationTitle("Bazarr")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { SubtitleFixDone(model: model) }
-            .onAppear { fix.searchIfNeeded() }
-            .accessibilityIdentifier("subtitleFix.search")
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        switch fix.search {
-        case nil, .searching?:
-            EmptyState(
-                title: "Searching Bazarr…",
-                message: "Bazarr asks each of its subtitle providers. This can take half a minute.",
-                systemImage: nil
-            )
-        case .failed(let error)?:
-            failure(error)
-        case .found?:
-            results
-        }
-    }
-
-    private var results: some View {
-        let shown = fix.results
-        let languageName = fix.language.name ?? "this language"
-        return List {
-            Section {
-                Picker("Language", selection: $fix.language) {
-                    ForEach(fix.languages, id: \.self) { language in
-                        Text(language.name ?? language.code ?? "Unknown").tag(language)
-                    }
-                }
-                .accessibilityIdentifier("bazarr.language")
-            }
-            .listRowBackground(theme.sheet)
-
-            Section {
-                if shown.isEmpty {
-                    Text("Bazarr found nothing in \(languageName).")
-                        .foregroundStyle(theme.ink2)
-                }
-                ForEach(shown) { result in
-                    row(result)
-                }
-            } header: {
-                Text(shown.count == 1 ? "1 Result" : "\(shown.count) Results")
-            } footer: {
-                if !shown.isEmpty {
-                    Text("Best match first. Bazarr saves the file next to the video, then it shows here.")
-                        .foregroundStyle(theme.ink2)
-                }
-            }
-            .listRowBackground(theme.sheet)
-        }
-        .themedList(theme)
-    }
-
-    @ViewBuilder
-    private func row(_ result: BazarrSubtitle) -> some View {
+    @ViewBuilder func row(_ result: BazarrSubtitle) -> some View {
         if let download = fix.downloads[result.id] {
             VStack(alignment: .leading, spacing: Space.s2) {
                 label(result)
@@ -366,41 +382,6 @@ struct BazarrSearchView: View {
         .accessibilityElement(children: .combine)
     }
 
-    private func failure(_ error: BazarrError) -> some View {
-        let retry = EmptyState.Action(title: "Try Again", systemImage: "arrow.clockwise") { fix.searchAgain() }
-        return switch error {
-        case .unreachable, .timedOut:
-            EmptyState(
-                title: "Can't Reach Bazarr",
-                message: "No answer from its address. Check that this iPhone is on the same network.",
-                systemImage: "wifi.exclamationmark", action: retry
-            )
-        case .badKey:
-            EmptyState(
-                title: "Bazarr Refused the Key",
-                message: "Check the API key in Settings, Integrations, Bazarr.",
-                systemImage: "exclamationmark.triangle"
-            )
-        case .notBazarr:
-            EmptyState(
-                title: "Not Bazarr",
-                message: "That address does not answer like Bazarr. Check it in Settings, Integrations, Bazarr.",
-                systemImage: "exclamationmark.triangle"
-            )
-        case .notFound:
-            EmptyState(
-                title: "Not in Bazarr",
-                message: "Bazarr doesn't have this title. It lists what Sonarr and Radarr manage.",
-                systemImage: "magnifyingglass", action: retry
-            )
-        case .searchFailed, .badCandidate, .downloadFailed:
-            EmptyState(
-                title: "Search Failed",
-                message: "Bazarr couldn't search. Check its providers.",
-                systemImage: "exclamationmark.triangle", action: retry
-            )
-        }
-    }
 }
 
 /// Where one download stands, with Check Plex Again while Plex may hold the file already. `source`

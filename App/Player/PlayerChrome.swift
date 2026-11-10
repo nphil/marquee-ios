@@ -711,11 +711,10 @@ struct LoadingArc: View {
 
 // MARK: - Menus
 
-/// Audio and subtitles in one native menu, as Apple's own player has them (DESIGN §8.6, Tracks menu).
+/// Audio choices stay in the native menu; subtitles open their own sheet.
 struct TracksMenu: View {
     @Bindable var model: PlayerModel
     @Environment(\.theme) private var theme
-    @Environment(AppSession.self) private var session
 
     var body: some View {
         Menu {
@@ -747,140 +746,12 @@ struct TracksMenu: View {
                 }
             }
         }
-        let languages = SubtitleLanguages(tracks.visibleSubtitles, yours: model.subtitleLanguages)
-        // A language with one track goes without a header: its row already starts with the language.
-        Section("Subtitles") {
-            choice("Off", value: SubtitleChoice.off, selection: $model.subtitlePick)
-            if tracks.visibleSubtitles.contains(where: { $0.kind == .onScreenText }) {
-                choice("On-Screen Text Only", value: SubtitleChoice.onScreenTextOnly, selection: $model.subtitlePick)
-            }
-            ForEach(languages.yours.filter { $0.tracks.count == 1 }) { group in
-                subtitleRows(group.tracks)
-            }
+        Section {
+            Button("Subtitles…") { model.openSubtitleFix(.subtitles) }
+                .accessibilityIdentifier("player.tracks.subtitles")
         }
-        // The one section every tracks menu has reports the menu opening and closing.
         .onAppear { model.menuOpened() }
         .onDisappear { model.menuClosed() }
-        ForEach(languages.yours.filter { $0.tracks.count > 1 }) { group in
-            Section(group.name) { subtitleRows(group.tracks) }
-        }
-        if !languages.other.isEmpty {
-            Section { otherLanguages(languages.other) }
-        }
-        subtitleTools
-        subtitleFixes
-    }
-
-    /// One row per language, A to Z: a language with one track is that track, one with more opens its own
-    /// list. A row that holds the subtitle on screen names it in place of its count.
-    private func otherLanguages(_ groups: [SubtitleLanguages.Group]) -> some View {
-        let picked = groups.lazy.flatMap(\.tracks).first { SubtitleChoice.track($0.id) == model.subtitlePick }
-        return Menu {
-            ForEach(groups) { group in
-                if group.tracks.count == 1 {
-                    subtitleRows(group.tracks)
-                } else {
-                    Menu {
-                        subtitleRows(group.tracks)
-                    } label: {
-                        Text(group.name)
-                        if let picked, group.tracks.contains(picked) {
-                            Text(variant(picked))
-                        } else {
-                            Text("\(group.tracks.count) tracks")
-                        }
-                    }
-                }
-            }
-        } label: {
-            Text("Other Languages")
-            Text(picked?.languageName ?? "\(groups.count) languages")
-        }
-        .accessibilityIdentifier("player.tracks.otherLanguages")
-    }
-
-    /// Timing and Style; both stay but dim, with the reason, while the server draws the subtitle into the
-    /// picture. Timing shows only while a subtitle is on.
-    @ViewBuilder
-    private var subtitleTools: some View {
-        let drawnByServer = model.subtitleDrawnByServer
-        let look = session.settings.subtitleStyle
-        Section {
-            if model.canTimeSubtitles || drawnByServer != nil {
-                Button {
-                    model.openTiming()
-                } label: {
-                    Text("Subtitle Timing")
-                    Text(model.timingText)
-                }
-                .disabled(drawnByServer != nil)
-                .accessibilityIdentifier("player.tracks.timing")
-            }
-            Button {
-                model.showsStyle = true
-            } label: {
-                Text("Subtitle Style")
-                Text(look.isCustom ? "Custom" : look.preset.title)
-            }
-            .disabled(drawnByServer != nil)
-            .accessibilityIdentifier("player.tracks.style")
-            if model.subtitleIsImage && drawnByServer == nil {
-                Text("Image subtitles keep their own size and position.")
-            }
-            if let drawnByServer {
-                Text(drawnByServer)
-            }
-            if let problem = model.subtitleProblem {
-                Text(problem)
-            }
-        }
-    }
-
-    /// Searches for another subtitle, with Plex's own agents and with Bazarr once it is set up, and the
-    /// way out of a subtitle that doesn't match the video.
-    private var subtitleFixes: some View {
-        Section {
-            Button {
-                model.openSubtitleFix(.plex)
-            } label: {
-                Text("Search Subtitles")
-                Text("Plex")
-            }
-            .accessibilityIdentifier("player.tracks.searchPlex")
-            if model.bazarr != nil {
-                Button {
-                    model.openSubtitleFix(.bazarr)
-                } label: {
-                    Text("Search Subtitles")
-                    Text("Bazarr")
-                }
-                .accessibilityIdentifier("player.tracks.search")
-            }
-            if model.subtitle?.track != nil {
-                Button("Wrong Subtitles?") { model.openSubtitleFix(.wrong) }
-                    .accessibilityIdentifier("player.tracks.wrong")
-            }
-        }
-    }
-
-    private func subtitleRows(_ tracks: [SubtitleTrack]) -> some View {
-        ForEach(tracks) { track in
-            choice(
-                track.label,
-                detail: detail(track.badges, imageFormat: track.imageFormat),
-                value: SubtitleChoice.track(track.id),
-                selection: $model.subtitlePick
-            )
-        }
-    }
-
-    /// What tells a track apart within its language: "on-screen text", "Captions", "Track 2". A plain
-    /// track goes by its own name.
-    private func variant(_ track: SubtitleTrack) -> String {
-        var rest = track.label.hasPrefix(track.languageName) ? String(track.label.dropFirst(track.languageName.count)) : ""
-        rest = rest.trimmingCharacters(in: CharacterSet(charactersIn: " ()–"))
-        let words = [rest].filter { !$0.isEmpty } + track.badges.map(\.rawValue) + [track.imageFormat].compactMap { $0 }
-        return words.isEmpty ? track.label : words.joined(separator: " · ")
     }
 
     /// A menu row with a checkmark while `selection` holds `value`; choosing it again keeps it.
