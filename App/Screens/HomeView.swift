@@ -40,7 +40,7 @@ struct HomeView: View {
         .navigationTitle("Home")
         .toolbarTitleDisplayMode(.inlineLarge)
         .toolbar {
-            if session.remote.isEnabled {
+            if session.remote.isEnabled && session.remote.access == .homeButton && session.place == .home {
                 ToolbarItem(placement: .topBarTrailing) { TVRemoteButton() }
                     .sharedBackgroundVisibility(.hidden)
                 ToolbarSpacer(.fixed, placement: .topBarTrailing)

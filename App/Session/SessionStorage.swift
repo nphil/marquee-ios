@@ -26,6 +26,7 @@ final class SessionStorage {
         static let bazarrKey = "marquee.bazarr.key"
         static let castEnabled = "marquee.cast.enabled"
         static let remoteEnabled = "marquee.remote.enabled"
+        static let remoteAccess = "marquee.remote.access"
         static let tracksPrefix = "marquee."
     }
 
@@ -118,6 +119,11 @@ final class SessionStorage {
     var remoteEnabled: Bool {
         get { defaults.bool(forKey: Key.remoteEnabled) }
         set { defaults.set(newValue, forKey: Key.remoteEnabled) }
+    }
+
+    var remoteAccess: RemoteAccess {
+        get { defaults.string(forKey: Key.remoteAccess).flatMap(RemoteAccess.init(rawValue:)) ?? .miniBar }
+        set { defaults.set(newValue.rawValue, forKey: Key.remoteAccess) }
     }
 
     /// Sign-out: the token and servers leave the Keychain; settings and themes stay.

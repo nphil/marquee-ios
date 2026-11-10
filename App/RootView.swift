@@ -35,9 +35,15 @@ struct RootView: View {
         .fullScreenCover(item: $player.presented, onDismiss: { session.player.dismissed() }) { model in
             PlayerView(model: model, outerTheme: theme, outerScheme: scheme ?? colorScheme)
         }
-        .fullScreenCover(isPresented: $remote.isPresented) {
+        .sheet(isPresented: $remote.isPresented, onDismiss: {
+            if remote.isEnabled && remote.access == .miniBar && session.place == .home {
+                remote.model.activate()
+            }
+        }) {
             TVRemoteScreen()
                 .preferredColorScheme(scheme)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
         // The TV's pairing QR code carries a lumaremote:// link. The remote opens from here, so Settings,
         // a sheet over the same view, closes first.
@@ -46,7 +52,12 @@ struct RootView: View {
             session.showsSettings = false
             session.remote.open(url)
         }
-        .sheet(isPresented: $session.showsSettings) {
+        .sheet(isPresented: $session.showsSettings, onDismiss: {
+            if remote.opensAfterSettings {
+                remote.opensAfterSettings = false
+                remote.isPresented = true
+            }
+        }) {
             NavigationStack {
                 SettingsView()
                     .toolbar {
@@ -112,6 +123,11 @@ private struct MainTabs: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        .tabViewBottomAccessory {
+            if session.remote.isEnabled && session.remote.access == .miniBar && session.place == .home {
+                TVRemoteMiniBar()
+            }
+        }
         // Minimise on Scroll shrinks the bar while a page scrolls down; Hide on Scroll is each browse stack's
         // own (BrowseStack). Search keeps the bar still while its results scroll and the keyboard comes and goes.
         .tabBarMinimizeBehavior(store.tabBar == .minimise && selection != .search ? .onScrollDown : .never)
