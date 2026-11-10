@@ -1,0 +1,20 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "221",
+    "key": "/library/metadata/221",
+    "type": "episode",
+    "title": "A New Adventure",
+    "index": 1,
+    "parentIndex": 2,
+    "parentRatingKey": "203",
+    "parentTitle": "Season 2",
+    "grandparentRatingKey": "201",
+    "grandparentTitle": "Caminandes",
+    "duration": 90000
+   }
+  ]
+ }
+}

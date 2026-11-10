@@ -1,6 +1,6 @@
 {
  "MediaContainer": {
-  "size": 1,
+  "size": 2,
   "Metadata": [
    {
     "ratingKey": "202",
@@ -17,6 +17,16 @@
     "leafCount": 3,
     "viewedLeafCount": 1,
     "addedAt": 1759568000
+   },
+   {
+    "ratingKey": "203",
+    "key": "/library/metadata/203/children",
+    "parentRatingKey": "201",
+    "type": "season",
+    "title": "Season 2",
+    "index": 2,
+    "parentTitle": "Caminandes",
+    "leafCount": 1
    }
   ]
  }

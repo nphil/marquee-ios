@@ -17,6 +17,7 @@ struct EpisodeSheet: View {
     @State private var season: String?
     @State private var episodes: [PlexMetadata]?
     @State private var failed = false
+    @State private var episodeRequest = UUID()
     private let prefetch = ArtPrefetcher()
 
     /// How many rows below the one on screen have their stills loaded ahead of the scroll.
@@ -114,7 +115,13 @@ struct EpisodeSheet: View {
     /// Wrapping, so a long season name never clips at large text.
     private var seasonMenu: some View {
         Menu {
-            Picker("Season", selection: $season) {
+            Picker("Season", selection: Binding(get: { season }, set: { selected in
+                guard selected != season else { return }
+                episodeRequest = UUID()
+                episodes = nil
+                failed = false
+                season = selected
+            })) {
                 ForEach(seasons) { entry in
                     Text(entry.title).tag(Optional(entry.ratingKey))
                 }
@@ -264,11 +271,18 @@ struct EpisodeSheet: View {
 
     private func loadEpisodes() async {
         guard let season else { return }
+        let request = UUID()
+        episodeRequest = request
+        episodes = nil
+        failed = false
         do {
-            episodes = try await model.library.children(of: season)
+            let loaded = try await model.library.children(of: season)
+            guard !Task.isCancelled, episodeRequest == request, self.season == season else { return }
+            episodes = loaded
             failed = false
         } catch {
-            if !Task.isCancelled { failed = episodes == nil }
+            guard !Task.isCancelled, episodeRequest == request, self.season == season else { return }
+            failed = true
         }
     }
 }

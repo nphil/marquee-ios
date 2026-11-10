@@ -10,9 +10,15 @@ import SwiftUI
 /// mixes with other apps and Silent mode silences it.
 @MainActor @Observable
 final class ThemeMusicPlayer {
+    struct Identity: Equatable {
+        let library: ObjectIdentifier
+        let key: String
+    }
+
     struct Want {
         let key: String
         let library: PlexLibrary
+        var identity: Identity { Identity(library: library.instance, key: key) }
     }
 
     /// The tune is playing and can be heard; a trailer that starts meanwhile plays silently.
@@ -28,7 +34,7 @@ final class ThemeMusicPlayer {
 
     /// The pages asking for a tune, oldest first; the last one wins.
     @ObservationIgnored private var wants: [(page: UUID, want: Want)] = []
-    @ObservationIgnored private var loadedKey: String?
+    @ObservationIgnored private var loadedIdentity: Identity?
     @ObservationIgnored private var player: AVPlayer?
     @ObservationIgnored private var loading: Task<Void, Never>?
     @ObservationIgnored private var finished = false
@@ -39,12 +45,30 @@ final class ThemeMusicPlayer {
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
     @ObservationIgnored private var endToken: (any NSObjectProtocol)?
     @ObservationIgnored private var hintToken: (any NSObjectProtocol)?
+    @ObservationIgnored private var interruptionToken: (any NSObjectProtocol)?
+    @ObservationIgnored private var interrupted = false
 
     init() {
         hintToken = NotificationCenter.default.addObserver(
             forName: AVAudioSession.silenceSecondaryAudioHintNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshOtherAudio() }
+        }
+        interruptionToken = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification, object: nil, queue: .main
+        ) { [weak self] note in
+            let type = (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt).flatMap { AVAudioSession.InterruptionType(rawValue: $0) }
+            guard let type else { return }
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                if type == .began {
+                    self.interrupted = true
+                    self.player?.pause()
+                    self.ended()
+                } else if type == .ended {
+                    self.interrupted = false
+                }
+            }
         }
     }
 
@@ -61,13 +85,13 @@ final class ThemeMusicPlayer {
     }
 
     func forget() {
-        guard loadedKey != nil else { return }
+        guard loadedIdentity != nil else { return }
         forgets = true
         reconcile()
     }
 
     private var wantsLoaded: Bool {
-        wants.last?.want.key == loadedKey && loadedKey != nil && !finished && !forgets
+        wants.last?.want.identity == loadedIdentity && loadedIdentity != nil && !finished && !forgets
     }
 
     private func reconcile() {
@@ -87,7 +111,7 @@ final class ThemeMusicPlayer {
 
     /// Sound has begun, so the fade in starts now rather than while the tune buffers.
     private func started() {
-        guard wantsLoaded else { return }
+        guard wantsLoaded, player?.timeControlStatus == .playing else { return }
         fade.rising = true
         isHeard = true
         runFade()
@@ -122,12 +146,16 @@ final class ThemeMusicPlayer {
             if forgets { unload() }
             return
         }
-        if want.key != loadedKey || forgets { load(want) }
+        if want.identity != loadedIdentity || forgets { load(want) }
     }
 
     private func load(_ want: Want) {
         unload()
-        loadedKey = want.key
+        loadedIdentity = want.identity
+        if interrupted {
+            finished = true
+            return
+        }
         // The UI tests' fake server has no tunes.
         guard !FakePlex.isActive else { return }
         loading = Task { [weak self] in
@@ -137,8 +165,11 @@ final class ThemeMusicPlayer {
             player.volume = 0
             observations = [
                 player.observe(\.timeControlStatus, options: [.new]) { [weak self] player, _ in
-                    guard player.timeControlStatus == .playing else { return }
-                    Task { @MainActor in self?.started() }
+                    Task { @MainActor in
+                        guard let self, self.player === player else { return }
+                        if player.timeControlStatus == .playing { self.started() }
+                        else { self.isHeard = false }
+                    }
                 },
                 item.observe(\.status, options: [.new]) { [weak self] item, _ in
                     guard item.status == .failed else { return }
@@ -170,7 +201,7 @@ final class ThemeMusicPlayer {
         endToken = nil
         player?.pause()
         player = nil
-        loadedKey = nil
+        loadedIdentity = nil
         finished = false
         forgets = false
         fading?.cancel()
@@ -217,8 +248,8 @@ private struct ThemeMusicPage: ViewModifier {
                 onScreen = false
                 music.update(page: page, want: nil)
             }
-            .onChange(of: wanted, initial: true) { _, wanted in
-                music.update(page: page, want: wanted.flatMap { key in library.map { ThemeMusicPlayer.Want(key: key, library: $0) } })
+            .onChange(of: wanted.flatMap { key in library.map { ThemeMusicPlayer.Identity(library: $0.instance, key: key) } }, initial: true) { _, identity in
+                music.update(page: page, want: identity.flatMap { identity in library.map { ThemeMusicPlayer.Want(key: identity.key, library: $0) } })
             }
             .onChange(of: app.settings.themeMusicVolume, initial: true) { _, level in music.level = level }
             .onChange(of: playerOpen) { _, open in
