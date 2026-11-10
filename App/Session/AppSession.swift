@@ -41,6 +41,7 @@ final class AppSession {
     let player = PlayerCenter()
     /// The theme tune of the show page on screen.
     let themeMusic = ThemeMusicPlayer()
+    let downloads = DownloadCenter()
     /// The profile switcher sheet, opened from the Settings Account row.
     var showsProfileSwitcher = false
     /// The active profile's playback, audio and subtitle settings; every change is saved at once.
@@ -216,6 +217,7 @@ final class AppSession {
         } else {
             library = nil
             server = nil
+            downloads.connect(library: nil, scope: nil)
             state = .choosingServer(found)
         }
     }
@@ -235,6 +237,7 @@ final class AppSession {
         homeUsers = []
         linkCode = nil
         setUser(nil)
+        downloads.connect(library: nil, scope: nil)
         state = .signedOut
     }
 
@@ -263,6 +266,7 @@ final class AppSession {
         signOut()
         storage.eraseAll()
         remote.eraseAll()
+        downloads.eraseAll()
         identity = Self.identity(defaults: storage.defaults)
         URLCache.shared.removeAllCachedResponses()
         HTTPCookieStorage.shared.removeCookies(since: .distantPast)
@@ -482,6 +486,7 @@ final class AppSession {
         let library = PlexLibrary(server: server, identity: identity, transport: transport, rememberedURI: storage.address(for: server.id))
         self.server = server
         self.library = library
+        downloads.connect(library: library, scope: DownloadScope(server: server.id, profile: user?.uuid ?? ""))
         serverInfo = PlexServerInfo()
         state = .ready
         addressTask?.cancel()
@@ -547,6 +552,7 @@ final class AppSession {
         let previous = settingsProfile
         user = profile
         storage.profile = profile
+        if let library, let server { downloads.connect(library: library, scope: DownloadScope(server: server.id, profile: key)) }
         guard key != previous || !settingsLoaded else { return }
         settingsLoaded = true
         settingsProfile = key
@@ -567,6 +573,7 @@ final class AppSession {
     /// A phone that comes home should move back to the LAN address, and one that leaves to a remote one.
     private func networkChanged() {
         networkChanges += 1
+        downloads.syncWatch()
         guard let connection = library?.connection else { return }
         addressTask?.cancel()
         addressTask = Task { await keepAddress(of: connection, reprobe: true) }

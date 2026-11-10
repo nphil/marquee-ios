@@ -40,9 +40,11 @@ final class AudioSession {
     }
 
     /// Lets the music another app paused resume.
-    func deactivate() {
+    func deactivate(completion: @escaping @MainActor @Sendable () -> Void = {}) {
         for token in tokens { NotificationCenter.default.removeObserver(token) }
         tokens = []
-        AVAudioSession.sharedInstance().deactivate(options: .notifyOthersOnDeactivation) { _, _ in }
+        AVAudioSession.sharedInstance().deactivate(options: .notifyOthersOnDeactivation) { _, _ in
+            Task { @MainActor in completion() }
+        }
     }
 }

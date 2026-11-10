@@ -110,6 +110,10 @@ struct SettingsView: View {
                     AudioSubtitleSettingsView()
                 }
                 .accessibilityIdentifier("settings.audio")
+                NavigationLink("Downloads") {
+                    DownloadSettingsView()
+                }
+                .accessibilityIdentifier("settings.downloads")
             } header: {
                 Text("Playback")
             } footer: {

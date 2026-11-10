@@ -28,6 +28,7 @@ final class LivePlaybackModel: Identifiable {
     private(set) var keepsChrome = false
 
     @ObservationIgnored private let audio = AudioSession()
+    @ObservationIgnored private let playbackActive: @MainActor @Sendable (Bool) -> Void
     @ObservationIgnored private var surfCommit: Task<Void, Never>?
     @ObservationIgnored private var tuneTask: Task<Void, Never>?
     @ObservationIgnored private var chromeTimer: Task<Void, Never>?
@@ -40,10 +41,11 @@ final class LivePlaybackModel: Identifiable {
     /// A tune waits this long after the last channel passed, so surfing across five channels tunes once.
     static let surfCommitDelay: Duration = .milliseconds(300)
 
-    init(store: LiveTVStore, channel: LiveChannel, readsTunerDirectly: Bool, skipInterval: Double) {
+    init(store: LiveTVStore, channel: LiveChannel, readsTunerDirectly: Bool, skipInterval: Double, playbackActive: @escaping @MainActor @Sendable (Bool) -> Void) {
         self.store = store
         self.channel = channel
         self.skipInterval = skipInterval
+        self.playbackActive = playbackActive
         source = LiveRouter(live: store.live, plex: PlexLiveSource(live: store.live))
         source.prefersPlex = !readsTunerDirectly
     }
@@ -76,6 +78,7 @@ final class LivePlaybackModel: Identifiable {
     func start() {
         guard !started, !closed else { return }
         started = true
+        playbackActive(true)
         audio.onInterruption = { [weak self] began, shouldResume in
             guard let self else { return }
             if began {
@@ -101,7 +104,11 @@ final class LivePlaybackModel: Identifiable {
         tuneTask?.cancel()
         chromeTimer?.cancel()
         source.stop()
-        audio.deactivate()
+        let wasStarted = started
+        let playbackActive = playbackActive
+        audio.deactivate {
+            if wasStarted { playbackActive(false) }
+        }
     }
 
     // MARK: Channels

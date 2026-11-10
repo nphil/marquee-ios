@@ -71,7 +71,11 @@ enum SidecarLoader {
         let file = FileManager.default.temporaryDirectory.appending(path: "marquee-subtitle-\(UUID().uuidString).\(ext)")
         try data.write(to: file)
         defer { try? FileManager.default.removeItem(at: file) }
-        let contents = try await SubtitleFile.read(fileURL: file)
+        return try await load(track, fileURL: file)
+    }
+
+    static func load(_ track: SubtitleTrack, fileURL: URL) async throws -> SidecarContents {
+        let contents = try await SubtitleFile.read(fileURL: fileURL)
         return SidecarContents(
             cues: contents.cues.map { TextCue(start: $0.start, end: $0.end, text: CueText.attributed($0.text)) },
             bitmaps: contents.bitmaps.isEmpty ? nil : SubtitleOverlayTrack(contents.bitmaps),
