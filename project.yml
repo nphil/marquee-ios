@@ -27,7 +27,7 @@ packages:
     exactVersion: 4.8.6
   LumaRemoteKit:
     url: https://github.com/nphil/LumaRemoteKit
-    revision: af70564b1f4d23e96cbc4232baed1fea0721ffbe
+    revision: ba192bce9c04a32d355fc1689b91d79a2443125b
 
 targets:
   Marquee:
