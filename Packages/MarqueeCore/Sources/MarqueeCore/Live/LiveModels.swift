@@ -320,9 +320,17 @@ public protocol LiveSource: AnyObject {
     var status: String? { get }
     /// The current tune's diagnostics line, once known.
     var diagnosticsLine: String? { get }
+    /// Where playback is against live and how far back it can go; `LiveTimeshift()` while nothing plays.
+    var timeshift: LiveTimeshift { get }
     /// Tunes `channel`, replacing whatever played.
     func play(_ channel: LiveChannel) async
-    /// Ends the stream and frees the tuner; the last picture stays.
+    /// Holds the picture and sound; the stream goes on into the buffer, so the tuner stays in use.
+    func pause()
+    /// Plays on from the picture a pause held.
+    func resume()
+    /// Plays from `behindLive` seconds behind live, within what the buffer holds; 0 is live.
+    func seek(behindLive: Double)
+    /// Ends the stream, frees the tuner and drops the buffer; the last picture stays.
     func stop()
 }
 

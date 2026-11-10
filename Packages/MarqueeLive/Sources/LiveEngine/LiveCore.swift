@@ -152,6 +152,7 @@ final class LiveCore: @unchecked Sendable {
     private var reportedRate = 1.0
     private var tracks: [LiveAudioTrack] = []
     private var videoSuspended = false
+    private var paused = false
 
     // The video side's own.
     private var decoder: VideoDecoder?
@@ -193,6 +194,25 @@ final class LiveCore: @unchecked Sendable {
     /// Background without picture-in-picture: sound goes on, pictures are dropped until the next intra picture after
     /// they are wanted again.
     func setVideoEnabled(_ enabled: Bool) { lock.withLock { videoSuspended = !enabled } }
+
+    /// Paused, the clock stands still and nothing is steered; playing again starts it from the same picture. The
+    /// pipeline holds the bytes back meanwhile, so the buffer is as deep after as before.
+    func setPaused(_ paused: Bool, now: Double) {
+        lock.withLock {
+            guard paused != self.paused else { return }
+            self.paused = paused
+            if paused {
+                output.setRate(0, time: nil)
+                diagnostics.rate = 0
+            } else if phase == .playing {
+                output.setRate(1, time: nil)
+                servo.reset()
+                lastControl = now
+                diagnostics.rate = 1
+                reportedRate = 1
+            }
+        }
+    }
 
     // MARK: - Demux side
 
@@ -419,9 +439,9 @@ final class LiveCore: @unchecked Sendable {
         control(now: now, events: &events)
         events.forEach(onEvent)
         return lock.withLock {
-            // Only a running clock brings pictures due. Standing still, before the start or in a stall, the side waits
-            // for sound, which wakes it as it comes.
-            guard phase == .playing, let next = queue.first?.dts else { return 0.1 }
+            // Only a running clock brings pictures due. Standing still, before the start, in a stall or paused, the side
+            // waits for sound, which wakes it as it comes.
+            guard phase == .playing, !paused, let next = queue.first?.dts else { return 0.1 }
             return min(max(min(next, decodedUpTo ?? next) - Self.lead - clock, 0.002), 0.1)
         }
     }
@@ -589,6 +609,7 @@ final class LiveCore: @unchecked Sendable {
     private func control(now: Double, events: inout [LiveEvent]) {
         let clock = output.time
         lock.withLock {
+            guard !paused else { return }
             // Sound sets the buffer's depth while there is any, since the clock runs on it. It counts as gone once a
             // second of pictures came without it: while nothing comes at all, its buffer is what runs out.
             let soundGone = audioEnd == nil || picturesSinceSound.map { $0.last - $0.first >= 1 } ?? false

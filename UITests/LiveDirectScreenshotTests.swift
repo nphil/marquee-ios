@@ -16,10 +16,24 @@ final class LiveDirectScreenshotTests: XCTestCase {
         tap("livetv.row.ch-0201", in: app)
         waitFor("liveplayer", in: app)
         XCUIDevice.shared.orientation = .landscapeLeft
-        let stop = element("liveplayer.stop", in: app)
-        XCTAssertTrue(stop.waitForExistence(timeout: 10), "Channel 2.1 did not play from the tuner")
+        let pause = element("liveplayer.playPause", in: app)
+        XCTAssertTrue(pause.waitForExistence(timeout: 10), "Channel 2.1 did not play from the tuner")
         try snap("livetv-direct-01-playing-rose-pine")
-        XCTAssertTrue(stop.waitForNonExistence(timeout: 6), "The live player's controls did not fade")
+        XCTAssertTrue(pause.waitForNonExistence(timeout: 6), "The live player's controls did not fade")
         try snap("livetv-direct-02-picture-rose-pine")
+
+        // Paused, the tuner's stream goes on into the buffer: LIVE offers the way back, and skip back goes
+        // back within what the buffer holds.
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
+        XCTAssertTrue(pause.waitForExistence(timeout: 3), "The live player's controls did not come back")
+        pause.tap()
+        let goLive = element("liveplayer.goLive", in: app)
+        XCTAssertTrue(goLive.waitForExistence(timeout: 3), "Pause did not leave live")
+        try snap("livetv-direct-03-paused-rose-pine")
+        goLive.tap()
+        XCTAssertTrue(goLive.waitForNonExistence(timeout: 5), "LIVE did not go back to live")
+        tap("liveplayer.skipBack", in: app)
+        XCTAssertTrue(goLive.waitForExistence(timeout: 5), "Skip back did not go back in the buffer")
+        try snap("livetv-direct-04-behind-rose-pine")
     }
 }

@@ -178,14 +178,14 @@ extension XCTestCase {
         waitFor("liveplayer", in: app)
         // The player turns the screen on its side; turning the phone with it keeps the shots upright.
         XCUIDevice.shared.orientation = .landscapeLeft
-        let stop = element("liveplayer.stop", in: app)
-        // Stop shows once the channel plays and fades with the controls 3 s later. At accessibility sizes
-        // turning the screen took most of that window (Stop on screen 16.8-19.0 s, first check at 19.4 s),
-        // so a missed Stop is raised again with a tap on the picture. A wait's first check lands about 1 s
-        // in, so Stop found on the first wait is not waited for again: by then it had faded.
-        if !stop.waitForExistence(timeout: 10) {
+        let pause = element("liveplayer.playPause", in: app)
+        // Pause shows once the channel plays and fades with the controls 3 s later. At accessibility sizes
+        // turning the screen took most of that window (Pause on screen 16.8-19.0 s, first check at 19.4 s),
+        // so a missed Pause is raised again with a tap on the picture. A wait's first check lands about 1 s
+        // in, so Pause found on the first wait is not waited for again: by then it had faded.
+        if !pause.waitForExistence(timeout: 10) {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
-            XCTAssertTrue(stop.waitForExistence(timeout: 5), "Channel 2.1 did not play")
+            XCTAssertTrue(pause.waitForExistence(timeout: 5), "Channel 2.1 did not play")
         }
         try snap("livetv-13-player-\(suffix)")
 
@@ -198,14 +198,15 @@ extension XCTestCase {
 
         raiseLiveControls(in: app)
         tap("liveplayer.next", in: app)
-        XCTAssertTrue(stop.waitForExistence(timeout: 10), "The next channel did not play")
+        XCTAssertTrue(pause.waitForExistence(timeout: 10), "The next channel did not play")
         try snap("livetv-15-next-\(suffix)")
 
         raiseLiveControls(in: app)
-        stop.tap()
-        let play = app.buttons.matching(NSPredicate(format: "identifier == 'liveplayer.stop' AND label == 'Play'")).firstMatch
-        XCTAssertTrue(play.waitForExistence(timeout: 5), "The stream did not stop")
-        try snap("livetv-16-stopped-\(suffix)")
+        pause.tap()
+        let play = app.buttons.matching(NSPredicate(format: "identifier == 'liveplayer.playPause' AND label == 'Play'")).firstMatch
+        XCTAssertTrue(play.waitForExistence(timeout: 5), "The stream did not pause")
+        XCTAssertTrue(element("liveplayer.goLive", in: app).exists, "LIVE did not offer the way back to live")
+        try snap("livetv-16-paused-\(suffix)")
 
         XCUIDevice.shared.orientation = .portrait
         tap("liveplayer.guide", in: app)
@@ -222,11 +223,11 @@ extension XCTestCase {
     /// so the next step has the full 3 s.
     @MainActor
     func raiseLiveControls(in app: XCUIApplication) {
-        let stop = element("liveplayer.stop", in: app)
-        // Stop shows once the channel plays; false here only means the controls faded unseen.
-        _ = stop.waitForExistence(timeout: 10)
-        XCTAssertTrue(stop.waitForNonExistence(timeout: 6), "The live player's controls did not fade")
+        let pause = element("liveplayer.playPause", in: app)
+        // Pause shows once the channel plays; false here only means the controls faded unseen.
+        _ = pause.waitForExistence(timeout: 10)
+        XCTAssertTrue(pause.waitForNonExistence(timeout: 6), "The live player's controls did not fade")
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
-        XCTAssertTrue(stop.waitForExistence(timeout: 3), "The live player's controls did not come back")
+        XCTAssertTrue(pause.waitForExistence(timeout: 3), "The live player's controls did not come back")
     }
 }

@@ -6,7 +6,8 @@ import UIKit
 
 /// Plays a live MPEG-TS stream on a sample-buffer layer. The tuner's slate and the station's first picture go on
 /// screen as stills, then motion and sound start together. Opening a URL while another plays is a channel change:
-/// the new request goes out first, and the old picture stays until the new stream's first.
+/// the new request goes out first, and the old picture stays until the new stream's first. The stream goes into a
+/// timeshift buffer as it comes, so playback can pause and go back within it; the buffer is deleted with the stream.
 @MainActor @Observable
 public final class LiveStreamPlayer {
     public enum State: Sendable, Equatable {
@@ -43,6 +44,12 @@ public final class LiveStreamPlayer {
     public private(set) var audioTracks: [LiveAudioTrack] = []
     /// The current stream's, refreshed every second while it plays.
     public private(set) var diagnostics = LiveDiagnostics()
+    /// The picture and sound hold while the stream goes on into the buffer; the tuner stays in use.
+    public private(set) var isPaused = false
+    /// Seconds behind live, counting a pause; 0 at live. Refreshed every second.
+    public private(set) var behindLive = 0.0
+    /// How far back playback can go now, in whole seconds. Refreshed every second.
+    public private(set) var reach = 0.0
     public let view: LiveVideoView
     /// Nil where the device has no Picture in Picture.
     @ObservationIgnored public private(set) var pictureInPicture: LivePictureInPicture?
@@ -56,6 +63,10 @@ public final class LiveStreamPlayer {
     @ObservationIgnored private var signposts: Signposts?
     @ObservationIgnored private var ticker: Task<Void, Never>?
     @ObservationIgnored private var appObservers: AppObservers?
+    /// A seek's pipeline has not played yet: the picture before it stays and the state does not move back to opening.
+    @ObservationIgnored private var seeking = false
+    /// The tune's milestones, kept in the diagnostics after seeks replaced its pipeline.
+    @ObservationIgnored private var tuneTimings: LiveTimings?
     @ObservationIgnored private(set) var isInBackground = false
     @ObservationIgnored var isPictureInPictureActive = false {
         didSet { pipeline?.setVideoEnabled(showsVideo) }
@@ -82,62 +93,101 @@ public final class LiveStreamPlayer {
     /// Opens the tuner's stream (`…/auto/v<channel>`); while another plays, this is a channel change.
     public func open(_ url: URL) {
         self.url = url
-        start(.tuner(url), name: url.absoluteString)
+        start(LiveFeed(url: url, buffer: .temporary()), name: url.absoluteString)
     }
 
-    /// Plays bytes the caller writes: a recording, in tests and screenshots.
-    public func play(_ ring: ByteRing) {
+    /// Plays bytes the caller writes into `buffer`: a recording, in tests and screenshots.
+    public func play(_ buffer: TimeshiftBuffer) {
         url = nil
-        start(.ring(ring), name: "recording")
+        start(LiveFeed(buffer: buffer), name: "recording")
     }
 
-    /// Ends the stream and frees the tuner; the last picture stays. `resume()` opens the same URL again.
+    /// Ends the stream, frees the tuner and deletes the buffer; the last picture stays. `resume()` opens the same URL
+    /// again.
     public func close() {
         if let pipeline { end(pipeline) }
         move(to: .idle)
         slateOnScreen = false
     }
 
-    /// Opens the last URL again after `close()` or a failure.
-    public func resume() {
-        guard pipeline == nil, let url else { return }
-        open(url)
+    /// Holds the picture and sound. The stream goes on into the buffer, so `resume()` plays on from the same picture.
+    public func pause() {
+        guard let pipeline, !isPaused else { return }
+        pipeline.setPaused(true)
+        isPaused = true
+        LiveLog.line("pause")
+        pictureInPicture?.playbackChanged()
     }
 
-    private func start(_ input: LivePipeline.Input, name: String) {
+    /// Plays on after `pause()`; after `close()` or a failure, opens the last URL again.
+    public func resume() {
+        guard let pipeline else {
+            if let url { open(url) }
+            return
+        }
+        guard isPaused else { return }
+        pipeline.setPaused(false)
+        isPaused = false
+        LiveLog.line("play", ["behind": LiveLog.seconds(pipeline.behindLive)])
+        refreshTimeshift()
+        pictureInPicture?.playbackChanged()
+    }
+
+    /// Plays from `delay` seconds behind live, within what the buffer holds; 0 is live. The picture on screen stays
+    /// until the new position's first, and playback goes on from there even if it was paused.
+    public func seek(behindLive delay: Double) {
+        guard let current = pipeline, state != .opening else { return }
+        if tuneTimings == nil { tuneTimings = current.diagnostics.timings }
+        start(current.feed, behindLive: max(0, delay), name: "seek", seek: true)
+    }
+
+    private func start(_ feed: LiveFeed, behindLive delay: Double = 0, name: String, seek: Bool = false) {
         generation += 1
         let id = generation
         let previous = pipeline
         ticker?.cancel()
         signposts?.abandon()
-        signposts = Signposts(changing: previous != nil)
-        let pipeline = LivePipeline(input: input, output: output, options: options, replacing: previous) { [weak self] event in
+        signposts = seek ? nil : Signposts(changing: previous != nil)
+        let pipeline = LivePipeline(feed: feed, behindLive: delay, output: output, options: options, replacing: previous) { [weak self] event in
             DispatchQueue.main.async { [weak self] in
                 MainActor.assumeIsolated { self?.handle(event, from: id) }
             }
         }
         self.pipeline = pipeline
         pipeline.setVideoEnabled(showsVideo)
-        move(to: .opening)
-        slateOnScreen = false
-        audioTracks = []
-        diagnostics = LiveDiagnostics()
-        LiveLog.line("open", ["url": name, "change": previous == nil ? "no" : "yes"])
+        seeking = seek
+        isPaused = false
+        if seek {
+            LiveLog.line("seek", ["behind": LiveLog.seconds(delay)])
+        } else {
+            move(to: .opening)
+            slateOnScreen = false
+            audioTracks = []
+            diagnostics = LiveDiagnostics()
+            tuneTimings = nil
+            LiveLog.line("open", ["url": name, "change": previous == nil ? "no" : "yes"])
+        }
         pipeline.start()
+        refreshTimeshift()
         startTicker()
         pictureInPicture?.playbackChanged()
     }
 
-    /// Stops `pipeline`, keeping its last picture and its diagnostics.
+    /// Stops `pipeline`, keeping its last picture and its diagnostics, and deletes the buffer.
     private func end(_ pipeline: LivePipeline) {
         generation += 1
         ticker?.cancel()
         signposts?.abandon()
         signposts = nil
-        diagnostics = pipeline.diagnostics
+        diagnostics = snapshot(of: pipeline)
         LiveLog.line("close", ["line": diagnostics.line])
         pipeline.stop()
         self.pipeline = nil
+        seeking = false
+        tuneTimings = nil
+        isPaused = false
+        behindLive = 0
+        reach = 0
         // The pipeline's output gate is closed once `stop()` returns, so nothing races these.
         output.setRate(0, time: nil)
         output.flush(keepingImage: true)
@@ -189,6 +239,14 @@ public final class LiveStreamPlayer {
     private func handle(_ event: LiveEvent, timings: LiveTimings) {
         switch event {
         case .phase(let phase):
+            if seeking {
+                // The picture before the seek stays up until the new position plays.
+                guard phase == .playing else { return }
+                seeking = false
+                LiveLog.line("seeked", ["after": LiveLog.seconds(timings.sound)])
+                move(to: .playing)
+                return
+            }
             let resumed = state == .stalled && phase == .playing
             move(to: State(phase))
             signposts?.reached(phase)
@@ -229,14 +287,30 @@ public final class LiveStreamPlayer {
                 try? await Task.sleep(for: .seconds(1))
                 guard !Task.isCancelled, let self else { return }
                 self.refreshDiagnostics()
+                self.refreshTimeshift()
             }
         }
     }
 
     private func refreshDiagnostics() {
         guard let pipeline else { return }
-        let now = pipeline.diagnostics
+        let now = snapshot(of: pipeline)
         if now != diagnostics { diagnostics = now }
+    }
+
+    /// The pipeline's diagnostics with the tune's milestones, which a seek's pipeline does not have.
+    private func snapshot(of pipeline: LivePipeline) -> LiveDiagnostics {
+        var now = pipeline.diagnostics
+        if let tuneTimings { now.timings = tuneTimings }
+        return now
+    }
+
+    private func refreshTimeshift() {
+        guard let pipeline else { return }
+        let behind = pipeline.behindLive
+        if behind != behindLive { behindLive = behind }
+        let held = pipeline.feed.buffer.reach.rounded(.down)
+        if held != reach { reach = held }
     }
 
     // MARK: Background

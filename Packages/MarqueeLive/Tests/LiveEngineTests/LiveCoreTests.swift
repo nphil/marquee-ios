@@ -39,6 +39,27 @@ struct LiveCoreTests {
         #expect(abs(sim.core.snapshot.jitterTarget - 0.45) < 1e-9)
     }
 
+    @Test func pauseHoldsTheClockAndPlaysOnFromTheSamePicture() throws {
+        // Paused 4 s in for 2 s; the reader holds the stream back as long.
+        var pause: (from: Double, to: Double, rate: Double?) = (0, 0, nil)
+        let sim = try Simulation.run(tuned, tail: 0, delivery: { $0 < 4 ? $0 : $0 + 2 }, at: [
+            (4, { core, now in
+                core.setPaused(true, now: now)
+                pause.from = now
+            }),
+            (5, { core, _ in pause.rate = core.snapshot.rate }),
+            (6, { core, now in
+                core.setPaused(false, now: now)
+                pause.to = now
+            }),
+        ])
+        #expect(pause.rate == 0)
+        #expect(!sim.output.pictures.contains { $0.at > pause.from && $0.at < pause.to })
+        #expect(sim.count { $0 == .underrun || $0 == .reanchor } == 0)
+        #expect(sim.phases.last == .playing)
+        #expect(sim.core.snapshot.drops == 0)
+    }
+
     @Test func lateBurstDropsToTheNewestPicture() throws {
         // Three seconds held back and then delivered at once leave the clock far behind live.
         let sim = try Simulation.run(tuned, tail: 0, delivery: { $0 < 2.5 || $0 >= 5.5 ? $0 : 5.5 })

@@ -17,6 +17,7 @@ final class PlexLiveSource: LiveVideoSource {
     private(set) var state: LiveState = .idle
     private(set) var status: String?
     private(set) var diagnosticsLine: String?
+    private(set) var timeshift = LiveTimeshift()
     let videoView: UIView
 
     @ObservationIgnored private let live: PlexLiveTV
@@ -35,6 +36,7 @@ final class PlexLiveSource: LiveVideoSource {
     @ObservationIgnored private var observers: [any NSObjectProtocol] = []
     @ObservationIgnored private var isExternal = false
     @ObservationIgnored private var saidThroughPlex = false
+    @ObservationIgnored private var isPaused = false
 
     private static let signposter = OSSignposter(subsystem: "com.nphil.marquee", category: "LiveTV")
     private static let log = Logger(subsystem: "com.nphil.marquee", category: "LiveTV")
@@ -85,6 +87,7 @@ final class PlexLiveSource: LiveVideoSource {
         // The old picture stays up, silent, until the new one arrives.
         backend.pause()
         timeline?.cancel()
+        endTimeshift()
         state = .opening
         diagnosticsLine = nil
         show("Tuning \(channel.number)")
@@ -102,12 +105,49 @@ final class PlexLiveSource: LiveVideoSource {
         generation += 1
         backend.pause()
         timeline?.cancel()
+        endTimeshift()
         state = .idle
         show(nil)
         for token in observers { NotificationCenter.default.removeObserver(token) }
         observers = []
         layerView?.playerLayer.player = backend.player
         endCurrent()
+    }
+
+    /// AVPlayer holds the position while the server's HLS window moves on (§6.7); the paused timeline keeps the
+    /// session open.
+    func pause() {
+        guard loaded == generation, !isPaused else { return }
+        isPaused = true
+        backend.pause()
+        refreshTimeshift()
+        Task { await report() }
+    }
+
+    func resume() {
+        guard loaded == generation, isPaused else { return }
+        isPaused = false
+        backend.play()
+        refreshTimeshift()
+        Task { await report() }
+    }
+
+    func seek(behindLive delay: Double) {
+        guard loaded == generation else { return }
+        guard let item = backend.player?.currentItem, let seekable = Self.seekable(item) else {
+            // No window to move in yet: LIVE plays on from the pause.
+            resume()
+            return
+        }
+        let target = LiveTimeshift.hlsPosition(behindLive: delay, seekable: seekable, liveOffset: Self.liveOffset(item))
+        let mine = generation
+        isPaused = false
+        Task {
+            _ = await backend.seek(to: target, precise: false)
+            guard mine == generation else { return }
+            backend.play()
+            refreshTimeshift()
+        }
     }
 
     /// Waits until the session a `stop()` let go of has ended on the server. A one-tuner device refuses
@@ -199,6 +239,7 @@ final class PlexLiveSource: LiveVideoSource {
         generation += 1
         backend.pause()
         timeline?.cancel()
+        endTimeshift()
         show(nil)
         state = .failed(error)
         endCurrent()
@@ -224,23 +265,58 @@ final class PlexLiveSource: LiveVideoSource {
 
     // MARK: Timeline
 
-    /// Every 10 s while the stream is open, as Plex's own app reports (§1.3).
+    /// Every second while the stream is open, where it plays against live; every 10 s the timeline, as Plex's own
+    /// app reports (§1.3).
     private func startTimeline() {
         timeline?.cancel()
         timeline = Task { [weak self] in
+            var ticks = 0
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(10))
+                try? await Task.sleep(for: .seconds(1))
                 guard let self, !Task.isCancelled else { return }
-                await self.report()
+                self.refreshTimeshift()
+                ticks += 1
+                if ticks.isMultiple(of: 10) { Task { await self.report() } }
             }
         }
     }
 
     private func report() async {
         guard let stream = current, let session = stream.session else { return }
-        let playback: PlaybackState = state == .playing ? .playing : .buffering
+        let playback: PlaybackState = isPaused ? .paused : state == .playing ? .playing : .buffering
         let update = LiveTimelineUpdate(session: session, state: playback, time: stream.milliseconds)
         try? await live.reportTimeline(update)
+    }
+
+    // MARK: Timeshift
+
+    private func refreshTimeshift() {
+        var now = LiveTimeshift(isPaused: isPaused)
+        if let item = backend.player?.currentItem {
+            now = LiveTimeshift.hls(
+                seekable: Self.seekable(item), position: item.currentTime().seconds, liveOffset: Self.liveOffset(item),
+                isPaused: isPaused
+            )
+        }
+        if now != timeshift { timeshift = now }
+    }
+
+    private func endTimeshift() {
+        isPaused = false
+        timeshift = LiveTimeshift()
+    }
+
+    /// The playlist's range in the player's time: the server's window of the stream.
+    private static func seekable(_ item: AVPlayerItem) -> ClosedRange<Double>? {
+        guard let range = item.seekableTimeRanges.last?.timeRangeValue else { return nil }
+        let start = range.start.seconds, end = range.end.seconds
+        return start.isFinite && end.isFinite && end >= start ? start...end : nil
+    }
+
+    /// How far behind the window's end the player sits at live.
+    private static func liveOffset(_ item: AVPlayerItem) -> Double {
+        let offset = item.recommendedTimeOffsetFromLive.seconds
+        return offset.isFinite ? offset : 0
     }
 
     // MARK: Status

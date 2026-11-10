@@ -41,12 +41,28 @@ final class DirectLiveSource: LiveVideoSource {
         return "\(channel.number) direct · \(player.diagnostics.line)"
     }
 
+    var timeshift: LiveTimeshift {
+        LiveTimeshift(isPaused: player.isPaused, behindLive: player.behindLive, reach: player.reach)
+    }
+
     func play(_ channel: LiveChannel) async {
         self.channel = channel
         #if DEBUG
         if FakeTuner.isActive { return FakeTuner.play(on: player) }
         #endif
         player.open(channel.device.streamURL(channel))
+    }
+
+    func pause() {
+        player.pause()
+    }
+
+    func resume() {
+        player.resume()
+    }
+
+    func seek(behindLive: Double) {
+        player.seek(behindLive: behindLive)
     }
 
     func stop() {

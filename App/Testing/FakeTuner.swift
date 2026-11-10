@@ -19,9 +19,9 @@ enum FakeTuner {
 
     #if DEBUG
     @MainActor static func play(on player: LiveStreamPlayer) {
-        let ring = ByteRing()
-        player.play(ring)
-        SyntheticTuner.feed(ring)
+        let buffer = TimeshiftBuffer(folder: nil, limits: .inMemory)
+        player.play(buffer)
+        SyntheticTuner.feed(buffer)
     }
     #endif
 }

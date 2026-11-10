@@ -5,27 +5,27 @@ import Libavutil
 import Synchronization
 
 /// What the read callback reaches through `opaque`.
-private final class RingInput: Sendable {
-    let ring: ByteRing
+private final class ReaderInput: Sendable {
+    let reader: TimeshiftReader
     /// Set from any thread, read by FFmpeg's interrupt callback on the demux thread.
     let cancelled = Atomic(false)
 
-    init(ring: ByteRing) { self.ring = ring }
+    init(reader: TimeshiftReader) { self.reader = reader }
 }
 
-/// An MPEG-TS demuxer reading a `ByteRing` through a custom, non-seekable AVIOContext. Streams appear
+/// An MPEG-TS demuxer reading a `TimeshiftReader` through a custom, non-seekable AVIOContext. Streams appear
 /// as their PMT arrives; nothing waits for stream info, which a live start does not need. Confined to the
 /// thread that reads it.
 final class TSDemuxer {
     let context: UnsafeMutablePointer<AVFormatContext>
     private let avio: UnsafeMutablePointer<AVIOContext>
-    private let opaque: Unmanaged<RingInput>
+    private let opaque: Unmanaged<ReaderInput>
     private var isOpen = true
 
     /// Blocks until the first bytes arrive. `probeBytes` is what the demuxer reads before returning:
     /// a slate runs at well under 1 Mb/s, so even 32 KB would hold the first picture back.
-    init(ring: ByteRing, probeBytes: Int64 = 188 * 7) throws {
-        let input = RingInput(ring: ring)
+    init(reader: TimeshiftReader, probeBytes: Int64 = 188 * 7) throws {
+        let input = ReaderInput(reader: reader)
         let bufferSize: Int32 = 64 * 1024
         guard let buffer = av_malloc(Int(bufferSize)) else { throw LiveEngineError.outOfMemory }
         let opaque = Unmanaged.passRetained(input)
@@ -80,10 +80,10 @@ final class TSDemuxer {
         var pmtVersion: Int32 = -1
     }
 
-    /// Stops a read blocked in the ring; the next read returns FF.exit.
+    /// Stops a read blocked in the reader; the next read returns FF.exit.
     func cancel() {
         opaque.takeUnretainedValue().cancelled.store(true, ordering: .relaxed)
-        opaque.takeUnretainedValue().ring.cancel()
+        opaque.takeUnretainedValue().reader.cancel()
     }
 
     func close() {
@@ -107,8 +107,8 @@ final class TSDemuxer {
 
 private func readPacket(_ opaque: UnsafeMutableRawPointer?, _ buffer: UnsafeMutablePointer<UInt8>?, _ size: Int32) -> Int32 {
     guard let opaque, let buffer, size > 0 else { return FF.einval }
-    let input = Unmanaged<RingInput>.fromOpaque(opaque).takeUnretainedValue()
-    switch input.ring.read(into: UnsafeMutableRawBufferPointer(start: buffer, count: Int(size))) {
+    let input = Unmanaged<ReaderInput>.fromOpaque(opaque).takeUnretainedValue()
+    switch input.reader.read(into: UnsafeMutableRawBufferPointer(start: buffer, count: Int(size))) {
     case .bytes(let count): return Int32(count)
     case .end: return FF.eof
     case .cancelled: return FF.exit
@@ -117,5 +117,5 @@ private func readPacket(_ opaque: UnsafeMutableRawPointer?, _ buffer: UnsafeMuta
 
 private func interrupt(_ opaque: UnsafeMutableRawPointer?) -> Int32 {
     guard let opaque else { return 0 }
-    return Unmanaged<RingInput>.fromOpaque(opaque).takeUnretainedValue().cancelled.load(ordering: .relaxed) ? 1 : 0
+    return Unmanaged<ReaderInput>.fromOpaque(opaque).takeUnretainedValue().cancelled.load(ordering: .relaxed) ? 1 : 0
 }

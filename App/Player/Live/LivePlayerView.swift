@@ -61,7 +61,7 @@ struct LivePlayerView: View {
             if showsChrome && !model.showsGuide {
                 LiveChrome(model: model, lean: lean, close: close)
                     .transition(.opacity)
-            } else if !model.showsGuide, let status = model.source.status {
+            } else if !model.showsGuide, let status = model.status {
                 LiveStatusLabel(text: status)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
                     .padding(.horizontal, Space.inset)
@@ -83,7 +83,7 @@ struct LivePlayerView: View {
             }
         }
         .animation(Motion.spring(reduceMotion: reduceMotion), value: model.showsGuide)
-        .animation(.easeOut(duration: 0.18), value: model.source.status)
+        .animation(.easeOut(duration: 0.18), value: model.status)
         .onGeometryChange(for: CGSize.self) { proxy in
             proxy.size
         } action: { size in
@@ -228,9 +228,9 @@ struct LivePlayerView: View {
 
 // MARK: - Chrome
 
-/// The controls over the picture: close, the channel and AirPlay on top; channel down, stop and channel
-/// up in the middle, where the channel card shows while surfing or tuning; LIVE, the programme's
-/// progress, Last and Guide at the bottom.
+/// The controls over the picture: close, the channel and AirPlay on top; channel down, skip back, pause, skip
+/// forward and channel up in the middle, where the channel card shows while surfing or tuning; LIVE, the
+/// programme's progress, Last and Guide at the bottom.
 private struct LiveChrome: View {
     let model: LivePlaybackModel
     let lean: CGFloat
@@ -273,10 +273,10 @@ private struct LiveChrome: View {
     private var top: some View {
         HStack(spacing: Space.s3) {
             Button(action: close) {
-                Image(systemName: "chevron.down")
+                Image(systemName: "xmark")
             }
             .buttonStyle(PlayerButtonStyle())
-            .accessibilityLabel("Close player")
+            .accessibilityLabel("Close")
             .accessibilityIdentifier("liveplayer.close")
 
             NowWatching(model: model)
@@ -297,18 +297,18 @@ private struct LiveChrome: View {
                 FailureCard(message: error.description, close: close, retry: model.retry)
             }
         } else {
-            HStack(spacing: Space.s6) {
+            HStack(spacing: Space.s4) {
                 surfButton(by: -1)
                 ZStack {
                     if showsCard {
                         let channel = model.shown
                         let airings = model.airings(on: channel)
-                        ChannelCard(channel: channel, airing: airings.now, next: airings.next, now: model.store.now)
+                        ChannelCard(channel: channel, airing: airings.now, next: airings.next, now: model.moment(on: channel))
                             .id(channel.id)
                             .offset(x: lean)
                             .transition(.opacity.combined(with: .scale(scale: reduceMotion ? 1 : 0.97)))
                     } else {
-                        stopButton
+                        transport
                             .transition(.opacity)
                     }
                 }
@@ -319,25 +319,51 @@ private struct LiveChrome: View {
         }
     }
 
-    /// The card stands in for Stop while surfing, and while a channel tunes, which on the Plex path
-    /// takes about 3 s.
+    /// The card stands in for the transport while surfing, and while a channel tunes, which on the Plex
+    /// path takes about 3 s.
     private var showsCard: Bool {
-        model.surfing != nil || (model.state == .opening && !model.isStopped)
+        model.surfing != nil || model.state == .opening
     }
 
-    private var stopButton: some View {
-        let playing = !(model.isStopped || model.state == .idle)
-        return Button {
-            Haptics.impact(.medium)
-            model.togglePlay()
-        } label: {
-            Image(systemName: playing ? "stop.fill" : "play.fill")
-                .contentTransition(.symbolEffect(.replace))
+    /// Back, pause and forward within the buffer (docs/LIVE-TV.md §6.7); forward only behind live.
+    private var transport: some View {
+        let seconds = Int(model.skipInterval)
+        let timeshift = model.timeshift
+        let playing = !(timeshift.isPaused || model.state == .idle)
+        return HStack(spacing: Space.s3) {
+            Button {
+                Haptics.impact(.light)
+                model.skip(by: -model.skipInterval)
+            } label: {
+                Image(systemName: "gobackward.\(seconds)")
+            }
+            .buttonStyle(PlayerButtonStyle())
+            .disabled(!timeshift.canSkipBack)
+            .accessibilityLabel("Skip back \(seconds) seconds")
+            .accessibilityIdentifier("liveplayer.skipBack")
+
+            Button {
+                Haptics.impact(.medium)
+                model.togglePlay()
+            } label: {
+                Image(systemName: playing ? "pause.fill" : "play.fill")
+                    .contentTransition(.symbolEffect(.replace))
+            }
+            .buttonStyle(PlayerButtonStyle(prominent: true))
+            .accessibilityLabel(playing ? "Pause" : "Play")
+            .accessibilityIdentifier("liveplayer.playPause")
+
+            Button {
+                Haptics.impact(.light)
+                model.skip(by: model.skipInterval)
+            } label: {
+                Image(systemName: "goforward.\(seconds)")
+            }
+            .buttonStyle(PlayerButtonStyle())
+            .disabled(!timeshift.isBehindLive)
+            .accessibilityLabel("Skip forward \(seconds) seconds")
+            .accessibilityIdentifier("liveplayer.skipForward")
         }
-        .buttonStyle(PlayerButtonStyle(prominent: true))
-        .accessibilityLabel(playing ? "Stop" : "Play")
-        .accessibilityHint(playing ? "Frees the tuner and keeps the last picture" : "")
-        .accessibilityIdentifier("liveplayer.stop")
     }
 
     private func surfButton(by steps: Int) -> some View {
@@ -357,11 +383,11 @@ private struct LiveChrome: View {
 
     private var bottom: some View {
         VStack(alignment: .leading, spacing: Space.s2) {
-            if let status = model.source.status {
+            if let status = model.status {
                 LiveStatusLabel(text: status)
             }
             HStack(spacing: Space.s3) {
-                LiveChip(isLive: !model.isStopped)
+                LiveChip(timeshift: model.timeshift, isOn: model.state != .idle, goLive: model.goLive)
                 programmeProgress
                     .frame(maxWidth: .infinity)
                 Button {
@@ -387,10 +413,10 @@ private struct LiveChrome: View {
         }
     }
 
-    /// Start, progress and end of the programme on now; no seek bar, since live has nowhere to seek.
+    /// Start, progress and end of the programme on screen, which behind live is the one the picture is from.
     @ViewBuilder
     private var programmeProgress: some View {
-        let now = model.store.now
+        let now = model.moment(on: model.channel)
         if let airing = model.airings(on: model.channel).now {
             HStack(spacing: Space.s2) {
                 Text(LiveText.time(airing.start))
@@ -440,7 +466,7 @@ private struct NowWatching: View {
             model.showsDiagnostics.toggle()
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(LiveText.spoken(channel, airing: airing, at: model.store.now, mark: nil))
+        .accessibilityLabel(LiveText.spoken(channel, airing: airing, at: model.moment(on: channel), mark: nil))
         .accessibilityAddTraits(.isHeader)
         .accessibilityAdjustableAction { direction in
             switch direction {
@@ -514,27 +540,55 @@ private struct ChannelCard: View {
     }
 }
 
-/// "● LIVE" on the scrim; the dot greys while stopped.
+/// "● LIVE" on the scrim at live; behind live, a button that says how far behind and goes back to live.
 private struct LiveChip: View {
-    let isLive: Bool
+    let timeshift: LiveTimeshift
+    /// A stream is open; without one the dot greys.
+    let isOn: Bool
+    let goLive: () -> Void
     @Environment(\.theme) private var theme
 
     var body: some View {
+        if isOn, timeshift.isBehindLive {
+            Button {
+                Haptics.impact(.light)
+                goLive()
+            } label: {
+                chip(behind: "−" + clockText(timeshift.behindLive))
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Go to live")
+            .accessibilityValue(Duration.seconds(Int(timeshift.behindLive)).formatted(.units(allowed: [.hours, .minutes, .seconds], width: .wide)) + " behind")
+            .accessibilityIdentifier("liveplayer.goLive")
+        } else {
+            chip(behind: nil)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(isOn ? "Live" : "Not playing")
+        }
+    }
+
+    private func chip(behind: String?) -> some View {
         HStack(spacing: 6) {
             Circle()
-                .fill(isLive ? theme.live : theme.ink3)
+                .fill(isOn && behind == nil ? theme.live : theme.ink3)
                 .frame(width: 8, height: 8)
             Text("LIVE")
                 .font(.caption.weight(.bold))
                 .tracking(0.6)
                 .foregroundStyle(theme.ink)
+            if let behind {
+                Text(behind)
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(theme.ink2)
+            }
         }
         .padding(.horizontal, Space.s3)
         .frame(minHeight: 28)
         .background(theme.roles.scrim.withAlpha(0.8).color, in: Capsule())
         .fixedSize()
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(isLive ? "Live" : "Stopped")
     }
 }
 

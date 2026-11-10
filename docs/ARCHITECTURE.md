@@ -27,7 +27,7 @@ Reasons:
 
 Live TV can bypass Plex and read an HDHomeRun-protocol tuner on the home network (`docs/LIVE-TV.md` §2). That needs FFmpeg decoding into sample-buffer layers, which the video engine ships for iOS only. So:
 
-- `LiveEngine` (demuxer, decoders, byte ring, playout servo, tuner connection) imports no AVFoundation, which keeps it testable without a device UI and portable to a scratch package.
+- `LiveEngine` (demuxer, decoders, timeshift buffer, playout servo, tuner connection) imports no AVFoundation, which keeps it testable without a device UI and portable to a scratch package.
 - `MarqueeLive` adds the AVFoundation side: `LiveStreamPlayer`, the sample-buffer output and the Picture in Picture and Now Playing types.
 - `LiveFixtures` is a synthetic tuner and transport stream used by the engine's tests and linked into Debug app builds, so the Live TV screenshots play something without a real tuner.
 - Its tests run on an iOS simulator through `xcodebuild` (the `live` CI job), not `swift test`.

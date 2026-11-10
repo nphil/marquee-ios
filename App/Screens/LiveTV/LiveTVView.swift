@@ -305,7 +305,10 @@ private struct LiveGuideScreen: View {
     /// Opens the live player; a film playing, in Picture in Picture too, stops first.
     private func play(_ channel: LiveChannel) {
         session.player.stopAll()
-        playing = LivePlaybackModel(store: store, channel: channel, readsTunerDirectly: session.settings.readsTunerDirectly)
+        playing = LivePlaybackModel(
+            store: store, channel: channel, readsTunerDirectly: session.settings.readsTunerDirectly,
+            skipInterval: TimeInterval(session.settings.skipInterval)
+        )
     }
 
     private func playAfterSheet() {

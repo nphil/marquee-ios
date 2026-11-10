@@ -56,7 +56,7 @@ extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
 
-/// One HTTP request for a channel's stream. A 200's body goes into `ring`; any other status is collected
+/// One HTTP request for a channel's stream. A 200's body goes into `buffer`; any other status is collected
 /// and reported as a `TunerRefusal`. Events arrive on the connection's own serial queue.
 public final class TunerConnection: NSObject, URLSessionDataDelegate, @unchecked Sendable {
     public enum Event: Sendable {
@@ -69,7 +69,7 @@ public final class TunerConnection: NSObject, URLSessionDataDelegate, @unchecked
     }
 
     public let url: URL
-    public let ring: ByteRing
+    public let buffer: TimeshiftBuffer
     private let onEvent: @Sendable (Event) -> Void
     private let lock = NSLock()
     // Guarded by `lock`.
@@ -81,9 +81,9 @@ public final class TunerConnection: NSObject, URLSessionDataDelegate, @unchecked
     private var sawByte = false
     private var cancelled = false
 
-    public init(url: URL, ring: ByteRing, onEvent: @escaping @Sendable (Event) -> Void) {
+    public init(url: URL, buffer: TimeshiftBuffer, onEvent: @escaping @Sendable (Event) -> Void) {
         self.url = url
-        self.ring = ring
+        self.buffer = buffer
         self.onEvent = onEvent
         super.init()
     }
@@ -97,7 +97,7 @@ public final class TunerConnection: NSObject, URLSessionDataDelegate, @unchecked
         configuration.timeoutIntervalForResource = .greatestFiniteMagnitude
         let queue = OperationQueue()
         queue.maxConcurrentOperationCount = 1
-        // The pipeline's reader and the main thread wait on the ring's lock this queue writes under; any lower and
+        // The pipeline's readers and the main thread wait on the buffer's lock this queue writes under; any lower and
         // they would wait on a lower-priority thread.
         queue.qualityOfService = .userInteractive
         let session = URLSession(configuration: configuration, delegate: self, delegateQueue: queue)
@@ -112,7 +112,7 @@ public final class TunerConnection: NSObject, URLSessionDataDelegate, @unchecked
         session.dataTask(with: request).resume()
     }
 
-    /// Closes the request; the tuner sees the connection drop and lets the channel go.
+    /// Closes the request; the tuner sees the connection drop and lets the channel go. What came stays in the buffer.
     public func cancel() {
         let session = lock.withLock {
             cancelled = true
@@ -120,7 +120,6 @@ public final class TunerConnection: NSObject, URLSessionDataDelegate, @unchecked
             return self.session
         }
         session?.invalidateAndCancel()
-        ring.cancel()
     }
 
     public func urlSession(
@@ -141,7 +140,7 @@ public final class TunerConnection: NSObject, URLSessionDataDelegate, @unchecked
         }
         guard status == 200 else { return }
         if first { onEvent(.firstByte(after: after)) }
-        ring.write(data)
+        buffer.write(data)
     }
 
     public func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: (any Error)?) {
@@ -152,8 +151,9 @@ public final class TunerConnection: NSObject, URLSessionDataDelegate, @unchecked
         if status != 0, status != 200 {
             onEvent(.refused(TunerRefusal(status: status, errorHeader: header, body: body)))
         } else {
-            ring.finish()
+            // The end is known before a reader can reach it.
             onEvent(.ended(error.map { $0.localizedDescription }))
+            buffer.finish()
         }
     }
 

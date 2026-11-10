@@ -149,10 +149,10 @@ The engine's `ByteRangeSource`/`HTTPRangeSource` need 206 range responses (E ENG
 
 ### 3.3 PiP, AirPlay, Now Playing, audio session
 
-- **PiP:** `AVPictureInPictureController(contentSource: .init(sampleBufferDisplayLayer:playbackDelegate:))`. `timeRangeForPlayback` returns an infinite range (start `-infinity`, duration `+infinity`), which tells the system the content is live (WWDC21 10290). Pause in PiP stops the stream and frees the tuner; play reopens. Skip requests are ignored. PiP starts automatically on leaving the app (as in Channels, https://getchannels.com/releases/). PB builds PiP from an `AVPlayerLayer` only (PB PlayerSurface.swift:39-61) and needs a sample-buffer variant.
+- **PiP:** `AVPictureInPictureController(contentSource: .init(sampleBufferDisplayLayer:playbackDelegate:))`. `timeRangeForPlayback` returns an infinite range (start `-infinity`, duration `+infinity`), which tells the system the content is live (WWDC21 10290). Pause in PiP pauses into the timeshift buffer (§6.7), so the tuner stays in use; play goes on from the same picture, or reopens a stream that ended. Skip requests are ignored. PiP starts automatically on leaving the app (as in Channels, https://getchannels.com/releases/). PB builds PiP from an `AVPlayerLayer` only (PB PlayerSurface.swift:39-61) and needs a sample-buffer variant.
 - **AirPlay:** audio follows the system route. Choosing an AirPlay video receiver from the route picker switches the session to the Plex path (`allowsExternalPlayback`), one Plex tune of about 3 s.
-- **Now Playing:** set by hand: `MPNowPlayingInfoPropertyIsLiveStream = true`, title = programme, artist = "2.1 WXXX", artwork = programme or channel image, no elapsed time. Remote commands: play/pause (stop and reopen), next/previous track = channel up/down; skip and seek disabled. PB's Now Playing is AVPlayer-based (PB NowPlaying.swift:24-82) and is generalised to take a `LiveSource`.
-- **Audio session:** `.playback` / `.moviePlayback`, as PB already activates it (PB AudioSession.swift:34); the background audio mode is already declared (M project.yml:60-61). An interruption stops the stream (frees the tuner); its end reopens if the system says to resume. Local-network access and the plain-HTTP exception for LAN addresses are already declared (M project.yml:51-53).
+- **Now Playing:** set by hand: `MPNowPlayingInfoPropertyIsLiveStream = true`, title = programme, artist = "2.1 WXXX", artwork = programme or channel image, no elapsed time. Remote commands: play/pause (pause into the buffer and play on), next/previous track = channel up/down; skip and seek disabled. PB's Now Playing is AVPlayer-based (PB NowPlaying.swift:24-82) and is generalised to take a `LiveSource`.
+- **Audio session:** `.playback` / `.moviePlayback`, as PB already activates it (PB AudioSession.swift:34); the background audio mode is already declared (M project.yml:60-61). An interruption, or the headphones going, pauses the stream into the buffer; an interruption's end plays on if the system says to resume. Local-network access and the plain-HTTP exception for LAN addresses are already declared (M project.yml:51-53).
 
 ### 3.4 API sketch
 
@@ -219,11 +219,16 @@ public struct LiveClockServo { public mutating func rate(buffered: Double, targe
     public var onStateChange: ((State) -> Void)?
     public private(set) var audioTracks: [LiveAudioTrack]
     public private(set) var diagnostics: LiveDiagnostics
+    public private(set) var isPaused: Bool
+    public private(set) var behindLive: Double         // seconds, counting a pause; refreshed every second
+    public private(set) var reach: Double              // how far back the buffer goes, whole seconds
     public private(set) var pictureInPicture: LivePictureInPicture?
     public func open(_ url: URL)                       // while another plays: a change, in takeover order
-    public func play(_ ring: ByteRing)                 // bytes the caller writes: tests and screenshots
-    public func close()
-    public func resume()
+    public func play(_ buffer: TimeshiftBuffer)        // bytes the caller writes: tests and screenshots
+    public func pause()                                // the stream goes on into the buffer
+    public func resume()                               // plays on; after close or a failure, opens the URL again
+    public func seek(behindLive: Double)               // a new reader on the same buffer, no new tune
+    public func close()                                // frees the tuner and deletes the buffer
 }
 // L7 adds caption cues and audio track selection.
 
@@ -232,7 +237,11 @@ public struct LiveClockServo { public mutating func rate(buffered: Double, targe
     var state: LiveState { get }
     var status: String? { get }
     var diagnosticsLine: String? { get }
+    var timeshift: LiveTimeshift { get }               // paused, seconds behind live, reach
     func play(_ channel: LiveChannel) async
+    func pause()
+    func resume()
+    func seek(behindLive: Double)
     func stop()
 }
 // LiveRouter decides each tune (§2.2) and plays it through DirectLiveSource (LiveStreamPlayer) or
@@ -392,16 +401,18 @@ rail │ Today ▾   8:00            8:30            9:00            9:30   8:18
 ┌──────────────────────────────────────────────────────────────────┐
 │ ⌄   ▢ 2.1 WXXX · Evening News · 8:00–8:30          CC  ◁))  ⎚    │
 │                                                                  │
-│              ⏮                ■                ⏭                 │
+│        ⏮         ↺10         ❚❚         ↻10         ⏭            │
 │                                                                  │
 │ ● LIVE   8:00 ▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬────── 8:30        ↩ last   ☰ guide │
+│ ○ LIVE −1:24  (behind live: a button back to live)               │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
 - Player rules of M DESIGN.md:333-363: 56 pt `glass` buttons with 26 pt glyphs, chrome fades after 3 s, swipe down closes. Text over video sits on `scrim` at 0.55 or more (M DESIGN.md:148-150).
-- Top: close (`chevron.down`), channel card (logo, "2.1 WXXX", programme, times), captions (`captions.bubble`), audio (`speaker.wave.2`, track menu), AirPlay route picker.
-- Centre: previous channel (`backward.end.fill`), stop/play (`stop.fill`/`play.fill`), next channel (`forward.end.fill`). Stop frees the tuner and keeps the last frame.
-- Bottom: LIVE chip (`scrim` 0.80 with a `live` dot), programme progress 4 pt (white on white at 0.35) with start and end, last channel (`arrow.uturn.backward`), guide (`list.bullet.rectangle`). No seek bar.
+- Top: close (`xmark`, "Close"), channel card (logo, "2.1 WXXX", programme, times), captions (`captions.bubble`), audio (`speaker.wave.2`, track menu), AirPlay route picker.
+- Centre: previous channel (`backward.end.fill`), skip back (`gobackward.N`, the app's skip interval), pause/play (`pause.fill`/`play.fill`), skip forward (`goforward.N`, only behind live), next channel (`forward.end.fill`). Pause holds the picture while the stream goes on into the timeshift buffer, so the tuner stays in use; play goes on from the same picture. Skips stay within what the buffer holds, and one that would land within 3 s of live goes live.
+- Timeshift buffer: on the Direct path the app keeps the tuner's stream in segment files under the temporary folder, up to 30 min, half the free space and 4 GB, or 64 MB in memory when space is short; changing channel or closing the player deletes it, and launch deletes any a crash left. On the Plex path playback moves within the HLS window the server keeps (AVPlayer's seekable range); how long that window is has not been measured. On a one-tuner device the status line says the tuner stays in use while paused.
+- Bottom: LIVE chip (`scrim` 0.80 with a `live` dot); behind live it greys its dot, adds "−m:ss" and becomes a button ("Go to live") that jumps to the live edge. Programme progress 4 pt (white on white at 0.35) with start and end, for the moment on screen; last channel (`arrow.uturn.backward`), guide (`list.bullet.rectangle`). No seek bar.
 - Status label (bottom left, `caption` on `scrim`) only when it says something: "Tuning 7.1" (stations without slates), "Weak signal", "Playing through Plex", a tuner refusal. Never a spinner over the picture.
 - Gestures: swipe left/right surfs (§6.8); swipe up opens the Quick Guide; swipe down closes and frees the tuner; tap toggles chrome; double tap toggles fit and fill.
 
@@ -483,4 +494,4 @@ Every result goes into the receipt with its diagnostics line.
 | LT21 | Change theme with the guide open | Colours change live |
 | LT22 | Play for 30 min | Buffer 0.2-0.5 s, rate within ±0.5 %, memory flat |
 
-Out of scope: pause and timeshift, start over, multiview, live previews in the guide, ATSC 3.0 (the TV's tuner is a single ATSC 1.0 tuner, T capture.md:36), CEA-708 captions, guide sources other than Plex.
+Out of scope: start over, a seek bar over the buffer, multiview, live previews in the guide, ATSC 3.0 (the TV's tuner is a single ATSC 1.0 tuner, T capture.md:36), CEA-708 captions, guide sources other than Plex.

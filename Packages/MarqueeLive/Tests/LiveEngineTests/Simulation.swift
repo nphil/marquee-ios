@@ -93,10 +93,11 @@ struct Simulation {
     let splices: [Double]
 
     /// `delivery` maps when the tuner sent a byte to when it reached the phone, both in seconds from its first byte;
-    /// `tail` runs the clock on after the last byte.
+    /// `tail` runs the clock on after the last byte. Each hook runs at its time from the first byte's delivery, and
+    /// gets the clock's reading.
     static func run(
         _ segments: [SyntheticTS.Segment], options: VideoOptions = VideoOptions(), tail: Double = 1,
-        delivery relative: (Double) -> Double = { $0 }, at hooks: [(Double, (LiveCore) -> Void)] = []
+        delivery relative: (Double) -> Double = { $0 }, at hooks: [(Double, (LiveCore, Double) -> Void)] = []
     ) throws -> Simulation {
         let stream = try fixture(segments)
         let origin = stream.chunk.marks[0].time
@@ -108,12 +109,14 @@ struct Simulation {
         let core = LiveCore(output: output, options: options, startedAt: startedAt) { [clock] event in
             collected.append(clock.now, event)
         }
-        let ring = ByteRing(capacity: stream.chunk.bytes.count + 1)
-        ring.write(stream.chunk.bytes)
-        ring.finish()
-        let demuxer = try TSDemuxer(ring: ring)
+        // A reader there before the first byte gets every byte at once.
+        let buffer = TimeshiftBuffer(folder: nil, limits: .inMemory)
+        let reader = buffer.reader(delay: 0, preroll: 0)
+        buffer.write(stream.chunk.bytes)
+        buffer.finish()
+        let demuxer = try TSDemuxer(reader: reader)
         let packet = try Packet()
-        var pendingHooks = hooks.sorted { $0.0 < $1.0 }
+        var pendingHooks = hooks.map { (delivery(origin) + $0.0, $0.1) }.sorted { $0.0 < $1.0 }
         var nextStep = startedAt
         var shape = TSDemuxer.ProgramShape()
         var last = startedAt
@@ -122,7 +125,7 @@ struct Simulation {
             while nextStep <= time {
                 while let hook = pendingHooks.first, hook.0 <= nextStep {
                     clock.now = hook.0
-                    hook.1(core)
+                    hook.1(core, hook.0)
                     pendingHooks.removeFirst()
                 }
                 clock.now = nextStep

@@ -118,7 +118,8 @@ The endpoints and the route rules are in `docs/LIVE-TV.md`.
 - `RecordingRule`, `ScheduledRecording`, `RecordSetting`, `LiveRecordings.mark(for:)` → `RecordingMark` (scheduled, series, recording, failed, recorded) for the guide's record glyphs.
 - `LiveRouteDecider.route(_:_:)` with `RouteContext` → `LiveRoute`: `.direct(URL)`, `.plex(PlexRouteReason)` or `.protectedChannel`, by the first matching rule of §2.2.
 - `HDHomeRunClient`: a tuner's `discover.json` (0.5 s timeout, the reachability check) and `lineup.json` (`HDHomeRunChannel` with codecs, HD and DRM when the tuner sends them).
-- `LiveSource` (`@MainActor` protocol): what the live player plays through; `LiveState`, `LiveError`.
+- `LiveSource` (`@MainActor` protocol): what the live player plays through (play, pause, resume, `seek(behindLive:)`, stop); `LiveState`, `LiveError`.
+- `LiveTimeshift`: where a live stream plays against live (`isPaused`, `behindLive`, `reach`). `isBehindLive` (paused, or 3 s or more behind), `canSkipBack`, `skipped(by:)` (a skip's landing, within the buffer and snapped to live within 3 s); `hls(seekable:position:liveOffset:isPaused:)` and `hlsPosition(behindLive:seekable:liveOffset:)` map the Plex path's HLS player times.
 
 ## Subtitles (`Subtitles/`)
 

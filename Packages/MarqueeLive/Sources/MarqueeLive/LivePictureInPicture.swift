@@ -2,9 +2,9 @@ import AVFoundation
 import AVKit
 import UIKit
 
-/// Picture in Picture for the live picture. The window shows a live stream, without a scrubber; its pause stops the
-/// stream and frees the tuner, its play opens the stream again, and skips are ignored. It starts on its own when the
-/// app goes to the background while the picture is on screen.
+/// Picture in Picture for the live picture. The window shows a live stream, without a scrubber; its pause holds the
+/// picture while the stream goes on into the buffer, its play plays on (or opens the stream again after it ended), and
+/// skips are ignored. It starts on its own when the app goes to the background while the picture is on screen.
 @MainActor
 public final class LivePictureInPicture: NSObject {
     /// Reopens the player screen, then calls the completion once it is on screen. Without it the window hands back
@@ -55,7 +55,7 @@ extension LivePictureInPicture: @preconcurrency AVPictureInPictureSampleBufferPl
         if playing {
             player?.resume()
         } else {
-            player?.close()
+            player?.pause()
         }
     }
 
@@ -65,7 +65,7 @@ extension LivePictureInPicture: @preconcurrency AVPictureInPictureSampleBufferPl
     }
 
     public func pictureInPictureControllerIsPlaybackPaused(_ pictureInPictureController: AVPictureInPictureController) -> Bool {
-        player?.isStopped ?? true
+        player.map { $0.isStopped || $0.isPaused } ?? true
     }
 
     public func pictureInPictureController(

@@ -63,6 +63,7 @@ final class LiveRouter: LiveVideoSource {
     var state: LiveState { ownState ?? active?.state ?? .idle }
     var status: String? { notice ?? active?.status }
     var diagnosticsLine: String? { active?.diagnosticsLine }
+    var timeshift: LiveTimeshift { ownState == nil ? active?.timeshift ?? LiveTimeshift() : LiveTimeshift() }
 
     func play(_ channel: LiveChannel) async {
         generation += 1
@@ -93,6 +94,18 @@ final class LiveRouter: LiveVideoSource {
             active?.stop()
             ownState = .failed(.protectedChannel)
         }
+    }
+
+    func pause() {
+        active?.pause()
+    }
+
+    func resume() {
+        active?.resume()
+    }
+
+    func seek(behindLive: Double) {
+        active?.seek(behindLive: behindLive)
     }
 
     func stop() {

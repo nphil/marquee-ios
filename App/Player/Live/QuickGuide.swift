@@ -156,7 +156,7 @@ struct QuickGuide: View {
 
     private func watch(_ channel: LiveChannel) {
         model.setGuide(false)
-        guard channel.id != model.channel.id || model.isStopped || model.state == .idle else { return }
+        guard channel.id != model.channel.id || model.state == .idle else { return }
         model.tune(channel)
     }
 }
