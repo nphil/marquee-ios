@@ -4,17 +4,17 @@ Auto quality is the default and adapts to the measured link. Plex converts on th
 
 ## Where the phone is (`NetworkPlace`)
 
-Plex's local flag, subnet membership and a short round trip do not prove the phone is home: a VPN can route the home subnet from elsewhere. `NetworkPlace.of` therefore never returns home. It classifies a relay as away (relay), a Tailscale address on either end or a local address outside the phone's attached networks as away (tunnel), and other connections as away (remote). The phone-side address comes from URLSession's request metrics.
+Plex's local flag, subnet membership and a short round trip do not prove the phone is home: a VPN can route the home subnet from elsewhere. `NetworkPlace.of` classifies a relay as away (relay) and a Tailscale address on either end as away (tunnel); otherwise it returns unknown. Request metrics belong to the exact server origin and current network revision. Unknown never counts as home.
 
-`HomePresence` is a separate state machine for an independent home proof. It starts unknown; a successful proof makes it home. After a failed proof, home lasts only until the configured grace period from the last success, expiring at the boundary. A network change must invalidate the state immediately. The caller supplies the times and must re-evaluate after a failure to expire the grace period; the state machine does not collect proof or observe network changes itself. It is not connected to playback by `NetworkPlace.of`.
+`HomePresence` is independent proof for the optional TV remote, not proof of the Plex playback route. An authenticated paired-TV connection over Wi-Fi establishes home; failed probes retain it for at most 30 seconds from the last success. A network change invalidates proof immediately. Probes run only while the plugin is enabled and the app is foregrounded.
 
-Away also turns a file that needs the remux into a server stream (`RouteLimits.remoteConnection`).
+Away or unknown turns a file that needs the remux into a server stream (`RouteLimits.remoteConnection`).
 
 ## Choosing a rung (`AdaptiveQuality`)
 
 The ladder is Original plus watchable presets below the file's bitrate. For a source and viewing picture both at least 1080 pixels on their short edge, the lowest preset is 8 Mbps; otherwise it is 4 Mbps. A source below 720 pixels on its short edge has only Original, as does a file whose bitrate leaves no eligible preset. With missing dimensions, the source defaults to 1080 for floor selection and 720 for ladder eligibility, and the view defaults to 720. Throughput is two moving averages of the link speed (half-lives 3 s and 10 s), the lower of them counting: bytes over active transfer time from AVPlayer's access log, or the remux's source rate. Buffer is media on the phone ahead of the playhead.
 
-- **Start.** A measured link selects the highest eligible rung that fits, at home or away, subject to any quality-score ceiling. Without a measurement, home starts at Original and away starts at the lowest eligible rung at or below 4 Mbps, or the lowest eligible rung if none does. A rung fits when its rate is at most 70% of the estimate; if none fits, the floor is retained.
+- **Start.** A measured link selects the highest eligible rung that fits, at home, away or unknown, subject to any quality-score ceiling. Without a measurement, home starts at Original; away and unknown start at the lowest eligible rung at or below 4 Mbps, or the lowest eligible rung if none does. A rung fits when its rate is at most 70% of the estimate; if none fits, the floor is retained.
 - **Down.** A wait on the network of 2 s, or under 12 s of buffer with the estimate below the rung's rate: down to the highest rung that fits, at least one step.
 - **Up.** The estimate fits a higher rung for 10 s straight, the buffer holds 10 s, and the last switch was 20 s ago: up to the highest rung that fits.
 - **Hysteresis.** Down needs the estimate below the rate; up needs it at 1/0.7 of the target's, so estimates in between change nothing. A drop within 60 s of a climb doubles the wait before the next climb (once per climb, to 160 s at most); 5 minutes without a drop resets it.
