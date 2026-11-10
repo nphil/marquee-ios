@@ -1,17 +1,12 @@
 # Adaptive playback
 
-Auto quality, the default, plays Original at home and adapts away from home. Plex converts on the fly, so there is no ready-made ladder of aligned streams to hop between: each step is a new server stream at one of the `VideoQuality` presets, opened beside the playing one and swapped in at a movie time ahead of the playhead.
+Auto quality, the default, plays Original when home is established and adapts otherwise. Plex converts on the fly, so there is no ready-made ladder of aligned streams to hop between: each step is a new server stream at one of the `VideoQuality` presets, opened beside the playing one and swapped in at a movie time ahead of the playhead.
 
 ## Where the phone is (`NetworkPlace`)
 
-Plex's own flag says only which address answered. Away from home with a VPN that routes the home subnet (Tailscale subnet routes), the LAN address answers through the tunnel and looks local. The place is decided from the address in use:
+Plex's local flag, subnet membership and a short round trip do not prove the phone is home: a VPN can route the home subnet from elsewhere. `NetworkPlace.of` therefore never returns home. It classifies a relay as away (relay), a Tailscale address on either end or a local address outside the phone's attached networks as away (tunnel), and other connections as away (remote). The phone-side address comes from URLSession's request metrics.
 
-1. A relay address is away.
-2. A request that left the phone from a tunnel address (100.64.0.0/10, Tailscale's fd7a:115c:a1e0::/48), or a server address inside those ranges, is away.
-3. A server IP (plex.direct names spell it) on a network one of the phone's own interfaces is attached to, tunnels excluded, is home. A local IP on no attached network is reached through a tunnel: away.
-4. A host name is home only when Plex calls it local and the round trip is under 25 ms.
-
-The phone-side address and round trip come from URLSession's metrics for the app's requests to the server. With Tailscale on at home, iOS keeps the Wi-Fi network's own route ahead of an advertised subnet route that overlaps it (tailscale/tailscale#14142), so LAN traffic goes direct; rule 2 makes the tunnel visible if that ever changes, and stats for nerds shows the place. AVPlayer cannot be pinned to an interface, so the app does not steer around the tunnel.
+`HomePresence` is a separate state machine for an independent home proof. It starts unknown; a successful proof makes it home. After a failed proof, home lasts only until the configured grace period from the last success, expiring at the boundary. A network change must invalidate the state immediately. The caller supplies the times and must re-evaluate after a failure to expire the grace period; the state machine does not collect proof or observe network changes itself. It is not connected to playback by `NetworkPlace.of`.
 
 Away also turns a file that needs the remux into a server stream (`RouteLimits.remoteConnection`).
 

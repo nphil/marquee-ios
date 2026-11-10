@@ -17,9 +17,6 @@ public enum NetworkPlace: Sendable, Hashable, CustomStringConvertible {
         case tunnel
     }
 
-    /// A host name counts as home only when Plex calls it local and a round trip is shorter than this.
-    public static let homeRoundTrip: TimeInterval = 0.025
-
     public var isHome: Bool { self == .home }
 
     /// "Home", "Away (tunnel)".
@@ -32,24 +29,16 @@ public enum NetworkPlace: Sendable, Hashable, CustomStringConvertible {
 
     /// The place of a phone that reaches the server at `connection`.
     /// - Parameters:
-    ///   - onPhoneNetwork: whether the server's IP is on a network one of the phone's own interfaces is
-    ///     attached to, tunnels excluded; nil when the address is a host name.
+    ///   - onPhoneNetwork: whether the server's IP is on an attached non-tunnel network, or nil if unknown.
     ///   - localAddress: the phone's address the last request to the server left from.
-    ///   - roundTrip: that request's round trip.
+    ///   - roundTrip: that request's round trip; latency does not prove presence at home.
     public static func of(
         _ connection: PlexConnection, onPhoneNetwork: Bool?, localAddress: String?, roundTrip: TimeInterval?
     ) -> NetworkPlace {
         if connection.isRelay { return .away(.relay) }
         if [localAddress, connection.ipAddress].contains(where: { $0.map(isTunnel) ?? false }) { return .away(.tunnel) }
-        switch onPhoneNetwork {
-        case true?:
-            return .home
-        case false?:
-            // A LAN address that answers from off the phone's networks comes through a VPN's route.
-            return .away(connection.isLocal ? .tunnel : .remote)
-        case nil:
-            return connection.isLocal && (roundTrip ?? 0) < homeRoundTrip ? .home : .away(.remote)
-        }
+        if onPhoneNetwork == false && connection.isLocal { return .away(.tunnel) }
+        return .away(.remote)
     }
 
     /// Tailscale's addresses: carrier-grade NAT space and its IPv6 prefix, fd7a:115c:a1e0::/48.
@@ -58,5 +47,56 @@ public enum NetworkPlace: Sendable, Hashable, CustomStringConvertible {
         if address.contains(":") { return address.hasPrefix("fd7a:115c:a1e0:") }
         let octets = address.split(separator: ".").compactMap { UInt8($0) }
         return octets.count == 4 && octets[0] == 100 && (64...127).contains(octets[1])
+    }
+}
+
+/// Presence established by an independent proof, rather than connection characteristics.
+public struct HomePresence: Sendable {
+    public enum Verdict: Sendable, Equatable {
+        case unknown, home, away
+    }
+
+    public private(set) var verdict: Verdict = .unknown
+    private let gracePeriod: TimeInterval
+    private var lastProof: Date?
+    private var failed = false
+
+    public init(gracePeriod: TimeInterval) {
+        precondition(gracePeriod.isFinite && gracePeriod >= 0)
+        self.gracePeriod = gracePeriod
+    }
+
+    /// Records a successful home proof at the supplied time.
+    public mutating func proofSucceeded(at time: Date) {
+        lastProof = time
+        failed = false
+        verdict = .home
+    }
+
+    /// A failure retains home only until the grace period from the last successful proof expires.
+    public mutating func proofFailed(at time: Date) {
+        failed = true
+        _ = verdict(at: time)
+    }
+
+    /// Re-evaluates the grace period after a failed proof.
+    @discardableResult
+    public mutating func verdict(at time: Date) -> Verdict {
+        if failed {
+            if let lastProof {
+                let elapsed = time.timeIntervalSince(lastProof)
+                if elapsed < 0 || elapsed >= gracePeriod { verdict = .away }
+            } else {
+                verdict = .away
+            }
+        }
+        return verdict
+    }
+
+    /// Discards proof from the previous network immediately.
+    public mutating func invalidate() {
+        lastProof = nil
+        failed = false
+        verdict = .unknown
     }
 }

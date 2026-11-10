@@ -1,4 +1,5 @@
 import MarqueeCore
+import LumaRemoteCore
 import Observation
 import SwiftUI
 import UIKit
@@ -35,6 +36,11 @@ final class AppSession {
     private(set) var linkCode: String?
     /// Counts network changes, so a visible server list knows to check its servers again.
     private(set) var networkChanges = 0
+    private(set) var presenceNetworkRevision = 0
+    private(set) var presencePath: NetworkPath?
+    private(set) var place: HomePresence.Verdict = .unknown
+    @ObservationIgnored private var presenceGeneration = 0
+    @ObservationIgnored private var presence = HomePresence(gracePeriod: 30)
     /// Settings, in a sheet opened from Home's profile button.
     var showsSettings = false
     /// The full-screen player and whatever keeps playing in Picture in Picture.
@@ -565,10 +571,53 @@ final class AppSession {
             for await path in NetworkPath.updates() {
                 let changed = last.map { $0 != path } ?? false
                 last = path
+                self?.invalidatePresence()
+                self?.presencePath = path
+                self?.presenceNetworkRevision += 1
                 if changed, path.isConnected { self?.networkChanged() }
             }
         }
     }
+
+    /// A restarted task invalidates its predecessor before accepting any further proof.
+    func trackPresence(enabled: Bool, foreground: Bool, tv: PairedTV?) async {
+        presenceGeneration += 1
+        let generation = presenceGeneration
+        presence.invalidate()
+        setPlace(.unknown)
+        #if DEBUG
+        if FakePlex.isActive {
+            let arguments = ProcessInfo.processInfo.arguments
+            if arguments.contains("--ui-testing-place-home") { setPlace(.home); return }
+            if arguments.contains("--ui-testing-place-away") { setPlace(.away); return }
+            if arguments.contains("--ui-testing-place-unknown") { return }
+        }
+        #endif
+        guard enabled, foreground, let tv, let path = presencePath, path.isConnected,
+              let interface = path.wifiInterface else { return }
+        let phone = PhoneInfo(name: remote.model.settings.phoneName, model: PhoneInfo.hardwareModel, app: "Marquee")
+        while !Task.isCancelled {
+            let proved = await HomePresenceProbe.check(tv: tv, interface: interface, phone: phone)
+            guard !Task.isCancelled, generation == presenceGeneration else { return }
+            if proved { presence.proofSucceeded(at: Date()) } else { presence.proofFailed(at: Date()) }
+            setPlace(presence.verdict(at: Date()))
+            do { try await Task.sleep(for: .seconds(5)) } catch { return }
+        }
+    }
+
+    private func invalidatePresence() {
+        presenceGeneration += 1
+        presence.invalidate()
+        setPlace(.unknown)
+    }
+
+
+    private func setPlace(_ value: HomePresence.Verdict) {
+        guard place != value else { return }
+        place = value
+        networkChanges += 1
+    }
+
 
     /// A phone that comes home should move back to the LAN address, and one that leaves to a remote one.
     private func networkChanged() {

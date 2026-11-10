@@ -1,5 +1,13 @@
 import MarqueeCore
+import LumaRemoteCore
 import SwiftUI
+
+private struct PresenceInputs: Equatable {
+    let enabled: Bool
+    let foreground: Bool
+    let tv: PairedTV?
+    let network: Int
+}
 
 /// Sign-in until a server is chosen, then the tabs the person chose (DESIGN §7), all drawn in the active theme.
 struct RootView: View {
@@ -74,6 +82,10 @@ struct RootView: View {
         .scrollIndicators(store.showsScrollBars ? .automatic : .hidden)
         .tint(theme.accentText)
         .preferredColorScheme(scheme)
+        .task(id: PresenceInputs(enabled: remote.isEnabled, foreground: scenePhase == .active,
+                                 tv: remote.model.current, network: session.presenceNetworkRevision)) {
+            await session.trackPresence(enabled: remote.isEnabled, foreground: scenePhase == .active, tv: remote.model.current)
+        }
         .onChange(of: scenePhase, initial: true) { _, phase in
             switch phase {
             case .active: remote.setForeground(true)
