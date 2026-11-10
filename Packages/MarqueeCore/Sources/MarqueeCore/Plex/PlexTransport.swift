@@ -20,11 +20,13 @@ public struct URLSessionTransport: PlexTransport {
         var urlRequest = URLRequest(url: request.url, timeoutInterval: request.timeout)
         urlRequest.httpMethod = request.method.rawValue
         urlRequest.httpBody = request.body
+        if request.restrictToOrigin { urlRequest.httpShouldHandleCookies = false }
         for (name, value) in request.headers {
             urlRequest.setValue(value, forHTTPHeaderField: name)
         }
         do {
-            let (data, response) = try await session.data(for: urlRequest)
+            let delegate = request.restrictToOrigin ? OriginRedirectDelegate(origin: request.url) : nil
+            let (data, response) = try await session.data(for: urlRequest, delegate: delegate)
             guard let http = response as? HTTPURLResponse else { throw NetworkFailure.other }
             var headers: [String: String] = [:]
             for case let (name as String, value as String) in http.allHeaderFields {
@@ -35,6 +37,36 @@ public struct URLSessionTransport: PlexTransport {
             if error.code == .cancelled { throw CancellationError() }
             throw NetworkFailure(error.code)
         }
+    }
+}
+
+/// URLSession may otherwise forward custom credential headers and POST bodies to a redirect target.
+final class OriginRedirectDelegate: NSObject, URLSessionTaskDelegate {
+    private let origin: URL
+
+    init(origin: URL) { self.origin = origin }
+
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void
+    ) {
+        guard let url = request.url, Self.sameOrigin(origin, url) else {
+            completionHandler(nil)
+            return
+        }
+        var request = request
+        request.httpShouldHandleCookies = false
+        completionHandler(request)
+    }
+
+    static func sameOrigin(_ lhs: URL, _ rhs: URL) -> Bool {
+        guard let scheme = lhs.scheme?.lowercased(), let otherScheme = rhs.scheme?.lowercased(),
+              (scheme == "http" || scheme == "https"), scheme == otherScheme,
+              let host = lhs.host?.lowercased(), let otherHost = rhs.host?.lowercased(), host == otherHost else {
+            return false
+        }
+        let defaultPort = scheme == "https" ? 443 : 80
+        return (lhs.port ?? defaultPort) == (rhs.port ?? defaultPort)
     }
 }
 

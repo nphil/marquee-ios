@@ -164,7 +164,7 @@ public actor SeerrClient {
         if method != .get, let token = cookies["XSRF-TOKEN"] { headers["X-XSRF-TOKEN"] = token.removingPercentEncoding ?? token }
         let response: PlexHTTPResponse
         do {
-            response = try await transport.send(PlexRequest(method: method, url: url, headers: headers, body: body))
+            response = try await transport.send(PlexRequest(method: method, url: url, headers: headers, body: body, restrictToOrigin: true))
         } catch let failure as NetworkFailure {
             throw failure == .timedOut ? SeerrError.timedOut : SeerrError.unreachable
         }

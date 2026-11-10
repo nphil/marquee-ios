@@ -1,0 +1,6 @@
+{
+  "movie4kEnabled": true,
+  "series4kEnabled": true,
+  "partialRequestsEnabled": true,
+  "enableSpecialEpisodes": false
+}

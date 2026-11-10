@@ -46,9 +46,19 @@ struct SeerrTests {
         _ = try await client.discover(.trending)
         let signIn = try #require(await transport.requests(to: "/api/v1/auth/plex").first)
         #expect(signIn.method == .post && Self.body(signIn)["authToken"] as? String == "plex-token")
+        #expect(signIn.restrictToOrigin)
         let discover = try #require(await transport.requests(to: "/api/v1/discover/trending").first)
         #expect(discover.headers["Cookie"] == "connect.sid=s%3Aabc.def")
+        #expect(discover.restrictToOrigin)
         #expect(kept.withLock { $0 } == "connect.sid=s%3Aabc.def")
+    }
+
+    @Test func redirectsStayOnTheOriginalOrigin() {
+        let origin = URL(string: "https://seerr.example.net/path")!
+        #expect(OriginRedirectDelegate.sameOrigin(origin, URL(string: "https://SEERR.example.net:443/other")!))
+        #expect(!OriginRedirectDelegate.sameOrigin(origin, URL(string: "http://seerr.example.net/other")!))
+        #expect(!OriginRedirectDelegate.sameOrigin(origin, URL(string: "https://other.example.net/other")!))
+        #expect(!OriginRedirectDelegate.sameOrigin(origin, URL(string: "https://seerr.example.net:8443/other")!))
     }
 
     @Test func plexSignInNamesTheRefusal() async {

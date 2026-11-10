@@ -83,6 +83,12 @@ Screens do not own fetch logic scattered across views:
 
 Integrations (SpeechDock, Bazarr, Chromecast, the direct Live TV path, anything added later) are off until enabled in Settings, each with its own page and stored connection. They supply data to the core and never styling. Secrets such as an API key go to the Keychain, and an address that is not a viewing preference is kept per iPhone rather than per profile.
 
+### Seerr requests
+
+`SeerrSettings` owns the optional connection and the client for the active profile. The address and Pulsarr preference are per phone; the API key and Plex-backed session cookie are kept with other secrets. A saved connection makes Requests available as a tab or a Library destination. The client is replaced when its connection or profile changes.
+
+`SeerrClient` in MarqueeCore uses the shared transport but owns its cookies; its app session disables automatic cookie storage. Plex sign-in exchanges the profile token for a Seerr session, while API-key sign-in acts as the key’s owner. Session expiry triggers a shared sign-in and one retry. Core owns the request permissions, quality and season rules, status badges and Plex link checks. Requests and title screens display those results, submit through `SeerrSettings`, and reload after a successful request. A Plex link without a server identity is confirmed against the item’s TMDB identifier before use.
+
 ## Tests and seams
 
 | Layer | How it is tested | Seam |

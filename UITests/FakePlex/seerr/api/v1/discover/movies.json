@@ -1,0 +1,42 @@
+{
+  "page": 1,
+  "totalPages": 1,
+  "totalResults": 3,
+  "results": [
+    {
+      "id": 9101,
+      "mediaType": "movie",
+      "title": "Wing It!",
+      "releaseDate": "2023-04-01",
+      "posterPath": "/art/wing-it-poster.jpg",
+      "backdropPath": "/art/wing-it-backdrop.jpg",
+      "overview": "A young inventor takes flight in an unlikely machine."
+    },
+    {
+      "id": 9102,
+      "mediaType": "movie",
+      "title": "Spring",
+      "releaseDate": "2019-04-01",
+      "posterPath": "/art/spring-poster.jpg",
+      "backdropPath": "/art/spring-backdrop.jpg",
+      "overview": "A shepherd and her dog face the spirits of the mountain.",
+      "mediaInfo": {
+        "status": 5,
+        "ratingKey": "110",
+        "iOSPlexUrl": "plex://preplay/?metadataKey=110&server=fake-server"
+      }
+    },
+    {
+      "id": 9103,
+      "mediaType": "movie",
+      "title": "Sintel",
+      "releaseDate": "2010-04-01",
+      "posterPath": "/art/sintel-poster.jpg",
+      "backdropPath": "/art/sintel-backdrop.jpg",
+      "overview": "A traveller searches for a lost dragon.",
+      "mediaInfo": {
+        "status": 2
+      }
+    }
+  ]
+}

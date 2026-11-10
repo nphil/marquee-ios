@@ -1,0 +1,48 @@
+{
+  "id": 9201,
+  "mediaType": "tv",
+  "name": "Caminandes",
+  "firstAirDate": "2013-04-01",
+  "posterPath": "/art/caminandes-poster.jpg",
+  "backdropPath": "/art/caminandes-backdrop.jpg",
+  "overview": "A determined llama finds adventure in Patagonia.",
+  "mediaInfo": {
+    "status": 4,
+    "seasons": [
+      {
+        "seasonNumber": 1,
+        "status": 5
+      },
+      {
+        "seasonNumber": 2,
+        "status": 1
+      }
+    ]
+  },
+  "genres": [
+    {
+      "id": 16,
+      "name": "Animation"
+    }
+  ],
+  "externalIds": {
+    "tvdbId": 9201
+  },
+  "seasons": [
+    {
+      "seasonNumber": 0,
+      "name": "Specials",
+      "episodeCount": 1
+    },
+    {
+      "seasonNumber": 1,
+      "name": "Season 1",
+      "episodeCount": 3
+    },
+    {
+      "seasonNumber": 2,
+      "name": "Season 2",
+      "episodeCount": 3
+    }
+  ]
+}

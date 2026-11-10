@@ -63,9 +63,8 @@ final class SeerrSettings {
         let key = ClientKey(config: config, owner: owner, token: token)
         if let cached, cached.key == key { return cached.client }
         let saved = storage.seerrSession.flatMap { $0.owner == owner && $0.address == config.address ? $0.cookie : nil }
-        let address = config.address
         let client = SeerrClient(config: config, transport: transport, plexToken: token, session: saved) { [weak self] cookie in
-            Task { @MainActor in self?.remember(cookie, owner: owner, address: address) }
+            Task { @MainActor in self?.remember(cookie, for: key) }
         }
         cached = (key, client)
         return client
@@ -102,13 +101,19 @@ final class SeerrSettings {
     /// Sends a request and, once Seerr takes it, has Requests reload.
     func request(_ order: SeerrOrder) async throws {
         guard let client else { throw SeerrError.unreachable }
-        try await client.request(order)
-        requestsSent += 1
+        do {
+            try await client.request(order)
+            requestsSent += 1
+        } catch SeerrError.alreadyRequested {
+            requestsSent += 1
+            throw SeerrError.alreadyRequested
+        }
     }
 
-    private func remember(_ cookie: String, owner: String, address: URL) {
-        guard config?.address == address else { return }
-        storage.seerrSession = SeerrSession(owner: owner, address: address, cookie: cookie)
+    private func remember(_ cookie: String, for key: ClientKey) {
+        guard config == key.config, (storage.profile?.uuid ?? "") == key.owner,
+              storage.accountToken == key.token else { return }
+        storage.seerrSession = SeerrSession(owner: key.owner, address: key.config.address, cookie: cookie)
     }
 }
 

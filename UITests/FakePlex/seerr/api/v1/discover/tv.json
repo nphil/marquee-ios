@@ -1,0 +1,38 @@
+{
+  "page": 1,
+  "totalPages": 1,
+  "totalResults": 2,
+  "results": [
+    {
+      "id": 9201,
+      "mediaType": "tv",
+      "name": "Caminandes",
+      "firstAirDate": "2013-04-01",
+      "posterPath": "/art/caminandes-poster.jpg",
+      "backdropPath": "/art/caminandes-backdrop.jpg",
+      "overview": "A determined llama finds adventure in Patagonia.",
+      "mediaInfo": {
+        "status": 4,
+        "seasons": [
+          {
+            "seasonNumber": 1,
+            "status": 5
+          },
+          {
+            "seasonNumber": 2,
+            "status": 1
+          }
+        ]
+      }
+    },
+    {
+      "id": 9202,
+      "mediaType": "tv",
+      "name": "The Mountain Workshop",
+      "firstAirDate": "2024-04-01",
+      "posterPath": "/art/hero-poster.jpg",
+      "backdropPath": "/art/hero-backdrop.jpg",
+      "overview": "Artists and inventors bring remarkable stories to life."
+    }
+  ]
+}

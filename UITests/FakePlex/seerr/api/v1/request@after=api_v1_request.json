@@ -1,0 +1,39 @@
+{
+  "page": 1,
+  "totalPages": 1,
+  "totalResults": 2,
+  "results": [
+    {
+      "id": 502,
+      "status": 1,
+      "type": "movie",
+      "is4k": false,
+      "requestedBy": {
+        "id": 1,
+        "displayName": "Jordan"
+      },
+      "createdAt": "2026-01-13T12:00:00.000Z",
+      "media": {
+        "tmdbId": 9101,
+        "mediaType": "movie",
+        "status": 2
+      }
+    },
+    {
+      "id": 501,
+      "status": 1,
+      "type": "movie",
+      "is4k": false,
+      "requestedBy": {
+        "id": 1,
+        "displayName": "Jordan"
+      },
+      "createdAt": "2026-01-12T12:00:00.000Z",
+      "media": {
+        "tmdbId": 9103,
+        "mediaType": "movie",
+        "status": 2
+      }
+    }
+  ]
+}
