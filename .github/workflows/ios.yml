@@ -249,7 +249,9 @@ jobs:
     name: UI tests ${{ matrix.shard }}
     needs: plan
     runs-on: xcode-27
-    timeout-minutes: 60
+    # A shard measured 41-62 min with every test passing (2026-11-10): about 35 min of tests after a 6-15 min
+    # build. The limit only stops a hung run; it is not a performance gate.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
