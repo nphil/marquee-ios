@@ -33,9 +33,7 @@ extension XCTestCase {
         XCTAssertFalse(app.tabBars.buttons["Watchlist"].exists, "Watchlist is still a tab")
         // The Watchlist shelf loads when Home scrolls it into the lazy stack.
         waitFor("continue.212", in: app)
-        app.swipeUp(velocity: .slow)
         // Wing It! is on the watchlist only, so its poster on Home is the Watchlist row's.
-        waitFor("poster.62a1b2c3d4e5f60718000112", in: app)
         _ = reveal("poster.62a1b2c3d4e5f60718000112", in: app)
         try snap("places-01-home-watchlist-row-\(suffix)")
 
