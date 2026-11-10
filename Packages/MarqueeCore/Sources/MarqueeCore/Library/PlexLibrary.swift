@@ -35,10 +35,14 @@ public struct PlexLibrary: Sendable {
         return PlexPage(items: result.metadata, totalSize: result.totalSize ?? start + result.metadata.count)
     }
 
-    /// Completed DVR versions across all movie and TV libraries, including libraries without an active rule.
-    public func recordedItems() async throws -> [PlexMetadata] {
+    /// Completed DVR versions in the libraries the DVR records into (`sectionIDs`, from the rules' target
+    /// library). Plex marks a finished recording on its `Media` with `origin="dvr"` and
+    /// `mediaGrabStatus="complete"`; there is no server-side filter on those, so each library is read
+    /// through and filtered here.
+    public func recordedItems(inSections sectionIDs: Set<Int>) async throws -> [PlexMetadata] {
+        guard !sectionIDs.isEmpty else { return [] }
         var recordings: [PlexMetadata] = []
-        for section in try await sections() {
+        for section in try await sections() where Int(section.key).map(sectionIDs.contains) == true {
             let type: PlexMediaType
             switch section.type {
             case .movie: type = .movie

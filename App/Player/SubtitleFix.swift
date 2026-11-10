@@ -84,6 +84,8 @@ final class SubtitleFix {
     /// The track ids Plex listed before each download, so the file it adds can be told apart.
     @ObservationIgnored private var before: [BazarrSubtitle.ID: Set<Int>] = [:]
     @ObservationIgnored private var plexBefore: [PlexSubtitleCandidate.ID: Set<Int>] = [:]
+    /// Unresolved Plex adds that no longer block; checked again by hand, they block until they settle.
+    private var setAside: Set<PlexSubtitleCandidate.ID> = []
     @ObservationIgnored private var removeTask: Task<Void, Never>?
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     @ObservationIgnored private var downloadTask: Task<Void, Never>?
@@ -98,9 +100,11 @@ final class SubtitleFix {
         self.language = TrackLanguage.all.first { $0.matches(language) } ?? .english
     }
 
-    /// The sheet opened again: an old removal's outcome is no longer news.
+    /// The sheet opened again: an old removal's outcome is no longer news, and a Plex add still
+    /// unresolved from the last visit no longer blocks.
     func open() {
         if removal != .removing { removal = nil }
+        if !isDownloading { setAsidePlexCheck() }
     }
 
     func cancel() {
@@ -113,8 +117,20 @@ final class SubtitleFix {
     }
 
     /// A Plex add may still complete after a timeout; keep its search keys valid until discovery succeeds.
+    /// An attempt Plex never lists would block everything else for good, so one that stays unresolved
+    /// can be set aside; it keeps its keys, so the same file is not added twice.
     var plexAddUnresolved: Bool {
-        plexDownloads.values.contains { $0.isBusy || $0.canCheckPlex }
+        plexDownloads.contains { $0.value.isBusy || ($0.value.canCheckPlex && !setAside.contains($0.key)) }
+    }
+
+    /// An unresolved Plex add is waiting with nothing in flight, so it can be set aside.
+    var canSetAsidePlexCheck: Bool {
+        plexAddUnresolved && !isDownloading
+    }
+
+    /// Stops an unresolved Plex add from blocking language, search and other downloads.
+    func setAsidePlexCheck() {
+        setAside.formUnion(plexDownloads.filter { $0.value.canCheckPlex }.keys)
     }
 
     // MARK: Remove
@@ -296,6 +312,7 @@ final class SubtitleFix {
     /// Reads the item again; never adds the file again.
     func checkPlexAgain(_ candidate: PlexSubtitleCandidate) {
         guard plexDownloads[candidate.id]?.canCheckPlex == true, !isDownloading else { return }
+        setAside.remove(candidate.id)
         plexDownloads[candidate.id] = .waiting(afterBazarr: false)
         downloadTask = Task { [weak self] in await self?.waitForPlex(candidate) }
     }

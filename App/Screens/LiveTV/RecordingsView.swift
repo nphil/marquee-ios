@@ -465,7 +465,7 @@ private struct RecordedList: View {
                     .listRowBackground(theme.sheet)
                 }
                 .themedList(theme)
-                .refreshable { await reload() }
+                .refreshable { await reload(refresh: true) }
             case .failed(let message):
                 EmptyState(
                     title: "Recordings didn't load",
@@ -479,9 +479,9 @@ private struct RecordedList: View {
         .task(id: attempt) { await reload() }
     }
 
-    private func reload() async {
+    private func reload(refresh: Bool = false) async {
         do {
-            load = .ready(try await store.recorded())
+            load = .ready(try await store.recorded(refresh: refresh))
         } catch {
             load = .failed(LiveText.problem(error, server: store.serverName))
         }

@@ -75,6 +75,7 @@ final class LiveTVStore {
     @ObservationIgnored private let serverID: String
     @ObservationIgnored private var refreshing: Task<Void, Never>?
     @ObservationIgnored private var genreCache: [String: Set<String>] = [:]
+    @ObservationIgnored private var recordedCache: [PlexMetadata]?
 
     /// The guide loads the next 3 hours first, then the rest of the day.
     static let firstSpan: TimeInterval = 3 * 60 * 60
@@ -325,9 +326,22 @@ final class LiveTVStore {
         recordings.scheduled.filter { $0.isUpcoming || $0.status == .error }
     }
 
-    /// Completed DVR recordings across the server’s movie and TV libraries.
-    func recorded() async throws -> [PlexMetadata] {
-        try await live.library.recordedItems()
+    /// Completed DVR recordings in the libraries the DVR's rules record into. The list is kept after
+    /// a load, so only `refresh` (pull to refresh, Try Again) reads the libraries again.
+    func recorded(refresh: Bool = false) async throws -> [PlexMetadata] {
+        if !refresh, let recordedCache { return recordedCache }
+        let rules: [RecordingRule]
+        do {
+            rules = try await live.rules()
+        } catch PlexError.unauthorized {
+            return []
+        } catch PlexError.server(let status, _) where status == 401 || status == 403 {
+            return []
+        }
+        let sections = Set(rules.compactMap(\.targetLibrarySectionID))
+        let items = try await live.library.recordedItems(inSections: sections)
+        recordedCache = items
+        return items
     }
 
     private static var cacheDirectory: URL {

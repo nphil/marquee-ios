@@ -46,7 +46,11 @@ final class ThemeMusicPlayer {
     @ObservationIgnored private var endToken: (any NSObjectProtocol)?
     @ObservationIgnored private var hintToken: (any NSObjectProtocol)?
     @ObservationIgnored private var interruptionToken: (any NSObjectProtocol)?
+    /// An interruption began and no end has been seen. iOS does not promise an end notification, so the
+    /// latch also clears when the app becomes active and when a different tune is wanted than the one it held back.
     @ObservationIgnored private var interrupted = false
+    @ObservationIgnored private var heldBack: Identity?
+    @ObservationIgnored private var activeToken: (any NSObjectProtocol)?
 
     init() {
         hintToken = NotificationCenter.default.addObserver(
@@ -63,11 +67,21 @@ final class ThemeMusicPlayer {
                 guard let self else { return }
                 if type == .began {
                     self.interrupted = true
+                    self.heldBack = self.loadedIdentity
                     self.player?.pause()
                     self.ended()
                 } else if type == .ended {
                     self.interrupted = false
+                    self.heldBack = nil
                 }
+            }
+        }
+        activeToken = NotificationCenter.default.addObserver(
+            forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.interrupted = false
+                self?.heldBack = nil
             }
         }
     }
@@ -152,10 +166,13 @@ final class ThemeMusicPlayer {
     private func load(_ want: Want) {
         unload()
         loadedIdentity = want.identity
-        if interrupted {
+        if interrupted, heldBack == nil || heldBack == want.identity {
+            heldBack = want.identity
             finished = true
             return
         }
+        interrupted = false
+        heldBack = nil
         // The UI tests' fake server has no tunes.
         guard !FakePlex.isActive else { return }
         loading = Task { [weak self] in

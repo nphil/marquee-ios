@@ -242,6 +242,10 @@ struct SubtitleSearchView: View {
                 Section {
                     Text("Finish checking the requested subtitle in Plex before changing language or searching Plex again.")
                         .foregroundStyle(theme.ink2)
+                    if fix.canSetAsidePlexCheck {
+                        Button("Stop Waiting for Plex") { fix.setAsidePlexCheck() }
+                            .accessibilityIdentifier("subtitleSearch.setAsidePlexCheck")
+                    }
                 }.listRowBackground(theme.sheet)
             } else if fix.plexSearch == nil && fix.results.isEmpty && (fix.search != nil || model.bazarr == nil) {
                 Section {

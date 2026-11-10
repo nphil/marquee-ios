@@ -33,7 +33,17 @@ struct PlexLibraryTests {
         #expect(request.url.query("unwatchedLeaves") == "1")
     }
 
-    @Test func recordingsUseCompletedDVRMediaAcrossEveryLibraryPage() async throws {
+    /// A completed recording's `Media`, as a real server (Plex Media Server, forum topic 903932) writes it.
+    static func recordedMedia(id: Int = 1, begins: Int? = nil) -> [String: Any] {
+        var media: [String: Any] = [
+            "id": id, "container": "mpegts", "channelIdentifier": "5", "mediaGrabPostProcessed": 1,
+            "mediaGrabStatus": "complete", "origin": "dvr",
+        ]
+        media["mediaGrabBeginsAt"] = begins
+        return media
+    }
+
+    @Test func recordingsAreCompletedDVRMediaInTheTargetLibrariesOnly() async throws {
         let (library, transport) = Self.library { request in
             switch request.url.path {
             case "/library/sections":
@@ -41,20 +51,21 @@ struct PlexLibraryTests {
                     ["key": "1", "title": "Movies", "type": "movie"],
                     ["key": "2", "title": "Shows", "type": "show"],
                     ["key": "3", "title": "Music", "type": "artist"],
+                    ["key": "4", "title": "Other shows", "type": "show"],
                 ]])
             case "/library/sections/1/all":
                 return container(["totalSize": 1, "Metadata": [
-                    ["ratingKey": "movie", "Media": [["origin": "dvr", "mediaGrabStatus": "complete", "mediaGrabBeginsAt": 100]]],
+                    ["ratingKey": "movie", "Media": [Self.recordedMedia(begins: 100)]],
                 ]])
             case "/library/sections/2/all" where request.headers[PlexHeader.containerStart] == "0":
                 return container(["totalSize": 4, "Metadata": [
                     ["ratingKey": "ordinary", "addedAt": 999, "Media": [["id": 1]]],
                     ["ratingKey": "incomplete", "Media": [["origin": "dvr", "mediaGrabStatus": "recording"]]],
-                    ["ratingKey": "mixed", "Media": [["id": 2, "mediaGrabBeginsAt": 999], ["id": 3, "origin": "dvr", "mediaGrabStatus": "complete", "mediaGrabBeginsAt": 200]]],
+                    ["ratingKey": "mixed", "Media": [["id": 2, "mediaGrabBeginsAt": 999], Self.recordedMedia(id: 3, begins: 200)]],
                 ]])
             case "/library/sections/2/all":
                 return container(["totalSize": 4, "Metadata": [
-                    ["ratingKey": "undated", "addedAt": 1000, "Media": [["origin": "dvr", "mediaGrabStatus": "complete"]]],
+                    ["ratingKey": "undated", "addedAt": 1000, "Media": [Self.recordedMedia()]],
                 ]])
             case "/library/metadata/mixed":
                 return container(["Metadata": [["ratingKey": "mixed", "Media": [["id": 3], ["id": 2]]]]])
@@ -63,7 +74,7 @@ struct PlexLibraryTests {
             }
         }
 
-        let recordings = try await library.recordedItems()
+        let recordings = try await library.recordedItems(inSections: [1, 2])
 
         #expect(recordings.map(\.ratingKey) == ["mixed", "movie", "undated"])
         #expect(recordings[0].recordedAt == Date(timeIntervalSince1970: 200))
@@ -80,9 +91,10 @@ struct PlexLibraryTests {
         #expect(episodes.map { $0.headers[PlexHeader.containerStart] } == ["0", "3"])
         #expect(episodes.allSatisfy { $0.url.query("type") == "4" })
         #expect(await transport.requests(to: "/library/sections/3/all").isEmpty)
+        #expect(await transport.requests(to: "/library/sections/4/all").isEmpty)
     }
 
-    @Test func recordingsStayEmptyWithoutDVRProvenance() async throws {
+    @Test func recordingsStayEmptyWithoutDVRProvenanceOrTargetLibrary() async throws {
         let (library, _) = Self.library { request in
             if request.url.path == "/library/sections" {
                 return container(["Directory": [["key": "1", "title": "Shows", "type": "show"]]])
@@ -92,7 +104,8 @@ struct PlexLibraryTests {
                 ["ratingKey": "unknown", "Media": []],
             ]])
         }
-        #expect(try await library.recordedItems().isEmpty)
+        #expect(try await library.recordedItems(inSections: [1]).isEmpty)
+        #expect(try await library.recordedItems(inSections: []).isEmpty)
     }
 
     @Test func recordingsPropagateLibraryFailure() async {
@@ -102,7 +115,7 @@ struct PlexLibraryTests {
             }
             return PlexHTTPResponse(status: 503, body: Data())
         }
-        await #expect(throws: PlexError.self) { try await library.recordedItems() }
+        await #expect(throws: PlexError.self) { try await library.recordedItems(inSections: [1]) }
     }
 
     @Test func jumpBarLettersStartWhereEarlierLettersEnd() async throws {
