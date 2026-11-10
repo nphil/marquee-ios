@@ -25,7 +25,7 @@ struct LibraryView: View {
                         .id(section.key)
                         .titleMenu(section.title) {
                             Picker("Library", selection: Binding(get: { section.key }, set: { chosenKey = $0 })) {
-                                ForEach(browsable) { Text($0.title).tag($0.key) }
+                                ForEach(browsable) { Label($0.title, systemImage: $0.type.libraryImage).tag($0.key) }
                             }
                             // Search and Requests have their own buttons in the header.
                             let places = [Destination.liveTV, .watchlist, .downloads].filter {
@@ -64,6 +64,19 @@ struct LibraryView: View {
         .task(id: LoadKey(library: library?.instance, attempt: sections.attempt)) {
             guard let library else { return }
             await sections.load { try await library.sections() }
+        }
+    }
+}
+
+extension PlexMediaType {
+    /// The glyph for a library of this type in the title menu.
+    var libraryImage: String {
+        switch self {
+        case .movie, .clip: "film"
+        case .show, .season, .episode: "tv"
+        case .collection: "square.stack"
+        case .playlist: "music.note.list"
+        case .unknown: "folder"
         }
     }
 }
