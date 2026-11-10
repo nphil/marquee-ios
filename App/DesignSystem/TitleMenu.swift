@@ -3,7 +3,8 @@ import SwiftUI
 extension View {
     /// A leading title that opens a menu. The menu is an explicit button in the bar's title slot, set in
     /// the display face with a chevron, because `toolbarTitleMenu` showed no chevron and opened nothing in
-    /// the inline-large bar.
+    /// the inline-large bar. The system's own title is removed from the bar (`toolbar(removing: .title)`),
+    /// otherwise the bar draws it again under the button; `navigationTitle` stays for back buttons.
     func titleMenu<Items: View>(_ title: String, @ViewBuilder items: () -> Items) -> some View {
         modifier(TitleMenuModifier(title: title, items: items()))
     }
@@ -15,7 +16,7 @@ private struct TitleMenuModifier<Items: View>: ViewModifier {
     @Environment(\.theme) private var theme
 
     func body(content: Content) -> some View {
-        content.toolbar {
+        content.toolbar(removing: .title).toolbar {
             ToolbarItem(placement: .title) {
                 Menu {
                     items
