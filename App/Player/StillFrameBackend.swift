@@ -1,6 +1,6 @@
 #if DEBUG
 import AVFoundation
-import Darwin
+import notify
 import UIKit
 
 /// The UI tests' frame source. The simulator decodes no video, so a fixture picture (the path in the

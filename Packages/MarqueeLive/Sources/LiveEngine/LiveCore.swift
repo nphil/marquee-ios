@@ -153,6 +153,7 @@ final class LiveCore: @unchecked Sendable {
     private var tracks: [LiveAudioTrack] = []
     private var videoSuspended = false
     private var paused = false
+    private var inputEnded = false
 
     // The video side's own.
     private var decoder: VideoDecoder?
@@ -187,6 +188,20 @@ final class LiveCore: @unchecked Sendable {
 
     var snapshot: LiveDiagnostics { lock.withLock { diagnostics } }
     var currentPhase: LivePhase { lock.withLock { slateAssumed ? .slate : phase } }
+
+    func finishInput() { lock.withLock { inputEnded = true } }
+
+    var inputDrained: Bool {
+        let clock = output.time
+        return lock.withLock {
+            guard inputEnded, !paused, queue.isEmpty else { return false }
+            switch phase {
+            case .opening, .slate: return true
+            case .picture, .stalled: return false
+            case .playing: return clock >= max(newestVideo ?? -.infinity, audioEnd ?? -.infinity)
+            }
+        }
+    }
 
     func note(response after: Double) { lock.withLock { diagnostics.timings.response = after } }
     func note(firstByte after: Double) { lock.withLock { diagnostics.timings.firstByte = after } }
@@ -619,10 +634,10 @@ final class LiveCore: @unchecked Sendable {
                 break
             case .picture:
                 guard let anchor else { break }
-                let target = jitter.seconds
+                let target = inputEnded ? 0 : jitter.seconds
                 let soundReady = (audioEnd ?? -Double.infinity) >= anchor + target
                 let lastSound = max(audioPacketAt ?? -Double.infinity, firstPictureAt ?? now)
-                let silent = tracks.isEmpty || now - lastSound >= Self.silentStart
+                let silent = inputEnded || tracks.isEmpty || now - lastSound >= Self.silentStart
                 let picturesReady = (newestVideo ?? -Double.infinity) >= anchor + target
                 guard soundReady || (silent && picturesReady) else { break }
                 output.setRate(1, time: anchor)
@@ -637,6 +652,7 @@ final class LiveCore: @unchecked Sendable {
             case .playing:
                 guard let newest else { break }
                 let buffered = newest - clock
+                if inputEnded { break }
                 if buffered < 0.05 {
                     output.setRate(0, time: nil)
                     jitter.underrun(at: now)
@@ -666,7 +682,7 @@ final class LiveCore: @unchecked Sendable {
                 }
                 diagnostics.buffered = servo.buffered
             case .stalled:
-                guard let newest, newest - clock >= jitter.seconds else { break }
+                guard let newest, inputEnded || newest - clock >= jitter.seconds else { break }
                 output.setRate(1, time: nil)
                 diagnostics.rate = 1
                 reportedRate = 1

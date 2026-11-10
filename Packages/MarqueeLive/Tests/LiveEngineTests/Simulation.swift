@@ -97,7 +97,8 @@ struct Simulation {
     /// gets the clock's reading.
     static func run(
         _ segments: [SyntheticTS.Segment], options: VideoOptions = VideoOptions(), tail: Double = 1,
-        delivery relative: (Double) -> Double = { $0 }, at hooks: [(Double, (LiveCore, Double) -> Void)] = []
+        delivery relative: (Double) -> Double = { $0 }, at hooks: [(Double, (LiveCore, Double) -> Void)] = [],
+        finishInput: Bool = false
     ) throws -> Simulation {
         let stream = try fixture(segments)
         let origin = stream.chunk.marks[0].time
@@ -145,6 +146,10 @@ struct Simulation {
             }
             guard let avStream = demuxer.stream(packet.pointer.pointee.stream_index) else { continue }
             if core.ingest(packet.pointer, stream: avStream, now: arrival) { nextStep = min(nextStep, arrival) }
+        }
+        if finishInput {
+            core.finishInput()
+            nextStep = min(nextStep, last)
         }
         advance(to: last + tail)
         return Simulation(

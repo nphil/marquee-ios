@@ -24,6 +24,28 @@ struct LiveCoreTests {
         #expect(previous.behindLive == 5)
         replacement.stop()
     }
+    @Test func endedInputPlaysBufferedPicturesBeforeDraining() throws {
+        let segments: [SyntheticTS.Segment] = [.slate(seconds: 0.5), .station(seconds: 2)]
+        let playing = try Simulation.run(segments, tail: 0.5, delivery: { _ in 0 }, finishInput: true)
+        #expect(playing.phases.contains(.playing))
+        #expect(!playing.core.inputDrained)
+
+        let drained = try Simulation.run(segments, tail: 4, delivery: { _ in 0 }, finishInput: true)
+        #expect(drained.phases.contains(.playing))
+        #expect(drained.core.inputDrained)
+        #expect(drained.count { $0 == .underrun } == 0)
+    }
+
+    @Test func emptyEndedInputDrainsUnlessPaused() {
+        let clock = TestClock()
+        let core = LiveCore(output: RecordingOutput { clock.now }, options: VideoOptions(), startedAt: 0) { _ in }
+        core.setPaused(true, now: 0)
+        core.finishInput()
+        #expect(!core.inputDrained)
+        core.setPaused(false, now: 0)
+        #expect(core.inputDrained)
+    }
+
 
     @Test func slateThenStationStartsMotionAndSoundTogether() throws {
         let sim = try Simulation.run(tuned, tail: 0)
