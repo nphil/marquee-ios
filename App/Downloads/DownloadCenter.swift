@@ -40,8 +40,8 @@ final class DownloadCenter {
     private var playbackCount = 0
     private var removing: Set<String> = []
     private var backgroundHandoff = false
-    private lazy var fetcher = RangeFetcher(meter: meter)
-    private lazy var background = BackgroundTransfer { [weak self] result in
+    @ObservationIgnored private lazy var fetcher = RangeFetcher(meter: meter)
+    @ObservationIgnored private lazy var background = BackgroundTransfer { [weak self] result in
         await self?.receivedBackground(result)
     }
 

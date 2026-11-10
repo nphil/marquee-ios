@@ -294,7 +294,7 @@ struct SubtitleSearchView: View {
 }
 
 /// Provider result rows used by the shared search page.
-struct PlexSearchRows {
+@MainActor struct PlexSearchRows {
     let model: PlayerModel
     let fix: SubtitleFix
     let theme: Theme
@@ -332,7 +332,7 @@ struct PlexSearchRows {
     }
 }
 
-struct BazarrSearchRows {
+@MainActor struct BazarrSearchRows {
     let model: PlayerModel
     let fix: SubtitleFix
     let theme: Theme

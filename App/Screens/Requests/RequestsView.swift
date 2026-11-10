@@ -190,7 +190,7 @@ struct RequestsView: View {
         .contentShape(Rectangle())
     }
 
-    private func failure(_ message: String, retry: @escaping () -> Void) -> some View {
+    private func failure(_ message: String, retry: @escaping @MainActor () -> Void) -> some View {
         EmptyState(title: "Couldn't load Seerr", message: message, systemImage: "exclamationmark.triangle", action: .init(title: "Try Again", systemImage: "arrow.clockwise", perform: retry))
     }
 
