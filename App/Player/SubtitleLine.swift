@@ -1,5 +1,22 @@
 import MarqueeCore
 import SwiftUI
+import UIKit
+
+enum SubtitleFont {
+    static func uiFont(_ font: SubtitleLook.Font, size: CGFloat, bold: Bool) -> UIFont {
+        let base = UIFont.systemFont(ofSize: size, weight: bold ? .bold : .medium)
+        switch font {
+        case .standard: return base
+        case .serif, .mono, .rounded:
+            let design: UIFontDescriptor.SystemDesign = font == .serif ? .serif : font == .mono ? .monospaced : .rounded
+            return base.fontDescriptor.withDesign(design).map { UIFont(descriptor: $0, size: size) } ?? base
+        case .legible:
+            return UIFont(name: bold ? "AtkinsonHyperlegible-Bold" : "AtkinsonHyperlegible-Regular", size: size) ?? base
+        case .avenirNext:
+            return UIFont(name: bold ? "AvenirNext-Bold" : "AvenirNext-Medium", size: size) ?? base
+        }
+    }
+}
 
 /// Subtitle text in a profile's look (behaviour spec §3, "Subtitle look"). Every length is a share of the
 /// picture's height, as on a TV, so the text does not follow the iPhone's text size. The player passes cue
@@ -125,14 +142,7 @@ private struct SubtitleMetrics {
     var lineGap: CGFloat { textSize * CGFloat(look.lineSpacing - 100) / 100 }
 
     var font: Font {
-        let weight: Font.Weight = look.isBold ? .bold : .medium
-        return switch look.font {
-        case .standard: .system(size: textSize, weight: weight)
-        case .serif: .system(size: textSize, weight: weight, design: .serif)
-        case .mono: .system(size: textSize, weight: weight, design: .monospaced)
-        // Atkinson Hyperlegible comes in regular and bold only.
-        case .legible: .custom(look.isBold ? "AtkinsonHyperlegible-Bold" : "AtkinsonHyperlegible-Regular", fixedSize: textSize)
-        }
+        Font(SubtitleFont.uiFont(look.font, size: textSize, bold: look.isBold))
     }
 }
 

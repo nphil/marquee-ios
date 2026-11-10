@@ -51,6 +51,11 @@ final class AccountAccessibilityScreenshots: XCTestCase {
     func testProfiles() throws {
         try profileFlow(mode: "light", suffix: "ax-dawn")
     }
+
+    @MainActor
+    func testSubtitleAppearance() throws {
+        try subtitleAppearanceFlow(mode: "light", suffix: "ax-dawn")
+    }
 }
 
 /// The same screens in landscape, in Rosé Pine. Landscape swipes did not scroll the Settings list and
@@ -76,7 +81,41 @@ final class AccountLandscapeScreenshots: XCTestCase {
     }
 }
 
+final class SubtitleAppearanceScreenshots: XCTestCase {
+    @MainActor
+    func testDark() throws { try subtitleAppearanceFlow(mode: "dark", suffix: "rose-pine") }
+
+    @MainActor
+    func testLight() throws { try subtitleAppearanceFlow(mode: "light", suffix: "dawn") }
+
+    @MainActor
+    func testLandscape() throws { try subtitleAppearanceFlow(mode: "dark", suffix: "land-rose-pine", turned: true) }
+}
+
 extension XCTestCase {
+    @MainActor
+    func subtitleAppearanceFlow(mode: String, suffix: String, turned: Bool = false) throws {
+        let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", arguments: ["-marquee.fakeSignedIn", "YES"])
+        openSettings(in: app)
+        reveal("settings.audio", in: app).tap()
+        waitForBar("Audio & Subtitles", in: app)
+        reveal("subtitles.style", in: app).tap()
+        waitForBar("Subtitle Style", in: app)
+        try snap("subtitle-appearance-\(suffix)", turned: turned)
+        reveal("style.font", in: app).tap()
+        waitForBar("Font", in: app)
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS 'Atkinson Hyperlegible'")).firstMatch.exists)
+        let rounded = app.buttons.matching(NSPredicate(format: "label CONTAINS 'Rounded'")).firstMatch
+        XCTAssertTrue(rounded.waitForExistence(timeout: 5))
+        rounded.tap()
+        try snap("subtitle-fonts-\(suffix)", turned: turned)
+        goBack(from: "Font", in: app)
+        reveal("style.moreOptions", in: app).tap()
+        waitForBar("More options", in: app)
+        XCTAssertTrue(element("style.reveal", in: app).exists)
+        try snap("subtitle-more-options-\(suffix)", turned: turned)
+    }
+
     /// Sign-in screen, code panel, browser sign-in (the fake approves at once), server list, then Home.
     @MainActor
     func signInFlow(mode: String, suffix: String) throws {
