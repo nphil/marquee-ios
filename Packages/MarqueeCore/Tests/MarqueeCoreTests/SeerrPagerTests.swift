@@ -105,6 +105,21 @@ struct SeerrPagerTests {
         #expect(pager.items.count == 4 && pager.failure as? SeerrError == .unreachable)
     }
 
+    @Test func refreshingLoadedPagesKeepsTheListLongAndAFailureKeepsItToo() async {
+        let server = Server(size: 4, pages: 3)
+        let pager = SeerrPager()
+        await pager.reload { try await server.page($0) }
+        await pager.loadMore()
+
+        await pager.refreshLoaded()
+        #expect(pager.items.count == 8 && pager.hasMore && pager.failure == nil)
+        #expect(await server.requests == [1, 2, 1, 2])
+
+        await server.goDown()
+        await pager.refreshLoaded()
+        #expect(pager.items.count == 8 && pager.failure as? SeerrError == .unreachable)
+    }
+
     @Test func pageForAnOlderReloadIsDropped() async {
         let pager = SeerrPager()
         let started = Gate()

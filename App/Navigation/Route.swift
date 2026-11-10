@@ -16,11 +16,13 @@ enum Route: Hashable {
     case destination(Destination)
     /// A title on Seerr, to request or, once it is in Plex, to play.
     case seerrTitle(SeerrTitle, zoomID: String? = nil)
+    /// A Seerr Discover list, paged with its filters: a shelf's "See all", or a genre card.
+    case seerrBrowse(SeerrFeed)
 
     var zoomID: String? {
         switch self {
         case .item(_, let zoomID), .watchlist(_, let zoomID), .seerrTitle(_, let zoomID): zoomID
-        case .hub, .person, .destination: nil
+        case .hub, .person, .destination, .seerrBrowse: nil
         }
     }
 

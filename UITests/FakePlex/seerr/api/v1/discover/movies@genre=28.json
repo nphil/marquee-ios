@@ -1,0 +1,25 @@
+{
+  "page": 1,
+  "totalPages": 1,
+  "totalResults": 2,
+  "results": [
+    {
+      "id": 9104,
+      "mediaType": "movie",
+      "title": "Charge",
+      "releaseDate": "2022-12-01",
+      "posterPath": "/art/charge-poster.jpg",
+      "backdropPath": "/art/charge-backdrop.jpg",
+      "overview": "A worn-out fighter has one last battery to spend."
+    },
+    {
+      "id": 9105,
+      "mediaType": "movie",
+      "title": "Hero",
+      "releaseDate": "2018-12-01",
+      "posterPath": "/art/hero-poster.jpg",
+      "backdropPath": "/art/hero-backdrop.jpg",
+      "overview": "A courier races across the rooftops of a neon city."
+    }
+  ]
+}

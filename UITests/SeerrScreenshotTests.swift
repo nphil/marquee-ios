@@ -3,7 +3,8 @@ import XCTest
 final class SeerrScreenshotTests: XCTestCase {
     @MainActor
     func testRequestsDark() throws {
-        try seerrFlow(mode: "dark", suffix: "rose-pine")
+        let app = try seerrFlow(mode: "dark", suffix: "rose-pine")
+        try browseFilters(in: app, suffix: "rose-pine")
     }
 
     @MainActor
@@ -60,8 +61,10 @@ private extension XCTestCase {
         return app
     }
 
+    /// Discover, a title and its request, My Requests, then the Action card's list. Ends on that list.
     @MainActor
-    func seerrFlow(mode: String, suffix: String) throws {
+    @discardableResult
+    func seerrFlow(mode: String, suffix: String) throws -> XCUIApplication {
         let app = launchSeerr(mode: mode)
         try snap("seerr-01-discover-\(suffix)")
         tap("seerr.poster.movie/9101", in: app)
@@ -80,5 +83,34 @@ private extension XCTestCase {
         myRequests.tap()
         waitFor("seerr.request.502", in: app)
         try snap("seerr-04-my-requests-\(suffix)")
+        app.buttons["Discover"].firstMatch.tap()
+        // The genre cards sit below the first shelves, which a lazy stack creates only as they scroll in.
+        _ = reveal("seerr.genre.movie.28", in: app)
+        tap("seerr.genre.movie.28", in: app)
+        waitForBar("Movies", in: app)
+        waitFor("seerr.poster.movie/9104", in: app)
+        try snap("seerr-05-browse-\(suffix)")
+        return app
+    }
+
+    /// From the Action list: the genre chip is chosen, the View menu turns on Upcoming Only, and Series
+    /// swaps in the series genres and titles while the filter stays on.
+    @MainActor
+    func browseFilters(in app: XCUIApplication, suffix: String) throws {
+        waitFor("seerr.chip.28", in: app)
+        XCTAssertTrue(element("seerr.chip.28", in: app).isSelected, "The Action chip is not chosen")
+        app.navigationBars.buttons["View"].firstMatch.tap()
+        let upcoming = app.buttons["Upcoming Only"].firstMatch
+        XCTAssertTrue(upcoming.waitForExistence(timeout: 5), "No Upcoming Only in the View menu")
+        try snap("seerr-06-view-menu-\(suffix)")
+        upcoming.tap()
+        let chip = app.buttons["Upcoming"].firstMatch
+        XCTAssertTrue(chip.waitForExistence(timeout: 5), "No Upcoming filter chip")
+        try snap("seerr-07-browse-filtered-\(suffix)")
+        app.buttons["Series"].firstMatch.tap()
+        waitFor("seerr.chip.10765", in: app)
+        waitFor("seerr.poster.tv/9201", in: app)
+        chip.tap()
+        XCTAssertTrue(chip.waitForNonExistence(timeout: 5), "The Upcoming chip stayed after a tap")
     }
 }

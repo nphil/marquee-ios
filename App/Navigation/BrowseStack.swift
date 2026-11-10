@@ -99,6 +99,8 @@ private struct RouteDestination: View {
             destination.page(pushed: true)
         case .seerrTitle(let title, _):
             SeerrTitleView(title: title)
+        case .seerrBrowse(let feed):
+            SeerrBrowseView(feed: feed)
         }
     }
 }

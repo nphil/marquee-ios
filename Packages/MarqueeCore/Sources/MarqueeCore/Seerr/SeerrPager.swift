@@ -36,16 +36,23 @@ public final class SeerrPager {
         self.fetch = fetch
         items = []
         hasLoaded = false
-        await loadFirstPage()
+        await load(pages: 1)
     }
 
     /// Loads the first page of the same list again. Titles already shown stay until it arrives, and
     /// after a failure.
     public func refresh() async {
-        await loadFirstPage()
+        await load(pages: 1)
     }
 
-    private func loadFirstPage() async {
+    /// Loads every page shown so far again, so what a title's badge says is current while the list keeps
+    /// its length and the screen its place. Titles already shown stay until all of them arrive, and after
+    /// a failure.
+    public func refreshLoaded() async {
+        await load(pages: max(1, nextPage - 1))
+    }
+
+    private func load(pages: Int) async {
         guard let fetch else { return }
         generation += 1
         let current = generation
@@ -54,12 +61,21 @@ public final class SeerrPager {
         failure = nil
         moreFailed = false
         do {
-            let page = try await fetch(1)
-            guard current == generation else { return }
-            items = Self.unique(page.titles)
-            nextPage = page.page + 1
-            hasMore = page.hasMore
-            hasLoaded = true
+            var titles: [SeerrTitle] = []
+            var last: SeerrTitlePage?
+            for number in 1...pages {
+                let page = try await fetch(number)
+                guard current == generation else { return }
+                titles += page.titles
+                last = page
+                if !page.hasMore { break }
+            }
+            if let last {
+                items = Self.unique(titles)
+                nextPage = last.page + 1
+                hasMore = last.hasMore
+                hasLoaded = true
+            }
         } catch {
             guard current == generation else { return }
             // A load cancelled because its screen went away is not a failure; the screen loads again

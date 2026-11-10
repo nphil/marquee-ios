@@ -8,14 +8,12 @@ struct RequestsView: View {
     @Environment(\.openRoute) private var openRoute
     @State private var page = Page.discover
     @State private var text = ""
-    @State private var shelves: [SeerrShelf: [SeerrTitle]]?
+    @State private var feed = DiscoverFeed()
     @State private var requests: [SeerrRequestItem]?
     @State private var searchResults: [SeerrTitle]?
     @State private var searchQuery = ""
-    @State private var discoverError: String?
     @State private var requestsError: String?
     @State private var searchError: String?
-    @State private var discoverAttempt = 0
     @State private var requestsAttempt = 0
     @State private var searchAttempt = 0
 
@@ -33,9 +31,7 @@ struct RequestsView: View {
         WidthReader { width in
             ScrollView {
                 VStack(alignment: .leading, spacing: Space.s4) {
-                    if client == nil {
-                        EmptyState(title: "Set up Seerr", message: "Add Seerr in Settings under Integrations to discover and request movies and series.", systemImage: "plus.rectangle.on.folder")
-                    } else {
+                    if let client {
                         Picker("Requests", selection: $page) {
                             Text("Discover").tag(Page.discover)
                             Text("My Requests").tag(Page.requests)
@@ -45,16 +41,19 @@ struct RequestsView: View {
                         if !query.isEmpty {
                             searchContent(width: width)
                         } else if page == .discover {
-                            discoverContent(width: width)
+                            discoverContent(client)
                         } else {
                             requestsContent
                         }
+                    } else {
+                        EmptyState(title: "Set up Seerr", message: "Add Seerr in Settings under Integrations to discover and request movies and series.", systemImage: "plus.rectangle.on.folder")
                     }
                 }
                 .padding(.top, Space.s2)
                 .padding(.bottom, Space.s6)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .refreshable { await refreshDiscover(client) }
             .scrollHeader()
             .tabBarFollowsScroll()
             .scrollDismissesKeyboard(.immediately)
@@ -63,9 +62,11 @@ struct RequestsView: View {
         .toolbarTitleDisplayMode(.inlineLarge)
         .background(theme.canvas)
         .searchable(text: $text, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search movies and series")
-        .task(id: LoadID(client: clientID, attempt: discoverAttempt, extra: String(session.seerr.requestsSent))) {
-            guard let client else { return }
-            await loadDiscover(client)
+        .task(id: clientID) {
+            if let client { feed.use(client) }
+        }
+        .onChange(of: session.seerr.requestsSent) {
+            feed.invalidate()
         }
         .task(id: LoadID(client: clientID, attempt: requestsAttempt, extra: String(session.seerr.requestsSent))) {
             guard let client else { return }
@@ -85,38 +86,27 @@ struct RequestsView: View {
                 searchResults = titles
             } catch {
                 guard !Task.isCancelled else { return }
-                searchError = Self.message(error)
+                searchError = SeerrView.message(for: error)
             }
         }
     }
 
-    @ViewBuilder private func discoverContent(width: CGFloat) -> some View {
-        if let shelves {
-            let visible = SeerrShelf.allCases.filter { !(shelves[$0] ?? []).isEmpty }
-            if visible.isEmpty {
-                EmptyState(title: "Nothing to discover", message: "There are no titles to show right now.", systemImage: "film.stack")
+    @ViewBuilder private func discoverContent(_ client: SeerrClient) -> some View {
+        if feed.hasFailed {
+            if let error = feed.failure {
+                failure(SeerrView.message(for: error)) { feed.reset() }
             } else {
-                ForEach(visible) { shelf in
-                    VStack(alignment: .leading, spacing: Space.s2) {
-                        ShelfHeader(title: shelf.title)
-                            .padding(.horizontal, Space.inset)
-                        ScrollView(.horizontal) {
-                            LazyHStack(alignment: .top, spacing: Space.s3) {
-                                ForEach(shelves[shelf] ?? []) { title in
-                                    titleButton(title, width: 120)
-                                }
-                            }
-                            .padding(.horizontal, Space.inset)
-                        }
-                        .scrollIndicators(.hidden)
-                    }
-                }
+                EmptyState(title: "Nothing to discover", message: "There are no titles to show right now.", systemImage: "film.stack")
             }
-        } else if let discoverError {
-            failure(discoverError) { discoverAttempt += 1 }
         } else {
-            Skeleton.Shelf().padding(.horizontal, Space.inset)
+            DiscoverRows(feed: feed, client: client)
         }
+    }
+
+    /// Pull to refresh on Discover asks every row again; the other pages have nothing to refresh.
+    private func refreshDiscover(_ client: SeerrClient?) async {
+        guard let client, page == .discover, query.isEmpty else { return }
+        await feed.refresh(using: client)
     }
 
     @ViewBuilder private func searchContent(width: CGFloat) -> some View {
@@ -126,7 +116,7 @@ struct RequestsView: View {
                 EmptyState(title: "No results for “\(query)”", message: "Check the spelling or try another word.", systemImage: "magnifyingglass")
             } else {
                 LazyVGrid(columns: metrics.gridItems, alignment: .leading, spacing: Space.s4) {
-                    ForEach(searchResults) { title in titleButton(title, width: metrics.cellWidth) }
+                    ForEach(searchResults) { title in SeerrTitleButton(title: title, width: metrics.cellWidth) }
                 }
                 .padding(.horizontal, Space.inset)
             }
@@ -163,14 +153,6 @@ struct RequestsView: View {
         }
     }
 
-    private func titleButton(_ title: SeerrTitle, width: CGFloat) -> some View {
-        Button { openRoute(.seerrTitle(title)) } label: {
-            SeerrPoster(title: title, width: width)
-        }
-        .buttonStyle(.press)
-        .accessibilityIdentifier("seerr.poster.\(title.id)")
-    }
-
     private func requestRow(_ item: SeerrRequestItem) -> some View {
         let request = item.request
         let details = [request.seasons.isEmpty ? nil : "Season\(request.seasons.count == 1 ? "" : "s") \(request.seasons.sorted().map(String.init).joined(separator: ", "))", request.is4K ? "4K" : nil].compactMap { $0 }.joined(separator: " · ")
@@ -194,36 +176,6 @@ struct RequestsView: View {
         EmptyState(title: "Couldn't load Seerr", message: message, systemImage: "exclamationmark.triangle", action: .init(title: "Try Again", systemImage: "arrow.clockwise", perform: retry))
     }
 
-    private static func message(_ error: any Error) -> String {
-        if let error = error as? SeerrError { return SeerrView.text(for: error) }
-        return "Couldn't reach Seerr. Try again."
-    }
-
-    private func loadDiscover(_ client: SeerrClient) async {
-        shelves = nil
-        discoverError = nil
-        let result = await withTaskGroup(of: (SeerrShelf, Result<[SeerrTitle], any Error>).self) { group in
-            for shelf in SeerrShelf.allCases {
-                group.addTask {
-                    do { return (shelf, .success(try await client.discover(shelf))) }
-                    catch { return (shelf, .failure(error)) }
-                }
-            }
-            var loaded: [SeerrShelf: [SeerrTitle]] = [:]
-            var error: (any Error)?
-            for await (shelf, result) in group {
-                switch result {
-                case .success(let titles): loaded[shelf] = titles
-                case .failure(let failure): error = failure
-                }
-            }
-            return (loaded, error)
-        }
-        guard !Task.isCancelled else { return }
-        if result.0.isEmpty { discoverError = result.1.map(Self.message) ?? "Couldn't load Seerr." }
-        else { shelves = result.0 }
-    }
-
     private func loadRequests(_ client: SeerrClient) async {
         requests = nil
         requestsError = nil
@@ -234,53 +186,7 @@ struct RequestsView: View {
             requests = loaded
         } catch {
             guard !Task.isCancelled else { return }
-            requestsError = Self.message(error)
-        }
-    }
-}
-
-private struct SeerrPoster: View {
-    let title: SeerrTitle
-    let width: CGFloat
-    @Environment(\.theme) private var theme
-    @Environment(\.displayScale) private var scale
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: Space.s1) {
-            PlexArtView(path: TMDBImage.url(title.posterPath, pixels: width * scale)?.absoluteString, size: PosterCell.artSize(width: width))
-                .overlay(alignment: .topTrailing) {
-                    if let badge = title.badge {
-                        Image(systemName: symbol(badge))
-                            .textRole(.caption)
-                            .foregroundStyle(theme.ink)
-                            .padding(.horizontal, Space.s2)
-                            .padding(.vertical, Space.s1 / 2)
-                            .background(theme.canvas, in: Capsule())
-                            .padding(Space.s2)
-                            .accessibilityHidden(true)
-                    }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: width >= 96 ? Radius.tile : Radius.control, style: .continuous))
-            Text(title.name).textRole(.caption).fontWeight(.semibold).foregroundStyle(theme.ink).lineLimit(1)
-            Text(title.badge?.title ?? title.year.map(String.init) ?? " ")
-                .textRole(.caption).foregroundStyle(theme.ink2).lineLimit(1)
-        }
-        .frame(width: width, alignment: .leading)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title.name)
-        .accessibilityValue(title.badge?.title ?? title.year.map(String.init) ?? "")
-    }
-
-    private func symbol(_ badge: SeerrBadge) -> String {
-        switch badge {
-        case .available: "checkmark"
-        case .partiallyAvailable: "circle.lefthalf.filled"
-        case .processing: "arrow.down"
-        case .approved: "clock"
-        case .pending: "hourglass"
-        case .declined: "xmark"
-        case .failed: "exclamationmark.triangle"
-        case .blocklisted: "nosign"
+            requestsError = SeerrView.message(for: error)
         }
     }
 }

@@ -38,7 +38,7 @@ Bazarr, at `http://bazarr.local:6767` when a test passes `-marquee.uitest.bazarr
 
 SpeechDock, at `http://speechdock.local:8765` when a test passes `-marquee.uitest.speechDock`, answers its health check as version 1.0.0 and times every cue of a window, its words spread evenly over the time the cue shows.
 
-Seerr, at `http://seerr.local:5055` when a test passes `-marquee.uitest.seerr`, provides five discovery shelves, a search for Wing, requestable Wing It!, partly available Caminandes, and a pending Sintel request. A request write adds Wing It! to My Requests and marks its detail page pending. IDs and request state are synthetic.
+Seerr, at `http://seerr.local:5055` when a test passes `-marquee.uitest.seerr`, provides the Discover page's trending, popular and upcoming shelves and genre cards, the genre, language, region and streaming service lists the browse filters offer, an Action list (`discover/movies@genre=28.json`: Charge and Hero), a search for Wing, requestable Wing It!, partly available Caminandes, and a pending Sintel request. A request write adds Wing It! to My Requests and marks its detail page pending. IDs and request state are synthetic.
 
 ## Artwork
 

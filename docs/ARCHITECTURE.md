@@ -90,6 +90,8 @@ Integrations (SpeechDock, Bazarr, Chromecast, the direct Live TV path, anything 
 
 `SeerrClient` in MarqueeCore uses the shared transport but owns its cookies; its app session disables automatic cookie storage. Plex sign-in exchanges the profile token for a Seerr session, while API-key sign-in acts as the key’s owner. Session expiry triggers a shared sign-in and one retry. Core owns the request permissions, quality and season rules, status badges and Plex link checks. Requests and title screens display those results, submit through `SeerrSettings`, and reload after a successful request. A Plex link without a server identity is confirmed against the item’s TMDB identifier before use.
 
+`DiscoverFeed` loads the Requests page's Discover rows, not the row views: each row asks Seerr as it nears the screen, in parallel with the others, and its answer survives a lazy stack dropping the view. An answer stays fresh for five minutes, a request sent from a title page reloads the rows quietly, and a row that fails or is empty is hidden. `SeerrBrowseView` pages one `SeerrFeed` through `SeerrPager`, which drops a page that arrives for an older query so quick filter changes cannot mix two lists. MarqueeCore builds the discover query (`SeerrBrowseQuery`) and lists the genres, languages, regions and streaming services the View menu offers.
+
 ## Tests and seams
 
 | Layer | How it is tested | Seam |

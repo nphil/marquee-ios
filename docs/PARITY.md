@@ -134,6 +134,10 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Bazarr settings page (address, API key, Test connection, Forget key) | Done | Connection to Bazarr; the key is kept in the Keychain. | Bazarr REST API `GET /api/system/status` [code] |
 | Sonarr / Radarr linked | Done | The Bazarr page's connection test names the linked Sonarr and Radarr versions. | Bazarr `/api/system/status` |
 | SpeechDock page | Done | Address with its checks, and Test Connection naming the service's version. | SpeechDock `GET /health` [code] |
+| Seerr page (address, Plex profile or API key, Test Connection) | Done | Requests becomes a tab or a Library destination once connected; the API key is kept in the Keychain. | Seerr `/api/v1/status`, `/auth/plex`, `/auth/me`, `/settings/public` [code] |
+| Seerr Discover | Done | Trending, Popular Movies, Movie Genres, Upcoming Movies, Popular Series, Series Genres and Upcoming Series rows; each loads as it nears the screen and hides if it fails. | `/discover/trending`, `/discover/movies`, `/discover/tv`, `/discover/movies/upcoming`, `/discover/tv/upcoming`, `/discover/genreslider/{movie,tv}` [code] |
+| Seerr browse and filters | Done | See all or a genre card opens a paged poster grid: Movies \| Series, genre chips and one View menu (sort, release decade, original language, rating, runtime, streaming service and region, upcoming only). | `/discover/movies`, `/discover/tv`, `/genres/{movie,tv}`, `/languages`, `/watchproviders/{regions,movies,tv}` [code] |
+| Seerr request and status | Done | Posters badge a title's status (available, partially available, processing, pending and so on); a title page requests a movie or chosen seasons. | `/movie/{id}`, `/tv/{id}`, `POST /request`, `GET /request` [code] |
 
 ## 10. Not on a phone
 - TV remote focus and D-pad navigation: N/A.
