@@ -24,8 +24,8 @@ struct ProfileSettings: Equatable, Sendable {
     var subtitleStyle = SubtitleLook()
     var homeRows = HomeLayout()
     var posterLabels = PosterLabels()
-    /// The default quality; picking one in the player's More menu saves it too.
-    var quality = VideoQuality.original
+    /// The default quality: Auto, or a fixed one; picking one in the player's More menu saves it too.
+    var quality = QualitySetting.auto
     /// Boost dialog and Normalize loudness, from the player's Audio menu.
     var audioEnhancements: AudioEnhancements = []
     /// Libraries switched off under Favorite Libraries, by `HomeLayout.libraryID`. Empty shows every library,
@@ -47,7 +47,13 @@ extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
         case skipInterval, skipTaps, introSkipDelay, nextEpisodeDelay, directPlay, aspect, readsTunerDirectly
         case audioLanguage, subtitles, remembersTracks, subtitleStyle, homeRows
-        case posterLabels, quality, audioEnhancements, hiddenLibraries, playsTrailers, playsThemeMusic, themeMusicVolume
+        case posterLabels, audioEnhancements, hiddenLibraries, playsTrailers, playsThemeMusic, themeMusicVolume
+        /// "quality" held a fixed quality before Auto existed (`LegacyKeys`).
+        case quality = "qualitySetting"
+    }
+
+    private enum LegacyKeys: String, CodingKey {
+        case quality
     }
 
     init(from decoder: any Decoder) throws {
@@ -67,7 +73,8 @@ extension ProfileSettings: Codable {
         subtitleStyle = value(.subtitleStyle) ?? subtitleStyle
         homeRows = value(.homeRows) ?? homeRows
         posterLabels = value(.posterLabels) ?? posterLabels
-        quality = value(.quality) ?? quality
+        let legacy = try? decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent(VideoQuality.self, forKey: .quality)
+        quality = value(.quality) ?? QualitySetting.saved(legacy: legacy)
         audioEnhancements = value(.audioEnhancements) ?? audioEnhancements
         hiddenLibraries = value(.hiddenLibraries) ?? hiddenLibraries
         playsTrailers = value(.playsTrailers) ?? playsTrailers

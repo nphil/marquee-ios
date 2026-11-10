@@ -68,6 +68,8 @@ final class AppSession {
     /// Made again by Delete All Local Data, which removes the stored client identifier.
     private(set) var identity: PlexClientIdentity
     let transport: URLSessionTransport
+    /// What the app's requests showed of the path to each host, for `NetworkPlace`.
+    let pathMetrics: PathMetrics
     private let storage: SessionStorage
     @ObservationIgnored private var signInTask: Task<Void, Never>?
     @ObservationIgnored private let signInBrowser = PlexSignInBrowser()
@@ -85,7 +87,9 @@ final class AppSession {
         identity = Self.identity(defaults: storage.defaults)
         let configuration = URLSessionConfiguration.default
         FakePlex.install(into: configuration)
-        transport = URLSessionTransport(session: URLSession(configuration: configuration))
+        let pathMetrics = PathMetrics()
+        self.pathMetrics = pathMetrics
+        transport = URLSessionTransport(session: URLSession(configuration: configuration, delegate: pathMetrics, delegateQueue: nil))
         bazarr = BazarrSettings(storage: storage, transport: transport)
         speechDock = SpeechDockSettings(storage: storage, transport: transport)
         cast = CastCenter(storage: storage)
@@ -486,7 +490,8 @@ final class AppSession {
     /// UI tests open the player straight on an item, paused where they want it, against the fake server.
     /// `marquee.uitest.introSkipDelay` lengthens the intro countdown for this launch only, so a test can
     /// wait for the controls to hide before it taps the offer; `marquee.uitest.directPlay` sets Direct Play
-    /// (`disabled` sends the item through a server transcode).
+    /// (`disabled` sends the item through a server transcode); `marquee.uitest.quality` sets the quality by its raw
+    /// value, -1 for Auto.
     private func playForUITest(_ library: PlexLibrary) {
         let defaults = UserDefaults.standard
         guard FakePlex.isActive, let key = defaults.string(forKey: "marquee.uitest.play") else { return }
@@ -496,6 +501,9 @@ final class AppSession {
             if delay > 0 { profileSettings.introSkipDelay = delay }
             if let mode = defaults.string(forKey: "marquee.uitest.directPlay").flatMap(DirectPlayMode.init(rawValue:)) {
                 profileSettings.directPlay = mode
+            }
+            if let raw = defaults.string(forKey: "marquee.uitest.quality").flatMap(Int.init) {
+                profileSettings.quality = VideoQuality(rawValue: raw).map(QualitySetting.fixed) ?? .auto
             }
             let time = defaults.double(forKey: "marquee.uitest.playerTime")
             let request = PlaybackRequest(item: item, startAt: time > 0 ? time : nil, startsPaused: defaults.bool(forKey: "marquee.uitest.paused"))

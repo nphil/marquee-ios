@@ -175,7 +175,7 @@ final class PlexLiveSource: LiveVideoSource {
             fail(.server(status: 0, message: "Plex ended the stream."))
         case .externalPlayback(let active):
             isExternal = active
-        case .time, .ready:
+        case .time, .ready, .switchDue:
             break
         }
     }

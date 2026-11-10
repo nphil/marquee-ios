@@ -931,8 +931,8 @@ struct MoreMenu: View {
             }
             Section {
                 Picker(selection: $model.qualityPick) {
-                    ForEach(VideoQuality.allCases, id: \.self) { quality in
-                        Text(quality.title).tag(quality)
+                    ForEach(QualitySetting.all, id: \.self) { setting in
+                        Text(setting.title).tag(setting)
                     }
                 } label: {
                     Label("Quality", systemImage: "dial.medium")
@@ -1019,6 +1019,7 @@ struct MoreMenu: View {
 
     private var qualityValue: String {
         if model.forcesDirectPlay { return "Original" }
+        if model.qualitySetting == .auto { return "Auto · " + model.quality.title }
         return model.quality == .original && model.isConverting ? "Original · Converted" : model.quality.title
     }
 }

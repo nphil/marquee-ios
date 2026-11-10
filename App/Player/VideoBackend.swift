@@ -12,6 +12,8 @@ enum BackendEvent {
     case externalPlayback(Bool)
     /// The picture's size in pixels, adjusted for its pixel aspect.
     case presentationSize(CGSize)
+    /// The playing item reached the time `armSwitch` set: the standby stream is due.
+    case switchDue
 }
 
 /// Why a stream stopped: plain words for the screen, and the error's domain, code and AVPlayer's comment
@@ -37,7 +39,8 @@ struct PlaybackFailure: Equatable {
     }
 }
 
-/// Plays one stream for the player model: AVPlayer on a phone, a still frame in the UI tests.
+/// Plays one stream for the player model: AVPlayer on a phone, a still frame in the UI tests. For Auto
+/// quality's switch (docs/adaptive-playback.md) it can hold a second stream ready beside the playing one.
 @MainActor
 protocol VideoBackend: AnyObject {
     /// The player behind the picture, Picture in Picture and AirPlay; nil for the still frame.
@@ -54,35 +57,54 @@ protocol VideoBackend: AnyObject {
     func play()
     func pause()
     func seek(to itemTime: TimeInterval, precise: Bool) async -> Bool
+    /// Bytes the playing item has fetched and the time spent fetching them; nil when unknown.
+    var transfer: (bytes: Int64, seconds: TimeInterval)? { get }
+    /// Seconds of media loaded past the playhead; nil when unknown.
+    var bufferedAhead: TimeInterval? { get }
+    /// Opens `item` on a second, silent player while the playing one carries on; false when it fails, is
+    /// discarded first, or the backend cannot hold a second stream.
+    func openStandby(_ item: AVPlayerItem) async -> Bool
+    /// Holds the standby at `itemTime`, primed to play; returns its player, or nil when that failed.
+    func prerollStandby(at itemTime: TimeInterval) async -> AVPlayer?
+    /// Reports `.switchDue` when the playing item reaches `itemTime`.
+    func armSwitch(at itemTime: TimeInterval)
+    /// Plays the standby in place of the playing stream, which is let go.
+    func switchToStandby()
+    func discardStandby()
     /// Removes every observer; the backend is not used again.
     func tearDown()
 }
 
+extension AVPlayerItem {
+    /// Seconds loaded past the playhead.
+    var bufferedAhead: TimeInterval {
+        let now = currentTime()
+        for value in loadedTimeRanges {
+            let range = value.timeRangeValue
+            if range.containsTime(now) { return max(0, (range.end - now).seconds) }
+        }
+        return 0
+    }
+}
+
 @MainActor
 final class AVPlayerBackend: VideoBackend {
-    let avPlayer = AVPlayer()
+    /// The player on screen; a switch to the standby replaces it.
+    private(set) var avPlayer = AVPlayer()
     var player: AVPlayer? { avPlayer }
     var onEvent: ((BackendEvent) -> Void)?
 
     private var timeObserver: Any?
+    private var switchObserver: Any?
     private var playerObservations: [NSKeyValueObservation] = []
     private var itemObservations: [NSKeyValueObservation] = []
     private var itemNotifications: [any NSObjectProtocol] = []
+    /// The second, silent player holding the next stream (`openStandby`).
+    private var standby: AVPlayer?
 
     init() {
         avPlayer.allowsExternalPlayback = true
-        timeObserver = avPlayer.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 10), queue: .main) { [weak self] time in
-            let seconds = time.seconds
-            MainActor.assumeIsolated { self?.onEvent?(.time(seconds.isFinite ? seconds : 0)) }
-        }
-        playerObservations = [
-            avPlayer.observe(\.timeControlStatus, options: [.new]) { [weak self] _, _ in
-                Task { @MainActor in self?.stateChanged() }
-            },
-            avPlayer.observe(\.isExternalPlaybackActive, options: [.new]) { [weak self] _, _ in
-                Task { @MainActor in self?.externalChanged() }
-            },
-        ]
+        observePlayer()
     }
 
     var itemTime: TimeInterval {
@@ -108,25 +130,7 @@ final class AVPlayerBackend: VideoBackend {
         // Keeps voices at their pitch away from normal speed.
         item?.audioTimePitchAlgorithm = .spectral
         avPlayer.replaceCurrentItem(with: item)
-        guard let item else { return }
-        itemObservations = [
-            item.observe(\.status, options: [.new]) { [weak self] _, _ in
-                Task { @MainActor in self?.statusChanged() }
-            },
-            item.observe(\.presentationSize, options: [.new]) { [weak self] _, _ in
-                Task { @MainActor in self?.sizeChanged() }
-            },
-        ]
-        let center = NotificationCenter.default
-        itemNotifications = [
-            center.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main) { [weak self] _ in
-                MainActor.assumeIsolated { self?.onEvent?(.ended) }
-            },
-            center.addObserver(forName: AVPlayerItem.failedToPlayToEndTimeNotification, object: item, queue: .main) { [weak self] note in
-                let failure = PlaybackFailure(note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? NSError)
-                MainActor.assumeIsolated { self?.onEvent?(.failed(failure)) }
-            },
-        ]
+        if let item { observe(item) }
     }
 
     func play() {
@@ -146,14 +150,130 @@ final class AVPlayerBackend: VideoBackend {
         )
     }
 
+    var transfer: (bytes: Int64, seconds: TimeInterval)? {
+        guard let events = avPlayer.currentItem?.accessLog()?.events else { return nil }
+        var bytes: Int64 = 0
+        var seconds: TimeInterval = 0
+        // Each event counts from its own start; negative values are unknown.
+        for event in events {
+            bytes += max(0, event.numberOfBytesTransferred)
+            seconds += max(0, event.transferDuration)
+        }
+        return (bytes, seconds)
+    }
+
+    var bufferedAhead: TimeInterval? { avPlayer.currentItem?.bufferedAhead }
+
+    func openStandby(_ item: AVPlayerItem) async -> Bool {
+        discardStandby()
+        item.audioTimePitchAlgorithm = .spectral
+        let next = AVPlayer(playerItem: item)
+        next.isMuted = true
+        next.allowsExternalPlayback = true
+        standby = next
+        // The model discards the standby once the playhead passes the switch, which ends the wait.
+        while item.status == .unknown {
+            try? await Task.sleep(for: .milliseconds(100))
+            guard standby === next, !Task.isCancelled else { return false }
+        }
+        return item.status == .readyToPlay && standby === next
+    }
+
+    func prerollStandby(at itemTime: TimeInterval) async -> AVPlayer? {
+        guard let next = standby else { return nil }
+        let time = CMTime(seconds: max(0, itemTime), preferredTimescale: 600)
+        guard await next.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero), standby === next,
+              // Preroll raises an exception on a player that is not ready or not paused.
+              next.status == .readyToPlay, next.rate == 0
+        else { return nil }
+        guard await next.preroll(atRate: rate), standby === next else { return nil }
+        return next
+    }
+
+    func armSwitch(at itemTime: TimeInterval) {
+        if let switchObserver { avPlayer.removeTimeObserver(switchObserver) }
+        let time = NSValue(time: CMTime(seconds: itemTime, preferredTimescale: 600))
+        switchObserver = avPlayer.addBoundaryTimeObserver(forTimes: [time], queue: .main) { [weak self] in
+            MainActor.assumeIsolated { self?.onEvent?(.switchDue) }
+        }
+    }
+
+    func switchToStandby() {
+        guard let next = standby else { return }
+        standby = nil
+        let old = avPlayer
+        // Unobserved first, so the old player's pause does not read as the playback pausing.
+        stopObservingPlayer()
+        clearItem()
+        old.pause()
+        old.replaceCurrentItem(with: nil)
+        avPlayer = next
+        next.defaultRate = rate
+        next.isMuted = false
+        observePlayer()
+        if let item = next.currentItem { observe(item) }
+        next.play()
+        sizeChanged()
+    }
+
+    func discardStandby() {
+        if let switchObserver { avPlayer.removeTimeObserver(switchObserver) }
+        switchObserver = nil
+        standby?.cancelPendingPrerolls()
+        standby?.replaceCurrentItem(with: nil)
+        standby = nil
+    }
+
     func tearDown() {
+        discardStandby()
         avPlayer.pause()
         load(nil)
-        if let timeObserver { avPlayer.removeTimeObserver(timeObserver) }
+        stopObservingPlayer()
+        onEvent = nil
+    }
+
+    private func observePlayer() {
+        timeObserver = avPlayer.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 10), queue: .main) { [weak self] time in
+            let seconds = time.seconds
+            MainActor.assumeIsolated { self?.onEvent?(.time(seconds.isFinite ? seconds : 0)) }
+        }
+        playerObservations = [
+            avPlayer.observe(\.timeControlStatus, options: [.new]) { [weak self] _, _ in
+                Task { @MainActor in self?.stateChanged() }
+            },
+            avPlayer.observe(\.isExternalPlaybackActive, options: [.new]) { [weak self] _, _ in
+                Task { @MainActor in self?.externalChanged() }
+            },
+        ]
+    }
+
+    private func stopObservingPlayer() {
+        for observer in [timeObserver, switchObserver].compactMap({ $0 }) { avPlayer.removeTimeObserver(observer) }
         timeObserver = nil
+        switchObserver = nil
         playerObservations.forEach { $0.invalidate() }
         playerObservations = []
-        onEvent = nil
+    }
+
+    private func observe(_ item: AVPlayerItem) {
+        itemObservations = [
+            item.observe(\.status, options: [.new]) { [weak self] _, _ in
+                Task { @MainActor in self?.statusChanged() }
+            },
+            item.observe(\.presentationSize, options: [.new]) { [weak self] _, _ in
+                Task { @MainActor in self?.sizeChanged() }
+            },
+        ]
+        let center = NotificationCenter.default
+        itemNotifications = [
+            center.addObserver(forName: AVPlayerItem.didPlayToEndTimeNotification, object: item, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.onEvent?(.ended) }
+            },
+            center.addObserver(forName: AVPlayerItem.failedToPlayToEndTimeNotification, object: item, queue: .main) { [weak self] note in
+                let failure = PlaybackFailure(note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? NSError)
+                MainActor.assumeIsolated { self?.onEvent?(.failed(failure)) }
+            },
+        ]
     }
 
     private func clearItem() {

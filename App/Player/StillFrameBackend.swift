@@ -67,6 +67,16 @@ final class StillFrameBackend: VideoBackend {
         return true
     }
 
+    var transfer: (bytes: Int64, seconds: TimeInterval)? { nil }
+    var bufferedAhead: TimeInterval? { nil }
+
+    // One stream only: Auto's moves restart at the playhead.
+    func openStandby(_ item: AVPlayerItem) async -> Bool { false }
+    func prerollStandby(at itemTime: TimeInterval) async -> AVPlayer? { nil }
+    func armSwitch(at itemTime: TimeInterval) {}
+    func switchToStandby() {}
+    func discardStandby() {}
+
     func tearDown() {
         stopClock()
         onEvent = nil

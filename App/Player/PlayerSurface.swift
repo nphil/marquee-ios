@@ -9,6 +9,57 @@ final class PlayerLayerView: UIView {
     override class var layerClass: AnyClass { AVPlayerLayer.self }
 
     var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+
+    /// The standby player's picture, drawn unseen above the playing one so that Auto quality's switch
+    /// (docs/adaptive-playback.md) shows it at once.
+    private var standbyLayer: AVPlayerLayer?
+    private var coverTask: Task<Void, Never>?
+
+    func prepareStandby(_ player: AVPlayer) {
+        discardStandby()
+        let standby = AVPlayerLayer(player: player)
+        standby.videoGravity = playerLayer.videoGravity
+        standby.frame = bounds
+        standby.opacity = 0
+        layer.addSublayer(standby)
+        standbyLayer = standby
+    }
+
+    /// Shows the standby player in place of the playing one. Its own layer covers the swap until this
+    /// view's layer draws the new picture.
+    func switchToStandby() {
+        guard let standby = standbyLayer else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        standby.opacity = 1
+        playerLayer.player = standby.player
+        CATransaction.commit()
+        coverTask = Task { [weak self] in
+            // The cover shows the same player, so staying a little long costs nothing.
+            for _ in 0..<20 {
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled, let self else { return }
+                if playerLayer.isReadyForDisplay { break }
+            }
+            self?.discardStandby()
+        }
+    }
+
+    func discardStandby() {
+        coverTask?.cancel()
+        coverTask = nil
+        standbyLayer?.removeFromSuperlayer()
+        standbyLayer = nil
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        guard let standbyLayer else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        standbyLayer.frame = bounds
+        CATransaction.commit()
+    }
 }
 
 /// Puts the model's player layer view on screen, and takes it back after Picture in Picture.

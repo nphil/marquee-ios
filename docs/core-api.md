@@ -26,7 +26,8 @@
 
 ## Server address (`Connection/`)
 
-- `PlexServer`, `PlexConnection`: a server with this user's token and its addresses. Codable, for the Keychain only. `PlexConnection.displayAddress` is the address as a person reads it: the IP a plex.direct name spells, and the port when it is not 32400.
+- `PlexServer`, `PlexConnection`: a server with this user's token and its addresses. Codable, for the Keychain only. `PlexConnection.displayAddress` is the address as a person reads it: the IP a plex.direct name spells, and the port when it is not 32400. `ipAddress`: that IP, or nil for a host name.
+- `NetworkPlace.of(_:onPhoneNetwork:localAddress:roundTrip:)`: `.home` or `.away(.relay | .remote | .tunnel)` for the connection in use; a LAN address reached through a VPN (Tailscale) is away. Rules in docs/adaptive-playback.md.
 - `ConnectionRanking.ordered(_:httpsRequired:)`: local, then remote, then relay; https before http, IPv4 before IPv6; duplicates dropped.
 - `HomeNetwork.contains(_:)`: the hosts the app's transport security lets through without TLS (private, link-local and tailnet addresses, `.local` and single-label names); integrations allow plain http only to these.
 - `ConnectionRanking.pick(_:graceExpired:)`: `use`, `wait` or `noneReachable` from probe outcomes so far.
@@ -91,7 +92,9 @@ Tracks titled Signs or Songs count as on-screen text, as the spec's forced-word 
 - `ThemeMusic.key(for:)`: the tune a show's or season's page plays. `plays(_ conditions:)`: whether it plays now, from the setting, app activity, page visibility, an open player, other audio and a trailer with sound. `ThemeFade`: the tune's gain, rising over 1.5 s and falling over 1 s from wherever it is; `volume(level:)` is the setting times the gain squared.
 - `PlaybackRoute`: kind, `RouteReason`s, played audio and whether it stands in, audio conversion, video re-encode, `SubtitleDelivery` (sidecar, in stream, burned in, not shown).
 - `RouteReason`: plain-English reasons. `RouteLimits`: a server reason (on-device failure, direct play off, AirPlay), phone only (Direct play forced: never the server, unshowable subtitles not shown), bitrate cap.
-- `VideoQuality.lower(mediaKbps:)`: the highest preset at or below half the rate playing now, offered after a long network wait.
+- `VideoQuality.lower(mediaKbps:)`: the highest preset at or below half the rate playing now, offered after a long network wait at a fixed quality.
+- `QualitySetting`: `.auto` (the default) or `.fixed(VideoQuality)`; `all` for menus, `saved(legacy:)` reads the old fixed-only setting.
+- `AdaptiveQuality(place:mediaKbps:linkKbps:scores:tuning:now:)`: Auto's rung keeper (docs/adaptive-playback.md). `observe(Look)` takes the link speed, buffer and network wait every few seconds and returns a rung to move to or nil; `moved(to:at:)` once the move is over; `rung`, `estimateKbps`, `ladder`. `QualityScores`: a title's VMAF score per rung, capping the climb (nothing supplies them yet).
 - `StallWatch`: what a wait in mid-play waits on. `check(now:position:run:)` → `.network(seconds:)`, `.stuck(ahead:cause:)` (a remux run idle for 1 s, or 30 s of output the player sits on: restart it at the playhead) or `.giveUp` (stuck again within 1 s of the last restart); `resume()` once playback moves.
 - `SkipTaps`: the player's tap rule as a state machine. `tap(_ side:at:)` → `.skip(side)`, `.toggleAspect` or `.single`; `SkipTapMode.doubleTap` skips only on a true double-tap (`doubleTapWindow` 0.3 s), `.chained` also skips on same-side taps within `chainWindow` (1.5 s) of a skip; `reset()`. `TapSide` is the third of the picture a tap landed in.
 - `FormatBadge`: `make(video:media:audio:route:)` → the first-start badge: `resolution` (by width), `range` (HDR10, HDR10+, HLG, Dolby Vision; none when the server re-encodes, HDR10 for a Dolby Vision profile 7 base layer), `sound` (Atmos, 5.1, 7.1; only for passed-through audio), `spoken` for VoiceOver.

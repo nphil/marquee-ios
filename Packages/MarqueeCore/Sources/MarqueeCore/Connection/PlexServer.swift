@@ -66,14 +66,22 @@ public struct PlexConnection: Sendable, Hashable, Codable {
 
     public var isHTTPS: Bool { uri.scheme?.lowercased() == "https" }
 
-    /// The address as a person reads it. A plex.direct name spells its IP in the first label
-    /// ("81-2-3-4.<id>.plex.direct"), far shorter than the name; the port follows when it is not
-    /// Plex's 32400.
-    public var displayAddress: String {
-        var host = (uri.host() ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+    /// The IP the address points at: the host itself, or the one a plex.direct name spells in its first label
+    /// ("81-2-3-4.<id>.plex.direct"); nil for any other name.
+    public var ipAddress: String? {
+        let host = (uri.host() ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
         if host.hasSuffix(".plex.direct"), let label = host.split(separator: ".").first {
-            host = label.replacingOccurrences(of: "-", with: isIPv6 ? ":" : ".")
+            return label.replacingOccurrences(of: "-", with: isIPv6 ? ":" : ".")
         }
+        let parts = host.split(separator: ".", omittingEmptySubsequences: false)
+        let isIPv4 = parts.count == 4 && parts.allSatisfy { UInt8($0) != nil }
+        return isIPv4 || host.contains(":") ? host : nil
+    }
+
+    /// The address as a person reads it: the IP when there is one, far shorter than a plex.direct name; the
+    /// port follows when it is not Plex's 32400.
+    public var displayAddress: String {
+        let host = ipAddress ?? (uri.host() ?? "").trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
         guard let port = uri.port, port != 32400 else { return host }
         return host.contains(":") ? "[\(host)]:\(port)" : "\(host):\(port)"
     }

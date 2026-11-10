@@ -118,7 +118,7 @@ final class LiveRouter: LiveVideoSource {
         isPrepared = true
         async let readDVRs = try? live.dvrs()
         async let readSchedule = try? live.scheduled()
-        for device in devices where !FakeTuner.isActive && device.speaksHDHomeRun && Self.isOnAttachedNetwork(device.uri) != false {
+        for device in devices where !FakeTuner.isActive && device.speaksHDHomeRun && NetworkPath.isOnAttachedNetwork(device.uri.host()) != false {
             guard await isReachable(device), lineups[device.key] == nil else { continue }
             let tuners = tuners
             Task { [weak self] in
@@ -151,7 +151,9 @@ final class LiveRouter: LiveVideoSource {
 
     private func isAtHome(_ device: TunerDevice) async -> Bool {
         if FakeTuner.isActive { return true }
-        if let attached = Self.isOnAttachedNetwork(device.uri) { return attached }
+        // A tuner reached through a VPN's route into the home network is away: the tuner would see the VPN router's
+        // address, which may be the Plex server's, and let the phone take over a recording (§5 Q2).
+        if let attached = NetworkPath.isOnAttachedNetwork(device.uri.host()) { return attached }
         // A tuner by host name: home is where the server answers on its local address.
         return (try? await live.library.connection.connection().isLocal) ?? false
     }
@@ -166,32 +168,6 @@ final class LiveRouter: LiveVideoSource {
         } ?? false
         reachability[device.key] = (reachable, .now)
         return reachable
-    }
-
-    /// Whether the tuner's address is on a network one of the phone's own interfaces is attached to; nil for a host
-    /// name. A tuner reached through a VPN's route into the home network is away: the tuner would see the VPN router's
-    /// address, which may be the Plex server's, and let the phone take over a recording (§5 Q2).
-    nonisolated static func isOnAttachedNetwork(_ uri: URL) -> Bool? {
-        guard let host = uri.host() else { return nil }
-        var target = in_addr()
-        guard inet_pton(AF_INET, host, &target) == 1 else { return nil }
-        var list: UnsafeMutablePointer<ifaddrs>?
-        guard getifaddrs(&list) == 0 else { return false }
-        defer { freeifaddrs(list) }
-        var entry = list
-        while let current = entry {
-            defer { entry = current.pointee.ifa_next }
-            let flags = Int32(bitPattern: current.pointee.ifa_flags)
-            // VPN tunnels are point-to-point.
-            guard flags & IFF_UP != 0, flags & (IFF_LOOPBACK | IFF_POINTOPOINT) == 0,
-                  let address = current.pointee.ifa_addr, address.pointee.sa_family == sa_family_t(AF_INET),
-                  let netmask = current.pointee.ifa_netmask
-            else { continue }
-            let own = address.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee.sin_addr.s_addr }
-            let mask = netmask.withMemoryRebound(to: sockaddr_in.self, capacity: 1) { $0.pointee.sin_addr.s_addr }
-            if own & mask == target.s_addr & mask { return true }
-        }
-        return false
     }
 
     // MARK: Switching

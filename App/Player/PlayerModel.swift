@@ -157,11 +157,22 @@ final class PlayerModel: Identifiable {
         var note: String?
     }
 
-    /// The highest quality videos play at: Settings' default, or the lower one a long wait on the network
-    /// offered, which lasts for this playback (`qualityCap`). Picking one here changes Settings' default
-    /// too and lifts the cap.
-    var quality: VideoQuality { qualityCap ?? session.settings.quality }
+    /// The quality setting this playback follows: Settings', or the fixed quality a long wait on the network
+    /// offered, which lasts for this playback (`qualityCap`). Picking one here changes Settings' too and lifts
+    /// the cap.
+    var qualitySetting: QualitySetting { qualityCap.map(QualitySetting.fixed) ?? session.settings.quality }
+    /// The highest quality videos play at: the fixed one, or Auto's rung.
+    var quality: VideoQuality {
+        if case .fixed(let fixed) = qualitySetting { return fixed }
+        return autoRung
+    }
     private(set) var qualityCap: VideoQuality?
+    /// Auto's rung on this item (docs/adaptive-playback.md); Original while Auto does not adapt.
+    private(set) var autoRung = VideoQuality.original
+    /// Where the phone is from the server, for Auto and stats for nerds.
+    private(set) var place: NetworkPlace?
+    /// Auto's estimate of the link to the server, for stats for nerds.
+    private(set) var linkEstimateKbps: Int?
     var showsInfo = false
     var showsStyle = false
     var showsStats = false
@@ -186,6 +197,25 @@ final class PlayerModel: Identifiable {
         case direct
         case remux(RemuxSession)
         case transcode(String)
+    }
+
+    /// The stream Auto moves to, open on the backend's standby player until the playhead reaches its start.
+    private struct Standby {
+        var rung: VideoQuality
+        var choice: RouteChoice
+        var stream: Stream
+        var reporter: TimelineReporter
+        var connection: PlexConnection?
+        /// The server stream's offset; 0 for the file.
+        var offset: TimeInterval
+        var origin: TimeInterval
+    }
+
+    /// A route decided at one quality, taken on when its stream plays (`take`).
+    private struct RouteChoice {
+        var subtitle: SubtitleDecision
+        var route: PlaybackRoute
+        var enhancements: EnhancementState
     }
 
     /// What a track change can switch inside the playing stream; anything else needs a new stream.
@@ -276,6 +306,17 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var castSeekTarget: TimeInterval?
     /// The receiver could not open the file itself, so the server streams it.
     @ObservationIgnored private var castReceiverFailed = false
+    /// Auto's rung keeper while it adapts: Auto picked and not Force Direct Play.
+    @ObservationIgnored private var adaptive: AdaptiveQuality?
+    @ObservationIgnored private var qualityTask: Task<Void, Never>?
+    @ObservationIgnored private var moveTask: Task<Void, Never>?
+    /// Auto asked for a rung and the move has not settled (`settleMove`).
+    @ObservationIgnored private var movePending = false
+    @ObservationIgnored private var standby: Standby?
+    /// The playing item's transfer totals at Auto's last look.
+    @ObservationIgnored private var lastTransfer: (bytes: Int64, seconds: TimeInterval)?
+    /// The longest wait on the network since Auto's last look.
+    @ObservationIgnored private var longestWait: TimeInterval = 0
 
     init(request: PlaybackRequest, session: AppSession, library: PlexLibrary, capabilities: PlaybackCapabilities) {
         self.request = request
@@ -393,8 +434,8 @@ final class PlayerModel: Identifiable {
         set { setAspect(newValue) }
     }
 
-    var qualityPick: VideoQuality {
-        get { quality }
+    var qualityPick: QualitySetting {
+        get { qualitySetting }
         set { setQuality(newValue) }
     }
 
@@ -451,6 +492,7 @@ final class PlayerModel: Identifiable {
         session.cast.player = self
         session.cast.beginSearch()
         loadItem(request.item.ratingKey)
+        watchQuality()
     }
 
     func close() {
@@ -460,7 +502,9 @@ final class PlayerModel: Identifiable {
         generation += 1
         wordTiming?.stop()
         wordTiming = nil
-        for task in [loadTask, queueTask, seekTask, eventsTask, countdownTask, hideTask, stageTask, stallTask, trickplayLoad?.task] { task?.cancel() }
+        for task in [loadTask, queueTask, seekTask, eventsTask, countdownTask, hideTask, stageTask, stallTask, qualityTask, moveTask, trickplayLoad?.task] {
+            task?.cancel()
+        }
         sideTasks.forEach { $0.cancel() }
         subtitleFix?.cancel()
         stopStream()
@@ -500,6 +544,7 @@ final class PlayerModel: Identifiable {
 
     func pause() {
         wantsPlay = false
+        abandonMove()
         if castDevice != nil { session.cast.pause() } else { backend.pause() }
         interruptCountdown()
     }
@@ -542,6 +587,7 @@ final class PlayerModel: Identifiable {
     func seek(to requested: TimeInterval) {
         guard phase == .playing || phase == .finished else { return }
         if phase == .finished { phase = .playing }
+        abandonMove()
         let target = clamp(requested)
         time = target
         if castDevice != nil {
@@ -653,11 +699,13 @@ final class PlayerModel: Identifiable {
         scheduleHide()
     }
 
-    func setQuality(_ quality: VideoQuality) {
+    func setQuality(_ setting: QualitySetting) {
         scheduleHide()
-        let playing = self.quality
+        let playing = quality
         qualityCap = nil
-        if quality != session.settings.quality { session.settings.quality = quality }
+        if setting != session.settings.quality { session.settings.quality = setting }
+        abandonMove()
+        startAdapting(connection: streamConnection)
         if quality != playing { reroute(handPick: false) }
     }
 
@@ -843,6 +891,10 @@ final class PlayerModel: Identifiable {
         time = start
         publishItem()
         nextFromStart = false
+        // Where the phone is sets Auto's start and whether the remux may read the file over the link.
+        let connection = try? await library.connection.connection()
+        guard generation == self.generation else { return }
+        startAdapting(connection: connection)
         // Scene thumbnails load after the first picture (`arrived`).
         await decideRoute()
         startTiming.mark(.route)
@@ -850,7 +902,7 @@ final class PlayerModel: Identifiable {
         await startStream(at: start, generation: generation)
     }
 
-    private func routeLimits(connection: PlexConnection?) -> RouteLimits {
+    private func routeLimits(connection: PlexConnection?, quality: VideoQuality) -> RouteLimits {
         switch session.settings.directPlay {
         case .force:
             return RouteLimits(phoneOnly: true)
@@ -862,15 +914,17 @@ final class PlayerModel: Identifiable {
             return RouteLimits(
                 serverReason: onDeviceFailed || failedBefore ? .onDeviceFailed : nil,
                 quality: quality,
-                remoteConnection: connection.map { !$0.isLocal } ?? false,
-                linkKbps: connection.flatMap { session.player.linkKbps[$0.uri] }
+                // Plex calls a LAN address reached through a VPN local; the place knows better.
+                remoteConnection: place.map { !$0.isHome } ?? connection.map { !$0.isLocal } ?? false,
+                // Auto's rung already fits the link.
+                linkKbps: adaptive == nil ? connection.flatMap { session.player.linkKbps[$0.uri] } : nil
             )
         }
     }
 
     /// Why Boost dialog and Normalize loudness cannot apply to this video, given `base`, the route
     /// without them; nil when they can.
-    private func enhancementBlock(base: PlaybackRoute, audio: AudioTrack?) -> String? {
+    private func enhancementBlock(base: PlaybackRoute, audio: AudioTrack?, quality: VideoQuality) -> String? {
         if session.settings.directPlay == .force {
             return "Not available while Force Direct Play is on. Set Direct Play to Auto in Settings to use it."
         }
@@ -890,12 +944,19 @@ final class PlayerModel: Identifiable {
             decideCastRoute(castDevice, tracks: tracks, media: media, part: part)
             return
         }
+        let choice = await chooseRoute(tracks: tracks, media: media, part: part, quality: quality)
+        take(choice)
+        if case .sidecar(let track) = choice.route.subtitle { await loadSidecar(track) }
+    }
+
+    /// The route at `quality`, decided without changing the playing one.
+    private func chooseRoute(tracks: MediaTracks, media: PlexMedia, part: PlexPart, quality: VideoQuality) async -> RouteChoice {
         let settings = session.settings
         let memory = settings.remembersTracks ? session.trackMemory(for: item) : nil
         let picked = AudioPicker.pick(in: tracks, handPick: handAudio, remembered: memory?.audio, preferredLanguage: settings.audioLanguage)
         let device = await capabilities.current()
         let connection = try? await library.connection.connection()
-        var limits = routeLimits(connection: connection)
+        var limits = routeLimits(connection: connection, quality: quality)
         func decide(drawsImages: Bool) -> (SubtitleDecision, PlaybackRoute) {
             let decision = SubtitlePicker.decide(
                 tracks: tracks, audio: picked, handPick: handSubtitle, remembered: memory?.subtitle,
@@ -922,7 +983,7 @@ final class PlayerModel: Identifiable {
         // Boost dialog and Normalize loudness are the server's: it copies the video and reworks the sound.
         // They never ride on a stream it re-encodes anyway.
         let offered = session.serverInfo.hasPlexPass
-        var block = enhancementBlock(base: route, audio: picked)
+        var block = enhancementBlock(base: route, audio: picked, quality: quality)
         if offered, !settings.audioEnhancements.isEmpty, block == nil {
             limits.audioEnhancements = settings.audioEnhancements
             let enhanced = decide(drawsImages: drawsImages)
@@ -932,23 +993,23 @@ final class PlayerModel: Identifiable {
                 (decision, route) = enhanced
             }
         }
-        enhancements = EnhancementState(
+        let enhancements = EnhancementState(
             offered: offered,
             asked: settings.audioEnhancements,
             unavailable: block,
             note: !route.audioEnhancements.isEmpty && decision.track != nil ? "Subtitles won't change." : nil
         )
-        subtitle = decision
-        self.route = route
-        audio = route.audio
+        return RouteChoice(subtitle: decision, route: route, enhancements: enhancements)
+    }
+
+    private func take(_ choice: RouteChoice) {
+        enhancements = choice.enhancements
+        subtitle = choice.subtitle
+        route = choice.route
+        audio = choice.route.audio
         subtitleProblem = nil
-        switch route.subtitle {
-        case .notShown(let track):
+        if case .notShown(let track) = choice.route.subtitle {
             subtitleProblem = "\(track.label) needs the server to burn it in; pick it again to allow that."
-        case .sidecar(let track):
-            await loadSidecar(track)
-        default:
-            break
         }
     }
 
@@ -1028,13 +1089,18 @@ final class PlayerModel: Identifiable {
     private static let startBuffer: TimeInterval = 3
 
     private func load(_ url: URL) {
-        let playerItem = AVPlayerItem(asset: AVURLAsset(url: url))
+        let playerItem = makeItem(url)
         if case .remux = stream { playerItem.preferredForwardBufferDuration = Self.startBuffer }
-        playerItem.textStyleRules = textStyleRules
         streamText.attach(to: playerItem)
-        playerItem.externalMetadata = metadataItems()
         itemReady = false
         backend.load(playerItem)
+    }
+
+    private func makeItem(_ url: URL) -> AVPlayerItem {
+        let playerItem = AVPlayerItem(asset: AVURLAsset(url: url))
+        playerItem.textStyleRules = textStyleRules
+        playerItem.externalMetadata = metadataItems()
+        return playerItem
     }
 
     /// Holds a remux run's playlist until AVPlayer can start from its first read (`RemuxHandOff`),
@@ -1124,6 +1190,7 @@ final class PlayerModel: Identifiable {
     }
 
     private func stopStream() {
+        abandonMove()
         eventsTask?.cancel()
         eventsTask = nil
         seekTask?.cancel()
@@ -1159,6 +1226,8 @@ final class PlayerModel: Identifiable {
         case .direct, nil:
             break
         }
+        // Auto's estimate spans every stream of the item, not only this one's last reads.
+        if let estimate = adaptive?.estimateKbps { bitsPerSecond = Double(estimate) * 1000 }
         guard let bitsPerSecond, bitsPerSecond > 0 else { return }
         session.player.linkKbps[address] = Int(bitsPerSecond / 1000)
     }
@@ -1174,6 +1243,7 @@ final class PlayerModel: Identifiable {
 
     /// A track change: decides again, then switches inside the stream or starts a new one.
     private func reroute(handPick: Bool) {
+        abandonMove()
         generation += 1
         let generation = generation
         loadTask?.cancel()
@@ -1194,6 +1264,254 @@ final class PlayerModel: Identifiable {
             }
             if handPick { writeBack() }
         }
+    }
+
+    // MARK: Auto quality
+
+    /// How far past the playhead the standby takes over, and the buffer the playing stream needs to get there.
+    private static let switchLead: TimeInterval = 8
+    private static let switchBuffer: TimeInterval = 9
+
+    /// Auto's state for the item: where the phone is and the link as last measured set the start.
+    private func startAdapting(connection: PlexConnection?) {
+        adaptive = nil
+        lastTransfer = nil
+        longestWait = 0
+        linkEstimateKbps = nil
+        autoRung = .original
+        if let connection { place = networkPlace(of: connection) }
+        guard qualitySetting == .auto, !forcesDirectPlay, let connection, let place else { return }
+        let adaptive = AdaptiveQuality(
+            place: place, mediaKbps: media?.bitrate, linkKbps: session.player.linkKbps[connection.uri],
+            now: ProcessInfo.processInfo.systemUptime
+        )
+        self.adaptive = adaptive
+        autoRung = adaptive.rung
+    }
+
+    /// Where the phone is from the server at `connection`. The UI tests' fake server is at home when its address
+    /// is local.
+    private func networkPlace(of connection: PlexConnection) -> NetworkPlace {
+        if FakePlex.isActive { return connection.isLocal ? .home : .away(.remote) }
+        let path = session.pathMetrics.path(to: connection.uri.host() ?? "")
+        return .of(
+            connection, onPhoneNetwork: NetworkPath.isOnAttachedNetwork(connection.ipAddress),
+            localAddress: path?.localAddress, roundTrip: path?.roundTrip
+        )
+    }
+
+    private func watchQuality() {
+        qualityTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                guard let self, !Task.isCancelled else { return }
+                lookAtStream()
+            }
+        }
+    }
+
+    /// One look for Auto: the link's speed while data moved, the media in hand and the longest wait since the
+    /// last look.
+    private func lookAtStream() {
+        guard var adaptive, phase == .playing, isPlaying, castDevice == nil, landing == nil, !isSeeking else {
+            lastTransfer = nil
+            longestWait = 0
+            return
+        }
+        var look = AdaptiveQuality.Look(now: ProcessInfo.processInfo.systemUptime, waitingSeconds: longestWait)
+        longestWait = 0
+        switch stream {
+        case .remux(let remux):
+            // The remux reads the file from the server; the player reads from the phone.
+            let progress = remux.progress
+            if progress.isFetching, let rate = progress.sourceBytesPerSecond {
+                look.throughputKbps = Int(rate * 8 / 1000)
+                look.transferSeconds = 2
+            }
+            look.bufferSeconds = max(0, progress.mediaSeconds - backend.itemTime)
+        case .transcode, .direct:
+            if let transfer = backend.transfer {
+                if let last = lastTransfer, transfer.seconds > last.seconds, transfer.bytes > last.bytes {
+                    let seconds = transfer.seconds - last.seconds
+                    look.throughputKbps = Int(Double(transfer.bytes - last.bytes) * 8 / 1000 / seconds)
+                    look.transferSeconds = seconds
+                }
+                lastTransfer = transfer
+            }
+            look.bufferSeconds = backend.bufferedAhead
+        case nil:
+            return
+        }
+        let move = adaptive.observe(look)
+        self.adaptive = adaptive
+        linkEstimateKbps = adaptive.estimateKbps
+        if let move { adapt(to: move) }
+    }
+
+    /// Moves Auto to `rung`: beside the playing stream when it can, else by a new stream at the playhead.
+    private func adapt(to rung: VideoQuality) {
+        guard let tracks, let media, let part else { return settleMove(at: autoRung) }
+        movePending = true
+        moveTask = Task { [weak self] in
+            guard let self else { return }
+            let choice = await chooseRoute(tracks: tracks, media: media, part: part, quality: rung)
+            guard !Task.isCancelled else { return }
+            if StreamKey(choice.route) == streamKey {
+                // The file plays the same at this rung.
+                take(choice)
+                return settleMove(at: rung)
+            }
+            if canSwitchBeside(to: choice), await prepareSwitch(to: choice, rung: rung) { return }
+            guard !Task.isCancelled else { return }
+            restartForMove(choice, rung: rung)
+        }
+    }
+
+    /// The standby takes over only on the phone's own screen, from a stream with enough in hand, to a server
+    /// stream or the file with the same sound and subtitle.
+    private func canSwitchBeside(to choice: RouteChoice) -> Bool {
+        guard let route, choice.route.kind != .remux, choice.route.audio?.id == route.audio?.id,
+              choice.route.subtitle == route.subtitle, !(pictureInPicture?.isActive ?? false), !isExternalPlayback,
+              UIApplication.shared.applicationState == .active
+        else { return false }
+        return (backend.bufferedAhead ?? 0) >= Self.switchBuffer
+    }
+
+    /// Opens the stream at `rung` on the standby player, primed at a movie time a few seconds ahead, and arms the
+    /// switch for when the playhead gets there. False, with nothing of it left, when that failed or came too late.
+    private func prepareSwitch(to choice: RouteChoice, rung: VideoQuality) async -> Bool {
+        guard let part, let playingOrigin = origin else { return false }
+        // A move given up meanwhile has dropped its standby; a later one may hold the next.
+        func failed() -> Bool {
+            if !Task.isCancelled { dropStandby() }
+            return false
+        }
+        let at = time + Self.switchLead
+        let url: URL
+        do {
+            if choice.route.kind == .serverTranscode {
+                try await selectForServer(choice.route, part: part)
+                guard !Task.isCancelled else { return false }
+                let id = UUID().uuidString
+                // Held before the request, so that a move given up stops the server's work.
+                standby = Standby(
+                    rung: rung, choice: choice, stream: .transcode(id),
+                    reporter: TimelineReporter(library: library, item: item, sessionIdentifier: id), offset: at, origin: at
+                )
+                url = try await library.transcodeURL(
+                    TranscodeRequest(item: item, mediaIndex: mediaIndex, route: choice.route, offset: at, session: id)
+                )
+            } else {
+                standby = Standby(
+                    rung: rung, choice: choice, stream: .direct, reporter: TimelineReporter(library: library, item: item),
+                    offset: 0, origin: 0
+                )
+                url = try await library.playbackURL(path: part.key)
+            }
+        } catch {
+            return failed()
+        }
+        let playerItem = makeItem(url)
+        guard !Task.isCancelled, await backend.openStandby(playerItem), !Task.isCancelled, var next = standby else {
+            return failed()
+        }
+        if case .transcode = next.stream {
+            let length = playerItem.duration.seconds
+            next.origin = transcodeOrigin(itemDuration: length.isFinite && length > 0 ? length : nil, offset: next.offset)
+        }
+        next.connection = await library.connection.currentConnection
+        await applySelection(choice.route, to: playerItem)
+        guard !Task.isCancelled, time < at - 1, let player = await backend.prerollStandby(at: at - next.origin),
+              !Task.isCancelled, time < at - 0.5
+        else { return failed() }
+        standby = next
+        layerView.prepareStandby(player)
+        backend.armSwitch(at: at - playingOrigin)
+        return true
+    }
+
+    /// The playhead reached the standby's start: the standby plays on in place of the playing stream.
+    private func completeSwitch() {
+        guard let next = standby else { return }
+        guard !(pictureInPicture?.isActive ?? false), !isExternalPlayback, UIApplication.shared.applicationState == .active else {
+            return abandonMove()
+        }
+        standby = nil
+        moveTask = nil
+        eventsTask?.cancel()
+        eventsTask = nil
+        layerView.switchToStandby()
+        backend.switchToStandby()
+        switch stream {
+        case .remux(let remux):
+            remux.stop()
+        case .transcode(let session):
+            let library = library
+            Task { try? await library.stopTranscode(session: session) }
+        case .direct, nil:
+            break
+        }
+        stream = next.stream
+        streamKey = StreamKey(next.choice.route)
+        streamConnection = next.connection
+        reporter = next.reporter
+        transcodeOffset = next.offset
+        origin = next.origin
+        mediaInfo = nil
+        lastTransfer = nil
+        take(next.choice)
+        if let item = backend.player?.currentItem { streamText.attach(to: item) }
+        settleMove(at: next.rung)
+    }
+
+    /// Moves Auto by a new stream at the playhead, keeping the screen as it is.
+    private func restartForMove(_ choice: RouteChoice, rung: VideoQuality) {
+        take(choice)
+        settleMove(at: rung)
+        generation += 1
+        let generation = generation
+        loadTask?.cancel()
+        let at = time
+        isBuffering = true
+        loadTask = Task { [weak self] in
+            guard let self else { return }
+            if case .sidecar(let track) = choice.route.subtitle { await loadSidecar(track) }
+            guard generation == self.generation else { return }
+            await startStream(at: at, generation: generation)
+        }
+    }
+
+    /// Gives up the move under way, if any: playback stays at the rung it had.
+    private func abandonMove() {
+        moveTask?.cancel()
+        moveTask = nil
+        dropStandby()
+        if movePending { settleMove(at: autoRung) }
+    }
+
+    /// Lets go of the standby stream, stopping the server's work on it.
+    private func dropStandby() {
+        backend.discardStandby()
+        layerView.discardStandby()
+        guard let standby else { return }
+        self.standby = nil
+        if case .transcode(let session) = standby.stream {
+            let library = library
+            Task { try? await library.stopTranscode(session: session) }
+        }
+    }
+
+    private func settleMove(at rung: VideoQuality) {
+        movePending = false
+        autoRung = rung
+        adaptive?.moved(to: rung, at: ProcessInfo.processInfo.systemUptime)
+    }
+
+    /// Where a server stream started at `offset` begins in the movie. Some servers list the whole film whatever
+    /// the offset; the stream then starts at zero.
+    private func transcodeOrigin(itemDuration: TimeInterval?, offset: TimeInterval) -> TimeInterval {
+        if let length = itemDuration, duration > 0, length >= duration - 30 { return 0 }
+        return offset
     }
 
     private func streamFailed(_ failure: PlaybackFailure) {
@@ -1330,8 +1648,7 @@ final class PlayerModel: Identifiable {
             startTiming.mark(.ready)
             loadStage = .starting
             if case .transcode = stream, origin == nil {
-                // Some servers list the whole film whatever the offset; the stream then starts at zero.
-                if let length = backend.itemDuration, duration > 0, length >= duration - 30 { origin = 0 } else { origin = transcodeOffset }
+                origin = transcodeOrigin(itemDuration: backend.itemDuration, offset: transcodeOffset)
             }
             land()
         case .failed(let failure):
@@ -1342,6 +1659,8 @@ final class PlayerModel: Identifiable {
             externalPlaybackChanged(active)
         case .presentationSize(let size):
             presentationSize = size
+        case .switchDue:
+            completeSwitch()
         }
     }
 
@@ -1506,7 +1825,10 @@ final class PlayerModel: Identifiable {
         }
         switch stallWatch.check(now: ProcessInfo.processInfo.systemUptime, position: time, run: run) {
         case .network(let seconds):
+            longestWait = max(longestWait, seconds)
             guard seconds >= 2 else { return }
+            // The standby cannot take over from a stalled stream; Auto's next look moves by a new stream instead.
+            if standby != nil { abandonMove() }
             if !waitsForNetwork { withAnimation(.easeOut(duration: 0.18)) { waitsForNetwork = true } }
             hideTask?.cancel()
             if !chromeVisible { setChrome(true) }
@@ -1525,10 +1847,11 @@ final class PlayerModel: Identifiable {
         }
     }
 
-    /// A quality at half the rate playing now or below, unless Settings have every file play as it is.
+    /// A quality at half the rate playing now or below, unless Auto picks the rung or Settings have every file
+    /// play as it is.
     private func offerLowerQuality() {
         if case .lowerQuality? = offer { return }
-        guard !forcesDirectPlay, let lower = quality.lower(mediaKbps: media?.bitrate) else { return }
+        guard adaptive == nil, !forcesDirectPlay, let lower = quality.lower(mediaKbps: media?.bitrate) else { return }
         cancelCountdown()
         withAnimation(.easeOut(duration: 0.22)) { offer = .lowerQuality(lower) }
     }
@@ -1587,7 +1910,12 @@ final class PlayerModel: Identifiable {
 
     /// Picks the audio and text tracks AVPlayer plays from the stream.
     private func applySelection() async {
-        guard let player = backend.player, let playerItem = player.currentItem, let route, let tracks else { return }
+        guard let playerItem = backend.player?.currentItem, let route else { return }
+        await applySelection(route, to: playerItem)
+    }
+
+    private func applySelection(_ route: PlaybackRoute, to playerItem: AVPlayerItem) async {
+        guard let tracks else { return }
         if case .inStream(let track) = route.subtitle, route.kind == .remux, track.isImageBased {
             applySubtitleSources()
         }
@@ -2030,6 +2358,7 @@ final class PlayerModel: Identifiable {
     /// Without Picture in Picture or AirPlay the sound plays on alone: a layer showing video would
     /// make the system pause it.
     private func enteredBackground() {
+        abandonMove()
         guard !(pictureInPicture?.isActive ?? false), !isExternalPlayback else { return }
         layerView.playerLayer.player = nil
     }

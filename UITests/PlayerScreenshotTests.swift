@@ -159,6 +159,10 @@ private extension XCTestCase {
         tap("player.more", in: app)
         let aspect = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Aspect'")).firstMatch
         XCTAssertTrue(aspect.waitForExistence(timeout: 5), "No More menu")
+        // Auto is the default; at home it plays the original.
+        let quality = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Quality'")).firstMatch
+        let shown = "\(quality.label) \(quality.value as? String ?? "")"
+        XCTAssertTrue(shown.contains("Auto · Original"), "The More menu shows \(shown), not Auto · Original")
         try snap("player-03-more-menu-\(suffix)")
         dismissMenu(in: app)
 
@@ -233,12 +237,12 @@ private extension XCTestCase {
         XCTAssertTrue(skip.waitForNonExistence(timeout: 8), "The intro was not skipped after the countdown")
     }
 
-    /// Playback that waits on data for good: "Waiting for the network" under the ring after 2 s, the
-    /// lower-quality offer after 10 s (the caption gives way to it), and, once taken, the new stream's own
-    /// wait and the More menu showing the quality it took (8 Mbps file → 4 Mbps).
+    /// Playback that waits on data for good at a fixed quality (Auto steps down by itself): "Waiting for the
+    /// network" under the ring after 2 s, the lower-quality offer after 10 s (the caption gives way to it), and,
+    /// once taken, the new stream's own wait and the More menu showing the quality it took (8 Mbps file → 4 Mbps).
     @MainActor
     func networkWaitFlow(suffix: String) throws {
-        let app = launchPlayer(at: 61, paused: false, mode: "dark", stall: true)
+        let app = launchPlayer(at: 61, paused: false, mode: "dark", stall: true, quality: 0)
         waitFor("player.networkWait", in: app)
         try snap("player-40-network-wait-\(suffix)")
         let offer = element("player.lowerQuality", in: app)
@@ -459,7 +463,8 @@ private extension XCTestCase {
     @MainActor
     func launchPlayer(
         at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, bazarr: Bool = false, speechDock: Bool = false,
-        scrub: Double? = nil, cast: Bool = false, stall: Bool = false, item: String = "212", badgeSeconds: Double? = nil
+        scrub: Double? = nil, cast: Bool = false, stall: Bool = false, quality: Int? = nil, item: String = "212",
+        badgeSeconds: Double? = nil
     ) -> XCUIApplication {
         XCUIDevice.shared.orientation = .landscapeLeft
         // A failed step ends the test early; the next test still has to start upright.
@@ -479,6 +484,7 @@ private extension XCTestCase {
         if let scrub { arguments += ["-marquee.uitest.scrub", String(scrub)] }
         if cast { arguments += ["-marquee.uitest.cast", "YES"] }
         if stall { arguments += ["-marquee.uitest.stall", "YES"] }
+        if let quality { arguments += ["-marquee.uitest.quality", String(quality)] }
         if let badgeSeconds { arguments += ["-marquee.uitest.badgeSeconds", String(badgeSeconds)] }
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", light: "paper", arguments: arguments, waitingFor: nil)
         // Up Next hides the transport, so whichever control shows first means the player is up.

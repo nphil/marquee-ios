@@ -76,7 +76,7 @@ struct VideoPlaybackSettingsView: View {
                         .accessibilityIdentifier("video.quality")
                 } else {
                     Picker("Default Quality", selection: $session.settings.quality) {
-                        ForEach(VideoQuality.allCases, id: \.self) { quality in
+                        ForEach(QualitySetting.all, id: \.self) { quality in
                             Text(quality.title).tag(quality)
                         }
                     }
@@ -85,7 +85,7 @@ struct VideoPlaybackSettingsView: View {
             } footer: {
                 Text(session.settings.directPlay == .force
                     ? "Forced Direct Play: original quality."
-                    : "The highest quality a video plays at. Larger files are converted by your Plex server to fit. Also available in the player's More menu.")
+                    : "Auto plays the original at home and adjusts to the connection away from home. A fixed quality is the highest a video plays at: your Plex server converts larger files to fit. Also in the player's More menu.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)

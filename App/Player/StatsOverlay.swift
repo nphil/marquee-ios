@@ -151,6 +151,13 @@ enum PlayerStats {
         if let connection = model.streamConnection ?? server?.connection {
             lines.append(Line("Server", "\(connection.kindWord) · \(connection.displayAddress)"))
         }
+        if let place = model.place {
+            lines.append(Line("Place", place.description))
+        }
+        if model.qualitySetting == .auto, !model.forcesDirectPlay {
+            let link = model.linkEstimateKbps.map { " · link \(mbps(Double($0) * 1000))" } ?? ""
+            lines.append(Line("Auto", model.quality.title + link))
+        }
         for (i, line) in (server?.probes.last?.lines ?? []).enumerated() {
             lines.append(Line("Probe \(i + 1)", line))
         }
@@ -203,7 +210,7 @@ enum PlayerStats {
                 }
                 lines.append(Line("Frames", "\(max(0, event.numberOfDroppedVideoFrames)) dropped · \(max(0, event.numberOfStalls)) stalls"))
             }
-            lines.append(Line("Buffer", "\(bufferAhead(item).formatted(.number.precision(.fractionLength(1)))) s ahead"))
+            lines.append(Line("Buffer", "\(item.bufferedAhead.formatted(.number.precision(.fractionLength(1)))) s ahead"))
             if let errors = item.errorLog()?.events, let last = errors.last {
                 lines.append(Line("Errors", "\(errors.count) · last \(last.errorDomain) \(last.errorStatusCode)"))
             }
@@ -322,17 +329,5 @@ enum PlayerStats {
             }
         }
         return result == KERN_SUCCESS ? Int64(info.phys_footprint) : nil
-    }
-
-    /// Seconds loaded past the playhead.
-    private static func bufferAhead(_ item: AVPlayerItem) -> Double {
-        let now = item.currentTime()
-        for value in item.loadedTimeRanges {
-            let range = value.timeRangeValue
-            if range.containsTime(now) {
-                return max(0, (range.end - now).seconds)
-            }
-        }
-        return 0
     }
 }
