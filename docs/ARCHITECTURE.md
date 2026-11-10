@@ -6,7 +6,7 @@ Marquee for iPhone is three layers and one external engine. Each boundary exists
 App/                    SwiftUI screens, session, player model, theme      (iOS, CI only)
   |  uses
   +-- Packages/MarqueeLive   direct tuner playback: LiveEngine, MarqueeLive (iOS only)
-  +-- VideoEngine            stashy-videoengine 2.0.3: on-device remux, FFmpeg (external)
+  +-- VideoEngine            videoengine 2.0.3: on-device remux, FFmpeg (external)
   +-- Packages/MarqueeCore   Plex client, rules, decisions   (Foundation only, Linux-testable)
 ```
 

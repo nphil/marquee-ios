@@ -1,6 +1,6 @@
 # Device tests
 
-The simulator decodes no video and AVPlayer shows no picture there, so playback is proven only on a real iPhone: iOS 27, unplugged, Low Power Mode off, against the home Plex server. The IDs in brackets point at the video engine's device test sheets (stashy-videoengine `docs/ENGINE.md`, "Device test sheets"), which list the exact clips.
+The simulator decodes no video and AVPlayer shows no picture there, so playback is proven only on a real iPhone: iOS 27, unplugged, Low Power Mode off, against the home Plex server. The IDs in brackets point at the video engine's device test sheets (videoengine `docs/ENGINE.md`, "Device test sheets"), which list the exact clips.
 
 Each check records three things:
 

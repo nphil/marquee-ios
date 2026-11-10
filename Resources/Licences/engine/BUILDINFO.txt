@@ -1,4 +1,4 @@
-engine: https://github.com/nphil/stashy-videoengine @ 360f5993d56bddeecadb792649aa9070dc8dc5e4
+engine: https://github.com/nphil/videoengine @ 360f5993d56bddeecadb792649aa9070dc8dc5e4
 release: v2.0.0
 ffmpeg: n9.0.2 @ 946fcce07b6dcd0331c8cc609192aeff5e1924f8
 license: LGPL version 2.1 or later

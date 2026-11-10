@@ -4,10 +4,10 @@ under the GNU Lesser General Public License, version 2.1 or later
 configuration in BUILDINFO.txt.
 
 The source code of FFmpeg and of every library below, with the scripts that
-build them, is published with stashy-videoengine release v2.0.0:
-https://github.com/nphil/stashy-videoengine/releases/tag/v2.0.0
+build them, is published with VideoEngine release v2.0.0:
+https://github.com/nphil/videoengine/releases/tag/v2.0.0
 A modified FFmpeg can be used by building that repository with the change
-and pointing the app's stashy-videoengine package at the result.
+and pointing the app's videoengine package at the result.
 
 This software is based in part on the work of the FreeType Team.
 

@@ -20,7 +20,7 @@ packages:
   MarqueeLive:
     path: Packages/MarqueeLive
   VideoEngine:
-    url: https://github.com/nphil/stashy-videoengine.git
+    url: https://github.com/nphil/videoengine.git
     exactVersion: 2.0.3
   GoogleCast:
     url: https://github.com/googlecast/google-cast-ios-sdk.git

@@ -12,12 +12,12 @@ Marquee for iPhone shares a name and behaviour with the Marquee TV app, which is
 - `Packages/MarqueeCore/`: Plex API client, connection choice, playback and live route decisions, audio and subtitle rules. Foundation only, unit-tested with `swift test`; its API is summarised in `docs/core-api.md`.
 - `Packages/MarqueeLive/`: Live TV played straight from an HDHomeRun-protocol tuner (FFmpeg decode into sample-buffer layers). iOS only; tested on a simulator.
 - `UITests/`: UI and screenshot tests, answered by the synthetic Plex server in `UITests/FakePlex/`.
-- `Resources/`: `themes.json` (40 Lucent colour-role themes), the Manrope font (OFL), the app icon, and `Licences/engine`: the licence files of the linked stashy-videoengine release, shown under Open-Source Notices.
+- `Resources/`: `themes.json` (40 Lucent colour-role themes), the Manrope font (OFL), the app icon, and `Licences/engine`: the licence files of the linked VideoEngine release, shown under Open-Source Notices.
 - `docs/`: `ARCHITECTURE.md` (layers and why), `DESIGN.md` (design direction), `behaviour-spec.md` (behaviour), `PARITY.md` (feature parity with Marquee TV), `LIVE-TV.md` (Live TV), `DEVICE-TEST.md` (playback checks that need a real iPhone), `core-api.md`.
 - `tools/check_themes.py`: contrast and distinctness gate for `themes.json`; CI fails on any failing theme.
 - `AGENTS.md`: the guide for coding agents and new contributors.
 
-Video remux and transcode use [stashy-videoengine](https://github.com/nphil/stashy-videoengine) (FFmpeg, LGPL-2.1, linked statically; its source and build scripts are public in that repo).
+Video remux and transcode use [VideoEngine](https://github.com/nphil/videoengine) (FFmpeg, LGPL-2.1, linked statically; its source and build scripts are public in that repo). The repository was renamed from `stashy-videoengine`; the 2.0.3 pin and product imports are unchanged.
 
 ## Install
 
