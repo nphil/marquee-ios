@@ -20,7 +20,9 @@ struct SubtitleFixSheet: View {
             .navigationDestination(for: SubtitleFixPage.self) { page in
                 switch page {
                 case .wrong: WrongSubtitlesView(model: model, fix: fix)
-                case .appearance: SubtitleStyleView(imageSubtitles: model.subtitleIsImage)
+                case .appearance:
+                    SubtitleStyleView(imageSubtitles: model.subtitleIsImage)
+                        .toolbar { SubtitleFixDone(model: model) }
                 case .search: SubtitleSearchView(model: model, fix: fix)
                 }
             }

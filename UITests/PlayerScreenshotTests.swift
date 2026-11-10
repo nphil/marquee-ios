@@ -39,7 +39,7 @@ final class PlayerScreenshotTests: XCTestCase {
     @MainActor
     func testAutoBuffersInsteadOfDroppingBelowPictureFloor() throws {
         let app = launchPlayer(at: 61, paused: false, mode: "dark", item: "912", linkTest: true)
-        tap("player.more", in: app)
+        openMore(in: app)
         let quality = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Quality'")).firstMatch
         XCTAssertTrue(quality.waitForExistence(timeout: 5))
         func shown() -> String { "\(quality.label) \(quality.value as? String ?? "")" }
@@ -53,7 +53,7 @@ final class PlayerScreenshotTests: XCTestCase {
         XCTAssertTrue(element("player.playPause", in: app).exists, "The warning did not reveal hidden controls")
         XCTAssertFalse(element("player.lowerQuality", in: app).exists)
         try snap("player-43-auto-quality-floor")
-        tap("player.more", in: app)
+        openMore(in: app)
         let atFloor = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in shown().contains("Auto · 4 Mbps 720p") }, object: nil)
         XCTAssertEqual(XCTWaiter.wait(for: [atFloor], timeout: 30), .completed, "Auto did not reach the 720p floor: \(shown())")
         dismissMenu(in: app)
@@ -62,15 +62,13 @@ final class PlayerScreenshotTests: XCTestCase {
         Thread.sleep(forTimeInterval: 8)
         XCTAssertTrue(floor.exists, "The floor warning disappeared while stalled")
         XCTAssertFalse(element("player.lowerQuality", in: app).exists)
-        if !element("player.more", in: app).exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
-        tap("player.more", in: app)
+        openMore(in: app)
         XCTAssertTrue(shown().contains("Auto · 4 Mbps 720p"), "Auto dropped below the floor while stalled: \(shown())")
         dismissMenu(in: app)
 
         notify_post("marquee.uitest.link.healthy")
         XCTAssertTrue(floor.waitForNonExistence(timeout: 45), "The floor warning did not clear after recovery")
-        if !element("player.more", in: app).exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
-        tap("player.more", in: app)
+        openMore(in: app)
         let climbed = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
             let value = shown()
             return value.contains("Auto ·") && !value.contains("4 Mbps 720p")
@@ -219,7 +217,7 @@ private extension XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
 
         tap("player.tracks", in: app)
-        XCTAssertTrue(element("player.tracks.subtitles", in: app).waitForExistence(timeout: 5), "No subtitles entry in tracks menu")
+        XCTAssertNotNil(subtitlesMenuItem(in: app), "No subtitles entry in tracks menu")
         try snap("player-02-tracks-menu-\(suffix)")
         dismissMenu(in: app)
 
@@ -452,7 +450,7 @@ private extension XCTestCase {
         let word = app.buttons["Word by Word"]
         XCTAssertTrue(word.waitForExistence(timeout: 5), "No Word by Word reveal")
         word.tap()
-        app.navigationBars["More options"].buttons["Done"].tap()
+        tap("subtitleFix.done", in: app)
         XCTAssertTrue(app.navigationBars["Subtitle Style"].waitForNonExistence(timeout: 5), "The style sheet did not close")
         try snap("player-21-reveal-as-spoken-\(suffix)")
     }
@@ -467,8 +465,28 @@ private extension XCTestCase {
     @MainActor
     func openSubtitles(in app: XCUIApplication) {
         tap("player.tracks", in: app)
-        tap("player.tracks.subtitles", in: app)
+        guard let subtitles = subtitlesMenuItem(in: app) else {
+            XCTFail("No subtitles entry in tracks menu")
+            return
+        }
+        subtitles.tap()
         waitFor("player.subtitles", in: app)
+    }
+
+    @MainActor
+    func subtitlesMenuItem(in app: XCUIApplication) -> XCUIElement? {
+        scrollMenu(in: app) {
+            let item = labelled("Subtitles…", in: app)
+            return item.exists && item.isHittable ? item : nil
+        }
+    }
+
+    @MainActor
+    func openMore(in app: XCUIApplication) {
+        if !element("player.more", in: app).exists {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        tap("player.more", in: app)
     }
 
     /// An open menu lays out only the rows that fit on screen. The tracks menu hangs from the right of
