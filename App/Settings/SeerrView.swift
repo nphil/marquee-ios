@@ -300,18 +300,22 @@ struct SeerrView: View {
         }
     }
 
-    /// Also what Requests says when it can't load.
+    /// Also what Requests and title pages say when Seerr can't load or refuses a request.
     static func text(for error: SeerrError) -> String {
         switch error {
+        case .unreachable: "Can't reach Seerr. No answer from that address. Check it, and that this iPhone is on the same network."
+        case .timedOut: "Seerr took too long to answer. Try again in a moment."
         case .badKey: "Seerr refused the key. The address answers, but the API key is wrong. Copy it again from Seerr."
         case .notSeerr: "That is not Seerr. The address answers, but not like Seerr. Check the address."
         case .notSignedIn: "Sign in to Plex first. Seerr signs in with the Plex profile in use."
         case .plexAccountNotAllowed: "Seerr doesn't let this Plex profile in. Seerr's admin can import it under Users, or sign in with an API key instead."
         case .plexSignInFailed: "Seerr couldn't check this profile with Plex. Plex sign-in may be off in Seerr; an API key works instead."
         case .notAllowed: "This account may not make requests in Seerr."
-        case .timedOut: "Seerr took too long to answer. Try again in a moment."
+        case .quotaReached: "This account has used up its requests for now. Seerr's admin sets the limit."
+        case .alreadyRequested: "Already requested. Everything asked for is requested or available."
+        case .notFound: "Seerr no longer has this title."
         case .failed(let message?): "Seerr answered with an error: \(message)"
-        default: "Can't reach Seerr. No answer from that address. Check it, and that this iPhone is on the same network."
+        case .failed(nil): "Seerr answered with an error."
         }
     }
 }

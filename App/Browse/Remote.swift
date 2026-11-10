@@ -8,6 +8,8 @@ final class Remote<Value: Sendable> {
     private(set) var value: Value?
     private(set) var loadedAt: Date?
     private(set) var failure: PlexError?
+    /// The error itself, for content from another service such as Seerr.
+    private(set) var error: (any Error)?
     private(set) var isLoading = false
     /// Bumped by `retry()`; a view keys its loading task on it.
     private(set) var attempt = 0
@@ -32,8 +34,10 @@ final class Remote<Value: Sendable> {
             value = fresh
             loadedAt = .now
             failure = nil
+            self.error = nil
         case .failure(let error):
             failure = error as? PlexError ?? .unreachable(.other)
+            self.error = error
         }
     }
 
