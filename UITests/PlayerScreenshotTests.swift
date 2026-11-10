@@ -38,13 +38,15 @@ final class PlayerScreenshotTests: XCTestCase {
 
     @MainActor
     func testAutoBuffersInsteadOfDroppingBelowPictureFloor() throws {
-        let app = launchPlayer(at: 61, paused: false, mode: "dark", item: "912", linkTest: true)
+        // Paused, the controls stay up, so the first look at the menu cannot race their fade.
+        let app = launchPlayer(at: 61, paused: true, mode: "dark", item: "912", linkTest: true)
         openMore(in: app)
         let quality = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Quality'")).firstMatch
         XCTAssertTrue(quality.waitForExistence(timeout: 5))
         func shown() -> String { "\(quality.label) \(quality.value as? String ?? "")" }
         XCTAssertTrue(shown().contains("Auto · Original"), "Auto did not start at Original: \(shown())")
         dismissMenu(in: app)
+        tap("player.playPause", in: app)
         XCTAssertTrue(element("player.playPause", in: app).waitForNonExistence(timeout: 10), "Controls did not hide")
 
         notify_post("marquee.uitest.link.poor")
@@ -481,12 +483,24 @@ private extension XCTestCase {
         }
     }
 
+    /// Opens the More menu and returns once its Quality row shows. Playing chrome fades 3 s after the last
+    /// touch and a loaded runner can take longer than that to answer one query, so the button is resolved
+    /// once and tapped at that frame; when it is gone a tap on the picture brings the chrome back first.
     @MainActor
     func openMore(in app: XCUIApplication) {
-        if !element("player.more", in: app).exists {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let more = element("player.more", in: app)
+        let quality = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Quality'")).firstMatch
+        for _ in 0..<4 {
+            if let button = try? more.snapshot() {
+                app.coordinate(withNormalizedOffset: .zero)
+                    .withOffset(CGVector(dx: button.frame.midX, dy: button.frame.midY)).tap()
+                if quality.waitForExistence(timeout: 3) { return }
+            } else {
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                _ = more.waitForExistence(timeout: 3)
+            }
         }
-        tap("player.more", in: app)
+        XCTFail("The More menu did not open")
     }
 
     /// An open menu lays out only the rows that fit on screen. The tracks menu hangs from the right of
