@@ -40,6 +40,7 @@ final class LiveDirectScreenshotTests: XCTestCase {
         if !pause.exists {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
             XCTAssertTrue(pause.waitForExistence(timeout: 3), "The live player's controls did not come back")
+            XCTAssertFalse(goLive.exists, "LIVE did not go back to live")
         }
         tap("liveplayer.skipBack", in: app)
         XCTAssertTrue(goLive.waitForExistence(timeout: 5), "Skip back did not go back in the buffer")
