@@ -69,6 +69,7 @@ Other: `UITests/` (UI tests; `UITests/FakePlex/` fixtures and rules in its `READ
   - `ui-sizes`: one runner, the smallest and the largest iPhone simulator of the image (`tools/size-simulators.py` picks them by screen size) running `PlayerRouteMenuScreenshots`, one simulator at a time; its shots are named with the screen size and land in the `screens` artifact.
   - `screens`: merges the shard artifacts `screens-N` into the one `screens` artifact. `UITests-xcresult-N` stays per shard.
   - `release` (`main` only) needs `core`, `live`, `app`, `ui-sizes` and every `ui` shard to be green. The engine is `stashy-videoengine` pinned to exact 2.0.3 in `project.yml` and `Packages/MarqueeLive/Package.swift`; change both together.
+- Video engine changes go upstream only: fix or improve `nphil/stashy-videoengine` on its own `main`, publish a tag through its release workflow (which also builds Stashy), then pin that tag here. Never patch or fork the engine inside this repo. Tell the Stashy session the new tag and what changed, so Stashy adopts it too.
 - Running CI: batch the work. When a run fails, fix every failure on a branch and push the combined change once; do not push `main` a fix per failure, and do not push `main` while another `main` run is in progress (each run takes 4 runners). Rebase on `main` right before pushing.
 - A UI change is reviewed from the `screens` artifact: dark, light and large-text screenshots must be checked for overlap and contrast. UI tests run against FakePlex.
 
