@@ -9,7 +9,6 @@ struct WatchlistView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(LibraryChanges.self) private var changes
     @State private var titles = PagedLoader<PlexMetadata>()
-    private let actions = ItemActions()
     private let prefetch = ArtPrefetcher()
 
     var body: some View {
@@ -24,13 +23,7 @@ struct WatchlistView: View {
                                 PosterCell(item: item, width: metrics.cellWidth, zoomID: zoomID)
                             }
                             .buttonStyle(.press)
-                            .contextMenu {
-                                if let guid = item.guid, actions.canWatchlist(guid) {
-                                    Button("Remove from Watchlist", systemImage: "bookmark.slash", role: .destructive) {
-                                        actions.setWatchlisted(false, guid: guid) { _ in }
-                                    }
-                                }
-                            }
+                            .watchlistMenu(item)
                             .onAppear { appeared(item, metrics: metrics) }
                         }
                     }
@@ -76,5 +69,58 @@ struct WatchlistView: View {
         guard let index = titles.items.firstIndex(where: { $0.id == item.id }), index % metrics.columns == 0 else { return }
         let ahead = titles.items.dropFirst(index + metrics.columns * 2).prefix(metrics.columns * 2)
         prefetch(ahead.map(\.posterPath), size: PosterCell.artSize(width: metrics.cellWidth))
+    }
+}
+
+/// The watchlist's latest titles as a Home shelf, while Watchlist is not a tab (DESIGN §7, §8.1). Like any
+/// Home row it shows only with titles in it.
+struct WatchlistShelf: View {
+    @Environment(\.plexWatchlist) private var watchlist
+    @Environment(LibraryChanges.self) private var changes
+    @State private var titles = Remote<PlexPage<PlexMetadata>>()
+
+    private struct Reload: Hashable {
+        let watchlist: ObjectIdentifier?
+        let revision: Int
+    }
+
+    var body: some View {
+        Group {
+            if let page = titles.value, !changes.shownInWatchlist(page.items).isEmpty {
+                PosterShelf(
+                    id: "watchlist",
+                    title: "Watchlist",
+                    items: page.items,
+                    seeAll: page.totalSize > page.items.count ? .destination(.watchlist) : nil,
+                    watchlist: true
+                )
+            }
+        }
+        .task(id: Reload(watchlist: watchlist.map { ObjectIdentifier($0.http) }, revision: changes.watchlistRevision)) {
+            guard let watchlist else { return }
+            await titles.load { try await watchlist.items(start: 0, size: 20) }
+        }
+    }
+}
+
+/// A long press on a watchlist title offers Remove from Watchlist.
+private struct WatchlistMenu: ViewModifier {
+    let item: PlexMetadata
+    private let actions = ItemActions()
+
+    func body(content: Content) -> some View {
+        content.contextMenu {
+            if let guid = item.guid, actions.canWatchlist(guid) {
+                Button("Remove from Watchlist", systemImage: "bookmark.slash", role: .destructive) {
+                    actions.setWatchlisted(false, guid: guid) { _ in }
+                }
+            }
+        }
+    }
+}
+
+extension View {
+    func watchlistMenu(_ item: PlexMetadata) -> some View {
+        modifier(WatchlistMenu(item: item))
     }
 }

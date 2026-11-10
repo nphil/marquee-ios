@@ -12,11 +12,13 @@ enum Route: Hashable {
     case watchlist(PlexMetadata, zoomID: String? = nil)
     /// A cast or crew member's titles in the libraries.
     case person(id: String, name: String, thumb: String?)
+    /// A top-level place without a tab, opened from another page (DESIGN §7).
+    case destination(Destination)
 
     var zoomID: String? {
         switch self {
         case .item(_, let zoomID), .watchlist(_, let zoomID): zoomID
-        case .hub, .person: nil
+        case .hub, .person, .destination: nil
         }
     }
 

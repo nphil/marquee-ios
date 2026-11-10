@@ -372,9 +372,10 @@ jobs:
           path: build/UITests*.xcresult
           if-no-files-found: ignore
 
-  # The route menu on the smallest and the largest iPhone simulator the image has, upright and on its
-  # side: the rows must stay inside the screen and scroll when they do not fit. The standard shards run
-  # the same tests on the iPhone 18 Pro.
+  # The route menu and the A–Z rail mid-scrub on the smallest and the largest iPhone simulator the image
+  # has: the menu's rows must stay inside the screen, upright and on its side, and scroll when they do not
+  # fit; the rail's lens and callout are shot for review. The standard shards run the same tests on the
+  # iPhone 18 Pro.
   ui-sizes:
     name: UI tests on the smallest and largest iPhone
     runs-on: xcode-27
@@ -423,7 +424,7 @@ jobs:
             2>&1 | tee xcodebuild-build.log | xcbeautify
 
       # One simulator at a time: two on a runner double every test's time. A failed test runs once more.
-      - name: Route menu screenshots
+      - name: Route menu and A–Z rail screenshots
         env:
           SMALL: ${{ steps.simulators.outputs.small }}
           LARGE: ${{ steps.simulators.outputs.large }}
@@ -444,6 +445,8 @@ jobs:
               -resultBundlePath "build/UITests-$UDID.xcresult" \
               -retry-tests-on-failure -test-iterations 2 \
               -only-testing:MarqueeUITests/PlayerRouteMenuScreenshots \
+              -only-testing:MarqueeUITests/HeaderScreenshotTests/testAlphabetRailRosePine \
+              -only-testing:MarqueeUITests/HeaderScreenshotTests/testAlphabetRailDawn \
               2>&1 | tee "xcodebuild-test-$UDID.log" | xcbeautify
             if [ "${PIPESTATUS[0]}" -ne 0 ]; then FAILED=1; fi
             set -e

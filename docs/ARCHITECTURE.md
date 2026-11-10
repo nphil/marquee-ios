@@ -46,6 +46,12 @@ Screens do not own fetch logic scattered across views:
 - `LoadKey` makes a screen's task restart when the library instance changes (sign-in again, profile or server switch), on Retry, or on a screen-specific input.
 - `LibraryChanges` is the record of what this app changed on the server. A confirmed watched, watchlist or deletion change bumps a revision, and every screen that shows the title refreshes it. Deletions are also held as `DeletedTitles`, because Plex lists a deleted title until its trash is emptied and a refetch would bring it back. A deleted title that was on the Watchlist is also kept off the Watchlist screen for the session.
 
+### Navigation and page sound
+
+`TabLayout` (Core) is the person's tab bar: every `Destination` in order and which are tabs, with the rules (Home always, Search last, at most five). `App/Navigation/Destinations.swift` gives each destination its title, icon, availability and page; `MainTabs` builds the bar from the layout, and `openDestination` switches to a destination's tab or, when it has none, pushes the same page onto the current tab's stack. Pages read `tabSelection` to offer the places that are not tabs (DESIGN §7).
+
+`ThemeMusicPlayer` (`AppSession.themeMusic`, one per session) plays a show's theme tune. Pages register the tune they want and the last one shown wins, so a season pushed over its show carries the tune on without a restart. `ThemeMusic.plays` (Core) decides from the setting, app state, other audio, the player and a trailer with sound; `ThemeFade` shapes the volume. The trailer preview mutes itself while the tune is heard.
+
 ### Caches
 
 - `ImagePipeline` (actor): decoded bitmaps in memory, resized files on disk, at the pixel size the view draws, so scrolling back and relaunching never refetch and no cell decodes while scrolling. Keys exclude the token and the address and include the server, so `forget(_:server:)` can evict a deleted title's art.

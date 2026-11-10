@@ -26,7 +26,7 @@ struct TrailerPreview: View {
             appActive: scenePhase == .active,
             heroVisible: onScreen && heroVisible,
             playerOpen: app.player.presented != nil || app.player.active != nil,
-            otherAudioPlaying: model.otherAudioPlaying
+            otherAudioPlaying: model.otherAudioPlaying || app.themeMusic.isHeard
         ))
     }
 
@@ -52,7 +52,10 @@ struct TrailerPreview: View {
         .onDisappear {
             onScreen = false
             model.unwatchSystem()
+            app.themeMusic.trailerSounding = false
         }
+        // A show's theme tune waits while the trailer is heard.
+        .onChange(of: model.isPlaying && !model.isMuted) { _, sounding in app.themeMusic.trailerSounding = sounding }
         .onScrollVisibilityChange(threshold: 0.5) { heroVisible = $0 }
         .onChange(of: muted) { _, muted in model.isMuted = muted }
         .task(id: plays) {

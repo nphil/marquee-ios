@@ -39,18 +39,29 @@ struct BrowseStack<Root: View>: View {
     }
 }
 
-/// What every page of a browse stack carries: the zoom namespace, the push action, toasts above the tab
+/// What every page of a browse stack carries: the zoom namespace, the push actions, toasts above the tab
 /// bar and the stack's Hide on Scroll state.
 private struct StackChrome: ViewModifier {
     let zoom: Namespace.ID
     let open: OpenRouteAction
     let tabBar: TabBarScroll
 
+    @Environment(\.tabSelection) private var tabSelection
+
     func body(content: Content) -> some View {
+        let tabs = tabSelection
+        let open = open
         content
             .overlay(alignment: .bottom) { ToastOverlay() }
             .environment(\.zoomNamespace, zoom)
             .environment(\.openRoute, open)
+            .environment(\.openDestination, OpenDestinationAction { destination in
+                if tabs.isTab(destination) {
+                    tabs.select(destination)
+                } else {
+                    open(.destination(destination))
+                }
+            })
             .environment(tabBar)
             .toolbarVisibility(tabBar.hidden ? .hidden : .automatic, for: .tabBar)
     }
@@ -84,6 +95,8 @@ private struct RouteDestination: View {
             WatchlistDetailView(item: item)
         case .person(let id, let name, let thumb):
             PersonView(id: id, name: name, thumb: thumb)
+        case .destination(let destination):
+            destination.page(pushed: true)
         }
     }
 }

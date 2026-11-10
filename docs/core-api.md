@@ -13,7 +13,7 @@
 - `PlexHTTPClient` (actor): adds identity and token headers. `send` retries a read once after a dropped connection, never a write or a timeout; `decode` parses JSON off the actor; `setToken` after a profile switch.
 - `PlexError`: `unauthorized` (401), `unreachable(NetworkFailure)`, `server(status:message:)`, `decoding`, `pinExpired`, `profilePINRejected`, `noConnections`. Carries no token or URL, so it is safe to log.
 - `PlexMediaContainer`, `PlexMetadata`, `PlexMedia`, `PlexPart`, `PlexStream`, `PlexMarker`, `PlexChapter`, `PlexRole`, `PlexHub`, `PlexDirectory`, `PlexLibrarySection`, `PlexMediaType`: Plex JSON. Every field is optional and read whether Plex sends `"1"`, `1` or `true`; a bad field never drops its item.
-- `PlexMetadata.markers(_:)`: intro, credits or commercial markers in playback order. `onDeck`: the episode to play next on a show's details. `PlexPart.hasSceneThumbnails`: the server has scrubber thumbnails at `/library/parts/<id>/indexes/sd`.
+- `PlexMetadata.markers(_:)`: intro, credits or commercial markers in playback order. `onDeck`: the episode to play next on a show's details. `theme`, `parentTheme`: a show's theme tune path, on the show and on its seasons. `PlexPart.hasSceneThumbnails`: the server has scrubber thumbnails at `/library/parts/<id>/indexes/sd`.
 - `KeychainStore`, `KeychainError`: the account token and server list, readable after first unlock.
 - `PlexTV`: the plex.tv account API.
   - `createPIN(strong:)`, `authURL(for:)`, `checkPIN(_:)`, `waitForToken(_:every:now:sleep:)`: PIN sign-in. A strong PIN is for the browser sheet, which the app closes once polling sees the approval; a 4-character one is typed at plex.tv/link.
@@ -88,6 +88,7 @@ Tracks titled Signs or Songs count as on-screen text, as the spec's forced-word 
   - On-device remux for other containers, hev1 HEVC, Dolby Vision 7 and audio the remux converts. Without the remux, the server copies the video instead.
   - Server re-encode for video the phone cannot decode, Dolby Vision it cannot show, HDR on an SDR screen, HLS level or frame-rate limits, a quality limit, or a hand-picked subtitle to burn in.
   - Unplayable audio is first swapped for a playable track in the same language. Automatic subtitle picks never burn; a remembered one burns only when the video is re-encoded anyway.
+- `ThemeMusic.key(for:)`: the tune a show's or season's page plays. `plays(_ conditions:)`: whether it plays now, from the setting, app activity, page visibility, an open player, other audio and a trailer with sound. `ThemeFade`: the tune's gain, rising over 1.5 s and falling over 1 s from wherever it is; `volume(level:)` is the setting times the gain squared.
 - `PlaybackRoute`: kind, `RouteReason`s, played audio and whether it stands in, audio conversion, video re-encode, `SubtitleDelivery` (sidecar, in stream, burned in, not shown).
 - `RouteReason`: plain-English reasons. `RouteLimits`: a server reason (on-device failure, direct play off, AirPlay), phone only (Direct play forced: never the server, unshowable subtitles not shown), bitrate cap.
 - `VideoQuality.lower(mediaKbps:)`: the highest preset at or below half the rate playing now, offered after a long network wait.
@@ -126,6 +127,11 @@ The endpoints and the route rules are in `docs/LIVE-TV.md`.
 - `SubtitleTiming`: a subtitle offset in 0.1 s steps, up to 60 s either way.
 - `SubtitleReveal.estimate(_:duration:by:)`, `visibility(of:at:)`: Reveal as Spoken timing estimated from a cue's text and length. `measured(_:starts:by:)` takes SpeechDock's word starts instead; `spoken(_:)` is about how long a text takes to say.
 
+## Navigation (`Navigation/`)
+
+- `Destination`: Home, Library, Live TV, Watchlist, Search, Requests, Downloads.
+- `TabLayout`: the order and the tabs switched on; `standard`, `init(savedOrder:savedShown:)` (unknown names dropped, missing ones appended off), `tabs(available:)`, `canSwitch(_:available:)`, `setTab(_:_:available:)`, `reorder(_:)`. Home is always a tab, Search always last, at most `maximumTabs` (5).
+
 ## Not yet checked against a live server
 
 - The status codes for a wrong profile PIN (the live Plex Home has no protected profile). `/api/v2/resources`, `/api/v2/user` and `/api/v2/home/users` were decoded from a live account on 2026-11-06 with no mismatch.
@@ -135,3 +141,4 @@ The endpoints and the route rules are in `docs/LIVE-TV.md`.
 - Dolby Vision, HEVC level and HDR limits, and CEA-608 captions on the actual phone.
 - The live endpoints: fixtures follow the server's API spec and the shapes recorded in `docs/LIVE-TV.md` §1, not a captured response.
 - `removeSubtitle(streamID:)` and the subtitle search and add, which only FakePlex has answered (their shapes follow the TV's measured notes), and the Bazarr client, which follows Bazarr's API source rather than a captured response.
+- `PlexMetadata.theme` and `parentTheme`, which follow the server's API spec rather than a captured response; no test plays a tune.

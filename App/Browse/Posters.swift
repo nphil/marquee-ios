@@ -208,13 +208,15 @@ struct ShelfHeader: View {
 }
 
 /// A row of posters under its header; each opens its detail page, zooming from its art. The first six
-/// fade in 30 ms apart the first time the shelf appears (DESIGN §9).
+/// fade in 30 ms apart the first time the shelf appears (DESIGN §9). A watchlist shelf holds titles the
+/// server may not have, and a long press takes one off the watchlist.
 struct PosterShelf: View {
     let id: String
     let title: String
     let items: [PlexMetadata]
     var seeAll: Route?
     var menu: ShelfMenu?
+    var watchlist = false
 
     @State private var appeared = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -226,15 +228,11 @@ struct PosterShelf: View {
             ShelfHeader(title: title, seeAll: seeAll, menu: menu)
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: Space.s3) {
-                    ForEach(Array(changes.shown(items).enumerated()), id: \.element.id) { index, item in
-                        let zoomID = "\(id)/\(item.ratingKey)"
-                        NavigationLink(value: Route.to(item, zoomID: zoomID)) {
-                            PosterCell(item: item, width: Size.gridMin, zoomID: zoomID)
-                        }
-                        .buttonStyle(.press)
-                        .showWatchedMenu(item)
-                        .opacity(appeared ? 1 : 0)
-                        .animation(entrance(index), value: appeared)
+                    let shown = watchlist ? changes.shownInWatchlist(items) : changes.shown(items)
+                    ForEach(Array(shown.enumerated()), id: \.element.id) { index, item in
+                        poster(item, zoomID: "\(id)/\(item.ratingKey)")
+                            .opacity(appeared ? 1 : 0)
+                            .animation(entrance(index), value: appeared)
                     }
                 }
                 .scrollTargetLayout()
@@ -247,6 +245,23 @@ struct PosterShelf: View {
             guard !appeared else { return }
             appeared = true
             prefetch(items.map(\.posterPath), size: PosterCell.artSize(width: Size.gridMin))
+        }
+    }
+
+    @ViewBuilder
+    private func poster(_ item: PlexMetadata, zoomID: String) -> some View {
+        if watchlist {
+            NavigationLink(value: Route.watchlist(item, zoomID: zoomID)) {
+                PosterCell(item: item, width: Size.gridMin, zoomID: zoomID)
+            }
+            .buttonStyle(.press)
+            .watchlistMenu(item)
+        } else {
+            NavigationLink(value: Route.to(item, zoomID: zoomID)) {
+                PosterCell(item: item, width: Size.gridMin, zoomID: zoomID)
+            }
+            .buttonStyle(.press)
+            .showWatchedMenu(item)
         }
     }
 

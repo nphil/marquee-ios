@@ -2,7 +2,8 @@ import MarqueeCore
 import SwiftUI
 
 /// Home (DESIGN §8.1): the rows the profile chose in Home Rows, in its order. Continue Watching shows
-/// as 16:9 cards and every other row as a poster shelf.
+/// as 16:9 cards and every other row as a poster shelf. While Watchlist is not a tab its titles follow
+/// Continue Watching; while Library is not a tab the title menu opens every place that is not one (§7).
 struct HomeView: View {
     @Environment(\.plexLibrary) private var library
     @Environment(\.theme) private var theme
@@ -11,6 +12,8 @@ struct HomeView: View {
     @Environment(AppSession.self) private var session
     @Environment(ThemeStore.self) private var store
     @Environment(ToastCenter.self) private var toasts
+    @Environment(\.tabSelection) private var tabs
+    @Environment(\.openDestination) private var openDestination
     @State private var rows = Remote<[HomeRow]>()
     @State private var editing = false
 
@@ -45,6 +48,9 @@ struct HomeView: View {
             ToolbarItem(placement: .topBarTrailing) { ProfileButton() }
                 .sharedBackgroundVisibility(.hidden)
         }
+        .modifier(PlacesMenu(places: tabs.isTab(.library) ? [] : store.tabLayout.order.filter {
+            !tabs.isTab($0) && $0.isAvailable(in: session)
+        }, open: openDestination))
         // A library's hubs are asked for only while one of its rows is shown, so showing one reloads.
         .task(id: LoadKey(library: library?.instance, attempt: rows.attempt, extra: Reload(
             revision: changes.revision,
@@ -79,11 +85,18 @@ struct HomeView: View {
         } else {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: Space.s7) {
+                    let watchlistShelf = !tabs.isTab(.watchlist)
+                    if watchlistShelf, !shown.contains(where: \.isContinueWatching) {
+                        WatchlistShelf()
+                    }
                     ForEach(shown) { row in
                         let menu = ShelfMenu(hide: { hide(row, in: arranged) }, edit: { editing = true })
                         if row.isContinueWatching {
                             if width > 0 {
                                 ContinueShelf(hub: row.hub, title: row.title, cardWidth: Self.cardWidth(for: width), header: menu, setShown: setShown)
+                            }
+                            if watchlistShelf {
+                                WatchlistShelf()
                             }
                         } else {
                             PosterShelf(hub: row.hub, id: row.id, title: row.title, menu: menu)
@@ -151,6 +164,24 @@ struct HomeView: View {
         let revision: Int
         let libraries: Set<String>
         let hidden: Set<String>
+    }
+}
+
+/// Home's title menu, with every place that is not a tab, while Library is not one either (DESIGN §7).
+private struct PlacesMenu: ViewModifier {
+    let places: [Destination]
+    let open: OpenDestinationAction
+
+    func body(content: Content) -> some View {
+        if places.isEmpty {
+            content
+        } else {
+            content.toolbarTitleMenu {
+                ForEach(places) { place in
+                    Button(place.title, systemImage: place.systemImage) { open(place) }
+                }
+            }
+        }
     }
 }
 

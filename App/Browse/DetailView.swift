@@ -80,6 +80,8 @@ private struct DetailPage: View {
     @Environment(\.sessionActions) private var session
     @Environment(\.openRoute) private var openRoute
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.tabSelection) private var tabs
+    @Environment(\.openDestination) private var openDestination
     @State private var showsBarTitle = false
     /// The status and navigation bars' height over the top of the page, which the hero reaches up under.
     @State private var barInset: CGFloat = 0
@@ -218,6 +220,7 @@ private struct DetailPage: View {
             guard isOnServer, item.type == .movie || item.type == .show, let library else { return }
             extras = (try? await library.extras(of: item.ratingKey)) ?? []
         }
+        .themeMusic(isOnServer ? ThemeMusic.key(for: item) : nil)
         .deleteConfirmation($deleting) { target in
             if case .title = target { dismiss() }
         }
@@ -323,18 +326,7 @@ private struct DetailPage: View {
             }
             HStack(spacing: Space.s4) {
                 if let guid = item.guid, actions.canWatchlist(guid) {
-                    let on = watchlisted ?? !isOnServer
-                    Button {
-                        actions.setWatchlisted(!on, guid: guid) { state in
-                            withAnimation(Motion.label) { watchlisted = state }
-                        }
-                    } label: {
-                        Image(systemName: on ? "bookmark.fill" : "bookmark")
-                            .contentTransition(.symbolEffect(.replace))
-                    }
-                    .buttonStyle(.round)
-                    .disabled(watchlisted == nil && isOnServer)
-                    .accessibilityLabel(on ? "Remove from Watchlist" : "Add to Watchlist")
+                    watchlistButton(guid: guid)
                 }
                 if isOnServer, item.type != .clip {
                     Button {
@@ -358,6 +350,40 @@ private struct DetailPage: View {
                 }
             }
         }
+    }
+
+    /// The bookmark. While Watchlist is not a tab, a long press on it offers the watchlist itself (§7).
+    @ViewBuilder
+    private func watchlistButton(guid: String) -> some View {
+        let on = watchlisted ?? !isOnServer
+        let toggle = {
+            actions.setWatchlisted(!on, guid: guid) { state in
+                withAnimation(Motion.label) { watchlisted = state }
+            }
+        }
+        let label = Image(systemName: on ? "bookmark.fill" : "bookmark")
+            .contentTransition(.symbolEffect(.replace))
+        Group {
+            if tabs.isTab(.watchlist) {
+                Button(action: toggle) { label }
+            } else {
+                Menu {
+                    Button(Destination.watchlist.title, systemImage: Destination.watchlist.systemImage) {
+                        openDestination(.watchlist)
+                    }
+                } label: {
+                    label
+                } primaryAction: {
+                    toggle()
+                }
+                .menuStyle(.button)
+                .contentShape(.contextMenuPreview, Circle())
+                .accessibilityAction(named: "Open Watchlist") { openDestination(.watchlist) }
+            }
+        }
+        .buttonStyle(.round)
+        .disabled(watchlisted == nil && isOnServer)
+        .accessibilityLabel(on ? "Remove from Watchlist" : "Add to Watchlist")
     }
 
     /// "Mark Watched", or "Mark Show Unwatched" on a show's page: Plex marks every episode under it.

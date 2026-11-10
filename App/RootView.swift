@@ -1,11 +1,7 @@
 import MarqueeCore
 import SwiftUI
 
-enum AppTab: Hashable {
-    case home, library, liveTV, watchlist, search
-}
-
-/// Sign-in until a server is chosen, then five tabs (DESIGN §7), all drawn in the active theme.
+/// Sign-in until a server is chosen, then the tabs the person chose (DESIGN §7), all drawn in the active theme.
 struct RootView: View {
     @Environment(ThemeStore.self) private var store
     @Environment(AppSession.self) private var session
@@ -66,6 +62,8 @@ struct RootView: View {
         // Here rather than on the tabs, so the sheets above resolve artwork too.
         .environment(\.plexLibrary, session.library)
         .environment(\.posterLabels, session.settings.posterLabels)
+        // Show Scroll Bars (DESIGN §8.7) reaches the sheets from here too; the A–Z rail is its own control.
+        .scrollIndicators(store.showsScrollBars ? .automatic : .hidden)
         .tint(theme.accentText)
         .preferredColorScheme(scheme)
         .onChange(of: BarInputs(theme: theme, typeSize: typeSize, boldText: legibilityWeight == .bold), initial: true) { _, inputs in
@@ -91,38 +89,33 @@ struct RootView: View {
     }
 }
 
-/// The five tabs, each with its own navigation stack; Settings opens from Home's profile button. The
-/// browse tabs share the toasts, the record of watch-state changes, the profile's watchlist and the way
-/// into playback.
+/// The tabs the person chose (DESIGN §7), each with its own navigation stack; the first opens at launch.
+/// Settings opens from Home's profile button. The browse tabs share the toasts, the record of watch-state
+/// changes, the profile's watchlist and the way into playback.
 private struct MainTabs: View {
     @Environment(AppSession.self) private var session
     @Environment(ThemeStore.self) private var store
-    @State private var selection: AppTab = .home
+    /// Nil until a tab is picked; a picked tab that leaves the bar gives way to the first.
+    @State private var picked: Destination?
     @State private var toasts = ToastCenter()
     @State private var changes = LibraryChanges()
 
     var body: some View {
-        TabView(selection: $selection) {
-            Tab("Home", systemImage: "house", value: AppTab.home) {
-                BrowseStack { HomeView() }
-            }
-            Tab("Library", systemImage: "rectangle.stack", value: AppTab.library) {
-                BrowseStack { LibraryView() }
-            }
-            Tab("Live TV", systemImage: "play.tv", value: AppTab.liveTV) {
-                BrowseStack { LiveTVView() }
-            }
-            Tab("Watchlist", systemImage: "bookmark", value: AppTab.watchlist) {
-                BrowseStack { WatchlistView() }
-            }
-            Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
-                BrowseStack { SearchView() }
+        let tabs = store.tabLayout.tabs(available: Destination.available(in: session))
+        let selection = picked.flatMap { tabs.contains($0) ? $0 : nil } ?? tabs.first ?? .home
+        TabView(selection: Binding(get: { selection }, set: { picked = $0 })) {
+            ForEach(tabs) { destination in
+                Tab(destination.title, systemImage: destination.systemImage, value: destination, role: destination == .search ? .search : nil) {
+                    BrowseStack { destination.page() }
+                }
+                .badge(destination.badge(in: session))
             }
         }
         .tabViewStyle(.sidebarAdaptable)
         // Minimise on Scroll shrinks the bar while a page scrolls down; Hide on Scroll is each browse stack's
         // own (BrowseStack). Search keeps the bar still while its results scroll and the keyboard comes and goes.
         .tabBarMinimizeBehavior(store.tabBar == .minimise && selection != .search ? .onScrollDown : .never)
+        .environment(\.tabSelection, TabSelection(tabs: tabs, select: { picked = $0 }))
         .environment(toasts)
         .environment(changes)
         .onChange(of: session.server?.id) { changes.forgetDeletions() }

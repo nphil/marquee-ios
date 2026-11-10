@@ -3,8 +3,11 @@ import SwiftUI
 
 /// Search (DESIGN §8.5): the standard search tab, whose landing page keeps the field at the top. Results
 /// arrive while typing, grouped into movies, shows, episodes and people, and the last four searches wait
-/// under an empty field.
+/// under an empty field. Opened from a button while Search is not a tab (§7), it comes with the field ready
+/// to type in.
 struct SearchView: View {
+    var focusesField = false
+
     @Environment(\.plexLibrary) private var library
     @Environment(\.theme) private var theme
     @Environment(\.openRoute) private var openRoute
@@ -14,6 +17,8 @@ struct SearchView: View {
     @State private var scope = SearchScope.all
     @State private var results = Remote<SearchResults>()
     @AppStorage("search.recents") private var storedRecents = ""
+    @FocusState private var fieldFocused: Bool
+    @State private var focusedOnce = false
 
     private var query: String {
         text.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -50,10 +55,17 @@ struct SearchView: View {
         // Always shown: with the default placement iOS 27 tucks the field away as soon as the list
         // has rows, which left the landing page with no way to type.
         .searchable(text: $text, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search your library")
+        .searchFocused($fieldFocused)
         .searchScopes($scope, activation: .onSearchPresentation) {
             ForEach(SearchScope.allCases, id: \.self) { Text($0.title).tag($0) }
         }
         .onSubmit(of: .search) { remember(query) }
+        .task {
+            // Once: back from a result, the keyboard stays down.
+            guard focusesField, !focusedOnce else { return }
+            focusedOnce = true
+            fieldFocused = true
+        }
         .task(id: LoadKey(library: library?.instance, attempt: results.attempt, extra: query)) {
             guard let library, !query.isEmpty else { return }
             let query = query

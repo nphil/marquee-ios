@@ -39,6 +39,8 @@ final class AppSession {
     var showsSettings = false
     /// The full-screen player and whatever keeps playing in Picture in Picture.
     let player = PlayerCenter()
+    /// The theme tune of the show page on screen.
+    let themeMusic = ThemeMusicPlayer()
     /// The profile switcher sheet, opened from the Settings Account row.
     var showsProfileSwitcher = false
     /// The active profile's playback, audio and subtitle settings; every change is saved at once.

@@ -17,7 +17,7 @@ Citation key:
 
 ## 1. The short version
 
-- **Five tabs:** Home, Library, Live TV, Watchlist and Search; Settings opens from the profile button on Home. System tab bar, system back swipe, system sheets.
+- **Tabs:** Home, Library, Live TV, Watchlist and Search by default; each place can be switched off or moved, up to five tabs, and one that is not a tab opens from another page. Settings opens from the profile button on Home. System tab bar, system back swipe, system sheets.
 - **Home:** one large Continue Watching card, then poster shelves. Posters carry the colour; everything else stays quiet.
 - **Detail:** art that melts into the page, the title in Manrope, one wide Play button (it reads Resume on a part-watched title).
 - **Player:** full-screen video. Controls fade after 3 seconds; one tap brings them back. Audio and subtitles share one native menu with plain track names.
@@ -29,7 +29,7 @@ Citation key:
 
 | # | Decision | Why | Cost to change |
 |---|---|---|---|
-| 1 | Tabs: Home, Library, Live TV, Watchlist, Search; Settings is a sheet from Home's profile button | `B:§1` lists these destinations; Lucent allows 3 to 5 (`L:160`). Watchlist could fold into Library | one tab |
+| 1 | Tabs by default: Home, Library, Live TV, Watchlist, Search, each changeable in Tab Bar (§7); Settings is a sheet from Home's profile button | `B:§1` lists these destinations; Lucent allows 3 to 5 (`L:160`) | one default |
 | 2 | "Match system appearance" is on by default | Apple expects both appearances to be supported (`W26-251`); `I:31` | one default |
 | 3 | Every player control is a 56 pt circle; play/pause is marked by a solid white fill, not by size | Lucent: one button size per screen (`L:381`) | one size |
 | 4 | Hero title 34 pt, not Lucent's 48 | A long film title takes about 4 lines at 48 pt and about 3 at 34 pt on a 390 pt screen [INFERENCE: estimated from average glyph width] | one size |
@@ -55,7 +55,7 @@ No PRODUCT.md interview was possible. This section is inferred from the brief, L
 ## 3. Mode, scene and visual world
 
 - **Mode:** Operate (get the person to a film fast), with Experience-leaning moments: the detail hero and the player.
-- **Scene:** an evening on the couch, phone in one hand, lights low. One thumb, no glare, no animation for its own sake, no audio from the app until play is pressed.
+- **Scene:** an evening on the couch, phone in one hand, lights low. One thumb, no glare, no animation for its own sake, no audio from the app until play is pressed, save the hero trailer and a show's theme tune, each with a switch in Settings.
 - **Colour strategy:** Restrained. A tinted near-black (or soft paper) canvas, one accent on at most about 10% of a screen, and poster art as the only large colour. Dark is the first design target; light gets equal verification (`I:31`).
 - **Signature:** Manrope headings; a 1 pt lit rim on panels; the theme as personality; poster-first shelves with very little text.
 - **Craft floor:** no kicker lines above headings, no gradient text, no side stripes, no card inside a card, no hard offset shadows, no emoji or Unicode icons (SF Symbols only), no decorative glass. Gradients exist only as functional fades behind text (hero, player).
@@ -269,7 +269,8 @@ Apple's rule: Liquid Glass is the navigation layer, not the content layer; use r
 
 ## 7. Navigation model
 
-- **Root:** a tab view with Home, Library, Live TV, Watchlist and a Search tab in the search role (`W25-323`); built with the iOS 27 SDK the standard search tab sits in line with the others (`W26-292`). Settings is not a tab: the profile button at the top of Home opens it in a sheet, as in the Apple TV app.
+- **Root:** a tab view of the tabs the person chose, by default Home, Library, Live TV, Watchlist and a Search tab in the search role (`W25-323`); built with the iOS 27 SDK the standard search tab sits in line with the others (`W26-292`). Settings is not a tab: the profile button at the top of Home opens it in a sheet, as in the Apple TV app.
+- **Tabs** are a setting, Appearance › Tab Bar, after Apollo's: Home, Library, Live TV, Watchlist, Search, Requests (once Seerr is set up) and Downloads, each switched on or off and dragged into order (VoiceOver: Move Up, Move Down), at most five on the bar. Home stays a tab, as its profile button opens Settings, and Search stays last, where iOS draws the search tab. A place that is not a tab opens as the same page pushed onto the current tab: Live TV, Watchlist and Downloads from the Library's title menu; Search (its field ready to type) and Requests (`plus`) from buttons in the Library's header; every place off the bar from Home's title menu while the Library is off it too. Watchlist also gets a row on Home (§8.1) and a long press on Detail's bookmark (§8.3); Downloads a row in Settings (§8.7). A place that is switched on but unavailable, such as Requests without Seerr, leaves its slot to the others.
 - **Tab bar on scroll** is a setting, Appearance › Tab Bar, after Apollo's: **Minimise on Scroll** (the default) shrinks the bar to the current tab while a page scrolls down (`tabBarMinimizeBehavior(.onScrollDown)`, `W25-323`); **Hide on Scroll** slides it away after 24 pt of scrolling down and brings it back after 24 pt up, within 32 pt of the top, and on every push or pop; **Always Show** keeps it. Search keeps the bar under every choice, as its results scroll while the keyboard comes and goes. Hide on Scroll follows only a browse page's main scroll view and only a finger or a fling: a programmatic scroll, a sheet or the player never moves the bar, the bar stays as it is within three touch targets of a page's end (its coming and going changes the bottom inset by up to about 90 pt), and VoiceOver keeps it shown so the tabs stay reachable. The slide is the `tabBar` motion (§9).
 - **Each tab owns a navigation stack.** Detail pushes with a zoom transition from the tapped poster (`W26-251`); Reduce Motion makes it a 120 ms crossfade. The left-edge back swipe is never disabled or overlaid (`I:15`). No custom back buttons, no hamburger menu (`I:14`).
 - **Player:** a full-screen cover (`I:39`). The way out is a swipe down on the picture, the Close button, or the VoiceOver escape gesture; none depends on the chrome being visible.
@@ -298,14 +299,15 @@ Sign-in is Plex's PIN flow: the button opens plex.tv in a browser sheet and the 
 2. **Continue Watching** (hidden when empty, `B:§1`): a horizontal snap shelf of 16:9 cards, about 82% of the width so the next card peeks (33% from 600 pt wide, so a landscape card and its caption stay above the floating tab bar). Under each card, never over the art: a 3 pt progress bar (accent on `trackOff`), the title (Headline) and one line such as "S2 · E5 · 42 min left" in ink2 (the remaining time is the helpful context Apple asks for, `W26-250`). Tap resumes at once. Long-press opens a menu: Details, Mark watched, Remove from Continue Watching (with Undo).
 3. **Hubs**, in server order, empty ones hidden (`B:§1`). Each is a title (Manrope SemiBold 24) with a trailing `chevron.right` (accessible name "See all …") over a poster shelf. Poster cell: 2:3 art, a 3 pt progress bar if part-watched, a one-line title (Caption). Badge on the art, top trailing: a solid canvas-coloured pill with ink text (unwatched episode count; a check for watched), never glass.
 4. **Rows are the profile's choice.** Home shows the rows of Home Rows (§8.7) in its order: by default the server's Home hubs, with Continue Watching wherever it is placed. Long-press on a row's title (or its VoiceOver actions) offers Hide This Row (a toast with Undo) and Edit Home; Settings also opens Home Rows. With every row hidden the page is an empty state with Edit Home. Edit Home opens Home Rows in a sheet at half height, so Home above it follows each change.
-5. Pull to refresh.
+5. **Places off the bar** (§7): while Watchlist is not a tab, a Watchlist row of its latest 20 titles follows Continue Watching (or leads without it), with See all when there are more; a long press removes a title from the watchlist. While the Library is not a tab either, the "Home" title is a menu of every place off the bar.
+6. Pull to refresh.
 
 ### 8.2 Library
 
-1. **Large title with a menu** in the bar (§7.1) to switch library ("Movies" with a menu chevron). Toolbar: one View menu (sort, filter, unwatched only).
+1. **Large title with a menu** in the bar (§7.1) to switch library ("Movies" with a menu chevron); below the libraries it lists Live TV, Watchlist and Downloads when they are not tabs. Toolbar: one View menu (sort, filter, unwatched only), led by Search (`magnifyingglass`) when Search is not a tab and followed by Requests (`plus`) when Requests is available and not a tab.
 2. **Filter chips** appear under the title only while a filter is on: solid chips with `xmark`, full 48 pt hit height.
 3. **Poster grid:** adaptive, minimum 104 pt, 12 pt gutters; 3 columns at 390. At large accessibility sizes: 2 columns, then 1.
-4. **A–Z rail** on the trailing edge, only when sorted by title (`B:§1`): letters in Caption 2 Semibold, 16 pt apart. Touching it jumps letter by letter with a selection tick, and the letters around the finger swell and lean out over a lens, after Apollo's index: the touched letter 2.9× and 27 pt out, its neighbours 1.85× and 16 pt, the next 1.38× and 7 pt, the rest dimmed to 72%, blended between rows. The swollen letters part along the rail so that 4 pt of clear space stays between two capitals, and the rows beyond keep their 16 pt pitch. The lens is a `sheet` panel with an `edge` rim; the touched letter is `accentText`. Under Reduce Motion only the touched letter grows and nothing leans. VoiceOver and Switch Control adjust the rail a letter at a time, so it needs no separate menu.
+4. **A–Z rail** on the trailing edge, only when sorted by title (`B:§1`): letters in Caption 2 Semibold, 16 pt apart. Touching it jumps letter by letter with a selection tick, and the letters around the finger swell and lean out over a lens, after Apollo's index but stronger, so the touched letter clears the thumb: the touched letter 3.6× and 46 pt out, its neighbours 2.5× and 32 pt, then 1.75× and 18 pt and 1.3× and 7 pt, the rest dimmed to 72%, blended between rows. The swollen letters part along the rail so that 4 pt of clear space stays between two capitals, and the rows beyond keep their 16 pt pitch. The lens is a `sheet` panel with an `edge` rim; the touched letter is `accentText`. Left of the lens, level with the finger and kept within the rail's height, a callout shows the touched letter in Manrope Bold 44 (Large Title, scaling to XXXL) in `accentText` on a square `sheet` panel with an `edge` rim and the card radius; it fades out after the finger lifts. Under Reduce Motion only the touched letter grows and nothing leans. VoiceOver and Switch Control adjust the rail a letter at a time, so it needs no separate menu.
 5. Collections and Recommended (`B:§1`) are a system segmented control under the title (`L:269`).
 
 ### 8.3 Detail (movie or show)
@@ -328,13 +330,14 @@ Sign-in is Plex's PIN flow: the button opens plex.tv in a browser sheet and the 
 
 1. **Hero:** the backdrop at its natural 16:9 ratio, full width, starting below the navigation bar so the bars hide none of it, fading to canvas over its lower half on an eased ramp that reaches 85% where the title starts (§5.3). Above it the art runs on to the top edge as a blurred mirror of its top rows, the `backgroundExtensionEffect` look (`W25-323`), so the page still bleeds under the status bar. No portrait crop, so faces are not cut. With no backdrop: the poster, blurred, as the fallback [INFERENCE]. In landscape a full-width hero would be taller than the screen, so the backdrop becomes a rounded 16:9 card on the leading half with the title block and actions beside it, and Play stays on the first screen.
 2. **Title block** on the faded part: the title (display; wraps up to 3 lines), a meta line in ink2 (year, runtime, content rating, then a star glyph and the rating), and solid format chips (4K, HDR, Atmos) as small Caption badges in ink2, so they never read as the Version or Season menus.
-3. **Action row, one size (48):** a full-width **Play** pill in accent ("Play", or "Resume · 42 min left"; for a show "Play S1 · E1" or "Resume S2 · E5"), then round icon buttons: watchlist (`bookmark`), watched (`checkmark.circle`), More (`ellipsis`: Play from beginning, Version, Tracks, Share). Watched and watchlist apply at once with a toast and Undo (`L:365`).
+3. **Action row, one size (48):** a full-width **Play** pill in accent ("Play", or "Resume · 42 min left"; for a show "Play S1 · E1" or "Resume S2 · E5"), then round icon buttons: watchlist (`bookmark`), watched (`checkmark.circle`), More (`ellipsis`: Play from beginning, Version, Tracks, Share). Watched and watchlist apply at once with a toast and Undo (`L:365`). While Watchlist is not a tab, a long press on the bookmark offers Watchlist.
 4. **Version** menu ("4K HDR · 12 GB" with a chevron) only when the title has more than one version.
 5. **Synopsis:** Body, 3 lines, then a `chevron.down` to expand; capped near 70 characters per line.
 6. **Tracks** row opens a sheet with the full audio and subtitle list in technical terms: codec, channels, PCM and Dolby chips, and image-format chips (PGS, VOBSUB) only on image subtitles (`B:§3`).
 7. **Cast** (circular photos, 72 pt, Caption names; the person's initials where the server has no photo) and **Related** (poster shelf), when the server provides them.
 8. The navigation bar is transparent at rest and gains glass as the page scrolls under it (`scrollEdgeEffectStyle`, `W25-323`).
 9. **Watchlist** items that are not on the user's server open this same screen with no Play pill and one line, "Not on your servers" [INFERENCE: not in `B:`].
+10. **Theme music:** a show's page and its seasons' play the show's theme tune from the server while the page is on screen, fading in over 1.5 s and out over 1 s (volume follows the gain squared, heard as an even fade). It waits while other audio plays, while the player holds the sound and while the trailer plays with sound; a trailer that starts while the tune plays stays muted. Covered by another page it pauses and resumes; after the player it starts over; it never repeats. It mixes with other apps and Silent mode silences it. Settings › Video & playback turns it off and sets its volume (50% by default).
 
 ### 8.4 Seasons and episodes (inside a show's detail)
 
@@ -427,9 +430,9 @@ On the smallest iPhones (375 × 667 pt), upright, the top row leaves the title 2
 Settings opens from Home's profile button in a sheet with Done (§7). It is a system inset-grouped list (`I:40`), rows 56 pt minimum. Top to bottom:
 
 1. **Account:** profile name and server name; opens the profile switcher.
-2. **Appearance:** the theme picker, Header Style and Tab Bar (below).
+2. **Appearance:** the theme picker, Header Style, Tab Bar and Show Scroll Bars (below).
 3. **Home:** Rows, reading Default or Custom, opens Home Rows: every row Home can show (the server's Home hubs, then each movie and TV library's hubs, named "Top Rated in Movies"), each with a small preview of its first posters, its first titles and a switch. The list is always in edit mode, so a row drags by its handle; VoiceOver offers Move Up and Move Down. A library's rows start off. Reset to Default restores the server's rows and order. Changes save at once for the profile, keyed by each hub's `hubIdentifier` (a library's prefixed with its uuid); a hub the server adds later shows at the end, and a library with no shown row is never asked for its hubs.
-4. **Video & playback** (`B:§1`): skip interval, intro skip (manual or auto, countdown), credits and auto-next delay, direct play mode (Auto, Disabled, Force; Force asks for confirmation with Cancel first), default aspect (`B:§4`); under **Live TV**, **Direct from Tuner** (on by default; off, every channel plays through Plex, docs/LIVE-TV.md §2.2).
+4. **Video & playback** (`B:§1`): skip interval, intro skip (manual or auto, countdown), credits and auto-next delay, direct play mode (Auto, Disabled, Force; Force asks for confirmation with Cancel first), default aspect (`B:§4`), Play Trailers Automatically, **Play Theme Music** with its volume (§8.3); under **Live TV**, **Direct from Tuner** (on by default; off, every channel plays through Plex, docs/LIVE-TV.md §2.2).
 5. **Audio & subtitles** (`B:§1`): preferred audio language, subtitle mode, follow-dub rule, remember choices, **Subtitle style** with a live preview (`B:§3`).
 6. **Integrations:** each is off until enabled and has its own page; plugins supply data, never styling (`/data/home/lgtv/CLAUDE.md`). Entries: the optional SpeechDock address (`B:§1`), Bazarr, **Chromecast** and the **LumaTV remote**. With Chromecast on, the player's route circle shows the Cast mark (accent while a Chromecast plays) and opens a popover: This iPhone, the Chromecasts found, and AirPlay & Bluetooth (the system picker). Every row has its icon in one fixed-width column (`Size.menuGlyph`, scaling with text) so the labels share one start line, and the check or spinner in a column of the same width at the trailing margin. The popover takes the room between the top row and the bottom controls and scrolls when the rows are taller, so a phone on its side never clips the first or last row. The phone looks for receivers only while the player or the Chromecast page is open. While casting, the picture area says "Playing on <name>", More hides Picture in Picture, Aspect and Speed, and the receiver plays the file itself when it can (MP4, video it decodes, AAC or MP3) or the server's HLS with subtitles burned in; it gets a transient token, never the account's. The LumaTV remote's page has one switch, which puts the remote button on Home. The remote is LumaRemoteKit's (`github.com/nphil/LumaRemoteKit`), drawn with the theme's canvas, glass, inks, accent and status roles, card and control radii, and Manrope for titles. Marquee registers `lumaremote://`, the link in the TV's pairing QR code: opening one turns the remote on and opens it at the pairing confirmation.
 7. **About:** version, open-source notices. **Sign out** is destructive: a confirmation dialog that names what is removed.
@@ -440,7 +443,7 @@ Settings opens from Home's profile button in a sheet with Done (§7). It is a sy
 2. **Grid:** adaptive columns, minimum tile width 104 pt (3 at 390), 16 pt spacing (`S:Features/Settings/SettingsView.swift:213`). A tile is a rounded 3:4 preview drawn from the theme's own roles: canvas fill, two ink lines, a sheet-coloured panel holding an accent pill and three small poster blocks. The name sits under the tile (Caption). No images, no blur, no shadows, so scrolling stays smooth.
 3. **Selecting:** the tile gets a ring in the theme's `focus` colour plus a check mark (never colour alone); the app re-themes instantly with a selection tick and no animation.
 4. At large accessibility sizes the grid goes to 2 columns, then 1; names wrap.
-5. **Header Style** (§7.1) and **Tab Bar** (§7) follow the themes, each an inline picker with a footer saying what its choices do. Both apply at once, without rebuilding the page under them, and are kept with the theme, not per profile.
+5. **Header Style** (§7.1) follows the themes, an inline picker with a footer saying what its choices do. **Tab Bar** (§7) is a row reading "5 Tabs" that opens its page: each place with its tab icon, a line saying where it opens when it is not a tab, and a switch, in edit mode so a row drags by its handle (Search stays last and has none), then the On Scroll choice. **Show Scroll Bars**, on by default, shows the system scroll indicator on every page and sheet; the A–Z rail shows either way. All apply at once, without rebuilding the page under them, and are kept with the theme, not per profile.
 
 ## 9. Motion and haptics
 
@@ -473,7 +476,7 @@ Theme change: instant and atomic. Nothing loops at rest; no autoplay; no motion 
 | Server confirms a watched, watchlist or settings change | success, only after the confirmation (`L:75`) |
 | Failure and rollback | error |
 
-No haptic on loads, countdowns or auto-skips. No sound from the app. [INFERENCE: haptics follow the iPhone's System Haptics setting.]
+No haptic on loads, countdowns or auto-skips. No interface sounds. [INFERENCE: haptics follow the iPhone's System Haptics setting.]
 
 ## 10. Accessibility
 
@@ -526,7 +529,7 @@ Icons: SF Symbols only. [INFERENCE: every name needs a check in the SF Symbols a
 
 | Meaning | Symbol |
 |---|---|
-| Tabs | `house`, `rectangle.stack`, `play.tv`, `bookmark`, `magnifyingglass` |
+| Tabs | `house`, `rectangle.stack`, `play.tv`, `bookmark`, `magnifyingglass`, `rectangle.stack.badge.plus` (Requests), `arrow.down.circle` (Downloads); the Library's Requests button `plus` |
 | Profile, close, expand, more, see all | `person.crop.circle`, `chevron.down`, `chevron.down`, `ellipsis`, `chevron.right` |
 | Watched, remove filter | `checkmark.circle`, `xmark` |
 | Player | `play.fill`, `pause.fill`, `gobackward.N`, `goforward.N`, `backward.end.fill`, `forward.end.fill`, `captions.bubble`, `airplayvideo`, `pip.enter` |

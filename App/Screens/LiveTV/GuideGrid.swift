@@ -30,6 +30,9 @@ struct GuideGrid: UIViewRepresentable {
         view.onNowVisibility = { visible in
             if binding.wrappedValue != visible { binding.wrappedValue = visible }
         }
+        // Show Scroll Bars (DESIGN §8.7) reaches this UIKit grid only through the environment.
+        let indicators = environment.verticalScrollIndicatorVisibility
+        view.showsScrollIndicator = indicators != .hidden && indicators != .never
         view.update(
             GuideGridView.Content(
                 channels: channels,
@@ -86,6 +89,10 @@ final class GuideGridView: UIView, UICollectionViewDataSource, UICollectionViewD
 
     var actions = GuideActions()
     var onNowVisibility: ((Bool) -> Void)?
+    var showsScrollIndicator: Bool {
+        get { collectionView.showsVerticalScrollIndicator }
+        set { collectionView.showsVerticalScrollIndicator = newValue }
+    }
 
     private let layout = GuideLayout()
     private let collectionView: UICollectionView

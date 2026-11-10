@@ -34,6 +34,10 @@ struct ProfileSettings: Equatable, Sendable {
     /// Plays a title's trailer in its page's hero after a moment (behaviour spec: Play trailers
     /// automatically, on by default).
     var playsTrailers = true
+    /// Plays a show's theme tune on its pages (DESIGN §8.3), on by default.
+    var playsThemeMusic = true
+    /// The theme tune's volume, 0 to 1.
+    var themeMusicVolume = 0.5
 
     static let skipIntervals = [5, 10, 15, 30, 60]
     static let countdowns = [3, 5, 10, 15, 30]
@@ -43,7 +47,7 @@ extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
         case skipInterval, skipTaps, introSkipDelay, nextEpisodeDelay, directPlay, aspect, readsTunerDirectly
         case audioLanguage, subtitles, remembersTracks, subtitleStyle, homeRows
-        case posterLabels, quality, audioEnhancements, hiddenLibraries, playsTrailers
+        case posterLabels, quality, audioEnhancements, hiddenLibraries, playsTrailers, playsThemeMusic, themeMusicVolume
     }
 
     init(from decoder: any Decoder) throws {
@@ -67,6 +71,8 @@ extension ProfileSettings: Codable {
         audioEnhancements = value(.audioEnhancements) ?? audioEnhancements
         hiddenLibraries = value(.hiddenLibraries) ?? hiddenLibraries
         playsTrailers = value(.playsTrailers) ?? playsTrailers
+        playsThemeMusic = value(.playsThemeMusic) ?? playsThemeMusic
+        themeMusicVolume = value(.themeMusicVolume) ?? themeMusicVolume
     }
 }
 

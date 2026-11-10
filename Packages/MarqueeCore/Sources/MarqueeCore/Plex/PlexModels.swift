@@ -112,6 +112,10 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
     public var parentThumb: String?
     public var grandparentThumb: String?
     public var grandparentArt: String?
+    /// A show's theme tune, "/library/metadata/1/theme/1700000000", on a show that has one.
+    public var theme: String?
+    /// A season's show's theme tune.
+    public var parentTheme: String?
     /// Milliseconds; 0 when unknown.
     public var duration: Int
     /// Resume point in milliseconds; 0 when not started.
@@ -151,7 +155,7 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
         case ratingKey, key, guid, type, subtype, extraType, primaryExtraKey, title, titleSort, originalTitle, summary, tagline, year
         case index, parentIndex
         case parentRatingKey, parentGuid, parentTitle, grandparentRatingKey, grandparentGuid, grandparentTitle
-        case thumb, art, parentThumb, grandparentThumb, grandparentArt
+        case thumb, art, parentThumb, grandparentThumb, grandparentArt, theme, parentTheme
         case duration, viewOffset, viewCount, leafCount, viewedLeafCount, childCount
         case addedAt, lastViewedAt, originallyAvailableAt, contentRating, studio, rating, audienceRating
         case librarySectionID, librarySectionTitle, playQueueItemID
@@ -187,6 +191,8 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
         parentThumb = c.string(.parentThumb)
         grandparentThumb = c.string(.grandparentThumb)
         grandparentArt = c.string(.grandparentArt)
+        theme = c.string(.theme)
+        parentTheme = c.string(.parentTheme)
         duration = c.int(.duration) ?? 0
         viewOffset = c.int(.viewOffset) ?? 0
         viewCount = c.int(.viewCount) ?? 0

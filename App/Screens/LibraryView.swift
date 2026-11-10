@@ -2,12 +2,15 @@ import MarqueeCore
 import SwiftUI
 
 /// Library (DESIGN §8.2): one movie or TV library at a time, picked from the title menu, shown as a poster
-/// grid with a View menu, filter chips and an A–Z rail, or as its collections or the server's picks.
+/// grid with a View menu, filter chips and an A–Z rail, or as its collections or the server's picks. The
+/// title menu and the header also open the places that are not tabs (§7).
 struct LibraryView: View {
     @Environment(\.plexLibrary) private var library
     @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(AppSession.self) private var session
+    @Environment(\.tabSelection) private var tabs
+    @Environment(\.openDestination) private var openDestination
     @State private var sections = Remote<[PlexLibrarySection]>()
     @AppStorage("library.section") private var chosenKey = ""
 
@@ -23,6 +26,17 @@ struct LibraryView: View {
                         .toolbarTitleMenu {
                             Picker("Library", selection: Binding(get: { section.key }, set: { chosenKey = $0 })) {
                                 ForEach(browsable) { Text($0.title).tag($0.key) }
+                            }
+                            // Search and Requests have their own buttons in the header.
+                            let places = [Destination.liveTV, .watchlist, .downloads].filter {
+                                !tabs.isTab($0) && $0.isAvailable(in: session)
+                            }
+                            if !places.isEmpty {
+                                Section {
+                                    ForEach(places) { place in
+                                        Button(place.title, systemImage: place.systemImage) { openDestination(place) }
+                                    }
+                                }
                             }
                         }
                 } else {
@@ -64,6 +78,9 @@ private struct SectionBrowser: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(LibraryChanges.self) private var changes
+    @Environment(AppSession.self) private var session
+    @Environment(\.tabSelection) private var tabs
+    @Environment(\.openDestination) private var openDestination
     @State private var segment = Segment.all
     @State private var sort = SectionQuery.Sort.title
     @State private var reversed = false
@@ -129,8 +146,19 @@ private struct SectionBrowser: View {
                 }
             }
             .toolbar {
-                if segment == .all {
-                    ToolbarItem(placement: .topBarTrailing) { viewMenu }
+                ToolbarItemGroup(placement: .topBarTrailing) {
+                    if !tabs.isTab(.search) {
+                        Button("Search", systemImage: Destination.search.systemImage) { openDestination(.search) }
+                            .accessibilityIdentifier("library.search")
+                    }
+                    if segment == .all { viewMenu }
+                }
+                if !tabs.isTab(.requests), Destination.requests.isAvailable(in: session) {
+                    ToolbarSpacer(.fixed, placement: .topBarTrailing)
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Requests", systemImage: "plus") { openDestination(.requests) }
+                            .accessibilityIdentifier("library.requests")
+                    }
                 }
             }
         }
@@ -393,8 +421,8 @@ private struct SectionBrowser: View {
 }
 
 /// The A–Z rail (DESIGN §8.2): letters in Caption down the trailing edge. Touching it jumps letter by letter
-/// with a selection tick, while the letters around the finger swell and lean out over a lens, after
-/// Apollo's index. VoiceOver and Switch Control step it a letter at a time.
+/// with a selection tick, while the letters around the finger swell and lean out over a lens and the touched
+/// letter shows large in a callout beside it. VoiceOver and Switch Control step it a letter at a time.
 private struct AlphabetRail: View {
     let entries: [AlphabetIndexEntry]
     let select: @MainActor (AlphabetIndexEntry) -> Void
@@ -408,11 +436,13 @@ private struct AlphabetRail: View {
     @State private var height: CGFloat = 0
     /// Where VoiceOver and Switch Control last stepped to, an index into `entries`.
     @State private var stepped = 0
+    /// The letter in the callout. Kept after the finger lifts, so the callout fades out still showing it.
+    @State private var callout = ""
 
     private static let rowHeight: CGFloat = 16
     private static let width: CGFloat = 24
-    /// Room for the touched letter leaning 27 pt out and for two letters either side of it.
-    private static let lens = CGSize(width: Size.target + Space.s4, height: Size.target * 2)
+    /// Room for the touched letter leaning 46 pt out and for two letters either side of it.
+    private static let lens = CGSize(width: Size.target * 2, height: Size.target * 2)
     private static let follow = Animation.interactiveSpring(response: 0.15, dampingFraction: 0.86)
 
     var body: some View {
@@ -424,6 +454,8 @@ private struct AlphabetRail: View {
         // up is a stretched bitmap and the touched letter came out soft.
         let glyph = Manrope.size(11, as: .caption2, at: typeSize, cap: .xxxLarge)
         let letter = glyph * LetterLens.peak
+        let calloutGlyph = Manrope.size(44, as: .largeTitle, at: typeSize, cap: .xxxLarge)
+        let calloutSide = (calloutGlyph * 1.8).rounded()
         // Tall enough for the touched letter and two either side, which spread apart as they swell.
         let lensHeight = max(Self.lens.height, 2 * (LetterLens.position(2, row: Self.rowHeight, glyph: glyph)
             + LetterLens.height(of: 2, glyph: glyph) / 2 + Space.s1))
@@ -448,11 +480,29 @@ private struct AlphabetRail: View {
             if let focus {
                 let shape = RoundedRectangle(cornerRadius: Radius.tile, style: .continuous)
                 shape
-                    .fill(theme.roles.sheet.over(theme.roles.canvas).color)
+                    .fill(panel)
                     .overlay { shape.strokeBorder(theme.edge, lineWidth: 1) }
                     .frame(width: Self.lens.width, height: lensHeight)
                     .offset(y: top + (focus + 0.5) * Self.rowHeight - lensHeight / 2)
                     .transition(.opacity)
+            }
+        }
+        // Solid like the lens: glass over the scrolling grid would resample it every frame.
+        .background(alignment: .topTrailing) {
+            if let finger, !callout.isEmpty {
+                let shape = RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+                Text(callout)
+                    .font(.custom(Manrope.bold.rawValue, fixedSize: calloutGlyph))
+                    .foregroundStyle(theme.accentText)
+                    .frame(width: calloutSide, height: calloutSide)
+                    .background(panel, in: shape)
+                    .overlay { shape.strokeBorder(theme.edge, lineWidth: 1) }
+                    .offset(
+                        x: -(Self.lens.width + Space.s3),
+                        y: min(max(finger - calloutSide / 2, 0), max(height - calloutSide, 0))
+                    )
+                    .transition(.opacity)
+                    .allowsHitTesting(false)
             }
         }
         .contentShape(Rectangle())
@@ -497,6 +547,10 @@ private struct AlphabetRail: View {
         return (0..<fitting).map { entries[Int((Double($0) * step).rounded())] }
     }
 
+    private var panel: Color {
+        theme.roles.sheet.over(theme.roles.canvas).color
+    }
+
     private func pick(at y: CGFloat, shownCount: Int) {
         let band = CGFloat(shownCount) * Self.rowHeight
         let top = (height - band) / 2
@@ -504,6 +558,7 @@ private struct AlphabetRail: View {
         let entry = entries[Int(fraction * CGFloat(entries.count))]
         guard entry.character != current else { return }
         current = entry.character
+        callout = entry.character
         Haptics.selection()
         select(entry)
     }
@@ -519,17 +574,19 @@ private struct AlphabetRail: View {
         let top = (height - CGFloat(shown.count) * Self.rowHeight) / 2
         finger = top + (CGFloat(row) + 0.5) * Self.rowHeight
         current = letter
+        callout = letter
         select(shown[row])
     }
     #endif
 }
 
-/// Where one rail letter sits in the lens, `offset` rows from the finger. Apollo's index swells the
-/// touched letter to 2.9× and leans it 27 pt out, the letters beside it to 1.85× and 16 pt and the next to
-/// 1.38× and 7 pt, and dims the rest to 72%; between rows it blends. The swollen letters would overlap at
-/// the rail's 16 pt row pitch, so the rows part from the finger until the gap between two letters is a
-/// fixed margin; the rest of the rail keeps its pitch, shifted by what the lens added. Under Reduce Motion
-/// only the touched letter grows, to a size that fits its row, and nothing leans or shifts.
+/// Where one rail letter sits in the lens, `offset` rows from the finger. The touched letter swells to 3.6×
+/// and leans 46 pt out, the letters beside it to 2.5× and 32 pt, then 1.75× and 18 pt and 1.3× and 7 pt, and
+/// the rest dim to 72%; between rows it blends. That is a stronger lens than Apollo's index (2.9× and
+/// 27 pt), so the touched letter clears the thumb. The swollen letters would overlap at the rail's 16 pt row
+/// pitch, so the rows part from the finger until the gap between two letters is a fixed margin; the rest of
+/// the rail keeps its pitch, shifted by what the lens added. Under Reduce Motion only the touched letter
+/// grows, to a size that fits its row, and nothing leans or shifts.
 private struct LetterLens {
     var scale: CGFloat = 1
     var lean: CGFloat = 0
@@ -538,10 +595,12 @@ private struct LetterLens {
     var shift: CGFloat = 0
 
     /// The touched letter's scale, the largest any letter is drawn at.
-    static let peak: CGFloat = 2.9
-    private static let scales: [CGFloat] = [peak, 1.85, 1.38, 1]
-    private static let leans: [CGFloat] = [27, 16, 7, 0]
+    static let peak: CGFloat = 3.6
+    private static let scales: [CGFloat] = [peak, 2.5, 1.75, 1.3, 1]
+    private static let leans: [CGFloat] = [46, 32, 18, 7, 0]
     private static let dimmed = 0.72
+    /// The touched letter under Reduce Motion: a capital 14.6 pt tall at the default size, inside its row.
+    private static let still: CGFloat = 1.85
     /// The rows the lens reaches past the touched one.
     private static let reach = CGFloat(scales.count - 1)
     /// A capital's height as a share of its font size, and the clear space kept between two capitals.
@@ -552,7 +611,7 @@ private struct LetterLens {
         guard let offset, offset.isFinite else { return }
         let distance = abs(offset)
         if reduceMotion {
-            if distance < 0.5 { scale = Self.scales[1] } else { opacity = Self.dimmed }
+            if distance < 0.5 { scale = Self.still } else { opacity = Self.dimmed }
             return
         }
         scale = Self.scale(at: distance)

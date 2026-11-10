@@ -2,7 +2,8 @@ import XCTest
 
 /// The header styles (DESIGN §7.1) on Home, the Library and Live TV, at rest and scrolled; the tab bar's
 /// scroll behaviours (§7) with the Appearance page that chooses them; and the A–Z rail held mid-scrub
-/// (§8.2). In Rosé Pine and Dawn.
+/// (§8.2), which CI also shoots on the smallest and largest iPhone, so its shots carry the screen's size.
+/// In Rosé Pine and Dawn.
 final class HeaderScreenshotTests: XCTestCase {
     @MainActor
     func testSoftRosePine() throws {
@@ -98,8 +99,8 @@ extension XCTestCase {
         try snap("header-\(style)-06-livetv-scrolled-\(suffix)")
     }
 
-    /// Hide on Scroll chosen in Settings › Appearance, then Home scrolled down with the tab bar away and back
-    /// up with it returned; then Home scrolled under Always Show and Minimise on Scroll.
+    /// Hide on Scroll chosen in Settings › Appearance › Tab Bar, then Home scrolled down with the tab bar away
+    /// and back up with it returned; then Home scrolled under Always Show and Minimise on Scroll.
     @MainActor
     func tabBarFlow(mode: String, suffix: String) throws {
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine")
@@ -107,8 +108,13 @@ extension XCTestCase {
         openSettings(in: app)
         tap("settings.theme", in: app)
         waitForBar("Appearance", in: app)
+        reveal("appearance.tabBar", in: app).tap()
+        waitForBar("Tab Bar", in: app)
+        try snap("tabbar-00-tabs-\(suffix)")
         reveal("appearance.tabBar.hide", in: app).tap()
-        try snap("tabbar-01-appearance-\(suffix)")
+        try snap("tabbar-01-on-scroll-\(suffix)")
+        goBack(from: "Tab Bar", in: app)
+        waitForBar("Appearance", in: app)
         goBack(from: "Appearance", in: app)
         tap("settings.done", in: app)
         XCTAssertTrue(element("settings.done", in: app).waitForNonExistence(timeout: 5), "Settings stayed open")
@@ -129,7 +135,8 @@ extension XCTestCase {
         try snap("tabbar-05-minimise-scrolled-\(suffix)")
     }
 
-    /// The Movies grid with the A–Z rail held on G, as a finger scrubbing it would leave it.
+    /// The Movies grid with the A–Z rail held on G, as a finger scrubbing it would leave it: the lens and
+    /// the callout beside it.
     @MainActor
     func alphabetRailFlow(mode: String, suffix: String) throws {
         let app = launch(
@@ -140,6 +147,7 @@ extension XCTestCase {
         )
         open(tab: "Library", title: "Movies", in: app)
         waitFor("library.alphabetRail", in: app)
-        try snap("library-rail-scrub-\(suffix)")
+        let screen = app.windows.firstMatch.frame
+        try snap("library-rail-scrub-\(Int(screen.width))x\(Int(screen.height))-\(suffix)")
     }
 }

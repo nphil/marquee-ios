@@ -5,6 +5,7 @@ import SwiftUI
 struct VideoPlaybackSettingsView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var confirmingForce = false
 
     var body: some View {
@@ -94,6 +95,29 @@ struct VideoPlaybackSettingsView: View {
                     .accessibilityIdentifier("video.playsTrailers")
             } footer: {
                 Text("After a moment on a title, play its trailer with sound. It waits while Low Power Mode, Reduce Motion or a cellular connection is on, and plays silently over other audio.")
+                    .foregroundStyle(theme.ink2)
+            }
+            .listRowBackground(theme.sheet)
+
+            Section {
+                Toggle("Play Theme Music", isOn: $session.settings.playsThemeMusic.animation(Motion.spring(reduceMotion: reduceMotion)))
+                    .accessibilityIdentifier("video.playsThemeMusic")
+                if session.settings.playsThemeMusic {
+                    Slider(value: $session.settings.themeMusicVolume, in: 0...1) {
+                        Text("Theme Music Volume")
+                    } minimumValueLabel: {
+                        Image(systemName: "speaker.fill")
+                            .foregroundStyle(theme.ink2)
+                            .accessibilityHidden(true)
+                    } maximumValueLabel: {
+                        Image(systemName: "speaker.wave.3.fill")
+                            .foregroundStyle(theme.ink2)
+                            .accessibilityHidden(true)
+                    }
+                    .accessibilityIdentifier("video.themeMusicVolume")
+                }
+            } footer: {
+                Text("A show's theme plays on its page and its seasons', fading out when the page closes or a video starts. It waits while other audio plays, and Silent mode silences it.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)

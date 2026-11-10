@@ -1,10 +1,12 @@
+import MarqueeCore
 import SwiftUI
 
-/// The theme picker (DESIGN §8.7), the header style (§7.1) and the tab bar's scroll behaviour (§7).
+/// The theme picker (DESIGN §8.7), the header style (§7.1), the way into Tab Bar (§7) and the scroll bars.
 /// Matching the system shows a Light and a Dark slot, each opening its mode's grid; with matching off one
 /// grid shows under a Dark | Light switch.
 struct AppearanceView: View {
     @Environment(ThemeStore.self) private var store
+    @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     /// The grid on show while matching is off; until the switch is used, the mode on screen.
@@ -80,21 +82,29 @@ struct AppearanceView: View {
             .listRowBackground(theme.sheet)
 
             Section {
-                Picker("Tab Bar", selection: Binding(
-                    get: { store.tabBar },
-                    set: { store.setTabBar($0) }
-                )) {
-                    ForEach(TabBarBehavior.allCases) { behavior in
-                        Text(behavior.name).tag(behavior)
-                            .accessibilityIdentifier("appearance.tabBar.\(behavior.rawValue)")
+                NavigationLink {
+                    TabBarView()
+                } label: {
+                    LabeledContent {
+                        Text("\(store.tabLayout.tabs(available: Destination.available(in: session)).count) Tabs")
+                            .foregroundStyle(theme.ink2)
+                    } label: {
+                        Text("Tab Bar")
                     }
                 }
-                .pickerStyle(.inline)
-                .labelsHidden()
-            } header: {
-                Text("Tab Bar")
+                .accessibilityIdentifier("appearance.tabBar")
+            }
+            .listRowBackground(theme.sheet)
+
+            Section {
+                Toggle("Show Scroll Bars", isOn: Binding(
+                    get: { store.showsScrollBars },
+                    set: { store.setShowsScrollBars($0) }
+                ))
+                .tint(theme.accent)
+                .accessibilityIdentifier("appearance.scrollBars")
             } footer: {
-                Text("While a page scrolls down, Hide on Scroll slides the tab bar away and Minimise on Scroll shrinks it to the current tab. Scrolling back up or reaching the top brings it back.")
+                Text("The thin bar at a page's edge while it scrolls. The Library's A–Z rail shows either way.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)

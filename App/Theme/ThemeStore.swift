@@ -1,10 +1,11 @@
+import MarqueeCore
 import SwiftUI
 import Observation
 
-/// The appearance choices: the theme (DESIGN §5.2), the header style and what the tab bar does on scroll
-/// (DESIGN §7). Matching the system keeps one theme per mode and follows the iPhone's appearance; with
-/// matching off one fixed mode shows. Saved in UserDefaults, so launch arguments such as
-/// `-marquee.theme.dark noir` override them (the UI tests rely on that).
+/// The appearance choices: the theme (DESIGN §5.2), the header style, the tab bar's tabs and what it does
+/// on scroll (DESIGN §7), and whether scroll bars show. Matching the system keeps one theme per mode and
+/// follows the iPhone's appearance; with matching off one fixed mode shows. Saved in UserDefaults, so
+/// launch arguments such as `-marquee.theme.dark noir` override them (the UI tests rely on that).
 @Observable @MainActor
 final class ThemeStore {
     private(set) var matchSystem: Bool
@@ -14,6 +15,8 @@ final class ThemeStore {
     private(set) var fixedMode: ThemeMode
     private(set) var headerStyle: HeaderStyle
     private(set) var tabBar: TabBarBehavior
+    private(set) var tabLayout: TabLayout
+    private(set) var showsScrollBars: Bool
 
     private enum Key {
         static let matchSystem = "marquee.theme.matchSystem"
@@ -22,6 +25,10 @@ final class ThemeStore {
         static let fixedMode = "marquee.theme.fixedMode"
         static let headerStyle = "marquee.headerStyle"
         static let tabBar = "marquee.tabBar"
+        /// Name arrays, so a launch argument such as `-marquee.tabs '(home, library, search)'` can set them.
+        static let tabOrder = "marquee.tabOrder"
+        static let tabs = "marquee.tabs"
+        static let scrollBars = "marquee.scrollBars"
     }
 
     init() {
@@ -33,6 +40,10 @@ final class ThemeStore {
         fixedMode = defaults.string(forKey: Key.fixedMode).flatMap(ThemeMode.init(rawValue:)) ?? .dark
         headerStyle = defaults.string(forKey: Key.headerStyle).flatMap(HeaderStyle.init(rawValue:)) ?? .soft
         tabBar = defaults.string(forKey: Key.tabBar).flatMap(TabBarBehavior.init(rawValue:)) ?? .minimise
+        tabLayout = defaults.stringArray(forKey: Key.tabs).map {
+            TabLayout(savedOrder: defaults.stringArray(forKey: Key.tabOrder) ?? [], savedShown: $0)
+        } ?? .standard
+        showsScrollBars = defaults.object(forKey: Key.scrollBars) == nil || defaults.bool(forKey: Key.scrollBars)
     }
 
     /// The theme on screen when the iPhone's appearance is `systemScheme`.
@@ -80,6 +91,20 @@ final class ThemeStore {
         save()
     }
 
+    // These two save only their own keys, so a layout a UI test gives as a launch argument is not written
+    // back for the tests after it when another choice saves.
+    func setTabLayout(_ layout: TabLayout) {
+        tabLayout = layout
+        let defaults = UserDefaults.standard
+        defaults.set(layout.order.map(\.rawValue), forKey: Key.tabOrder)
+        defaults.set(layout.savedShown, forKey: Key.tabs)
+    }
+
+    func setShowsScrollBars(_ on: Bool) {
+        showsScrollBars = on
+        UserDefaults.standard.set(on, forKey: Key.scrollBars)
+    }
+
     /// Back to the first-launch choice, after Delete All Local Data emptied the saved one.
     func reset() {
         let catalog = ThemeCatalog.bundled
@@ -89,6 +114,8 @@ final class ThemeStore {
         fixedMode = .dark
         headerStyle = .soft
         tabBar = .minimise
+        tabLayout = .standard
+        showsScrollBars = true
     }
 
     private func save() {
