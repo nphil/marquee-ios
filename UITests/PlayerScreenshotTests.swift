@@ -452,7 +452,7 @@ private extension XCTestCase {
         let word = app.buttons["Word by Word"]
         XCTAssertTrue(word.waitForExistence(timeout: 5), "No Word by Word reveal")
         word.tap()
-        tap("subtitleFix.done", in: app)
+        app.navigationBars["More options"].buttons["Done"].tap()
         XCTAssertTrue(app.navigationBars["Subtitle Style"].waitForNonExistence(timeout: 5), "The style sheet did not close")
         try snap("player-21-reveal-as-spoken-\(suffix)")
     }
