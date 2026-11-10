@@ -36,7 +36,7 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 **Lists and data:**
 - Responses are XML by default. Send `Accept: application/json` for JSON. The top level is a `MediaContainer`.
 - Sections: read the section list from the server. Do not hard-code section IDs. Movies=1, TV Shows=2 on the verified server.
-- Hubs: `/hubs/promoted` for home rows. Continue Watching is a hub with the hero style. A `playlist` hub type is not shown.
+- Hubs: `/hubs/promoted` for home rows. Continue Watching is read from `/hubs/continueWatching` (Plex Web's own Continue Watching hub), falling back to the hero-style hub in `/hubs/promoted` on a server without it. Removing a card is `PUT /actions/removeFromContinueWatching?ratingKey=<the card's own key>`, for part-watched and next-up episodes alike. A `playlist` hub type is not shown.
 - Items: `/library/sections/{key}/all` with paging (page size 60 in the app). Type codes: movie=1, show=2, season=3, episode=4.
 - Unwatched filter: movies `unwatched=1`. **Shows use `unwatchedLeaves=1`.** Episodes `unwatched=1`.
 - A–Z jump: `/library/sections/{key}/firstCharacter` gives counts per letter. The jump lands on the first title of each letter. `?firstCharacter=X` on `/all` is silently ignored.

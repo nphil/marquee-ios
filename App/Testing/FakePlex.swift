@@ -164,6 +164,9 @@ struct FakePlexRouter {
         if path == "/:/scrobble" || path == "/:/unscrobble", let key = query.first(where: { $0.name == "key" })?.value {
             Self.watchedWrites.withLock { $0.append(WatchedWrite(key: key, watched: path == "/:/scrobble")) }
         }
+        if path == "/actions/removeFromContinueWatching", let key = query.first(where: { $0.name == "ratingKey" })?.value {
+            Self.removedFromContinueWatching.withLock { _ = $0.insert(key) }
+        }
         // The fixtures keep a deleted title, as a server lists one until its trash is emptied.
         if method == "DELETE" {
             return .success(json([String: Any]()))
@@ -217,12 +220,16 @@ struct FakePlexRouter {
     /// What `/:/scrobble` and `/:/unscrobble` were asked, latest last.
     private static let watchedWrites = Mutex<[WatchedWrite]>([])
 
+    /// The cards `/actions/removeFromContinueWatching` took off Continue Watching.
+    private static let removedFromContinueWatching = Mutex<Set<String>>([])
+
     /// The titles of `object` as the server would list them after those writes: a title takes the latest
-    /// write for itself, its season or its show, and a title just marked watched leaves Continue Watching.
+    /// write for itself, its season or its show, and a title just marked watched or removed leaves Continue Watching.
     /// The fixtures themselves never change.
     private static func withWatchedWrites(_ object: [String: Any]) -> [String: Any] {
         let writes = watchedWrites.withLock { $0 }
-        guard !writes.isEmpty, var container = object["MediaContainer"] as? [String: Any] else { return object }
+        let removed = removedFromContinueWatching.withLock { $0 }
+        guard !writes.isEmpty || !removed.isEmpty, var container = object["MediaContainer"] as? [String: Any] else { return object }
 
         func latest(_ item: [String: Any]) -> Bool? {
             let keys = ["ratingKey", "parentRatingKey", "grandparentRatingKey"].compactMap { item[$0] as? String }
@@ -249,7 +256,9 @@ struct FakePlexRouter {
             container["Hub"] = hubs.map { hub in
                 var hub = hub
                 guard let items = hub["Metadata"] as? [[String: Any]] else { return hub }
-                let kept = applied(items, leavingWhenWatched: (hub["hubIdentifier"] as? String) == "home.continue")
+                let continuing = (hub["hubIdentifier"] as? String) == "home.continue"
+                var kept = applied(items, leavingWhenWatched: continuing)
+                if continuing { kept.removeAll { ($0["ratingKey"] as? String).map(removed.contains) ?? false } }
                 hub["Metadata"] = kept
                 hub["size"] = kept.count
                 return hub

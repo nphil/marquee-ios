@@ -143,6 +143,7 @@ private struct MainTabs: View {
     @Environment(ThemeStore.self) private var store
     /// Nil until a tab is picked; a picked tab that leaves the bar gives way to the first.
     @State private var picked: Destination?
+    @Environment(\.scenePhase) private var scenePhase
     @State private var toasts = ToastCenter()
     @State private var changes = LibraryChanges()
 
@@ -168,6 +169,9 @@ private struct MainTabs: View {
         .environment(toasts)
         .environment(changes)
         .onChange(of: session.server?.id) { changes.forgetDeletions() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { toasts.finish() }
+        }
         .environment(\.plexWatchlist, session.plexTV.map { PlexWatchlist(http: $0.http) })
         .environment(\.sessionActions, SessionActions(
             startPlayback: { item, index, fromStart in session.play(item: item, mediaIndex: index, fromStart: fromStart) },

@@ -19,9 +19,27 @@ public struct PlexLibrary: Sendable {
 
     // MARK: Browsing
 
-    /// Home rows: Continue Watching (style `hero`), On Deck, Recently Added.
+    /// Home rows: Continue Watching (style `hero`), On Deck, Recently Added. Continue Watching is read
+    /// from `/hubs/continueWatching`: Plex Web reads it from a hub of its own and asks `/hubs/promoted`
+    /// with `excludeContinueWatching=1`. A server without that hub leaves the one in `/hubs/promoted`.
     public func promotedHubs(count: Int = 12) async throws -> [PlexHub] {
-        try await container("/hubs/promoted", ["count": String(count)]).hubs
+        async let promoted = container("/hubs/promoted", ["count": String(count)]).hubs
+        let continuing = try? await container("/hubs/continueWatching", ["count": String(count)]).hubs
+        return Self.settingContinueWatching(continuing, in: try await promoted)
+    }
+
+    /// `promoted` with its Continue Watching hub swapped for `continuing`, the answer of
+    /// `/hubs/continueWatching`. Nil, or a hub that came without its items, keeps `promoted` as it is.
+    static func settingContinueWatching(_ continuing: [PlexHub]?, in promoted: [PlexHub]) -> [PlexHub] {
+        guard let continuing, continuing.allSatisfy({ $0.size == 0 || !$0.items.isEmpty }) else { return promoted }
+        var hubs = promoted
+        let at = hubs.firstIndex { $0.style == "hero" || $0.identifier == "home.continue" }
+        if let at { hubs.remove(at: at) }
+        guard var hub = continuing.first(where: { !$0.items.isEmpty }) else { return hubs }
+        hub.identifier = "home.continue"
+        hub.style = "hero"
+        hubs.insert(hub, at: at ?? 0)
+        return hubs
     }
 
     public func sections() async throws -> [PlexLibrarySection] {
@@ -160,7 +178,10 @@ public struct PlexLibrary: Sendable {
         try await perform(.get, "/:/unscrobble", ["identifier": "com.plexapp.plugins.library", "key": ratingKey])
     }
 
-    /// Takes an item off Continue Watching and leaves its watched state and resume point alone.
+    /// Takes an item off Continue Watching and leaves its watched state and resume point alone. The key is
+    /// the card's own, an episode's or a film's, never its show's: Plex Web sends `PUT
+    /// /actions/removeFromContinueWatching?ratingKey=` with the item's key whether it is part-watched or
+    /// the next episode up, and python-plexapi offers the call on `Movie` and `Episode` only.
     public func removeFromContinueWatching(_ ratingKey: String) async throws {
         try await perform(.put, "/actions/removeFromContinueWatching", ["ratingKey": ratingKey])
     }

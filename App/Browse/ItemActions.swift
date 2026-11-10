@@ -61,6 +61,19 @@ final class LibraryChanges {
         deleted.removing(from: items)
     }
 
+    /// Cards taken off Continue Watching whose removal the server has not answered yet. A refetch in that
+    /// time still lists them, so Home leaves them out until the answer: confirmed, the next fetch is the
+    /// server's word; refused, the card is back.
+    private(set) var removing: Set<String> = []
+
+    func startRemovingFromContinueWatching(_ key: String) { removing.insert(key) }
+    func endRemovingFromContinueWatching(_ key: String) { removing.remove(key) }
+
+    /// `items` of Continue Watching without the cards being removed.
+    func shownInContinueWatching(_ items: [PlexMetadata]) -> [PlexMetadata] {
+        removing.isEmpty ? items : items.filter { !removing.contains($0.ratingKey) }
+    }
+
     /// Rating keys name titles on one server only, so choosing another server starts afresh.
     func forgetDeletions() {
         deleted = DeletedTitles()
@@ -183,19 +196,29 @@ struct ItemActions: DynamicProperty {
     }
 
     /// Takes `item` off Continue Watching. `hide` hides it at once; the server hears of it only once the
-    /// toast has gone without Undo, so Undo never needs a call of its own.
+    /// toast has gone without Undo (or the app leaves the foreground), so Undo never needs a call of its
+    /// own. The card stays out of Home's refetches until the server answers; a refused call puts it back.
     func removeFromContinueWatching(_ item: PlexMetadata, hide: @escaping @MainActor (Bool) -> Void) {
         guard let library else { return }
         let key = item.ratingKey
         let toasts = toasts
         let changes = changes
+        changes.startRemovingFromContinueWatching(key)
         hide(true)
-        toasts.show("Removed from Continue Watching", undo: { hide(false) }, commit: {
+        toasts.show("Removed from Continue Watching", undo: {
+            changes.endRemovingFromContinueWatching(key)
+            hide(false)
+        }, commit: {
+            // Sent as the app goes to the background too, which iOS suspends within seconds.
+            let assertion = UIApplication.shared.beginBackgroundTask(withName: "marquee-continue-watching")
             Task {
+                defer { if assertion != .invalid { UIApplication.shared.endBackgroundTask(assertion) } }
                 do {
                     try await library.removeFromContinueWatching(key)
+                    changes.endRemovingFromContinueWatching(key)
                     changes.record([key])
                 } catch {
+                    changes.endRemovingFromContinueWatching(key)
                     hide(false)
                     Haptics.error()
                     toasts.show("Couldn't remove from Continue Watching")

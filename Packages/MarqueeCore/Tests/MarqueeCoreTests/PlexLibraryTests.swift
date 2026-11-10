@@ -251,6 +251,72 @@ struct PlexLibraryTests {
         #expect(request.headers[PlexHeader.containerStart] == "60")
     }
 
+    @Test func removingFromContinueWatchingSendsTheCardsOwnKeyWhetherPartWatchedOrNextUp() async throws {
+        let (library, transport) = Self.library { _ in json([:]) }
+
+        try await library.removeFromContinueWatching("9001")
+        try await library.removeFromContinueWatching("9002")
+
+        let sent = await transport.requests(to: "/actions/removeFromContinueWatching")
+        #expect(sent.map(\.method) == [.put, .put])
+        #expect(sent.map { $0.url.query("ratingKey") } == ["9001", "9002"])
+        #expect(sent.allSatisfy { $0.url.query("key") == nil })
+    }
+
+    @Test func removingFromContinueWatchingThrowsWhenTheServerRefuses() async throws {
+        let (library, _) = Self.library { _ in json([:], status: 400) }
+
+        await #expect(throws: PlexError.self) { try await library.removeFromContinueWatching("9001") }
+    }
+
+    @Test func homeReadsContinueWatchingFromItsOwnHub() async throws {
+        let (library, transport) = Self.library { request in
+            switch request.url.path {
+            case "/hubs/continueWatching":
+                container(["Hub": [["hubIdentifier": "continueWatching", "title": "Continue Watching", "size": 1,
+                                    "Metadata": [["ratingKey": "2", "type": "episode"]]]]])
+            default:
+                container(["Hub": [
+                    ["hubIdentifier": "home.continue", "style": "hero", "size": 2,
+                     "Metadata": [["ratingKey": "1", "type": "episode"], ["ratingKey": "2", "type": "episode"]]],
+                    ["hubIdentifier": "home.movies.recent", "size": 1, "Metadata": [["ratingKey": "3", "type": "movie"]]],
+                ]])
+            }
+        }
+
+        let hubs = try await library.promotedHubs()
+
+        #expect(hubs.map(\.identifier) == ["home.continue", "home.movies.recent"])
+        #expect(hubs[0].style == "hero" && hubs[0].items.map(\.ratingKey) == ["2"])
+        #expect(await transport.requests(to: "/hubs/continueWatching").count == 1)
+    }
+
+    @Test func homeKeepsThePromotedContinueWatchingWhenTheServerHasNoSuchHub() async throws {
+        let (library, _) = Self.library { request in
+            request.url.path == "/hubs/continueWatching"
+                ? json(["MediaContainer": ["size": 0]], status: 404)
+                : container(["Hub": [["hubIdentifier": "home.continue", "style": "hero", "size": 1,
+                                      "Metadata": [["ratingKey": "1", "type": "episode"]]]]])
+        }
+
+        let hubs = try await library.promotedHubs()
+
+        #expect(hubs.map(\.identifier) == ["home.continue"] && hubs[0].items.map(\.ratingKey) == ["1"])
+    }
+
+    @Test func homeDropsContinueWatchingOnceTheServerEmptiesIt() async throws {
+        let (library, _) = Self.library { request in
+            request.url.path == "/hubs/continueWatching"
+                ? container(["size": 0])
+                : container(["Hub": [
+                    ["hubIdentifier": "home.continue", "style": "hero", "size": 1, "Metadata": [["ratingKey": "1", "type": "episode"]]],
+                    ["hubIdentifier": "home.movies.recent", "size": 1, "Metadata": [["ratingKey": "3", "type": "movie"]]],
+                ]])
+        }
+
+        #expect(try await library.promotedHubs().map(\.identifier) == ["home.movies.recent"])
+    }
+
     @Test func showDetailCarriesTheEpisodeToPlayNext() async throws {
         let (library, transport) = Self.library { _ in
             container(["Metadata": [[

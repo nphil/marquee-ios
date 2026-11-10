@@ -36,8 +36,9 @@ final class ToastCenter {
         toast.undo?()
     }
 
-    /// Ends the current toast and sends the change it held back.
-    private func finish() {
+    /// Ends the current toast and sends the change it held back. Called when the app leaves the
+    /// foreground, so a change waiting out its toast is not lost with the app.
+    func finish() {
         expiry?.cancel()
         expiry = nil
         guard let toast = current else { return }

@@ -166,6 +166,7 @@ struct HomeView: View {
         rows.map { row in
             var row = row
             row.hub.items = changes.shown(row.hub.items)
+            if row.isContinueWatching { row.hub.items = changes.shownInContinueWatching(row.hub.items) }
             return row
         }
     }

@@ -37,7 +37,7 @@
 ## Library (`Library/`)
 
 - `PlexLibrary`: one server's library through its chosen address. Reads move to another address once when the chosen one stops answering; writes are never repeated.
-  - `promotedHubs(count:)`, `sections()`, `search(_:limit:)`: home rows, libraries, search groups.
+  - `promotedHubs(count:)` (Continue Watching from `/hubs/continueWatching`), `sections()`, `search(_:limit:)`: home rows, libraries, search groups.
   - `items(in:query:start:size:)`, `alphabetIndex(in:query:)`, `genres(in:)`: one grid page (60 by default), its A–Z jump bar and the genres to filter by.
   - `collections(in:start:size:)`, `recommendedHubs(in:count:)`: a library's Collections and Recommended.
   - `list(_:start:size:)`: one page behind a key the server handed out (a row's "see all", a collection, a person); the key keeps its own query.
