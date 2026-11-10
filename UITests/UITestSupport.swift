@@ -76,10 +76,24 @@ extension XCTestCase {
     @MainActor
     func reveal(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         let target = element(identifier, in: app)
-        for _ in 0..<8 where !(target.exists && target.isHittable) {
-            app.swipeUp(velocity: .slow)
+        let viewport = app.frame.insetBy(dx: 0, dy: 44)
+        func isVisible() -> Bool {
+            guard target.exists, target.isHittable else { return false }
+            let frame = target.frame
+            let visible = frame.intersection(viewport)
+            return !visible.isNull && visible.width >= min(44, frame.width / 2)
+                && visible.height >= min(44, frame.height / 2)
+        }
+        for _ in 0..<8 {
+            if isVisible() { return target }
+            if target.exists && target.frame.midY < viewport.midY {
+                app.swipeDown(velocity: .slow)
+            } else {
+                app.swipeUp(velocity: .slow)
+            }
         }
         XCTAssertTrue(target.waitForExistence(timeout: 5), "No element \(identifier)")
+        XCTAssertTrue(isVisible(), "Element \(identifier) is not visible in the viewport")
         return target
     }
 
