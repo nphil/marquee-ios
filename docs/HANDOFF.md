@@ -4,7 +4,7 @@ The current state of unfinished work, for an agent picking it up without the con
 
 ## Batch for 0.1.30 (started 2026-11-09)
 
-Nitin wants this whole batch to ship as ONE release, never piecemeal, and wants tokens spent carefully.
+Nitin wants this whole batch to ship as ONE release, never piecemeal. Resumed on 2026-11-09. Every requested part remains required; no partial release is authorised.
 
 **Branching.** Work lands on the integration branch `batch`, not `main`: every push to `main` publishes a release. Each helper works on its own branch from `batch` and fast-forwards `batch` when done. Every commit on a non-`main` branch carries `[skip ci]` in its message (CI runs on every branch push). Nobody runs CI on a branch. When all parts are on `batch`, `main` is fast-forwarded to `batch` once; that `main` run is the single test, and its release job publishes only if every job passes. If it fails, every failure is fixed together on `batch` (or a branch from it) and `main` is pushed once more.
 
@@ -27,10 +27,10 @@ Not to be built until Nitin asks. Recorded so the design is not lost.
 
 - **YouTube-style mini player.**
 - **XR headset support.**
-- **Touch-surface TV remote (LumaRemoteKit and the LumaTV phone-remote plugin).** Turn the remote's pointer and directional modes into one glass control surface that matches the TV's own UI: slide to move focus with gentle attraction to cards, drag to scroll LumaTV's rows and lists continuously with momentum run on the TV (today the TV turns scroll into wheel steps and ignores horizontal), tap to activate with stable targets, haptics only when the TV confirms. Motion assistance: while a thumb rests on the surface the gyro (Core Motion attitude) steers the focus by wrist turns, the thumb fine-tunes, scrolling suppresses wrist motion, a tap freezes the target; lifting the thumb stops motion. Touch-only stays an option, and the hold-to-point air mouse stays for web pages. Transport: keep the existing encrypted UDP path first and measure finger-to-screen latency (aim 20–40 ms); then trial Wi-Fi Aware (iOS 26+, iPhone 12+) as a direct phone-to-TV link, which first needs proof that the LG's Wi-Fi chip and driver support NAN and that a sideloaded build can carry the `com.apple.developer.wifi-aware` entitlement. Bluetooth LE is not faster (iOS picks 15 ms connection intervals). A phone-side layout preview of the TV's current row uses the TV's theme, never screenshots.
+- **Touch-surface TV remote (LumaRemoteKit and the LumaTV phone-remote plugin).** Parked, not part of this release: a TV-themed touch surface with continuous scrolling, stable tap targets, thumb-engaged Core Motion assistance and TV-confirmed haptics. Investigate Wi-Fi Aware support in the LG radio, firmware and driver, plus the sideload signing entitlement, then compare against the existing encrypted UDP path. The proposed 20–40 ms touch-to-display target is unmeasured. Bluetooth LE is not inherently faster; its actual connection timing must be measured. The optional mini bar and automatic away hiding are separate, active release requirements.
 
 ## Standing rules (also in AGENTS.md)
 
-- Video engine changes go upstream to `nphil/videoengine` and its release flow; Marquee pins the tag; the Stashy Cody session is told the tag and the change.
+- Video engine changes go upstream to `nphil/videoengine` and its release flow; inform both Stashy and Marquee of improvements and released tags. Both consumers currently pin exact 2.0.3.
 - Clean room, real-server safety and token rules in AGENTS.md "Rules that bite" apply to every part.
 - Nitin is not a programmer: report to him in plain words, briefly.
