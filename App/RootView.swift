@@ -24,7 +24,6 @@ struct RootView: View {
 
     var body: some View {
         @Bindable var session = session
-        @Bindable var player = session.player
         @Bindable var remote = session.remote
         let theme = store.theme(for: colorScheme)
             .adjusted(increaseContrast: contrast == .increased, reduceTransparency: reduceTransparency)
@@ -42,7 +41,7 @@ struct RootView: View {
         // Sign-in, the server list and the tabs fade into each other rather than cut (DESIGN §9 layer;
         // Reduce Motion keeps a short fade).
         .animation(reduceMotion ? .linear(duration: 0.12) : .easeOut(duration: 0.22), value: stage)
-        .fullScreenCover(item: $player.presented, onDismiss: { session.player.dismissed() }) { model in
+        .fullScreenCover(item: playerCover(overSettings: false), onDismiss: { session.player.dismissed() }) { model in
             PlayerView(model: model, outerTheme: theme, outerScheme: scheme ?? colorScheme)
         }
         .sheet(isPresented: $remote.isPresented, onDismiss: { remote.refreshLifecycle() }) {
@@ -74,6 +73,9 @@ struct RootView: View {
                     }
             }
             .preferredColorScheme(scheme)
+            .fullScreenCover(item: playerCover(overSettings: true), onDismiss: { session.player.dismissed() }) { model in
+                PlayerView(model: model, outerTheme: theme, outerScheme: scheme ?? colorScheme)
+            }
         }
         .environment(\.theme, theme)
         // Here rather than on the tabs, so the sheets above resolve artwork too.
@@ -98,6 +100,17 @@ struct RootView: View {
         .onChange(of: BarInputs(theme: theme, typeSize: typeSize, boldText: legibilityWeight == .bold), initial: true) { _, inputs in
             NavigationBarStyle.apply(inputs.theme, typeSize: inputs.typeSize, boldText: inputs.boldText)
         }
+    }
+
+    /// The player's cover hangs from the root and again inside Settings, and the player goes to whichever
+    /// is on top. A cover on the root alone takes the Settings sheet down to show itself, so a download
+    /// played from Settings would close onto Home instead of back onto the downloads.
+    private func playerCover(overSettings: Bool) -> Binding<PlayerModel?> {
+        let session = session
+        return Binding(
+            get: { session.showsSettings == overSettings ? session.player.presented : nil },
+            set: { session.player.presented = $0 }
+        )
     }
 
     /// Which of the three screens the state shows, so a change within one, such as a refreshed server
