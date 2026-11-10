@@ -16,6 +16,8 @@ struct HomeView: View {
     @Environment(\.openDestination) private var openDestination
     @State private var rows = Remote<[HomeRow]>()
     @State private var editing = false
+    @State private var watchlistTitles = Remote<PlexPage<PlexMetadata>>()
+    @Environment(\.plexWatchlist) private var watchlist
 
     var body: some View {
         // Read here, not only inside the row content, so Home redraws on every layout change.
@@ -59,6 +61,14 @@ struct HomeView: View {
         ))) {
             await load()
         }
+        // Each profile has its own watchlist, reached with its own token.
+        .task(id: watchlist.map { ObjectIdentifier($0.http) }) {
+            watchlistTitles = Remote()
+            await loadWatchlist()
+        }
+        .onChange(of: changes.watchlistRevision) {
+            Task { await loadWatchlist() }
+        }
         .sheet(isPresented: $editing) {
             EditHomeSheet()
                 .preferredColorScheme(store.presentationScheme(for: theme))
@@ -87,7 +97,7 @@ struct HomeView: View {
                 LazyVStack(alignment: .leading, spacing: Space.s7) {
                     let watchlistShelf = !tabs.isTab(.watchlist)
                     if watchlistShelf, !shown.contains(where: \.isContinueWatching) {
-                        WatchlistShelf()
+                        WatchlistShelf(page: watchlistTitles.value)
                     }
                     ForEach(shown) { row in
                         let menu = ShelfMenu(hide: { hide(row, in: arranged) }, edit: { editing = true })
@@ -96,7 +106,7 @@ struct HomeView: View {
                                 ContinueShelf(hub: row.hub, title: row.title, cardWidth: Self.cardWidth(for: width), header: menu, setShown: setShown)
                             }
                             if watchlistShelf {
-                                WatchlistShelf()
+                                WatchlistShelf(page: watchlistTitles.value)
                             }
                         } else {
                             PosterShelf(hub: row.hub, id: row.id, title: row.title, menu: menu)
@@ -124,6 +134,11 @@ struct HomeView: View {
         let libraries = session.settings.homeRows.shownLibraries
         let hidden = session.settings.hiddenLibraries
         await rows.load { try await HomeRows.load(from: library, libraries: libraries, hidden: hidden) }
+    }
+
+    private func loadWatchlist() async {
+        guard let watchlist else { return }
+        await watchlistTitles.load { try await watchlist.items(start: 0, size: 20) }
     }
 
     /// `rows` without the titles deleted this session; a row left empty is not shown.

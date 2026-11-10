@@ -72,7 +72,8 @@ extension XCTestCase {
         XCTAssertTrue(element(identifier, in: app).waitForExistence(timeout: 10), "No element \(identifier)")
     }
 
-    /// Lists create rows only as they scroll in, so this swipes up until the row can be tapped.
+    /// Lists create rows only as they scroll in, so this drags the content until the row can be tapped. The
+    /// drag stays above the floating tab bar: in landscape `swipeUp` starts under it and scrolls nothing.
     @MainActor
     func reveal(_ identifier: String, in app: XCUIApplication) -> XCUIElement {
         let target = element(identifier, in: app)
@@ -86,11 +87,10 @@ extension XCTestCase {
         }
         for _ in 0..<8 {
             if isVisible() { return target }
-            if target.exists && target.frame.midY < viewport.midY {
-                app.swipeDown(velocity: .slow)
-            } else {
-                app.swipeUp(velocity: .slow)
-            }
+            let up = !(target.exists && target.frame.midY < viewport.midY)
+            let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.7 : 0.25))
+            let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: up ? 0.25 : 0.7))
+            from.press(forDuration: 0.1, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0)
         }
         XCTAssertTrue(target.waitForExistence(timeout: 5), "No element \(identifier)")
         XCTAssertTrue(isVisible(), "Element \(identifier) is not visible in the viewport")

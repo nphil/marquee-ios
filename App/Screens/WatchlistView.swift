@@ -73,32 +73,21 @@ struct WatchlistView: View {
 }
 
 /// The watchlist's latest titles as a Home shelf, while Watchlist is not a tab (DESIGN §7, §8.1). Like any
-/// Home row it shows only with titles in it.
+/// Home row it shows only with titles in it. Home loads the page: a view that draws nothing never runs a
+/// `.task`, so the shelf cannot load itself.
 struct WatchlistShelf: View {
-    @Environment(\.plexWatchlist) private var watchlist
+    let page: PlexPage<PlexMetadata>?
     @Environment(LibraryChanges.self) private var changes
-    @State private var titles = Remote<PlexPage<PlexMetadata>>()
-
-    private struct Reload: Hashable {
-        let watchlist: ObjectIdentifier?
-        let revision: Int
-    }
 
     var body: some View {
-        Group {
-            if let page = titles.value, !changes.shownInWatchlist(page.items).isEmpty {
-                PosterShelf(
-                    id: "watchlist",
-                    title: "Watchlist",
-                    items: page.items,
-                    seeAll: page.totalSize > page.items.count ? .destination(.watchlist) : nil,
-                    watchlist: true
-                )
-            }
-        }
-        .task(id: Reload(watchlist: watchlist.map { ObjectIdentifier($0.http) }, revision: changes.watchlistRevision)) {
-            guard let watchlist else { return }
-            await titles.load { try await watchlist.items(start: 0, size: 20) }
+        if let page, !changes.shownInWatchlist(page.items).isEmpty {
+            PosterShelf(
+                id: "watchlist",
+                title: "Watchlist",
+                items: page.items,
+                seeAll: page.totalSize > page.items.count ? .destination(.watchlist) : nil,
+                watchlist: true
+            )
         }
     }
 }
