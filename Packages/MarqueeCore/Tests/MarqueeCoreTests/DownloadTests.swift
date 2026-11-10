@@ -9,7 +9,8 @@ struct DownloadTests {
         "parentIndex": 1, "index": 1, "duration": 3_600_000, "viewOffset": 60_000,
         "Media": [
             ["id": 1, "duration": 3_600_000, "bitrate": 6000, "width": 1920, "height": 800, "container": "mkv",
-             "Part": [["id": 11, "key": "/library/parts/11/1700000000/file.mkv", "size": 2_000_000_000, "container": "mkv"]]],
+             "Part": [["id": 11, "key": "/library/parts/11/1700000000/file.mkv", "size": 2_000_000_000, "container": "mkv",
+                       "Stream": [["id": 77, "streamType": 3, "codec": "srt", "key": "/library/streams/77"]]]]],
             ["id": 2, "duration": 3_600_000, "bitrate": 25000, "width": 3840, "height": 2160, "container": "mkv",
              "Part": [["id": 21, "key": "/library/parts/21/1700000000/file.mkv", "size": 9_000_000_000]]],
         ],
@@ -171,17 +172,22 @@ struct DownloadTests {
         var record = try Self.record(quality: .converted(.mbps4))
         record.scope = DownloadScope(server: "../machine", profile: "uuid-1")
         record.received = ByteSpans([0..<10])
+        record.subtitles = [DownloadRecord.Subtitle(streamID: 77, fileName: "subtitle-77.srt")]
         try store.makeFolder(for: record)
         let snapshot = try JSONSerialization.data(withJSONObject: ["MediaContainer": ["Metadata": [Self.episode]]])
         try snapshot.write(to: store.metadataFile(for: record))
-        let decision: [String: Any] = ["MediaContainer": ["Metadata": [["ratingKey": "301", "Media": [["id": 9, "container": "mp4"]]]]]]
+        let decision: [String: Any] = ["MediaContainer": ["Metadata": [["ratingKey": "301", "Media": [
+            ["id": 9, "container": "mp4", "Part": [["id": 90, "key": "/x", "Stream": [["id": 5, "streamType": 1, "codec": "h264"]]]]],
+        ]]]]]
         try JSONSerialization.data(withJSONObject: decision).write(to: store.decisionFile(for: record))
 
         try store.saveIndex([record])
 
         #expect(store.loadIndex() == [record])
         #expect(store.folder(for: record).path().hasSuffix("/___machine/uuid-1/301/"))
-        #expect(try store.offlineItem(for: record).media.map(\.id) == [9])
+        let offline = try store.offlineItem(for: record)
+        #expect(offline.media.map(\.id) == [9])
+        #expect(offline.media[0].parts[0].streams.map(\.id) == [5, 77])
         #expect(store.bytesOnDisk() > 0)
         try store.remove(record)
         #expect(!FileManager.default.fileExists(atPath: store.folder(for: record).path()))

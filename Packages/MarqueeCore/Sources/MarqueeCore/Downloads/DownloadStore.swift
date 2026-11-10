@@ -43,13 +43,21 @@ public struct DownloadStore: Sendable {
     }
 
     /// The title as the player needs it offline: the server's answer, with the converted file's
-    /// version in place of the original's.
+    /// version in place of the original's. The separate subtitle files saved with a conversion are
+    /// the original's, so their streams join the converted file's.
     public func offlineItem(for record: DownloadRecord) throws -> PlexMetadata {
         var item = try PlexMetadata.fromSnapshot(Data(contentsOf: metadataFile(for: record)))
-        if record.quality == .original {
-            item.media = item.media.indices.contains(record.mediaIndex) ? [item.media[record.mediaIndex]] : []
-        } else {
-            item.media = try PlexMetadata.fromSnapshot(Data(contentsOf: decisionFile(for: record))).media
+        let original = item.media.indices.contains(record.mediaIndex) ? item.media[record.mediaIndex] : nil
+        guard record.quality != .original else {
+            item.media = original.map { [$0] } ?? []
+            return item
+        }
+        item.media = try PlexMetadata.fromSnapshot(Data(contentsOf: decisionFile(for: record))).media
+        let saved = Set(record.subtitles.map(\.streamID))
+        let sidecars = (original?.parts ?? []).flatMap(\.streams).filter { saved.contains($0.id) }
+        if !item.media.isEmpty, !item.media[0].parts.isEmpty {
+            let present = Set(item.media[0].parts[0].streams.map(\.id))
+            item.media[0].parts[0].streams += sidecars.filter { !present.contains($0.id) }
         }
         return item
     }

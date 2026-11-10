@@ -74,6 +74,8 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
     public var seasonIndex: Int?
     public var episodeIndex: Int?
     public var year: Int?
+    /// The poster: the movie's, or for an episode its show's.
+    public var thumb: String?
     /// Milliseconds.
     public var duration: Int
     public var quality: DownloadQuality
@@ -104,6 +106,7 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
         seasonIndex = item.parentIndex
         episodeIndex = item.index
         year = item.year
+        thumb = item.type == .episode ? item.grandparentThumb ?? item.thumb : item.thumb
         duration = item.duration
         self.quality = quality
         self.mediaIndex = mediaIndex
