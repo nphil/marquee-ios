@@ -93,8 +93,8 @@ public enum TransferPlan {
 public enum RangeReply: Hashable, Sendable {
     /// The range asked for, out of a file this long.
     case partial(length: Int64)
-    /// The whole file instead of the range: the server ignores ranges, so the download restarts on one
-    /// connection from the first byte.
+    /// The file from its first byte instead of the range: the server ignores ranges, so the download
+    /// continues on one connection from the start.
     case whole(length: Int64?)
     /// The server is still converting; ask again after this many seconds.
     case notReady(retryAfter: Int)
@@ -105,10 +105,9 @@ public enum RangeReply: Hashable, Sendable {
     public static func judge(status: Int, contentRange: String?, contentLength: Int64?, retryAfter: String?, requested: Range<Int64>) -> RangeReply {
         switch status {
         case 206:
-            guard let parsed = contentRange.flatMap(parse), parsed.start == requested.lowerBound, let length = parsed.length else {
-                return .whole(length: nil)
-            }
-            return .partial(length: length)
+            guard let parsed = contentRange.flatMap(parse), let length = parsed.length else { return .failed(status: status) }
+            if parsed.start == requested.lowerBound { return .partial(length: length) }
+            return parsed.start == 0 ? .whole(length: length) : .failed(status: status)
         case 200:
             return .whole(length: contentLength)
         case 503:

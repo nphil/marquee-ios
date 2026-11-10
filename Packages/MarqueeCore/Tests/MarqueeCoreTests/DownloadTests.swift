@@ -63,7 +63,8 @@ struct DownloadTests {
     @Test func rangeAnswersAreJudged() {
         let asked: Range<Int64> = 100..<200
         #expect(RangeReply.judge(status: 206, contentRange: "bytes 100-199/4096", contentLength: 100, retryAfter: nil, requested: asked) == .partial(length: 4096))
-        #expect(RangeReply.judge(status: 206, contentRange: "bytes 0-99/4096", contentLength: 100, retryAfter: nil, requested: asked) == .whole(length: nil))
+        #expect(RangeReply.judge(status: 206, contentRange: "bytes 0-99/4096", contentLength: 100, retryAfter: nil, requested: asked) == .whole(length: 4096))
+        #expect(RangeReply.judge(status: 206, contentRange: "bytes 50-149/4096", contentLength: 100, retryAfter: nil, requested: asked) == .failed(status: 206))
         #expect(RangeReply.judge(status: 200, contentRange: nil, contentLength: 4096, retryAfter: nil, requested: asked) == .whole(length: 4096))
         #expect(RangeReply.judge(status: 503, contentRange: nil, contentLength: nil, retryAfter: "10", requested: asked) == .notReady(retryAfter: 10))
         #expect(RangeReply.judge(status: 503, contentRange: nil, contentLength: nil, retryAfter: nil, requested: asked) == .notReady(retryAfter: 5))
