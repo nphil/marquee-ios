@@ -220,6 +220,24 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
         onDeckItems = (try? c.decodeIfPresent(OnDeck.self, forKey: .onDeck))?.items ?? []
     }
 
+    /// The newest completed DVR version, if Plex still retains its recording provenance.
+    public var recordedMediaIndex: Int? {
+        media.indices.filter { media[$0].isDVRRecording }.max {
+            (media[$0].mediaGrabBeginsAt ?? .distantPast) < (media[$1].mediaGrabBeginsAt ?? .distantPast)
+        }
+    }
+
+    public var isDVRRecording: Bool { recordedMediaIndex != nil }
+
+    /// The recording's broadcast start, not its library import date.
+    public var recordedAt: Date? { recordedMediaIndex.flatMap { media[$0].mediaGrabBeginsAt } }
+
+    /// Match a version across a refreshed metadata response, never by position alone.
+    public func index(ofMediaID id: Int) -> Int? {
+        guard id > 0 else { return nil }
+        return media.firstIndex { $0.id == id }
+    }
+
     /// Watched: a played movie or episode, or a show or season with no episode left to watch.
     public var isWatched: Bool {
         if let leafCount, leafCount > 0 { return (viewedLeafCount ?? 0) >= leafCount }
@@ -280,11 +298,16 @@ public struct PlexMedia: Sendable, Hashable, Identifiable, Decodable {
     public var container: String?
     public var videoFrameRate: String?
     public var videoProfile: String?
+    public var origin: String?
+    public var mediaGrabStatus: String?
+    public var mediaGrabBeginsAt: Date?
     public var parts: [PlexPart]
+
+    public var isDVRRecording: Bool { origin == "dvr" && mediaGrabStatus == "complete" }
 
     enum CodingKeys: String, CodingKey {
         case id, duration, bitrate, width, height, aspectRatio, audioChannels, audioCodec, videoCodec
-        case videoResolution, container, videoFrameRate, videoProfile
+        case videoResolution, container, videoFrameRate, videoProfile, origin, mediaGrabStatus, mediaGrabBeginsAt
         case parts = "Part"
     }
 
@@ -303,6 +326,9 @@ public struct PlexMedia: Sendable, Hashable, Identifiable, Decodable {
         container = c.string(.container)
         videoFrameRate = c.string(.videoFrameRate)
         videoProfile = c.string(.videoProfile)
+        origin = c.string(.origin)
+        mediaGrabStatus = c.string(.mediaGrabStatus)
+        mediaGrabBeginsAt = c.date(.mediaGrabBeginsAt)
         parts = c.list(.parts)
     }
 }

@@ -877,6 +877,14 @@ final class PlayerModel: Identifiable {
             subtitleSheet = nil
         }
         mediaIndex = isFirstItem && (request.download == nil || request.download?.quality == .original) ? request.mediaIndex : 0
+        if isFirstItem, request.download == nil, request.item.media.indices.contains(request.mediaIndex),
+           request.item.media[request.mediaIndex].isDVRRecording {
+            guard let index = full.index(ofMediaID: request.item.media[request.mediaIndex].id) else {
+                fail("The recorded version is no longer available.")
+                return
+            }
+            mediaIndex = index
+        }
         guard let media = full.media.indices.contains(mediaIndex) ? full.media[mediaIndex] : full.media.first,
               let part = media.parts.first else {
             fail("This item has no file to play.")

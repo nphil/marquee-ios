@@ -1,6 +1,6 @@
 {
  "MediaContainer": {
-  "size": 5,
+  "size": 6,
   "Metadata": [
    {
     "ratingKey": "2101",
@@ -12,6 +12,7 @@
     "librarySectionTitle": "TV Shows",
     "duration": 3600000,
     "addedAt": 1799922240,
+    "Media": [{"id": 21011, "origin": "dvr", "mediaGrabStatus": "complete", "mediaGrabBeginsAt": 1799922000}],
     "summary": ""
    },
    {
@@ -24,6 +25,7 @@
     "librarySectionTitle": "TV Shows",
     "duration": 600000,
     "addedAt": 1799917920,
+    "Media": [{"id": 21021, "origin": "dvr", "mediaGrabStatus": "complete", "mediaGrabBeginsAt": 1799917600}],
     "summary": "",
     "parentIndex": 1,
     "index": 1,
@@ -40,6 +42,7 @@
     "librarySectionTitle": "TV Shows",
     "duration": 3480000,
     "addedAt": 1799749440,
+    "Media": [{"id": 21031, "origin": "dvr", "mediaGrabStatus": "complete", "mediaGrabBeginsAt": 1799749000}],
     "summary": "",
     "parentIndex": 3,
     "index": 9
@@ -54,6 +57,7 @@
     "librarySectionTitle": "TV Shows",
     "duration": 3600000,
     "addedAt": 1799663040,
+    "Media": [{"id": 21041, "origin": "dvr", "mediaGrabStatus": "complete", "mediaGrabBeginsAt": 1799662600}],
     "summary": "",
     "parentIndex": 1,
     "index": 1,
@@ -69,10 +73,19 @@
     "librarySectionTitle": "TV Shows",
     "duration": 480000,
     "addedAt": 1799403840,
+    "Media": [{"id": 21051, "origin": "dvr", "mediaGrabStatus": "complete", "mediaGrabBeginsAt": 1799403400}],
     "summary": "",
     "parentIndex": 1,
     "index": 2,
     "thumb": "/art/spring-backdrop.jpg"
+   },
+   {
+    "ratingKey": "2199",
+    "type": "episode",
+    "title": "Ordinary episode",
+    "librarySectionID": 2,
+    "addedAt": 1799999999,
+    "Media": [{"id": 21991}]
    }
   ]
  }
