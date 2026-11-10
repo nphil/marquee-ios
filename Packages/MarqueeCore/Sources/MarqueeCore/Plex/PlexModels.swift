@@ -222,12 +222,12 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
 
     /// The newest completed DVR version, if Plex still retains its recording provenance.
     public var recordedMediaIndex: Int? {
-        media.indices.filter { media[$0].isDVRRecording }.max {
+        media.indices.lazy.filter { media[$0].isDVRRecording }.max {
             (media[$0].mediaGrabBeginsAt ?? .distantPast) < (media[$1].mediaGrabBeginsAt ?? .distantPast)
         }
     }
 
-    public var isDVRRecording: Bool { recordedMediaIndex != nil }
+    public var isDVRRecording: Bool { media.contains(where: \.isDVRRecording) }
 
     /// The recording's broadcast start, not its library import date.
     public var recordedAt: Date? { recordedMediaIndex.flatMap { media[$0].mediaGrabBeginsAt } }

@@ -82,6 +82,29 @@ struct PlexLibraryTests {
         #expect(await transport.requests(to: "/library/sections/3/all").isEmpty)
     }
 
+    @Test func recordingsStayEmptyWithoutDVRProvenance() async throws {
+        let (library, _) = Self.library { request in
+            if request.url.path == "/library/sections" {
+                return container(["Directory": [["key": "1", "title": "Shows", "type": "show"]]])
+            }
+            return container(["totalSize": 2, "Metadata": [
+                ["ratingKey": "ordinary", "addedAt": 999, "Media": [["id": 1]]],
+                ["ratingKey": "unknown", "Media": []],
+            ]])
+        }
+        #expect(try await library.recordedItems().isEmpty)
+    }
+
+    @Test func recordingsPropagateLibraryFailure() async {
+        let (library, _) = Self.library { request in
+            if request.url.path == "/library/sections" {
+                return container(["Directory": [["key": "1", "title": "Shows", "type": "show"]]])
+            }
+            return PlexHTTPResponse(status: 503, body: Data())
+        }
+        await #expect(throws: PlexError.self) { try await library.recordedItems() }
+    }
+
     @Test func jumpBarLettersStartWhereEarlierLettersEnd() async throws {
         let (library, transport) = Self.library { _ in
             container(["Directory": [
