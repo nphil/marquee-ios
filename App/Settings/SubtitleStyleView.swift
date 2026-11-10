@@ -14,9 +14,16 @@ struct SubtitleStyleView: View {
         List {
             if imageSubtitles {
                 Section {
-                    Text("These subtitles are images supplied by the video. Their text, colour, size and position cannot be changed here.")
+                    Text("These subtitles are images supplied by the video. Colour and brightness tint the image; its text, size and position cannot be changed here.")
                         .foregroundStyle(theme.ink2)
                         .accessibilityIdentifier("style.imageNote")
+                }
+                .listRowBackground(theme.sheet)
+                Section("Image appearance") {
+                    picker("Colour", "colour", $session.settings.subtitleStyle.colour, SubtitleLook.TextColour.allCases, \.title)
+                    Toggle("Soften brightness", isOn: $session.settings.subtitleStyle.blendsWithVideo)
+                        .tint(theme.accent)
+                        .accessibilityIdentifier("style.blend")
                 }
                 .listRowBackground(theme.sheet)
             } else {
@@ -214,10 +221,14 @@ private struct SubtitlePreview: View {
         GeometryReader { proxy in
             let pictureHeight = proxy.size.height
             let distance = CGFloat(look.edgeDistance) * pictureHeight / 1080
-            SubtitleLine(text: sample.text, look: look, pictureHeight: pictureHeight)
-                .padding(.horizontal, proxy.size.width * 0.06)
-                .padding(look.anchor == .top ? .top : .bottom, distance)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: look.anchor == .top ? .top : .bottom)
+            VStack(spacing: 0) {
+                if look.anchor == .bottom { Spacer(minLength: 0) }
+                SubtitleLine(text: sample.text, look: look, pictureHeight: pictureHeight)
+                if look.anchor == .top { Spacer(minLength: 0) }
+            }
+            .padding(.horizontal, proxy.size.width * 0.06)
+            .padding(.vertical, distance)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             Text("Sample \(sample.number) of \(SubtitleSample.allCases.count) · \(sample.title)")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.white)
@@ -341,9 +352,9 @@ extension SubtitleLook.Preset {
 extension SubtitleLook.Font {
     var title: String {
         switch self {
-        case .standard: "Default"
+        case .standard: "System"
         case .serif: "Serif"
-        case .mono: "Monospace"
+        case .mono: "Monospaced"
         case .legible: "Atkinson Hyperlegible"
         case .rounded: "Rounded"
         case .avenirNext: "Avenir Next"
