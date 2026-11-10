@@ -226,6 +226,7 @@ private struct DetailPage: View {
         }
         // One alert for the round button and every download item on the page.
         .downloadErrorAlert()
+        .removeDownloadConfirmation()
     }
 
     /// Everything between the actions and the cast: the version, synopsis, tracks and episodes.

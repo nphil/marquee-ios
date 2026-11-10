@@ -45,6 +45,7 @@ struct DownloadMenuItems: View {
     let item: PlexMetadata
     let mediaIndex: Int
     @Environment(AppSession.self) private var session
+    @Environment(\.confirmDownloadRemoval) private var confirmRemoval
 
     var body: some View {
         if let record = session.downloads.records.first(where: { $0.ratingKey == item.ratingKey }) {
@@ -55,7 +56,7 @@ struct DownloadMenuItems: View {
             } else {
                 Button("Resume Download", systemImage: "arrow.clockwise") { session.downloads.resume(record.id) }
             }
-            Button("Remove Download", systemImage: "trash", role: .destructive) { session.downloads.remove(record.id) }
+            Button("Remove Download", systemImage: "trash", role: .destructive) { confirmRemoval(record) }
         } else {
             Menu("Download", systemImage: "arrow.down.circle") {
                 DownloadQualityChoices(item: item, mediaIndex: mediaIndex)
@@ -115,4 +116,32 @@ private struct DownloadErrorAlert: ViewModifier {
 
 extension View {
     func downloadErrorAlert() -> some View { modifier(DownloadErrorAlert()) }
+}
+
+extension EnvironmentValues {
+    /// Asks before removing a download; set by `removeDownloadConfirmation()`.
+    @Entry var confirmDownloadRemoval: @MainActor (DownloadRecord) -> Void = { _ in }
+}
+
+/// "Remove Download?" for every remove button below it, which call `confirmDownloadRemoval`.
+private struct RemoveDownloadConfirmation: ViewModifier {
+    @Environment(AppSession.self) private var session
+    @State private var removing: DownloadRecord?
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.confirmDownloadRemoval) { removing = $0 }
+            .confirmationDialog("Remove Download?", isPresented: Binding(
+                get: { removing != nil },
+                set: { if !$0 { removing = nil } }
+            ), titleVisibility: .visible, presenting: removing) { record in
+                Button("Remove Download", role: .destructive) { session.downloads.remove(record.id) }
+            } message: { record in
+                Text("Remove \(record.title) from this iPhone?")
+            }
+    }
+}
+
+extension View {
+    func removeDownloadConfirmation() -> some View { modifier(RemoveDownloadConfirmation()) }
 }

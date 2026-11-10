@@ -4,7 +4,6 @@ import SwiftUI
 struct DownloadsView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
-    @State private var removing: DownloadRecord?
 
     var body: some View {
         List {
@@ -21,14 +20,7 @@ struct DownloadsView: View {
         .themedList(theme)
         .navigationTitle("Downloads")
         .downloadErrorAlert()
-        .confirmationDialog("Remove Download?", isPresented: Binding(
-            get: { removing != nil },
-            set: { if !$0 { removing = nil } }
-        ), titleVisibility: .visible, presenting: removing) { record in
-            Button("Remove Download", role: .destructive) { session.downloads.remove(record.id) }
-        } message: { record in
-            Text("Remove \(record.title) from this iPhone?")
-        }
+        .removeDownloadConfirmation()
     }
 
     private func row(_ record: DownloadRecord) -> some View {
@@ -62,11 +54,7 @@ struct DownloadsView: View {
                     .accessibilityLabel("Resume \(record.title)")
                     .accessibilityIdentifier("downloads.resume.\(record.id)")
                 }
-                Button(role: .destructive) { removing = record } label: {
-                    Image(systemName: "trash")
-                }
-                .accessibilityLabel("Remove \(record.title)")
-                .accessibilityIdentifier("downloads.remove.\(record.id)")
+                RemoveButton(record: record)
             }
             .buttonStyle(.borderless)
             if record.phase != .done, let fraction = record.fraction {
@@ -88,5 +76,19 @@ struct DownloadsView: View {
         case .failed(let reason): "Failed · \(reason)"
         case .done: "Downloaded · \(record.quality.title)"
         }
+    }
+}
+
+/// Its own view: the environment set by `removeDownloadConfirmation()` reaches views below it, not the one it modifies.
+private struct RemoveButton: View {
+    let record: DownloadRecord
+    @Environment(\.confirmDownloadRemoval) private var confirmRemoval
+
+    var body: some View {
+        Button(role: .destructive) { confirmRemoval(record) } label: {
+            Image(systemName: "trash")
+        }
+        .accessibilityLabel("Remove \(record.title)")
+        .accessibilityIdentifier("downloads.remove.\(record.id)")
     }
 }
