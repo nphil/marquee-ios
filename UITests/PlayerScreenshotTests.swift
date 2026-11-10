@@ -393,11 +393,13 @@ private extension XCTestCase {
         row?.tap()
         waitForBar("Subtitle Style", in: app)
         // A landscape sheet ignores app.swipeUp, so the style list is dragged to the row.
-        scrollList(app.collectionViews["style.list"], to: element("style.reveal", in: app)).tap()
+        scrollList(app.collectionViews["style.list"], to: element("style.moreOptions", in: app)).tap()
+        waitForBar("More options", in: app)
+        reveal("style.reveal", in: app).tap()
         let word = app.buttons["Word by Word"]
         XCTAssertTrue(word.waitForExistence(timeout: 5), "No Word by Word reveal")
         word.tap()
-        app.navigationBars["Subtitle Style"].buttons["Done"].tap()
+        app.navigationBars["More options"].buttons["Done"].tap()
         XCTAssertTrue(app.navigationBars["Subtitle Style"].waitForNonExistence(timeout: 5), "The style sheet did not close")
         try snap("player-21-reveal-as-spoken-\(suffix)")
     }

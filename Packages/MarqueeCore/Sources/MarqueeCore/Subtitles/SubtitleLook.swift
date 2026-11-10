@@ -37,7 +37,7 @@ public struct SubtitleLook: Sendable, Equatable, Codable {
     }
 
     public enum Font: String, Sendable, Codable, CaseIterable {
-        case standard, serif, mono, legible
+        case standard, serif, mono, legible, rounded, avenirNext
     }
 
     public enum TextColour: String, Sendable, Codable, CaseIterable {

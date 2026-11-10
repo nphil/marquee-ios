@@ -213,6 +213,8 @@ enum CaptionStyle {
         case .serif: attributes[kCMTextMarkupAttribute_GenericFontFamilyName as String] = kCMTextMarkupGenericFontName_Serif as String
         case .mono: attributes[kCMTextMarkupAttribute_GenericFontFamilyName as String] = kCMTextMarkupGenericFontName_Monospace as String
         case .legible: attributes[kCMTextMarkupAttribute_FontFamilyName as String] = "Atkinson Hyperlegible"
+        case .rounded, .avenirNext:
+            attributes[kCMTextMarkupAttribute_FontFamilyName as String] = SubtitleFont.uiFont(look.font, size: 16, bold: look.isBold).familyName
         }
         if look.background != .none {
             let box = PictureColours.rgb(look.backgroundColour)

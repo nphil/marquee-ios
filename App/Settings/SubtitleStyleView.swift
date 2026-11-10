@@ -1,10 +1,7 @@
 import MarqueeCore
 import SwiftUI
 
-/// How subtitles look (behaviour spec §3, "Subtitle look"), saved for the active profile: a preset, every
-/// setting under it, and a preview that follows each change.
 struct SubtitleStyleView: View {
-    /// The subtitle playing is a picture: it keeps its own size and position, and takes only the colour.
     var imageSubtitles = false
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
@@ -15,127 +12,182 @@ struct SubtitleStyleView: View {
         @Bindable var session = session
         let look = session.settings.subtitleStyle
         List {
-            Section {
-                SubtitlePreview(look: look, sample: $sample, scene: scene)
-                    .listRowInsets(EdgeInsets())
-            } footer: {
-                Text(look.isCustom ? "Your own mix of settings. Pick a preset to start over." : look.preset.about)
-                    .foregroundStyle(theme.ink2)
-                    .accessibilityIdentifier("style.about")
-            }
-            .listRowBackground(Color.clear)
-
-            Section {
-                Picker("Preset", selection: preset) {
-                    ForEach(SubtitleLook.Preset.allCases, id: \.self) { preset in
-                        Text(preset.title).tag(Optional(preset))
-                    }
-                    if look.isCustom {
-                        Text("Custom").tag(SubtitleLook.Preset?.none)
-                    }
-                }
-                .accessibilityIdentifier("style.preset")
-                picker("Sample Text", "sample", $sample, SubtitleSample.allCases, \.title)
-                picker("Sample Scene", "scene", $scene, SubtitleScene.allCases, \.title)
-            } header: {
-                Text("Look")
-            }
-            .listRowBackground(theme.sheet)
-
-            Section {
-                picker("Font", "font", $session.settings.subtitleStyle.font, SubtitleLook.Font.allCases, \.title)
-                picker("Size", "size", $session.settings.subtitleStyle.size, SubtitleLook.sizes, Self.percent)
-                    .disabled(imageSubtitles)
-                picker("Colour", "colour", $session.settings.subtitleStyle.colour, SubtitleLook.TextColour.allCases, \.title)
-                picker("Opacity", "opacity", $session.settings.subtitleStyle.opacity, SubtitleLook.opacities, Self.percent)
-                Toggle("Bold", isOn: $session.settings.subtitleStyle.isBold)
-                    .tint(theme.accent)
-                    .accessibilityIdentifier("style.bold")
-            } header: {
-                Text("Text")
-            } footer: {
-                if imageSubtitles { imageNote }
-            }
-            .listRowBackground(theme.sheet)
-
-            Section {
-                picker("Edge Style", "edge", $session.settings.subtitleStyle.edge, SubtitleLook.Edge.allCases, \.title)
-                if look.edge != .none {
-                    picker("Edge Width", "edgeWidth", $session.settings.subtitleStyle.edgeWidth, SubtitleLook.edgeWidths, Self.pixels)
-                }
-            } header: {
-                Text("Edge")
-            }
-            .listRowBackground(theme.sheet)
-
-            Section {
-                picker("Background", "background", $session.settings.subtitleStyle.background, SubtitleLook.Background.allCases, \.title)
-                if look.background != .none {
-                    picker("Colour", "backgroundColour", $session.settings.subtitleStyle.backgroundColour, SubtitleLook.BoxColour.allCases, \.title)
-                    picker("Opacity", "backgroundOpacity", $session.settings.subtitleStyle.backgroundOpacity, SubtitleLook.opacities, Self.percent)
-                    picker("Rounded Corners", "corners", $session.settings.subtitleStyle.cornerRadius, SubtitleLook.cornerRadii) { radius in
-                        radius == 0 ? "Square" : Self.pixels(radius)
-                    }
-                    picker("Padding", "padding", $session.settings.subtitleStyle.padding, SubtitleLook.paddings, Self.pixels)
-                }
-            } header: {
-                Text("Background")
-            }
-            .listRowBackground(theme.sheet)
-
-            Section {
-                picker("Position", "position", $session.settings.subtitleStyle.anchor, SubtitleLook.Anchor.allCases, \.title)
-                picker("Edge Distance", "distance", $session.settings.subtitleStyle.edgeDistance, SubtitleLook.edgeDistances, Self.pixels)
-                picker("Line Spacing", "lineSpacing", $session.settings.subtitleStyle.lineSpacing, SubtitleLook.lineSpacings, Self.percent)
-            } header: {
-                Text("Position")
-            } footer: {
-                if imageSubtitles {
-                    imageNote
-                } else {
-                    Text("Sizes and distances are pixels of a 1080-line picture, so subtitles keep their place on any screen.")
+            if imageSubtitles {
+                Section {
+                    Text("These subtitles are images supplied by the video. Colour and brightness tint the image; its text, size and position cannot be changed here.")
                         .foregroundStyle(theme.ink2)
+                        .accessibilityIdentifier("style.imageNote")
                 }
-            }
-            .disabled(imageSubtitles)
-            .listRowBackground(theme.sheet)
+                .listRowBackground(theme.sheet)
+                Section("Image appearance") {
+                    picker("Colour", "colour", $session.settings.subtitleStyle.colour, SubtitleLook.TextColour.allCases, \.title)
+                    Toggle("Soften brightness", isOn: $session.settings.subtitleStyle.blendsWithVideo)
+                        .tint(theme.accent)
+                        .accessibilityIdentifier("style.blend")
+                }
+                .listRowBackground(theme.sheet)
+            } else {
+                Section {
+                    SubtitlePreview(look: look, sample: $sample, scene: scene)
+                        .listRowInsets(EdgeInsets())
+                } footer: {
+                    Text(look.isCustom ? "Your own mix of settings. Pick a preset to start over." : look.preset.about)
+                        .foregroundStyle(theme.ink2)
+                        .accessibilityIdentifier("style.about")
+                }
+                .listRowBackground(Color.clear)
 
-            Section {
-                Toggle(isOn: $session.settings.subtitleStyle.blendsWithVideo) {
-                    Text("Blend with Video")
-                    Text("Keeps the text just under full brightness")
+                Section("Text appearance") {
+                    Picker("Preset", selection: preset) {
+                        ForEach(SubtitleLook.Preset.allCases, id: \.self) { preset in
+                            Text(preset.title).tag(Optional(preset))
+                        }
+                        if look.isCustom { Text("Custom").tag(SubtitleLook.Preset?.none) }
+                    }
+                    .accessibilityIdentifier("style.preset")
+                    NavigationLink {
+                        fontChoices
+                    } label: {
+                        LabeledContent("Font", value: look.font.title)
+                    }
+                    .accessibilityIdentifier("style.font")
+                    picker("Size", "size", $session.settings.subtitleStyle.size, SubtitleLook.sizes, Self.percent)
+                    picker("Colour", "colour", $session.settings.subtitleStyle.colour, SubtitleLook.TextColour.allCases, \.title)
+                    Toggle("Bold", isOn: $session.settings.subtitleStyle.isBold)
+                        .tint(theme.accent)
+                        .accessibilityIdentifier("style.bold")
                 }
-                .tint(theme.accent)
-                .accessibilityIdentifier("style.blend")
-                picker("Reveal as Spoken", "reveal", $session.settings.subtitleStyle.reveal, SubtitleLook.Reveal.allCases, \.title)
-                picker("File Styling", "fileStyling", $session.settings.subtitleStyle.keepsFileStyling, [true, false]) { keeps in
-                    keeps ? "Keep" : "My Look"
+                .listRowBackground(theme.sheet)
+
+                Section {
+                    NavigationLink("Background & outline") { backgroundOptions }
+                        .accessibilityIdentifier("style.backgroundOptions")
+                    NavigationLink("Position") { positionOptions }
+                        .accessibilityIdentifier("style.positionOptions")
+                    NavigationLink("More options") { moreOptions }
+                        .accessibilityIdentifier("style.moreOptions")
+                    NavigationLink("Preview options") { previewOptions }
+                        .accessibilityIdentifier("style.previewOptions")
+                    if look.isCustom {
+                        Button("Reset to \(look.preset.title)") { session.settings.subtitleStyle.resetToPreset() }
+                            .accessibilityIdentifier("style.reset")
+                    }
                 }
-                Button {
-                    session.settings.subtitleStyle.resetToPreset()
-                } label: {
-                    Text("Reset to Preset")
-                    Text("Back to \(look.preset.title)’s own settings")
-                }
-                .disabled(!look.isCustom)
-                .accessibilityIdentifier("style.reset")
-            } header: {
-                Text("Behaviour")
-            } footer: {
-                Text("Keep draws a styled file’s own colours; My Look draws it in this look.")
-                    .foregroundStyle(theme.ink2)
+                .listRowBackground(theme.sheet)
             }
-            .listRowBackground(theme.sheet)
         }
         .themedList(theme)
         .accessibilityIdentifier("style.list")
         .navigationTitle("Subtitle Style")
         .navigationBarTitleDisplayMode(.inline)
-        .animation(.default, value: look.edge == .none)
-        .animation(.default, value: look.background == .none)
     }
 
-    /// Picking a preset sets every look field; "Custom" only shows, and only while the look is one.
+    private var fontChoices: some View {
+        List {
+            ForEach(SubtitleLook.Font.allCases, id: \.self) { font in
+                Button {
+                    session.settings.subtitleStyle.font = font
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(font.title).foregroundStyle(theme.ink)
+                            Text("The quick brown fox 123")
+                                .font(Font(SubtitleFont.uiFont(font, size: 17, bold: false)))
+                                .foregroundStyle(theme.ink2)
+                        }
+                        Spacer()
+                        if session.settings.subtitleStyle.font == font {
+                            Image(systemName: "checkmark").foregroundStyle(theme.accent)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .accessibilityAddTraits(session.settings.subtitleStyle.font == font ? .isSelected : [])
+            }
+            .listRowBackground(theme.sheet)
+        }
+        .themedList(theme)
+        .navigationTitle("Font")
+    }
+
+    private var backgroundOptions: some View {
+        @Bindable var session = session
+        let look = session.settings.subtitleStyle
+        return List {
+            Section("Outline") {
+                picker("Edge Style", "edge", $session.settings.subtitleStyle.edge, SubtitleLook.Edge.allCases, \.title)
+                if look.edge != .none {
+                    picker("Edge Width", "edgeWidth", $session.settings.subtitleStyle.edgeWidth, SubtitleLook.edgeWidths, Self.pixels)
+                }
+            }
+            .listRowBackground(theme.sheet)
+            Section("Background") {
+                picker("Background", "background", $session.settings.subtitleStyle.background, SubtitleLook.Background.allCases, \.title)
+                if look.background != .none {
+                    picker("Colour", "backgroundColour", $session.settings.subtitleStyle.backgroundColour, SubtitleLook.BoxColour.allCases, \.title)
+                    picker("Opacity", "backgroundOpacity", $session.settings.subtitleStyle.backgroundOpacity, SubtitleLook.opacities, Self.percent)
+                    picker("Rounded Corners", "corners", $session.settings.subtitleStyle.cornerRadius, SubtitleLook.cornerRadii) { $0 == 0 ? "Square" : Self.pixels($0) }
+                    picker("Padding", "padding", $session.settings.subtitleStyle.padding, SubtitleLook.paddings, Self.pixels)
+                }
+            }
+            .listRowBackground(theme.sheet)
+        }
+        .themedList(theme)
+        .navigationTitle("Background & outline")
+    }
+
+    private var positionOptions: some View {
+        @Bindable var session = session
+        return List {
+            Section {
+                picker("Position", "position", $session.settings.subtitleStyle.anchor, SubtitleLook.Anchor.allCases, \.title)
+                picker("Edge Distance", "distance", $session.settings.subtitleStyle.edgeDistance, SubtitleLook.edgeDistances, Self.pixels)
+                picker("Line Spacing", "lineSpacing", $session.settings.subtitleStyle.lineSpacing, SubtitleLook.lineSpacings, Self.percent)
+            } footer: {
+                Text("Distances are pixels of a 1080-line picture and scale with the video’s height.")
+                    .foregroundStyle(theme.ink2)
+            }
+            .listRowBackground(theme.sheet)
+        }
+        .themedList(theme)
+        .navigationTitle("Position")
+    }
+
+    private var moreOptions: some View {
+        @Bindable var session = session
+        return List {
+            Section {
+                picker("Opacity", "opacity", $session.settings.subtitleStyle.opacity, SubtitleLook.opacities, Self.percent)
+                Toggle(isOn: $session.settings.subtitleStyle.blendsWithVideo) {
+                    Text("Soften brightness")
+                    Text("Keeps the text just under full brightness")
+                }
+                .tint(theme.accent)
+                .accessibilityIdentifier("style.blend")
+                picker("Reveal as Spoken", "reveal", $session.settings.subtitleStyle.reveal, SubtitleLook.Reveal.allCases, \.title)
+                picker("File Styling", "fileStyling", $session.settings.subtitleStyle.keepsFileStyling, [true, false]) { $0 ? "Keep" : "My Look" }
+            } footer: {
+                Text("Keep uses a styled file’s own colours. My Look uses the colours selected here; meaningful italics and bold remain.")
+                    .foregroundStyle(theme.ink2)
+            }
+            .listRowBackground(theme.sheet)
+        }
+        .themedList(theme)
+        .navigationTitle("More options")
+    }
+
+    private var previewOptions: some View {
+        List {
+            Section {
+                picker("Sample Text", "sample", $sample, SubtitleSample.allCases, \.title)
+                picker("Sample Scene", "scene", $scene, SubtitleScene.allCases, \.title)
+            }
+            .listRowBackground(theme.sheet)
+        }
+        .themedList(theme)
+        .navigationTitle("Preview options")
+    }
+
     private var preset: Binding<SubtitleLook.Preset?> {
         Binding {
             let look = session.settings.subtitleStyle
@@ -145,19 +197,11 @@ struct SubtitleStyleView: View {
         }
     }
 
-    private var imageNote: some View {
-        Text("Image subtitles keep their own size and position.")
-            .foregroundStyle(theme.ink2)
-            .accessibilityIdentifier("style.imageNote")
-    }
-
     private func picker<Value: Hashable>(
         _ title: String, _ id: String, _ selection: Binding<Value>, _ values: [Value], _ label: @escaping (Value) -> String
     ) -> some View {
         Picker(title, selection: selection) {
-            ForEach(values, id: \.self) { value in
-                Text(label(value)).tag(value)
-            }
+            ForEach(values, id: \.self) { value in Text(label(value)).tag(value) }
         }
         .accessibilityIdentifier("style.\(id)")
     }
@@ -166,27 +210,25 @@ struct SubtitleStyleView: View {
     private static func pixels(_ value: Int) -> String { "\(value) px" }
 }
 
-/// A 16:9 scene with a sample subtitle in the look, so the edge and background show over a real kind of
-/// picture. Played in landscape, the picture spans the phone's short side, which the preview's width
-/// matches, so the text takes the size it has on a video. Tapping it shows the next sample. The rows read
-/// out the same choices, so the preview is hidden from VoiceOver.
+/// A 16:9 picture; subtitle dimensions scale against its actual height, as in the player.
 private struct SubtitlePreview: View {
     let look: SubtitleLook
     @Binding var sample: SubtitleSample
     let scene: SubtitleScene
 
-    /// About an iPhone's short side. A landscape list row is far wider, and would make both the frame and
-    /// the text larger than any video shows them.
-    private static let maxWidth: CGFloat = 400
 
     var body: some View {
         GeometryReader { proxy in
-            let pictureHeight = proxy.size.width
+            let pictureHeight = proxy.size.height
             let distance = CGFloat(look.edgeDistance) * pictureHeight / 1080
-            SubtitleLine(text: sample.text, look: look, pictureHeight: pictureHeight)
-                .padding(.horizontal, proxy.size.width * 0.06)
-                .padding(look.anchor == .top ? .top : .bottom, distance)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: look.anchor == .top ? .top : .bottom)
+            VStack(spacing: 0) {
+                if look.anchor == .bottom { Spacer(minLength: 0) }
+                SubtitleLine(text: sample.text, look: look, pictureHeight: pictureHeight)
+                if look.anchor == .top { Spacer(minLength: 0) }
+            }
+            .padding(.horizontal, proxy.size.width * 0.06)
+            .padding(.vertical, distance)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             Text("Sample \(sample.number) of \(SubtitleSample.allCases.count) · \(sample.title)")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.white)
@@ -201,7 +243,6 @@ private struct SubtitlePreview: View {
         .clipShape(RoundedRectangle(cornerRadius: Radius.tile, style: .continuous))
         .contentShape(Rectangle())
         .onTapGesture { sample = sample.next }
-        .frame(maxWidth: Self.maxWidth)
         .frame(maxWidth: .infinity)
         .accessibilityHidden(true)
     }
@@ -311,10 +352,12 @@ extension SubtitleLook.Preset {
 extension SubtitleLook.Font {
     var title: String {
         switch self {
-        case .standard: "Default"
+        case .standard: "System"
         case .serif: "Serif"
-        case .mono: "Monospace"
-        case .legible: "Easy to Read"
+        case .mono: "Monospaced"
+        case .legible: "Atkinson Hyperlegible"
+        case .rounded: "Rounded"
+        case .avenirNext: "Avenir Next"
         }
     }
 }

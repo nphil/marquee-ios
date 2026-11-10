@@ -31,6 +31,16 @@ struct SubtitleLookTests {
         #expect(try JSONDecoder().decode(SubtitleLook.self, from: old) == SubtitleLook())
     }
 
+    @Test func allFontChoicesRoundTripWithoutChangingExistingIdentifiers() throws {
+        #expect(SubtitleLook.Font.allCases.map(\.rawValue) == ["standard", "serif", "mono", "legible", "rounded", "avenirNext"])
+        for font in SubtitleLook.Font.allCases {
+            var look = SubtitleLook()
+            look.font = font
+            let decoded = try JSONDecoder().decode(SubtitleLook.self, from: JSONEncoder().encode(look))
+            #expect(decoded.font == font)
+        }
+    }
+
     @Test func wordsAppearInOrderWithPausesAndATail() {
         let words = SubtitleReveal.estimate("Run, now.\nWhere?", duration: 3, by: .word)
         #expect(words.map(\.offset) == [0, 5, 10])
