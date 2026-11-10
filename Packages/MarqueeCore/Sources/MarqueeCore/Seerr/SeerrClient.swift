@@ -65,8 +65,9 @@ public actor SeerrClient {
         try await get(DetailsWire.self, "/api/v1/\(kind.rawValue)/\(tmdbID)", kind: kind).details
     }
 
-    /// Sends a request. Seerr approves it at once when the account may auto-approve.
-    public func request(_ order: SeerrOrder) async throws -> SeerrRequest {
+    /// Sends a request. Seerr approves it at once when the account may auto-approve; the title's page
+    /// reloads to show which.
+    public func request(_ order: SeerrOrder) async throws {
         struct Body: Encodable {
             let mediaType: String
             let mediaId: Int
@@ -80,13 +81,9 @@ public actor SeerrClient {
         )
         let response = try await send(.post, "/api/v1/request", body: try JSONEncoder().encode(body))
         switch response.status {
-        case 201, 200:
-            guard let request = (try? JSONDecoder().decode(RequestWire.self, from: response.body))?.request else {
-                throw SeerrError.notSeerr
-            }
-            return request
         // Seerr's answer when every season asked for is already requested or available.
         case 202: throw SeerrError.alreadyRequested
+        case 200..<300: return
         default: throw failure(response)
         }
     }

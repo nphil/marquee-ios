@@ -162,8 +162,7 @@ struct SeerrTests {
         let (client, transport) = Self.client(session: "connect.sid=x") { _, _ in
             json(["id": 31, "status": 1, "type": "tv", "is4k": false, "media": ["tmdbId": 1399, "status": 2]], status: 201)
         }
-        let request = try await client.request(SeerrOrder(kind: .tv, tmdbID: 1399, tvdbID: 121_361, seasons: [2, 3]))
-        #expect(request.id == 31 && request.status == .pending && request.tmdbID == 1399 && request.badge == .pending)
+        try await client.request(SeerrOrder(kind: .tv, tmdbID: 1399, tvdbID: 121_361, seasons: [2, 3]))
         let sent = try #require(await transport.requests(to: "/api/v1/request").first)
         let body = Self.body(sent)
         #expect(body["mediaType"] as? String == "tv" && body["mediaId"] as? Int == 1399 && body["tvdbId"] as? Int == 121_361)
