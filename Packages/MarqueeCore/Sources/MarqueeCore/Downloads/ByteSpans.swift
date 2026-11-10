@@ -89,6 +89,42 @@ public enum TransferPlan {
     }
 }
 
+extension TransferPlan {
+    /// A failure that comes from the connection or a restarting server, not from the file or the
+    /// disk, so the download waits and tries again.
+    public static func isTransient(_ error: any Error) -> Bool {
+        switch error {
+        case let error as URLError:
+            switch error.code {
+            case .timedOut, .networkConnectionLost, .notConnectedToInternet, .cannotConnectToHost, .cannotFindHost,
+                 .dnsLookupFailed, .dataNotAllowed, .internationalRoamingOff, .callIsActive:
+                return true
+            default:
+                return false
+            }
+        case let failure as NetworkFailure:
+            return failure != .secureConnectionFailed && failure != .other
+        case PlexError.unreachable(let failure):
+            return failure != .secureConnectionFailed && failure != .other
+        case let error as TransferStatusError:
+            return [408, 429, 502, 504].contains(error.status)
+        default:
+            return false
+        }
+    }
+}
+
+/// The server answered a transfer request with a status that is not a media reply.
+public struct TransferStatusError: Error, LocalizedError, Sendable, Equatable {
+    public let status: Int
+
+    public init(status: Int) {
+        self.status = status
+    }
+
+    public var errorDescription: String? { "The server answered \(status)." }
+}
+
 /// What an answer to a range request means for the download.
 public enum RangeReply: Hashable, Sendable {
     /// The range asked for, out of a file this long.

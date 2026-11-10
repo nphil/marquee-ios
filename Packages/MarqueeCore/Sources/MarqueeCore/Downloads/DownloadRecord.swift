@@ -126,9 +126,11 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
         return min(1, Double(received.byteCount) / Double(total))
     }
 
-    /// A finished download Auto-delete takes away: watched, and not the one playing.
+    /// A finished download Auto-delete takes away: finished on this iPhone, and not the one playing.
+    /// `watch.watched` alone may be Plex's own count from before the download, which says nothing
+    /// about this copy.
     public func isSpent(autoDeleteWatched: Bool, playing: String?) -> Bool {
-        autoDeleteWatched && phase == .done && watch.watched && playing != ratingKey
+        autoDeleteWatched && phase == .done && watch.finishedHere && playing != ratingKey
     }
 }
 
@@ -142,6 +144,19 @@ public struct OfflineWatch: Hashable, Sendable, Codable {
     /// Finished on the iPhone since Plex last heard. Kept apart from `watched`, which may be Plex's own:
     /// every scrobble counts one more viewing.
     public var finishedUnsynced = false
+    /// Finished on this iPhone since the download began; absent in indexes saved by older versions.
+    public var finishedHere = false
+
+    private enum CodingKeys: String, CodingKey { case offset, watched, unsynced, finishedUnsynced, finishedHere }
+
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        offset = try values.decode(Int.self, forKey: .offset)
+        watched = try values.decode(Bool.self, forKey: .watched)
+        unsynced = try values.decodeIfPresent(Date.self, forKey: .unsynced)
+        finishedUnsynced = try values.decodeIfPresent(Bool.self, forKey: .finishedUnsynced) ?? false
+        finishedHere = try values.decodeIfPresent(Bool.self, forKey: .finishedHere) ?? false
+    }
 
     public init(offset: Int = 0, watched: Bool = false) {
         self.offset = offset
@@ -157,6 +172,7 @@ public struct OfflineWatch: Hashable, Sendable, Codable {
     /// scrobble already.
     public mutating func finished(at date: Date, told: Bool) {
         watched = true
+        finishedHere = true
         offset = 0
         if told {
             unsynced = nil

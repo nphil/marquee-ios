@@ -27,7 +27,9 @@ final class BackgroundTransfer: Sendable {
     enum Result: Sendable {
         /// `written` is flushed into the part file; `length` is the file's, when the server said it.
         case saved(Slice, written: Range<Int64>, length: Int64?)
-        case notReady(Slice)
+        case notReady(Slice, retryAfter: Int)
+        /// A connection failure: the slice is tried again later.
+        case interrupted(Slice)
         case failed(Slice, String)
         case stopped(Slice)
     }
@@ -62,7 +64,12 @@ final class BackgroundTransfer: Sendable {
         session != nil && UserDefaults.standard.string(forKey: Self.brokenKey) != Self.systemVersion
     }
 
-    func start(_ slice: Slice, url: URL, headers: [String: String], cellular: Bool) {
+    /// What a slice's part path is relative to.
+    static var supportDirectory: URL {
+        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+    }
+
+    func start(_ slice: Slice, url: URL, headers: [String: String], cellular: Bool, after delay: TimeInterval = 0) {
         guard isAvailable, let session else { return }
         var request = URLRequest(url: url)
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
@@ -71,6 +78,8 @@ final class BackgroundTransfer: Sendable {
         let task = session.downloadTask(with: request)
         task.taskDescription = (try? JSONEncoder().encode(slice)).map { String(decoding: $0, as: UTF8.self) }
         task.countOfBytesClientExpectsToReceive = slice.upper - slice.lower
+        // iOS holds the task until then, with the app suspended.
+        if delay > 0 { task.earliestBeginDate = Date.now.addingTimeInterval(delay) }
         task.resume()
     }
 
@@ -111,7 +120,7 @@ final class BackgroundTransfer: Sendable {
                 status: http?.statusCode ?? 0,
                 contentRange: http?.value(forHTTPHeaderField: "Content-Range"),
                 contentLength: http.map(\.expectedContentLength).flatMap { $0 >= 0 ? $0 : nil },
-                retryAfter: nil,
+                retryAfter: http?.value(forHTTPHeaderField: "Retry-After"),
                 requested: slice.range
             )
             switch reply {
@@ -119,10 +128,10 @@ final class BackgroundTransfer: Sendable {
                 deliver(save(location, into: slice, at: slice.lower, limit: slice.upper, length: length))
             case .whole(let length):
                 deliver(save(location, into: slice, at: 0, limit: nil, length: length))
-            case .notReady:
-                deliver(.notReady(slice))
+            case .notReady(let retryAfter):
+                deliver(.notReady(slice, retryAfter: retryAfter))
             case .failed(let status):
-                deliver(.failed(slice, "The server answered \(status)."))
+                deliver(TransferPlan.isTransient(TransferStatusError(status: status)) ? .interrupted(slice) : .failed(slice, "The server answered \(status)."))
             }
         }
 
@@ -138,7 +147,7 @@ final class BackgroundTransfer: Sendable {
                 log.error("dl-background refused code=-3000; transport off for this iOS version")
                 refused()
             }
-            deliver(.failed(slice, error.localizedDescription))
+            deliver(TransferPlan.isTransient(error) ? .interrupted(slice) : .failed(slice, error.localizedDescription))
         }
 
         func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
@@ -167,8 +176,7 @@ final class BackgroundTransfer: Sendable {
         /// Copies the landed file into the part at `offset`, up to `limit`, and flushes it.
         private func save(_ location: URL, into slice: Slice, at offset: Int64, limit: Int64?, length: Int64?) -> Result {
             let input = open(location.path(percentEncoded: false), O_RDONLY)
-            let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            let output = open(support.appending(path: slice.part).path(percentEncoded: false), O_WRONLY)
+            let output = open(DownloadStore.file(forPart: slice.part, under: BackgroundTransfer.supportDirectory).path(percentEncoded: false), O_WRONLY)
             defer {
                 if input >= 0 { close(input) }
                 if output >= 0 { close(output) }

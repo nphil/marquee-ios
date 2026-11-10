@@ -52,6 +52,17 @@ struct DownloadTests {
         #expect((1...7).map(TransferPlan.retryDelay) == [2, 4, 8, 16, 32, 60, 60])
     }
 
+    @Test func onlyConnectionTroubleWaitsForARetry() {
+        #expect(TransferPlan.isTransient(URLError(.timedOut)))
+        #expect(TransferPlan.isTransient(URLError(.dataNotAllowed)))
+        #expect(TransferPlan.isTransient(PlexError.unreachable(.connectionLost)))
+        #expect(TransferPlan.isTransient(TransferStatusError(status: 502)))
+        #expect(!TransferPlan.isTransient(TransferStatusError(status: 404)))
+        #expect(!TransferPlan.isTransient(URLError(.badServerResponse)))
+        #expect(!TransferPlan.isTransient(POSIXError(.ENOSPC)))
+        #expect(!TransferPlan.isTransient(PlexError.unauthorized))
+    }
+
     @Test func secondConnectionOnlyAwayFromHomeAndOnlyWhenClearlyFaster() {
         #expect(!TransferPlan.triesSecondConnection(isLocal: true))
         #expect(TransferPlan.triesSecondConnection(isLocal: false))
@@ -114,6 +125,34 @@ struct DownloadTests {
         #expect(record.isSpent(autoDeleteWatched: true, playing: nil))
         #expect(!record.isSpent(autoDeleteWatched: true, playing: "301"))
         #expect(!record.isSpent(autoDeleteWatched: false, playing: nil))
+    }
+
+    @Test func autoDeleteIgnoresAViewingFromBeforeTheDownload() throws {
+        var record = try Self.record()
+        record.phase = .done
+        record.watch = OfflineWatch(offset: 0, watched: true)
+        record.watch.played(to: 30_000, at: .now)
+        #expect(!record.isSpent(autoDeleteWatched: true, playing: nil))
+        record.watch.finished(at: .now, told: false)
+        record.watch.synced()
+        #expect(record.isSpent(autoDeleteWatched: true, playing: nil))
+    }
+
+    @Test func watchStateFromOlderIndexesStillLoads() throws {
+        var json = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(OfflineWatch(offset: 5, watched: true))) as? [String: Any])
+        json.removeValue(forKey: "finishedHere")
+        let watch = try JSONDecoder().decode(OfflineWatch.self, from: JSONSerialization.data(withJSONObject: json))
+        #expect(watch.watched && !watch.finishedHere)
+    }
+
+    // MARK: Playability
+
+    @Test func originalTheServerMustReEncodeIsRefusedWithAWayOut() throws {
+        let mpeg2 = try PlaybackRouteTests.file("mpegts", video: Fixture.video("mpeg2video"))
+        let reason = DownloadPlayability.refusal(media: mpeg2.media, part: mpeg2.part, capabilities: PlaybackRouteTests.remuxer)
+        #expect(reason?.contains("converted quality") == true)
+        let mkv = try PlaybackRouteTests.file("mkv", streams: [Fixture.audio(2, "eng", codec: "dts", isDefault: true)])
+        #expect(DownloadPlayability.refusal(media: mkv.media, part: mkv.part, capabilities: PlaybackRouteTests.remuxer) == nil)
     }
 
     // MARK: Server queue
@@ -181,6 +220,17 @@ struct DownloadTests {
         #expect(legacy.partialID == nil)
         #expect(store.partialFile(for: legacy).lastPathComponent == "download.part")
         #expect(store.partialFile(for: legacy) != store.partialFile(for: replacement))
+    }
+
+    @Test func relativePartIgnoresATrailingSlash() {
+        let file = URL(fileURLWithPath: "/var/mobile/Library/Application Support/Downloads/server/account/12345/download-ABCD.part")
+        let expected = "Downloads/server/account/12345/download-ABCD.part"
+        for support in ["/var/mobile/Library/Application Support", "/var/mobile/Library/Application Support/"] {
+            let base = URL(fileURLWithPath: support, isDirectory: true)
+            #expect(DownloadStore.relativePart(of: file, under: base) == expected)
+            #expect(DownloadStore.file(forPart: expected, under: base).path == file.path)
+        }
+        #expect(DownloadStore.relativePart(of: file, under: URL(fileURLWithPath: "/tmp/elsewhere")) == nil)
     }
 
     @Test func storeKeepsRecordsAndBuildsTheOfflineTitle() throws {

@@ -62,6 +62,21 @@ public struct DownloadStore: Sendable {
         return item
     }
 
+    /// `file`'s path below `base`, joined by "/", built from path components so a trailing slash on
+    /// either URL changes nothing. Nil when `file` is not inside `base`. The background transfer keeps
+    /// this instead of an absolute path because the app container's path can change between launches.
+    public static func relativePart(of file: URL, under base: URL) -> String? {
+        let base = base.standardizedFileURL.pathComponents
+        let parts = file.standardizedFileURL.pathComponents
+        guard parts.count > base.count, Array(parts.prefix(base.count)) == base else { return nil }
+        return parts.dropFirst(base.count).joined(separator: "/")
+    }
+
+    /// The inverse of `relativePart(of:under:)`.
+    public static func file(forPart part: String, under base: URL) -> URL {
+        base.appending(path: part)
+    }
+
     private var indexFile: URL { root.appending(path: "index.json") }
 
     /// Every record, in the order added. An unreadable index reads as none.

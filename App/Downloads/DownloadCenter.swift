@@ -17,6 +17,7 @@ final class DownloadCenter {
         didSet {
             if let data = try? JSONEncoder().encode(settings) { defaults.set(data, forKey: Self.settingsKey) }
             if !settings.keepAlive { keepAlive.stop() }
+            if settings.cellular && !oldValue.cellular { wake() }
         }
     }
     var error: String?
@@ -40,6 +41,17 @@ final class DownloadCenter {
     private var playbackCount = 0
     private var removing: Set<String> = []
     private var backgroundHandoff = false
+    /// Per download: failures in a row, and the earliest time of the next try.
+    @ObservationIgnored private var retries: [String: Int] = [:]
+    @ObservationIgnored private var holds: [String: Date] = [:]
+    @ObservationIgnored private var backingOff = false
+    @ObservationIgnored private var pathTask: Task<Void, Never>?
+    /// Libraries in use since launch, by server, for removing a server's queue items after sign-out.
+    @ObservationIgnored private var libraries: [String: PlexLibrary] = [:]
+    @ObservationIgnored private var watchDirty = false
+    @ObservationIgnored private var lastPersist = Date.distantPast
+    @ObservationIgnored private var lastWatchPosition: [String: Int] = [:]
+    private static let watchSaveInterval: TimeInterval = 30
     @ObservationIgnored private lazy var fetcher = RangeFetcher(meter: meter)
     /// Poster and subtitle fetches; the UI tests' fake Plex answers them, which `.shared` would bypass.
     @ObservationIgnored private lazy var metadataSession: URLSession = {
@@ -73,20 +85,35 @@ final class DownloadCenter {
             Task { @MainActor in self?.enteredBackground() }
         }
         _ = background
+        pathTask = Task { [weak self] in
+            var previous: NetworkPath?
+            for await path in NetworkPath.updates() {
+                guard let self else { return }
+                if path.isConnected, path != previous { self.wake() }
+                previous = path
+            }
+        }
     }
 
     func connect(library: PlexLibrary?, scope: DownloadScope?) {
+        // An account refresh reconnects with what is already in use; restarting would cancel the
+        // transfer and any Download tap still in flight.
+        guard library?.server != self.library?.server || scope != self.scope else { return }
         transferOwner = UUID()
         enqueueOwner = UUID()
         worker?.cancel()
         keepAlive.stop()
         self.library = library
         self.scope = scope
+        if let library { libraries[library.server.id] = library }
+        // iOS relaunches the app in the background to deliver a finished slice; the in-app fetcher
+        // would be suspended within seconds there.
+        if UIApplication.shared.applicationState == .background { backgroundHandoff = true }
         kick()
         syncWatch()
     }
 
-    func enqueue(item: PlexMetadata, quality: DownloadQuality, mediaIndex: Int) async {
+    func enqueue(item: PlexMetadata, quality: DownloadQuality, mediaIndex: Int, capabilities: DeviceCapabilities) async {
         guard let library, let scope, !removing.contains(item.ratingKey), !records.contains(where: { $0.ratingKey == item.ratingKey }) else { return }
         let owner = enqueueOwner
         do {
@@ -95,6 +122,10 @@ final class DownloadCenter {
             let media = snapshot.item.media[mediaIndex]
             guard !media.parts.isEmpty else { throw DownloadFailure.message("No media file is available.") }
             guard quality != .original || media.parts.count == 1 else { throw DownloadFailure.message("Original downloads with multiple parts are not supported. Choose a converted quality.") }
+            // Offline there is no server to re-encode, so the phone has to play the original itself.
+            if quality == .original, let reason = DownloadPlayability.refusal(media: media, part: media.parts[0], capabilities: capabilities) {
+                throw DownloadFailure.message(reason)
+            }
             let target: DownloadTarget?
             if case .converted(let preset) = quality { target = PresetTarget.target(for: preset, media: media) } else { target = nil }
             var record = DownloadRecord(item: snapshot.item, scope: scope, quality: quality, mediaIndex: mediaIndex, addedAt: .now, expectedLength: quality.estimatedBytes(media: media, target: target))
@@ -133,26 +164,28 @@ final class DownloadCenter {
         allRecords[index].phase = .paused
         persist()
         worker?.cancel()
-        Task { await background.cancel(part: part) }
+        if let part { Task { await background.cancel(part: part) } }
     }
 
     func resume(_ id: String) {
         guard let index = index(id), allRecords[index].phase != .done else { return }
         allRecords[index].phase = .waiting
         persist()
-        kick()
+        wake()
     }
 
     func remove(_ id: String) {
         guard let index = index(id) else { return }
         if transferRecordID == id { transferOwner = UUID() }
         let record = allRecords.remove(at: index)
+        clearRetry(id)
         removing.insert(id)
         worker?.cancel()
         persist()
         do { try store.remove(record) } catch { self.error = error.localizedDescription }
+        let part = relativePart(for: record)
         Task {
-            await background.cancel(part: relativePart(for: record))
+            if let part { await background.cancel(part: part) }
             removing.remove(id)
             if let library, record.scope == scope, let conversion = record.conversion {
                 try? await library.removeFromDownloadQueue(conversion.queue, item: conversion.item)
@@ -163,19 +196,34 @@ final class DownloadCenter {
 
     func updateWatch(id: String, position: Int, duration: Int) {
         guard let index = index(id) else { return }
+        // Position standing still means paused or stopped: the moment worth keeping on disk.
+        var urgent = lastWatchPosition[id] == position
+        lastWatchPosition[id] = position
         if duration > 0 && Double(position) / Double(duration) >= 0.9 {
-            if !allRecords[index].watch.finishedUnsynced { allRecords[index].watch.finished(at: .now, told: false) }
+            if !allRecords[index].watch.finishedUnsynced {
+                allRecords[index].watch.finished(at: .now, told: false)
+                urgent = true
+            }
         } else {
             allRecords[index].watch.played(to: max(0, position), at: .now)
         }
-        persist()
+        watchDirty = true
+        if urgent || Date.now.timeIntervalSince(lastPersist) >= Self.watchSaveInterval { persist() }
     }
 
     func setPlaybackActive(_ active: Bool) {
         playbackCount = max(0, playbackCount + (active ? 1 : -1))
         if playbackCount > 0 { keepAlive.stop(restoringCategory: true) }
         else if UIApplication.shared.applicationState == .background { enteredBackground() }
-        if playbackCount == 0 { syncWatch() }
+        if playbackCount == 0 {
+            lastWatchPosition = [:]
+            flushWatch()
+            syncWatch()
+        }
+    }
+
+    private func flushWatch() {
+        if watchDirty { persist() }
     }
 
     func eraseAll() {
@@ -185,9 +233,22 @@ final class DownloadCenter {
         keepAlive.stop()
         let old = allRecords
         allRecords = []
+        retries = [:]
+        holds = [:]
+        lastWatchPosition = [:]
         do { try store.eraseAll() } catch { self.error = error.localizedDescription }
+        // Sign-out has dropped the current library by now, so the ones used since launch answer for
+        // their servers' queues.
+        let known = libraries
+        libraries = [:]
         Task {
-            for record in old { await background.cancel(part: relativePart(for: record)) }
+            for record in old {
+                if let part = relativePart(for: record) { await background.cancel(part: part) }
+                // Best effort: an unreachable server keeps its converted file until it expires.
+                if let conversion = record.conversion, let library = known[record.scope.server] {
+                    try? await library.removeFromDownloadQueue(conversion.queue, item: conversion.item)
+                }
+            }
         }
     }
 
@@ -197,6 +258,8 @@ final class DownloadCenter {
         return allRecords.firstIndex { $0.scope == scope && $0.id == id }
     }
     private func persist() {
+        watchDirty = false
+        lastPersist = .now
         do { try store.saveIndex(allRecords) } catch { self.error = error.localizedDescription }
     }
 
@@ -248,15 +311,47 @@ final class DownloadCenter {
         guard let record = records.first(where: { record in record.phase.isActive && !running.contains(where: { $0.part == relativePart(for: record) }) }) else { return false }
         transferRecordID = record.id
         defer { if transferOwner == owner { transferRecordID = nil } }
+        if let until = holds[record.id], until > .now, !(backgroundHandoff && background.isAvailable) {
+            backingOff = true
+            try? await Task.sleep(for: .seconds(until.timeIntervalSinceNow))
+            backingOff = false
+            guard !Task.isCancelled, transferOwner == owner else { return false }
+        }
         do { try await transfer(record.id, library: library, scope: scope, owner: owner) }
         catch is CancellationError { }
         catch {
             if !Task.isCancelled, let i = transferIndex(record.id, scope: scope, owner: owner), allRecords[i].phase.isActive {
-                allRecords[i].phase = .failed(error.localizedDescription)
+                if TransferPlan.isTransient(error) {
+                    scheduleRetry(at: i)
+                } else {
+                    allRecords[i].phase = .failed(error.localizedDescription)
+                }
                 persist()
             }
         }
         return true
+    }
+
+    /// Back to waiting with the next try after the backoff, instead of failing on a dropped connection.
+    private func scheduleRetry(at i: Int) {
+        let id = allRecords[i].id
+        let attempt = (retries[id] ?? 0) + 1
+        retries[id] = attempt
+        holds[id] = Date.now.addingTimeInterval(TimeInterval(TransferPlan.retryDelay(attempt: attempt)))
+        allRecords[i].phase = .waiting
+    }
+
+    private func clearRetry(_ id: String) {
+        retries[id] = nil
+        holds[id] = nil
+    }
+
+    /// Ends every backoff now: the network came back or the user asked for another try.
+    private func wake() {
+        retries = [:]
+        holds = [:]
+        if backingOff { worker?.cancel() }
+        kick()
     }
 
     private func transfer(_ id: String, library: PlexLibrary, scope: DownloadScope, owner: UUID) async throws {
@@ -311,7 +406,8 @@ final class DownloadCenter {
                 return
             }
             let length = record.length ?? Int64.max / 2
-            let size = backgroundHandoff && background.isAvailable ? TransferPlan.backgroundSlice : TransferPlan.foregroundChunk
+            let slicePart = backgroundHandoff && background.isAvailable ? relativePart(for: record) : nil
+            let size = slicePart == nil ? TransferPlan.foregroundChunk : TransferPlan.backgroundSlice
             guard let range = record.received.next(length: length, size: size) else { return }
             allRecords[i].phase = .downloading
             persist()
@@ -319,8 +415,10 @@ final class DownloadCenter {
             if !FileManager.default.fileExists(atPath: file.path(percentEncoded: false)) {
                 guard FileManager.default.createFile(atPath: file.path(percentEncoded: false), contents: nil) else { throw DownloadFailure.message("Could not create the download file.") }
             }
-            if backgroundHandoff && background.isAvailable {
-                background.start(.init(id: id, part: relativePart(for: record), lower: range.lowerBound, upper: range.upperBound), url: url, headers: library.authorizationHeaders(), cellular: settings.cellular)
+            if let slicePart {
+                // iOS starts the slice after the backoff, so a retry still happens while the app is suspended.
+                let delay = max(0, holds[id]?.timeIntervalSinceNow ?? 0)
+                background.start(.init(id: id, part: slicePart, lower: range.lowerBound, upper: range.upperBound), url: url, headers: library.authorizationHeaders(), cellular: settings.cellular, after: delay)
                 return
             }
             let outcome = await fetcher.fetch(url, headers: library.authorizationHeaders(), range: range, into: file, id: id, cellular: settings.cellular)
@@ -328,11 +426,12 @@ final class DownloadCenter {
             if case .whole = outcome.reply { allRecords[outcomeIndex].received = ByteSpans() }
             allRecords[outcomeIndex].received.insert(outcome.written)
             meter.commit(Int64(outcome.written.count), for: id)
+            if !outcome.written.isEmpty { clearRetry(id) }
             switch outcome.reply {
             case .partial(let length): allRecords[outcomeIndex].length = length
             case .whole(let length): allRecords[outcomeIndex].length = length ?? (outcome.error == nil ? outcome.written.upperBound : nil)
             case .notReady(let delay): persist(); try await Task.sleep(for: .seconds(delay)); continue
-            case .failed(let status): throw DownloadFailure.message("The server answered \(status).")
+            case .failed(let status): throw TransferStatusError(status: status)
             case nil: break
             }
             persist()
@@ -358,28 +457,35 @@ final class DownloadCenter {
     private func receivedBackground(_ result: BackgroundTransfer.Result) async {
         let slice: BackgroundTransfer.Slice
         switch result {
-        case .saved(let value, _, _), .notReady(let value), .failed(let value, _), .stopped(let value): slice = value
+        case .saved(let value, _, _), .notReady(let value, _), .interrupted(let value), .failed(let value, _), .stopped(let value): slice = value
         }
         guard let i = allRecords.firstIndex(where: { $0.id == slice.id && relativePart(for: $0) == slice.part && $0.phase.isActive }) else { return }
+        let id = allRecords[i].id
         switch result {
         case .saved(_, let written, let length):
             allRecords[i].received.insert(written)
             if let length { allRecords[i].length = length }
+            clearRetry(id)
+        case .notReady(_, let delay):
+            holds[id] = Date.now.addingTimeInterval(TimeInterval(delay))
+        case .interrupted:
+            scheduleRetry(at: i)
         case .failed(_, let message):
-            if allRecords[i].phase.isActive { allRecords[i].phase = .failed(message) }
-        case .notReady, .stopped: break
+            allRecords[i].phase = .failed(message)
+        case .stopped: break
         }
         persist()
         kick()
     }
 
-    private func relativePart(for record: DownloadRecord) -> String {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].path(percentEncoded: false)
-        let path = store.partialFile(for: record).path(percentEncoded: false)
-        return String(path.dropFirst(support.count + 1))
+    /// The part file's path below Application Support, which is what a background slice carries: the
+    /// app container's path can change between launches.
+    private func relativePart(for record: DownloadRecord) -> String? {
+        DownloadStore.relativePart(of: store.partialFile(for: record), under: BackgroundTransfer.supportDirectory)
     }
 
     private func enteredBackground() {
+        flushWatch()
         guard activeCount > 0 else { return }
         if settings.keepAlive && playbackCount == 0 {
             keepAlive.start { [weak self] in self?.activeCount ?? 0 > 0 }

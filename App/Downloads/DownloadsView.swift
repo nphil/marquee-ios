@@ -20,6 +20,7 @@ struct DownloadsView: View {
         }
         .themedList(theme)
         .navigationTitle("Downloads")
+        .downloadErrorAlert()
         .confirmationDialog("Remove Download?", isPresented: Binding(
             get: { removing != nil },
             set: { if !$0 { removing = nil } }
