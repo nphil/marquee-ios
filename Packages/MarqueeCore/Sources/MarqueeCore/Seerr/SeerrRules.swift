@@ -49,6 +49,11 @@ extension SeerrMedia {
         return nil
     }
 
+    /// The latest request still open in that quality, pending or approved: who already asked for it.
+    public func openRequest(is4K: Bool) -> SeerrRequest? {
+        requests.filter { $0.isActive && $0.is4K == is4K }.max { $0.id < $1.id }
+    }
+
     /// The Plex server's machine id from Seerr's links: `server=` in the app link
     /// (`plex://preplay/?metadataKey=…&server=<id>`), or `/server/<id>/` in the web link.
     static func plexServerID(app: String?, web: String?) -> String? {

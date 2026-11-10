@@ -138,6 +138,15 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings.bazarr")
                 NavigationLink {
+                    SeerrView()
+                } label: {
+                    LabeledContent("Seerr") {
+                        Text(session.seerr.isEnabled ? "On" : "Off")
+                            .foregroundStyle(theme.ink2)
+                    }
+                }
+                .accessibilityIdentifier("settings.seerr")
+                NavigationLink {
                     CastView()
                 } label: {
                     LabeledContent("Chromecast") {

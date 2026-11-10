@@ -239,6 +239,12 @@ struct SeerrTests {
     )
     static let requester = SeerrUser(id: 7, name: "Nitin", permissions: .request)
 
+    @Test func openRequestIsTheLatestPendingOrApprovedOfThatQuality() {
+        let media = Self.series.title.media
+        #expect(media?.openRequest(is4K: false)?.id == 4)
+        #expect(media?.openRequest(is4K: true)?.id == 6)
+    }
+
     @Test func seasonChoicesSkipSpecialsAndTakenSeasons() {
         let settings = SeerrServerSettings()
         let choices = Self.series.seasonChoices(is4K: false, settings: settings)
