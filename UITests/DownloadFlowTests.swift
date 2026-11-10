@@ -2,8 +2,18 @@ import XCTest
 
 final class DownloadFlowTests: XCTestCase {
     @MainActor
-    func testDownloadAndRemoveOriginal() {
-        let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine")
+    func testDownloadPlaybackDark() throws {
+        try downloadPlayback(mode: "dark")
+    }
+
+    @MainActor
+    func testDownloadPlaybackLight() throws {
+        try downloadPlayback(mode: "light")
+    }
+
+    @MainActor
+    private func downloadPlayback(mode: String) throws {
+        let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine")
         open(tab: "Library", title: "Movies", in: app)
         reveal("poster.101", in: app).tap()
         tap("detail.download", in: app)
@@ -16,6 +26,19 @@ final class DownloadFlowTests: XCTestCase {
         tap("downloads.open", in: app)
         waitFor("downloads.row.101", in: app)
         XCTAssertTrue(app.staticTexts["Downloaded · Original"].waitForExistence(timeout: 10))
+        try snap("downloads-\(mode)")
+
+        tap("downloads.play.101", in: app)
+        let title = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == 'player.title' AND label CONTAINS 'Big Buck Bunny'")).firstMatch
+        if !title.waitForExistence(timeout: 6), !element("player.playPause", in: app).exists {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(title.waitForExistence(timeout: 5), "Saved title is not shown in the player")
+        waitFor("player.playPause", in: app)
+        tap("player.close", in: app)
+        waitFor("downloads.row.101", in: app)
+
         app.buttons["Remove Big Buck Bunny"].tap()
         app.buttons["Remove Download"].tap()
         XCTAssertTrue(app.staticTexts["No Downloads"].waitForExistence(timeout: 10))
