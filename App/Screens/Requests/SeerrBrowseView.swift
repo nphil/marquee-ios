@@ -246,15 +246,15 @@ struct SeerrBrowseView: View {
 
     private var viewMenu: some View {
         Menu {
-            Picker("Sort By", selection: sortField) {
-                ForEach(SeerrSort.allCases, id: \.self) { Text($0.title).tag($0) }
+            Section {
+                ForEach(SeerrSort.allCases, id: \.self) { field in
+                    MenuChoice(title: field.title, systemImage: field.systemImage, value: field, selection: sortField)
+                }
             }
-            .pickerStyle(.inline)
-            Picker("Order", selection: $query.reversed) {
-                Text(query.sort.orders.first).tag(false)
-                Text(query.sort.orders.reversed).tag(true)
+            Section {
+                MenuChoice(title: query.sort.orders.first, systemImage: "arrow.down", value: false, selection: $query.reversed)
+                MenuChoice(title: query.sort.orders.reversed, systemImage: "arrow.up", value: true, selection: $query.reversed)
             }
-            .pickerStyle(.inline)
             Picker("Release", systemImage: "calendar", selection: $query.era) {
                 Text("Any Year").tag(SeerrEra?.none)
                 ForEach(SeerrEra.allCases, id: \.self) { Text($0.title).tag(Optional($0)) }
@@ -404,5 +404,17 @@ struct SeerrBrowseView: View {
     /// Back to every title of the kind, keeping the sort.
     private func clearFilters() {
         query = SeerrBrowseQuery(kind: query.kind, sort: query.sort, reversed: query.reversed)
+    }
+}
+
+extension SeerrSort {
+    /// The glyph beside the name in the View menu, in the Library's family.
+    var systemImage: String {
+        switch self {
+        case .popularity: "flame"
+        case .release: "calendar"
+        case .rating: "star"
+        case .title: "textformat"
+        }
     }
 }
