@@ -7,7 +7,7 @@ struct ProfileSettings: Equatable, Sendable {
     /// Seconds for both skip directions.
     var skipInterval = 10
     /// Whether taps after a skip keep skipping, or only a double-tap skips.
-    var skipTaps = SkipTapMode.chained
+    var skipTaps = SkipTapMode.doubleTap
     /// Seconds before an intro skips itself; 0 skips only when asked.
     var introSkipDelay = 5
     /// Seconds of countdown at the credits before the next episode; 0 turns auto-next off.

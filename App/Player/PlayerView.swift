@@ -25,7 +25,7 @@ struct PlayerView: View {
     /// The bottom controls' frame on screen, so subtitles and offers clear them.
     @State private var bottomControls: CGRect = .zero
     @State private var tapTask: Task<Void, Never>?
-    @State private var taps = SkipTaps(mode: .chained)
+    @State private var taps = SkipTaps(mode: .doubleTap)
     /// The format badge of the item that has started, and the item it was shown for: seeks, stalls and
     /// restarts of the same item never show it again.
     @State private var formatBadge: FormatBadge?
