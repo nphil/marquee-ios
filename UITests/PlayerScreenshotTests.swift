@@ -460,7 +460,9 @@ private extension XCTestCase {
         let word = app.buttons["Word by Word"]
         XCTAssertTrue(word.waitForExistence(timeout: 5), "No Word by Word reveal")
         word.tap()
-        app.navigationBars["More options"].buttons["Done"].tap()
+        // Done stands on the sheet's first page only; More options has the back button.
+        app.navigationBars["More options"].buttons["Subtitle Style"].tap()
+        app.navigationBars["Subtitle Style"].buttons["Done"].tap()
         XCTAssertTrue(app.navigationBars["Subtitle Style"].waitForNonExistence(timeout: 5), "The style sheet did not close")
         try snap("player-21-reveal-as-spoken-\(suffix)")
     }
