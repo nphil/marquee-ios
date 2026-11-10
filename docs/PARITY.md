@@ -83,11 +83,11 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Image-subtitle badges and no-restyle rule | Done | Image subtitles keep their own size and position; the style page and the track menu say so. | local |
 | Subtitle style (size, position, colour, background, presets, live preview) | Done | The TV's presets, fonts, edges, boxes, rounded corners, padding, edge distance, line spacing, file styling Keep/My Look and Reveal as Spoken (word by word or line by line), with a live preview over sample scenes. | local [code] |
 | Subtitle timing (offset) | Done | Shifts subtitles earlier or later for the playing item. | local offset [code] |
-| Wrong subtitles? flow | Done | In the subtitle menu: remove a separate file from Plex, or search Bazarr for another. | Plex refresh `/library/metadata/{id}/refresh` [code] |
-| Search subtitles (Bazarr) | Done | Bazarr's results by score with provider and language; a download is shown once Plex lists it. | Bazarr REST API, `X-API-KEY` header [code] |
+| Wrong subtitles? flow | Done | In the subtitle menu: remove a separate file from Plex, or open subtitle search. | Plex refresh `/library/metadata/{id}/refresh` [code] |
+| Search subtitles | Done | One search prefers Bazarr and falls back to Plex if Bazarr is unavailable, fails or has no results in the chosen language. Search more also searches Plex. | Bazarr REST API; Plex `GET`/`PUT /library/metadata/{id}/subtitles` [code] |
 | Check Plex again | Done | Refreshes metadata only, never downloads twice. | `/library/metadata/{id}/refresh` [code] |
 | Downloaded-twin rules (don't offer a second download when one already exists) | Done | A finished download is not fetched again, a Plex result the item already lists is not offered again, and a file fetched again replaces its earlier copy in the menu. | streams, release name and language [docs] |
-| Plex agent subtitle search | Done | Search Subtitles › Plex and Find Another with Plex: the server's own agents in one language at a time (the subtitle language by default), best match first; a tap adds the file and shows it once Plex lists it. | `GET`/`PUT /library/metadata/{id}/subtitles` [docs] |
+| Plex agent subtitle search | Done | Plex results can be added and shown once Plex lists the file. | `GET`/`PUT /library/metadata/{id}/subtitles` [code] |
 | SpeechDock: reveal as spoken (word timing) | Done | Words appear as they are said, timed by SpeechDock for an English text file over English audio; any other subtitle, or no answer, keeps the estimate. | SpeechDock `POST /api/alignment/windows`, protocol 1 [code] |
 | SpeechDock: address and on/off | Done | A valid address turns it on and an empty one off, as on the TV; plain http:// only on the home network. | SpeechDock `GET /health` [code] |
 

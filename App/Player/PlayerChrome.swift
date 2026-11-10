@@ -836,26 +836,11 @@ struct TracksMenu: View {
         }
     }
 
-    /// Searches for another subtitle, with Plex's own agents and with Bazarr once it is set up, and the
-    /// way out of a subtitle that doesn't match the video.
+    /// Search without requiring a provider choice or removing the current track.
     private var subtitleFixes: some View {
         Section {
-            Button {
-                model.openSubtitleFix(.plex)
-            } label: {
-                Text("Search Subtitles")
-                Text("Plex")
-            }
-            .accessibilityIdentifier("player.tracks.searchPlex")
-            if model.bazarr != nil {
-                Button {
-                    model.openSubtitleFix(.bazarr)
-                } label: {
-                    Text("Search Subtitles")
-                    Text("Bazarr")
-                }
+            Button("Search Subtitles") { model.openSubtitleFix(.search) }
                 .accessibilityIdentifier("player.tracks.search")
-            }
             if model.subtitle?.track != nil {
                 Button("Wrong Subtitles?") { model.openSubtitleFix(.wrong) }
                     .accessibilityIdentifier("player.tracks.wrong")

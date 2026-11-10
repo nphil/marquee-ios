@@ -77,11 +77,10 @@ final class PlayerModel: Identifiable {
         var cause: StallWatch.Cause
     }
 
-    /// The sheets "Wrong Subtitles?" and the two "Search Subtitles" open.
+    /// The current-subtitle manager and provider-neutral search.
     enum SubtitleSheet: Identifiable {
         case wrong
-        case plex
-        case bazarr
+        case search
 
         var id: Self { self }
     }
@@ -179,7 +178,7 @@ final class PlayerModel: Identifiable {
     var showsStats = false
     var showsEpisodes = false
     var subtitleSheet: SubtitleSheet?
-    /// The playing item's subtitle removal, Bazarr search and downloads.
+    /// The playing item's subtitle removal, search and downloads.
     private(set) var subtitleFix: SubtitleFix?
 
     let layerView = PlayerLayerView()
