@@ -58,7 +58,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Normalize loudness / Boost dialog (Plex Pass) | Done | More › Audio Enhancements toggles, shown only for a Plex Pass server; each reason they cannot apply is shown. The server reworks the sound on a copy of the video; on-device processing is not used because AVPlayer gives no audio tap on HLS streams. | `boostDialog=1`, `normalizeLoudness=1` on transcode; `Stream.canNormalizeLoudness` |
 | Stats for Nerds | Done | Route, stream and bitrate overlay. | local [code] |
 | Playback Info sheet | Done | Route, subtitle track, bitrate, frame rate. | local [code] |
-| AirPlay / Picture in Picture | Done | AirPlay in the top row; PiP on phone from More; AirPlay stream handling. | AVKit [code] |
+| AirPlay / Picture in Picture | Done | AirPlay and the PiP button in the top row; leaving the app while a film or a live channel plays starts PiP; AirPlay stream handling. | AVKit [code] |
 | Chromecast | Done | Settings › Chromecast turns it on; the route popover lists receivers. The receiver plays the file or the server's HLS with subtitles burned in; controls, Skip Intro, Up Next and watched state follow it. Untested on hardware. | Google Cast SDK; `/security/token`, `/video/:/transcode/universal/start.m3u8` [code] |
 | Resume position | Done | Starts at saved offset. | `viewOffset` [code] |
 | Watched threshold | Done | Marks watched near the end. | timeline [code] |

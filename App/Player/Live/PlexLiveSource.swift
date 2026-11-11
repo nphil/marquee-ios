@@ -12,6 +12,9 @@ import UIKit
 /// tune waits for that: a one-tuner device has nothing to tune with until the old session lets go.
 /// Tunes run one after another for the same reason; a tune overtaken by a later one is ended as soon
 /// as it returns.
+///
+/// Leaving the app while a channel plays starts Picture in Picture, as in the film player. The player
+/// screen stays open under the window, so the window hands straight back to it.
 @MainActor @Observable
 final class PlexLiveSource: LiveVideoSource {
     private(set) var state: LiveState = .idle
@@ -24,6 +27,8 @@ final class PlexLiveSource: LiveVideoSource {
     @ObservationIgnored private let backend: any VideoBackend
     /// The AVPlayer's layer; nil for the UI tests' still frame.
     @ObservationIgnored private let layerView: PlayerLayerView?
+    /// Made at the first tune, once the audio session is set for playback; nil for the still frame.
+    @ObservationIgnored private var pictureInPicture: PictureInPicture?
     /// Bumped by every play, stop and failure; work started under an older value gives way.
     @ObservationIgnored private var generation = 0
     /// The generation whose item the backend holds; events from any other item are dropped.
@@ -93,6 +98,7 @@ final class PlexLiveSource: LiveVideoSource {
         diagnosticsLine = nil
         show("Tuning \(channel.number)")
         observeApp()
+        offerPictureInPicture()
         let previous = queue
         let work = Task {
             await previous?.value
@@ -111,6 +117,7 @@ final class PlexLiveSource: LiveVideoSource {
         show(nil)
         for token in observers { NotificationCenter.default.removeObserver(token) }
         observers = []
+        pictureInPicture?.stop()
         layerView?.playerLayer.player = backend.player
         endCurrent()
     }
@@ -193,6 +200,7 @@ final class PlexLiveSource: LiveVideoSource {
         guard loaded == generation, var stream = current, stream.session != nil else { return }
         switch event {
         case .state(let isPlaying, let isBuffering):
+            followWindow(isPlaying: isPlaying)
             guard isPlaying else { return }
             if !isBuffering {
                 if stream.playing == nil {
@@ -334,8 +342,8 @@ final class PlexLiveSource: LiveVideoSource {
 
     // MARK: Background
 
-    /// Without AirPlay the sound plays on alone in the background: a layer showing video would make the
-    /// system pause it.
+    /// Without Picture in Picture or AirPlay the sound plays on alone in the background: a layer showing
+    /// video would make the system pause it.
     private func observeApp() {
         guard observers.isEmpty, layerView != nil else { return }
         let center = NotificationCenter.default
@@ -350,12 +358,37 @@ final class PlexLiveSource: LiveVideoSource {
     }
 
     private func enteredBackground() {
-        guard !isExternal else { return }
+        guard !isExternal, !(pictureInPicture?.isActive ?? false) else { return }
         layerView?.playerLayer.player = nil
     }
 
     private func enteringForeground() {
         layerView?.playerLayer.player = backend.player
+    }
+
+    // MARK: Picture in Picture
+
+    private func offerPictureInPicture() {
+        guard pictureInPicture == nil, let layerView else { return }
+        let window = PictureInPicture(layer: layerView.playerLayer)
+        window.onRestore = { $0(true) }
+        window.onClose = { [weak self] in self?.windowClosed() }
+        pictureInPicture = window
+    }
+
+    /// The window was closed rather than handed back. Away from the app that ends the tune and frees the
+    /// tuner, as on the direct path; in the app the player screen carries on.
+    private func windowClosed() {
+        guard UIApplication.shared.applicationState == .background else { return }
+        stop()
+    }
+
+    /// The window pauses and plays the player itself; either is the viewer's, as from the player screen.
+    private func followWindow(isPlaying: Bool) {
+        guard pictureInPicture?.isActive == true, isPlaying == isPaused else { return }
+        if isPlaying { intent.resume() } else { intent.pause() }
+        refreshTimeshift()
+        Task { await report() }
     }
 
     // MARK: Words
