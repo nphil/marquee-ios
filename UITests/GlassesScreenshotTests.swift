@@ -41,7 +41,12 @@ final class GlassesScreenshotTests: XCTestCase {
 
     @MainActor
     func testSearch() throws {
-        try pageFlow("search", shot: "glasses-06-search")
+        let app = launchGlasses(page: "search")
+        let found = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'glasses.tile.' AND NOT (identifier BEGINSWITH 'glasses.tile.key.')"))
+            .firstMatch
+        XCTAssertTrue(found.waitForExistence(timeout: 20), "The search found nothing")
+        try snapGlasses("glasses-06-search")
     }
 
     @MainActor
@@ -149,8 +154,8 @@ final class GlassesScreenshotTests: XCTestCase {
 
     private var player: [String] {
         [
-            "-marquee.uitest.play", "101",
-            "-marquee.uitest.playerTime", "1800",
+            "-marquee.uitest.play", "212",
+            "-marquee.uitest.playerTime", "61",
             "-marquee.uitest.paused", "YES",
             "-marquee.uitest.frame", "art/caminandes-backdrop.jpg",
         ]

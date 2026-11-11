@@ -60,7 +60,7 @@ enum GlassesCanvas {
     static let rowGap: CGFloat = 48
     static let titleGap: CGFloat = 16
     static let tileGap: CGFloat = 32
-    static let captionGap: CGFloat = 12
+    static let captionGap: CGFloat = 16
     /// Line boxes: the page title, a row title, a caption and the line under it, the focused title's two lines.
     static let header: CGFloat = 72
     static let rowTitle: CGFloat = 56

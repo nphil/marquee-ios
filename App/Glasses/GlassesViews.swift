@@ -190,6 +190,7 @@ private struct GlassesRowsView: View {
             .animation(Motion.spring(reduceMotion: reduceMotion), value: page.focus)
         }
         .clipShape(RowsClip())
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("glasses.rows")
     }
 
@@ -265,7 +266,7 @@ private struct GlassesTileView: View {
                 .overlay(alignment: .bottom) { progress(width: size.width) }
                 .clipShape(corners)
                 .overlay { corners.strokeBorder(theme.focus, lineWidth: GlassesCanvas.focusRing).opacity(focused ? 1 : 0) }
-                .scaleEffect(focused ? GlassesCanvas.focusScale : 1, anchor: .bottom)
+                .scaleEffect(focused ? GlassesCanvas.focusScale : 1)
                 .zIndex(focused ? 1 : 0)
             if shape.hasCaption {
                 VStack(alignment: .leading, spacing: 0) {
