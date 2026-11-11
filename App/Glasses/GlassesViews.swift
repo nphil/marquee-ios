@@ -72,10 +72,14 @@ struct GlassesPageView: View {
                 GlassesBackdrop(path: backdrop)
             }
             VStack(alignment: .leading, spacing: 0) {
-                Text(page.query.isEmpty ? page.title : page.query)
+                // An opened title names itself in the hero below; the line keeps its height.
+                let heading = page.query.isEmpty ? page.title : page.query
+                Text(heading)
                     .glassesText(.title)
                     .foregroundStyle(page.query.isEmpty ? theme.ink2 : theme.ink)
                     .lineLimit(1)
+                    .opacity(heading == page.hero?.title ? 0 : 1)
+                    .accessibilityHidden(heading == page.hero?.title)
                     .frame(height: GlassesCanvas.header, alignment: .topLeading)
                 if let hero = page.hero {
                     GlassesHeroView(hero: hero)
@@ -185,7 +189,7 @@ private struct GlassesRowsView: View {
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
             .animation(Motion.spring(reduceMotion: reduceMotion), value: page.focus)
         }
-        .clipped()
+        .clipShape(RowsClip())
         .accessibilityIdentifier("glasses.rows")
     }
 
@@ -197,6 +201,14 @@ private struct GlassesRowsView: View {
             y += row.height + row.shape.gapBelow
         }
         return tops
+    }
+}
+
+/// Cuts the rows off above and below only. A focused tile at the left or right grows past the rows'
+/// edge into the margin; a tile gap's width lets that through without showing the tile scrolled off.
+private struct RowsClip: Shape {
+    func path(in rect: CGRect) -> Path {
+        Path(rect.insetBy(dx: -GlassesCanvas.tileGap, dy: 0))
     }
 }
 
@@ -323,6 +335,7 @@ private struct GlassesTileView: View {
                         }
                     }
                     .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, GlassesCanvas.tileGap)
