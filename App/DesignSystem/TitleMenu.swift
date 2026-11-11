@@ -3,13 +3,13 @@ import SwiftUI
 extension View {
     /// A leading title that opens a menu: an explicit button at the bar's leading edge, set in the display
     /// face with a chevron, because `toolbarTitleMenu` showed no chevron and opened nothing in the
-    /// inline-large bar. The system's own title is removed (`toolbar(removing: .title)`), otherwise the bar
-    /// draws it again under the button; `navigationTitle` stays for back buttons. The button cannot sit in
-    /// the `.title` slot: removing the title removes that slot's item too, and the page showed no title.
+    /// inline-large bar. The bar is inline and its principal slot holds an empty view, which is what hides
+    /// the system's own title: `toolbar(removing: .title)` left the inline-large title standing beside the
+    /// button (0.1.33) and removed a menu placed in the `.title` slot (0.1.31). `navigationTitle` stays for
+    /// back buttons and the UI tests' bar queries. Callers set no title display mode of their own on this
+    /// path, so nothing overrides the inline one.
     ///
     /// Once the page has scrolled the button drops to the headline size, as the system's inline titles do.
-    /// `ToolbarItemPlacement.largeTitle` is documented for the bar's out-of-line title, which `inlineLarge`
-    /// has none of, so the scroll offset tells the two states apart.
     func titleMenu<Items: View>(_ title: String, @ViewBuilder items: () -> Items) -> some View {
         modifier(TitleMenuModifier(title: title, items: items()))
     }
@@ -28,8 +28,11 @@ private struct TitleMenuModifier<Items: View>: ViewModifier {
             } action: { _, isScrolled in
                 scrolled = isScrolled
             }
-            .toolbar(removing: .title)
+            .toolbarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Color.clear.frame(width: 1, height: 1).accessibilityHidden(true)
+                }
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
                         items

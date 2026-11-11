@@ -54,6 +54,7 @@ struct LibraryView: View {
                         action: EmptyState.Action(title: "Refresh", systemImage: "arrow.clockwise") { self.sections.retry() }
                     )
                     .navigationTitle("Library")
+                    .toolbarTitleDisplayMode(.inlineLarge)
                 }
             } skeleton: {
                 ScrollView {
@@ -63,11 +64,11 @@ struct LibraryView: View {
                 }
                 .scrollDisabled(true)
                 .navigationTitle("Library")
+                .toolbarTitleDisplayMode(.inlineLarge)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(theme.canvas)
-        .toolbarTitleDisplayMode(.inlineLarge)
         .task(id: LoadKey(library: library?.instance, attempt: sections.attempt)) {
             guard let library else { return }
             await sections.load { try await library.sections() }

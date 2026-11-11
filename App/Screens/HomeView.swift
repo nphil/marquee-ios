@@ -42,7 +42,6 @@ struct HomeView: View {
         }
         .background(theme.canvas)
         .navigationTitle("Home")
-        .toolbarTitleDisplayMode(.inlineLarge)
         .toolbar {
             if session.remote.isEnabled && session.remote.access == .homeButton && session.place == .home {
                 ToolbarItem(placement: .topBarTrailing) { TVRemoteButton() }
@@ -210,7 +209,7 @@ private struct PlacesMenu: ViewModifier {
 
     func body(content: Content) -> some View {
         if places.isEmpty {
-            content
+            content.toolbarTitleDisplayMode(.inlineLarge)
         } else {
             content.titleMenu("Home") {
                 ForEach(places) { place in
