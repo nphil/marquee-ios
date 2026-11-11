@@ -31,6 +31,9 @@ final class SessionStorage {
         static let castEnabled = "marquee.cast.enabled"
         static let remoteEnabled = "marquee.remote.enabled"
         static let remoteAccess = "marquee.remote.access"
+        static let glassesEnabled = "marquee.glasses.enabled"
+        static let glassesUse = "marquee.glasses.use"
+        static let glassesTilt = "marquee.glasses.tilt"
         static let tracksPrefix = "marquee."
     }
 
@@ -156,6 +159,23 @@ final class SessionStorage {
     var remoteAccess: RemoteAccess {
         get { defaults.string(forKey: Key.remoteAccess).flatMap(RemoteAccess.init(rawValue:)) ?? .miniBar }
         set { defaults.set(newValue.rawValue, forKey: Key.remoteAccess) }
+    }
+
+    /// The XR glasses plugin is on, what a connected display is for, and whether tilting the phone
+    /// moves things while the thumb holds. Kept per iPhone, like the glasses.
+    var glassesEnabled: Bool {
+        get { defaults.bool(forKey: Key.glassesEnabled) }
+        set { defaults.set(newValue, forKey: Key.glassesEnabled) }
+    }
+
+    var glassesUse: GlassesUse {
+        get { defaults.string(forKey: Key.glassesUse).flatMap(GlassesUse.init(rawValue:)) ?? .ask }
+        set { defaults.set(newValue.rawValue, forKey: Key.glassesUse) }
+    }
+
+    var glassesTilt: Bool {
+        get { defaults.object(forKey: Key.glassesTilt) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.glassesTilt) }
     }
 
     /// Sign-out: the token, the servers and the Seerr session made with the token leave the Keychain;

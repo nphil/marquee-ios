@@ -70,3 +70,45 @@ private struct TextRoleModifier: ViewModifier {
             .lineHeight(.multiple(factor: lineHeight))
     }
 }
+
+/// The glasses' type scale (DESIGN §8.12), in points of the 1920 × 1080 canvas. Fixed: the phone's
+/// text size does not reach a screen sized for reading from across the room. Bold Text still applies.
+enum GlassesText {
+    case display, title, headline, body, label, caption
+
+    var size: CGFloat {
+        switch self {
+        case .display: 76
+        case .title: 52
+        case .headline: 40
+        case .body: 32
+        case .label: 28
+        case .caption: 24
+        }
+    }
+}
+
+extension View {
+    func glassesText(_ role: GlassesText) -> some View {
+        modifier(GlassesTextModifier(role: role))
+    }
+}
+
+private struct GlassesTextModifier: ViewModifier {
+    let role: GlassesText
+    @Environment(\.legibilityWeight) private var legibilityWeight
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        let bold = legibilityWeight == .bold
+        switch role {
+        case .display, .title, .headline:
+            let cut: Manrope = role == .headline ? .semiBold : .bold
+            content
+                .font(.custom((bold ? cut.bolder : cut).rawValue, fixedSize: role.size))
+                .tracking(-0.01 * role.size)
+        case .body, .label, .caption:
+            content.font(.system(size: role.size, weight: bold ? .semibold : (role == .label ? .medium : .regular)))
+        }
+    }
+}
