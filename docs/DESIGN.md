@@ -484,6 +484,8 @@ Motion tokens come from Lucent (`T:motion`, `L:214-227`); native adapters use th
 
 Theme change: instant and atomic. Nothing loops at rest; no autoplay; no motion previews (`L:160`). Poster art fades in over 120 ms when it lands and the cell keeps its shape meanwhile (`L:295`).
 
+**Frame rate.** The app limits no frame rate. `CADisableMinimumFrameDurationOnPhone` is set, so on a 120 Hz iPhone animation runs at the display's rate, and the app holds no display link or frame-rate range of its own. iOS paces the picture: AVPlayer's layer for films and Live TV through Plex, and for Live TV read from the tuner a sample-buffer renderer on a clock that follows the stream's timestamps, with an interlaced station shown one picture per field. Two views redraw slower on purpose: Stats for Nerds twice a second, so its text is not composited over the video every frame, and a countdown ring once a second under Reduce Motion. One route rule concerns frame rate: video above 60 fps plays as it is on Direct Play, and is converted by the server where it would have to go out as HLS (`PlaybackRoute`). Smoothness itself is checked on an iPhone (`docs/DEVICE-TEST.md` check 19).
+
 **Haptics.** Stashy's wrapper is reusable: shared generators kept warm, selection ticks rate-limited to one per 12 ms (`S:Services/Haptics.swift:11-55`).
 
 | Moment | Feedback |
