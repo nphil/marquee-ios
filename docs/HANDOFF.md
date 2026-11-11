@@ -4,7 +4,7 @@ The current state of unfinished work, for an agent picking it up without the con
 
 ## 0.1.31 player
 
-Worktree `/tmp/cs/2407333fa292/batch`, branch `batch`; commits carry `[skip ci]`. Main owns integration, push and release: focused checks and build, the release, then the full GitHub suite and a point release if needed. Linux parses the Swift and runs the MarqueeCore tests; the app builds only in CI.
+Shipped as 0.1.31 (built from 14d0826). Its full UI run failed only `testPlacesOffTheBar` and its two theme variants ("No title menu button Movies"); the test now finds the title menu by its `title.menu` identifier, unconfirmed until the next run. The point release also stops the automatic intro skip from restarting its countdown: time read before the jump landed offered the intro again, so `skippedIntroEnd` holds the offer back until the picture reaches the intro's end. That fix needs a check on the iPhone.
 
 Done:
 

@@ -47,6 +47,7 @@ private struct TitleMenuModifier<Items: View>: ViewModifier {
                     }
                     .menuIndicator(.hidden)
                     .accessibilityLabel(title)
+                    .accessibilityIdentifier("title.menu")
                 }
                 .sharedBackgroundVisibility(.hidden)
             }

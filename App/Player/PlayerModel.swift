@@ -260,6 +260,9 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var serverSubtitle: Int?
     @ObservationIgnored private var retries = 0
     @ObservationIgnored private var introCancelled = false
+    /// The end of an intro just skipped. Until the picture reaches it, time from before the jump must not offer
+    /// the intro again, which restarted its countdown instead of skipping.
+    @ObservationIgnored private var skippedIntroEnd: Double?
     @ObservationIgnored private var creditsDismissed = false
     @ObservationIgnored private var countdownStopped = false
     @ObservationIgnored private var markedWatched = false
@@ -756,6 +759,7 @@ final class PlayerModel: Identifiable {
         guard case .skipIntro(let end)? = offer else { return }
         cancelCountdown()
         withAnimation(.easeOut(duration: 0.18)) { offer = nil }
+        skippedIntroEnd = end
         seek(to: end)
     }
 
@@ -1771,6 +1775,7 @@ final class PlayerModel: Identifiable {
         wroteBack = false
         retries = 0
         introCancelled = false
+        skippedIntroEnd = nil
         creditsDismissed = false
         countdownStopped = false
         markedWatched = false
@@ -2378,7 +2383,8 @@ final class PlayerModel: Identifiable {
         if case .lowerQuality? = offer { return }
         let ms = Int(movie * 1000)
         var next: Offer?
-        if let intro = item.markers(.intro).first(where: { $0.contains(ms) }), Double(intro.end) / 1000 - movie > 1 {
+        if let end = skippedIntroEnd, movie >= end - 1 { skippedIntroEnd = nil }
+        if skippedIntroEnd == nil, let intro = item.markers(.intro).first(where: { $0.contains(ms) }), Double(intro.end) / 1000 - movie > 1 {
             next = .skipIntro(end: Double(intro.end) / 1000)
         } else if !creditsDismissed, let credits = finalCredits, ms >= credits.start, let upcoming = queue?.item(after: item) {
             next = .upNext(upcoming)

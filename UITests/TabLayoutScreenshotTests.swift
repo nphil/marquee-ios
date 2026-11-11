@@ -65,11 +65,13 @@ extension XCTestCase {
         try snap("places-06-library-pushed-\(suffix)")
     }
 
-    /// A title menu draws the bar's title as a button named for it.
+    /// The title menu is found by its identifier: XCUI may report the bar's Menu as a pop-up button rather
+    /// than a button, so a query by element type missed it.
     @MainActor
     private func openTitleMenu(_ title: String, in app: XCUIApplication) {
-        let button = app.navigationBars.buttons[title].firstMatch
-        XCTAssertTrue(button.waitForExistence(timeout: 5), "No title menu button \(title)")
-        button.tap()
+        let menu = app.descendants(matching: .any).matching(identifier: "title.menu").firstMatch
+        XCTAssertTrue(menu.waitForExistence(timeout: 5), "No title menu \(title)")
+        XCTAssertEqual(menu.label, title, "Title menu names another page")
+        menu.tap()
     }
 }
