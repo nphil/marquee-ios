@@ -702,7 +702,7 @@ final class GlassesNavigator {
         searchTask = Task { [weak self, weak page] in
             try? await Task.sleep(for: Self.searchDelay)
             guard !Task.isCancelled, let self, let page else { return }
-            async let requests = client.map { try? await $0.search(text) } ?? nil
+            async let requests = Self.seerrSearch(client, text)
             let hubs = (try? await library.search(text, limit: 20)) ?? []
             var rows = keys
             for hub in hubs {
@@ -717,6 +717,11 @@ final class GlassesNavigator {
             page.setRows(rows)
             if rows.count == keys.count { show("Nothing found for “\(text)”") }
         }
+    }
+
+    private static func seerrSearch(_ client: SeerrClient?, _ text: String) async -> [SeerrTitle]? {
+        guard let client else { return nil }
+        return try? await client.search(text)
     }
 
     private func requestTile(_ title: SeerrTitle) -> GlassesTile {

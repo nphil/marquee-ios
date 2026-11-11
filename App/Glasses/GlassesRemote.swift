@@ -205,7 +205,7 @@ final class RemoteSurfaceView: UIView {
     private static let scrollRate = 12.0
     private static let scrubRate = 30.0
 
-    private weak var center: GlassesCenter?
+    private weak var glasses: GlassesCenter?
     private weak var navigator: GlassesNavigator?
     private let haptics = RemoteHaptics()
     private let tilt = RemoteTilt()
@@ -223,7 +223,7 @@ final class RemoteSurfaceView: UIView {
     private var tiltBlocked: FocusMove?
 
     init(center: GlassesCenter, navigator: GlassesNavigator) {
-        self.center = center
+        self.glasses = center
         self.navigator = navigator
         super.init(frame: .zero)
         isMultipleTouchEnabled = false
@@ -233,12 +233,12 @@ final class RemoteSurfaceView: UIView {
         accessibilityCustomActions = [
             UIAccessibilityCustomAction(name: "Back") { [weak self] _ in self?.send(.back) != nil },
             UIAccessibilityCustomAction(name: "Options") { [weak self] _ in
-                guard let self, let navigator else { return false }
+                guard let self, let navigator = self.navigator else { return false }
                 if let player = navigator.player { navigator.openTracks(player) } else { send(.holdBegan) }
                 return true
             },
             UIAccessibilityCustomAction(name: "Use the Phone App") { [weak self] _ in
-                self?.center?.showPhoneApp()
+                self?.glasses?.showPhoneApp()
                 return true
             },
         ]
@@ -381,7 +381,7 @@ final class RemoteSurfaceView: UIView {
         guard steps.axis != nil else { return }
         phase = .swiping
         stillTask?.cancel()
-        guard center?.tiltEnabled == true else { return }
+        guard glasses?.tiltEnabled == true else { return }
         stillTask = Task { [weak self] in
             try? await Task.sleep(for: Self.stillDelay)
             guard !Task.isCancelled, let self, phase == .swiping else { return }
@@ -400,7 +400,7 @@ final class RemoteSurfaceView: UIView {
 
     private func holdBegan() {
         send(.holdBegan)
-        guard navigator?.player != nil, navigator?.scrub != nil, center?.tiltEnabled == true else { return }
+        guard navigator?.player != nil, navigator?.scrub != nil, glasses?.tiltEnabled == true else { return }
         let drive = TiltDrive(topRate: Self.scrubRate)
         tilt.start { [weak self] roll, _, seconds in
             let amount = drive.amount(at: roll, for: seconds)
