@@ -350,7 +350,7 @@ private extension XCTestCase {
 
     /// The scrub preview with the scrubber held mid-drag at the start, middle and end of the track.
     /// The preview must sit a fixed gap above the thumb, centred on it, and stay `Space.inset` inside
-    /// the safe area at both ends. The player is landscape-only on iPhone, so there is no portrait shot.
+    /// the safe area at both ends.
     @MainActor
     func scrubPreviewFlow(suffix: String) throws {
         for (name, fraction) in [("start", 0.0), ("middle", 0.5), ("end", 1.0)] {

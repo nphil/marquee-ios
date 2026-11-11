@@ -58,15 +58,25 @@ struct VideoPlaybackSettingsView: View {
                     }
                 }
                 .accessibilityIdentifier("video.directPlay")
+            } footer: {
+                Text(Self.explanation(of: session.settings.directPlay))
+                    .foregroundStyle(theme.ink2)
+            }
+            .listRowBackground(theme.sheet)
+
+            Section {
                 Picker("Default Aspect", selection: $session.settings.aspect) {
                     ForEach(VideoAspect.allCases, id: \.self) { aspect in
                         Text(aspect.title).tag(aspect)
                     }
                 }
                 .accessibilityIdentifier("video.aspect")
-            } footer: {
-                Text(Self.explanation(of: session.settings.directPlay))
-                    .foregroundStyle(theme.ink2)
+                Picker("Video Orientation", selection: $session.settings.videoOrientation) {
+                    ForEach(VideoOrientation.allCases, id: \.self) { orientation in
+                        Text(orientation.title).tag(orientation)
+                    }
+                }
+                .accessibilityIdentifier("video.orientation")
             }
             .listRowBackground(theme.sheet)
 

@@ -177,7 +177,7 @@ extension XCTestCase {
         open(tab: "Live TV", title: "Live TV", in: app)
         tap("livetv.row.ch-0201", in: app)
         waitFor("liveplayer", in: app)
-        // The player turns the screen on its side; turning the phone with it keeps the shots upright.
+        // The player opens the way the phone is held; its first shots are on its side.
         XCUIDevice.shared.orientation = .landscapeLeft
         let pause = element("liveplayer.playPause", in: app)
         // Pause shows once the channel plays and fades with the controls 3 s later. At accessibility sizes

@@ -145,8 +145,8 @@ struct PlayerView: View {
         .task(id: "\(model.item.ratingKey)/\(model.trickplay?.count ?? 0)") {
             frames.reset(model.trickplay)
         }
-        .onAppear { rotate(to: .landscape) }
-        .onDisappear { rotate(to: .portrait) }
+        .onAppear { PlayerOrientation.opened(session.settings.videoOrientation) }
+        .onDisappear { PlayerOrientation.closed() }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("player")
     }
@@ -336,12 +336,6 @@ struct PlayerView: View {
 
     private func close() {
         session.player.close(model)
-    }
-
-    private func rotate(to orientations: UIInterfaceOrientationMask) {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        guard let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first else { return }
-        scene.requestGeometryUpdate(UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: orientations))
     }
 }
 

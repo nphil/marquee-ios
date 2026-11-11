@@ -10,14 +10,14 @@ Done:
 
 - Playback start and the still picture's controls (64483cf). A tap on a paused picture hides the controls and the next tap restores them; no timer hides them while paused; an automatic pause shows them; pinch works on a paused frame.
 - Tracks and More menus. The subtitle choices stand on the Tracks menu, audio opens from one row and the tools (Search Subtitles, Subtitle Style, Subtitle Timing, Wrong Subtitles?) end it; the Subtitles sheet is gone. The More menu reads top down in three groups. `PlayerScreenshotTests` reaches the subtitle flows through the menu, finding rows by label.
+- Video Orientation (Settings › Video & Playback): Follow Device (the default), Start in Landscape and Lock to Landscape, for the film and live players (`PlayerOrientation`; the rule is `OrientationHold` in Core, DESIGN §8.6). The player no longer turns the screen on its side as it opens: under Follow Device it opens the way the phone is held. `MarqueeApp` now adapts `AppDelegate`, which answers which ways the screen may turn; the downloads' background-launch handler in it was not reached before. iOS 27 deprecates that answer for `UIWindowSceneDelegate.supportedInterfaceOrientations(for:)`; it stays on the app delegate because the scene's delegate is SwiftUI's, and `PlayerOrientationTests` shows whether iOS 27 still asks it.
 
 Outstanding, in order:
 
-- Settings › Video & Playback › Video Orientation: Follow Device (default), Start in Landscape (opens on its side, then follows later physical turns, never the first upright reading), Lock to Landscape; the app's orientations return on exit; the film and live players both.
 - Picture in Picture on a swipe Home during playback, from the player on its side and upright; inspect, fix only what is broken, name the paths that cannot offer it.
 - ProMotion: inspect for frame-rate caps; note the result.
 
-Unseen until CI and a phone: the shots `player-02-tracks-menu` and `player-03-more-menu`, and the migrated subtitle flows.
+Unseen until CI and a phone: the shots `player-02-tracks-menu` and `player-03-more-menu`, and the migrated subtitle flows; `PlayerOrientationTests` (the setting's list in `video-orientation-01-choices` and `-02-chosen`, and the two settings that keep the player on its side) and the page in `acct-05-video`. The turns themselves, Portrait Orientation Lock included, are DEVICE-TEST check 18.
 
 ## Combined 0.1.30 batch
 

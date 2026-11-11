@@ -12,6 +12,7 @@ struct LivePlayerView: View {
     let outerScheme: ColorScheme
     let close: () -> Void
 
+    @Environment(AppSession.self) private var session
     @Environment(ThemeStore.self) private var themes
     @Environment(\.colorSchemeContrast) private var contrast
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
@@ -25,7 +26,6 @@ struct LivePlayerView: View {
     @State private var lean: CGFloat = 0
     @State private var details: ProgrammeSelection?
     @State private var size = CGSize(width: 2, height: 1)
-    @State private var cameFromPortrait = false
 
     /// One swipe gesture, read the way it started.
     private enum Drag {
@@ -121,14 +121,13 @@ struct LivePlayerView: View {
             }
         }
         .onAppear {
-            cameFromPortrait = Self.windowScene?.effectiveGeometry.interfaceOrientation.isPortrait ?? true
-            rotate(to: .landscape)
+            PlayerOrientation.opened(session.settings.videoOrientation)
             model.start()
         }
         .onDisappear {
             // However the player goes away, the tuner is freed.
             model.close()
-            if cameFromPortrait { rotate(to: .portrait) }
+            PlayerOrientation.closed()
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("liveplayer")
@@ -212,17 +211,6 @@ struct LivePlayerView: View {
         case nil:
             break
         }
-    }
-
-    // MARK: Orientation
-
-    private static var windowScene: UIWindowScene? {
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        return scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
-    }
-
-    private func rotate(to orientations: UIInterfaceOrientationMask) {
-        Self.windowScene?.requestGeometryUpdate(UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: orientations))
     }
 }
 

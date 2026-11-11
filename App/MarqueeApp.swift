@@ -3,6 +3,7 @@ import SwiftUI
 
 @main
 struct MarqueeApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var themeStore = ThemeStore()
     @State private var session = AppSession()
 
