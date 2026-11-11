@@ -69,7 +69,9 @@ enum PlayerOrientation {
     }
 
     private static var scene: UIWindowScene? {
+        // The glasses' scene is an external display's; orientation is the phone's.
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .filter { $0.session.role == .windowApplication }
         return scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
     }
 }

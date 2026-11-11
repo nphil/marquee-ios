@@ -93,7 +93,12 @@ targets:
           - AtkinsonHyperlegible-Italic.ttf
           - AtkinsonHyperlegible-BoldItalic.ttf
         UIApplicationSceneManifest:
-          UIApplicationSupportsMultipleScenes: false
+          UIApplicationSupportsMultipleScenes: true
+          # The XR glasses plugin's screen; it is offered only while the plugin is on (GlassesCenter).
+          UISceneConfigurations:
+            UIWindowSceneSessionRoleExternalDisplayNonInteractive:
+              - UISceneConfigurationName: Glasses
+                UISceneDelegateClassName: $(PRODUCT_MODULE_NAME).GlassesSceneDelegate
         UIBackgroundModes:
           - audio
         UILaunchScreen:

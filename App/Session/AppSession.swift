@@ -73,6 +73,8 @@ final class AppSession {
     let cast: CastCenter
     /// The LumaTV remote (DESIGN §8.7 Integrations), kept per iPhone.
     let remote: TVRemote
+    /// The XR glasses plugin (DESIGN §8.12), kept per iPhone.
+    let glasses: GlassesCenter
 
     /// Made again by Delete All Local Data, which removes the stored client identifier.
     private(set) var identity: PlexClientIdentity
@@ -104,6 +106,7 @@ final class AppSession {
         speechDock = SpeechDockSettings(storage: storage, transport: transport)
         cast = CastCenter(storage: storage)
         remote = TVRemote(storage: storage, inMemory: FakePlex.isActive)
+        glasses = GlassesCenter(storage: storage)
         restore()
         watchNetwork()
         watchForeground()
@@ -272,6 +275,7 @@ final class AppSession {
         signOut()
         storage.eraseAll()
         remote.eraseAll()
+        glasses.reset()
         downloads.eraseAll()
         identity = Self.identity(defaults: storage.defaults)
         URLCache.shared.removeAllCachedResponses()
@@ -377,6 +381,9 @@ final class AppSession {
         if arguments.bool(forKey: "marquee.uitest.remote") {
             remote.setEnabled(true)
         }
+        #if DEBUG
+        glasses.simulate(arguments: arguments)
+        #endif
         let pick: ServerPick
         if arguments.bool(forKey: "marquee.fakeSignedIn") {
             pick = .first

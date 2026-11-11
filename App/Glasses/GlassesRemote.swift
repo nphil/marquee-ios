@@ -75,6 +75,36 @@ private final class RemoteHost: UIHostingController<GlassesRemoteRoot> {
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
 }
 
+/// Home's glasses button while glasses are connected and the phone app shows: it takes the place of the
+/// TV remote button, in the same shape, and brings the glasses' remote back.
+struct GlassesButton: View {
+    @Environment(AppSession.self) private var session
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Button {
+            session.glasses.showRemote()
+        } label: {
+            Image(systemName: "eyeglasses")
+                .font(.system(size: (Size.target - Space.s3) * Size.controlGlyph / Size.control, weight: .semibold))
+                .foregroundStyle(theme.accentText)
+                .frame(width: Size.target - Space.s3, height: Size.target - Space.s3)
+                .background(theme.sheet, in: Circle())
+                .padding(Space.s1)
+                .overlay(Circle().strokeBorder(theme.accent, lineWidth: 2))
+                .frame(width: Size.target, height: Size.target)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Glasses Remote")
+        .accessibilityHint("Turns this iPhone into the glasses' remote.")
+        .accessibilityShowsLargeContentViewer {
+            Label("Glasses Remote", systemImage: "eyeglasses")
+        }
+        .accessibilityIdentifier("glasses.button")
+    }
+}
+
 /// The remote follows the active theme's dark side, as the glasses do.
 struct GlassesRemoteRoot: View {
     let center: GlassesCenter

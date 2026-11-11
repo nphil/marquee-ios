@@ -43,7 +43,11 @@ struct HomeView: View {
         .background(theme.canvas)
         .navigationTitle("Home")
         .toolbar {
-            if session.remote.isEnabled && session.remote.access == .homeButton && session.place == .home {
+            if session.glasses.isConnected {
+                ToolbarItem(placement: .topBarTrailing) { GlassesButton() }
+                    .sharedBackgroundVisibility(.hidden)
+                ToolbarSpacer(.fixed, placement: .topBarTrailing)
+            } else if session.remote.isEnabled && session.remote.access == .homeButton && session.place == .home {
                 ToolbarItem(placement: .topBarTrailing) { TVRemoteButton() }
                     .sharedBackgroundVisibility(.hidden)
                     .sheetZoomSource(.remote, in: sheetNamespace)

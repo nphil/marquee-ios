@@ -58,6 +58,7 @@ final class PlaybackCapabilities {
 
     private static func display() -> HardwareCapabilities.Display {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+            .filter { $0.session.role == .windowApplication }
         let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
         let screen = scene?.screen
         let traits = scene?.traitCollection

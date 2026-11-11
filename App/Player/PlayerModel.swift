@@ -2630,6 +2630,19 @@ final class PlayerCenter {
     }
     /// Each link as the last stream over it measured, in kbit/s.
     @ObservationIgnored var linkKbps: [Link: Int] = [:]
+    /// The XR glasses show the player in place of the phone (DESIGN §8.12). When they go, what played
+    /// carries on on the phone, paused.
+    var onGlasses = false {
+        didSet {
+            guard onGlasses != oldValue else { return }
+            if onGlasses {
+                presented = nil
+            } else if let active {
+                active.pause()
+                presented = active
+            }
+        }
+    }
 
     init() {
         RemuxSession.sweepStaleFiles()
@@ -2664,7 +2677,7 @@ final class PlayerCenter {
             }
         }
         active = model
-        presented = model
+        presented = onGlasses ? nil : model
         model.start()
     }
 
@@ -2678,7 +2691,7 @@ final class PlayerCenter {
 
     /// The full-screen player went away: playback ends unless Picture in Picture carries it.
     func dismissed() {
-        guard presented == nil, let model = active, !(model.pictureInPicture?.isActive ?? false) else { return }
+        guard !onGlasses, presented == nil, let model = active, !(model.pictureInPicture?.isActive ?? false) else { return }
         model.close()
         active = nil
     }
