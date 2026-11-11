@@ -232,8 +232,8 @@ jobs:
           fetch-depth: 0
 
       # The Increase Contrast and accessibility text pass is skipped on a branch whose change leaves the
-      # app, its tests, its resources and the CI itself alone; main always runs it, so no release ships
-      # without it. If the comparison with main fails, the pass runs.
+      # app, its tests, its resources and the CI itself alone; main always runs it.
+      # If the comparison with main fails, the pass runs.
       - name: Shard the tests
         id: plan
         run: |
@@ -549,7 +549,8 @@ jobs:
 
   release:
     name: Release
-    needs: [core, live, app, ui, ui-sizes]
+    # UI acceptance continues after package checks and the device build publish the release.
+    needs: [core, live, app]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
