@@ -224,9 +224,10 @@ final class GlassesCenter {
 
 #if DEBUG
 /// UI tests stand in for connected glasses: `ask` connects a display that asks what it is for; `remote`
-/// connects it as glasses; `canvas` also draws the glasses' screen over the phone for screenshots.
+/// connects it as glasses; `phone` does too, with the phone app picked over the remote; `canvas` also
+/// draws the glasses' screen over the phone for screenshots.
 enum GlassesSimulation: String {
-    case ask, remote, canvas
+    case ask, remote, phone, canvas
 }
 
 extension GlassesCenter {
@@ -240,6 +241,7 @@ extension GlassesCenter {
     private func simulate(_ mode: GlassesSimulation) {
         guard session?.state == .ready, !hasScene else { return }
         sceneConnected()
+        if mode == .phone { showPhoneApp() }
         if mode == .canvas { GlassesPreview.show(center: self) }
         if let page = UserDefaults.standard.string(forKey: "marquee.uitest.glassesPage"), let navigator {
             Task { await navigator.openForUITest(page) }

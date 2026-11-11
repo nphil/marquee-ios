@@ -14,6 +14,8 @@ struct GlassesNavigatorView: View {
                 GlassesLiveView(model: live)
             } else if let page = navigator.page {
                 GlassesPageView(page: page)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("glasses.page.\(navigator.pages.count)")
                     .id(page.id)
                     .transition(.opacity)
             }
