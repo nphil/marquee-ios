@@ -1,7 +1,7 @@
 import MarqueeCore
 import SwiftUI
 
-/// The player on the glasses (DESIGN §8.12): the picture fitted to the canvas, subtitles in the
+/// The player on the glasses (DESIGN §8.9): the picture fitted to the canvas, subtitles in the
 /// profile's style, and while the controls show, the title above and the timeline below on glass.
 struct GlassesPlayerView: View {
     let model: PlayerModel

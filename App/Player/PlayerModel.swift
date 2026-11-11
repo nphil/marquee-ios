@@ -2630,7 +2630,7 @@ final class PlayerCenter {
     }
     /// Each link as the last stream over it measured, in kbit/s.
     @ObservationIgnored var linkKbps: [Link: Int] = [:]
-    /// The XR glasses show the player in place of the phone (DESIGN §8.12). When they go, what played
+    /// The XR glasses show the player in place of the phone (DESIGN §8.9). When they go, what played
     /// carries on on the phone, paused.
     var onGlasses = false {
         didSet {

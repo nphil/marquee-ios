@@ -49,7 +49,7 @@ enum Radius {
     }
 }
 
-/// The glasses screen (DESIGN §8.12): a 1920 × 1080 canvas at scale 1. Its edges look soft through
+/// The glasses screen (DESIGN §8.9): a 1920 × 1080 canvas at scale 1. Its edges look soft through
 /// the lenses, so content keeps well inside the margins, and everything is sized to be read at a glance.
 enum GlassesCanvas {
     static let width: CGFloat = 1920

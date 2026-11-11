@@ -3,7 +3,7 @@ import MarqueeCore
 import SwiftUI
 import UIKit
 
-/// The XR glasses plugin (DESIGN §8.12). Glasses such as the Viture Pro reach the iPhone as an external
+/// The XR glasses plugin (DESIGN §8.9). Glasses such as the Viture Pro reach the iPhone as an external
 /// display. With the plugin on, the first connection asks whether to use them as glasses; if so they get
 /// Marquee's own screen and the iPhone becomes an eyes-free remote. Otherwise iOS mirrors the phone, as
 /// it does with the plugin off.

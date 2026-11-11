@@ -71,7 +71,7 @@ private struct TextRoleModifier: ViewModifier {
     }
 }
 
-/// The glasses' type scale (DESIGN §8.12), in points of the 1920 × 1080 canvas. Fixed: the phone's
+/// The glasses' type scale (DESIGN §8.9), in points of the 1920 × 1080 canvas. Fixed: the phone's
 /// text size does not reach a screen sized for reading from across the room. Bold Text still applies.
 enum GlassesText {
     case display, title, headline, body, label, caption

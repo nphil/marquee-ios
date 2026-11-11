@@ -124,7 +124,7 @@ final class GlassesPanel {
     }
 }
 
-/// The glasses' pages and what the remote does on them (DESIGN §8.12). Data comes through the
+/// The glasses' pages and what the remote does on them (DESIGN §8.9). Data comes through the
 /// session's own library, Seerr, downloads and Live TV, as on the phone; only the screens differ.
 @MainActor @Observable
 final class GlassesNavigator {

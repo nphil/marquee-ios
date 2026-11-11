@@ -6,7 +6,7 @@ Behaviour only (clean room): TV-side rows come from the TV app's user-facing str
 - **Done**: works in the iPhone app.
 - **Partial**: some of it exists; the gap is named.
 - **Missing**: no iPhone code found.
-- **N/A**: does not apply on a phone (remote-control focus etc.).
+- **N/A**: does not apply on a phone (D-pad navigation etc.).
 
 Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the iPhone app. Endpoints marked `[INFERENCE]` are not yet used in the iPhone code and must be checked against the Plex or Bazarr API docs before building.
 
@@ -61,7 +61,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Chromecast | Done | Settings › Chromecast turns it on; the route popover lists receivers. The receiver plays the file or the server's HLS with subtitles burned in; controls, Skip Intro, Up Next and watched state follow it. Untested on hardware. | Google Cast SDK; `/security/token`, `/video/:/transcode/universal/start.m3u8` [code] |
 | Resume position | Done | Starts at saved offset. | `viewOffset` [code] |
 | Watched threshold | Done | Marks watched near the end. | timeline [code] |
-| Remote-control focus | N/A | TV remote focus. | — |
+| Remote-control focus | Done | On XR glasses only (DESIGN §8.9): one focus on the glasses, moved by swipes on the phone, which is the remote. | — |
 
 ## 4. Audio
 | Feature | Status | Behaviour | API |
@@ -134,9 +134,10 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Seerr Discover | Done | Trending, Popular Movies, Movie Genres, Upcoming Movies, Popular Series, Series Genres and Upcoming Series rows; each loads as it nears the screen and hides if it fails. | `/discover/trending`, `/discover/movies`, `/discover/tv`, `/discover/movies/upcoming`, `/discover/tv/upcoming`, `/discover/genreslider/{movie,tv}` [code] |
 | Seerr browse and filters | Done | See all or a genre card opens a paged poster grid: Movies \| Series, genre chips and one View menu (sort, release decade, original language, rating, runtime, streaming service and region, upcoming only). | `/discover/movies`, `/discover/tv`, `/genres/{movie,tv}`, `/languages`, `/watchproviders/{regions,movies,tv}` [code] |
 | Seerr request and status | Done | Posters badge a title's status (available, partially available, processing, pending and so on); a title page requests a movie or chosen seasons. | `/movie/{id}`, `/tv/{id}`, `POST /request`, `GET /request` [code] |
+| XR glasses plugin | Done | Off until enabled. Glasses connected as a display get their own 1920 × 1080 screen: Home, libraries, detail, seasons, search, Seerr requests, downloads, Live TV and the player with its tracks. The phone becomes an eyes-free remote (DESIGN §8.9). | UIKit external display scene (`UIWindowSceneSessionRoleExternalDisplayNonInteractive`), Core Haptics, Core Motion [code] |
 
 ## 10. Not on a phone
-- TV remote focus and D-pad navigation: N/A.
+- D-pad navigation: N/A; on XR glasses the phone's swipes stand in for it (§3).
 - Tuner sharing: N/A (server plugin).
 
 ## Summary counts

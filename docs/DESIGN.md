@@ -463,6 +463,32 @@ Requests is available once Seerr is configured. It can be a tab or open from the
 3. **Request rows and title pages** show the available status and requester, with 4K or season information where relevant. A title page uses its backdrop and poster, synopsis and metadata. An available Plex item can open in the Library or play; a link without a server identity must first match the title’s TMDB identifier on the selected server.
 4. **Request** opens a sheet for the permitted quality and, when the server permits partial requests, the seasons to request. Unavailable choices explain their status. The server decides approval and quota; success refreshes the title and My Requests. If Seerr or Pulsarr automatically requests Watchlist additions, the title page says so.
 
+### 8.9 XR glasses
+
+A plugin, off until **XR Glasses** is turned on in Settings. Its page holds the switch, **When Glasses Connect** (Ask, Use as XR Glasses, Mirror the Phone) and **Tilt While Holding**. Glasses such as the Viture Pro reach the iPhone as an external display; with the plugin off or Mirror chosen, iOS mirrors the phone as before. The first connection with the plugin on asks "Use as XR Glasses?" on the phone and keeps the answer.
+
+1. **The glasses' screen** is Marquee's own 1920 × 1080 canvas at scale 1 (`GlassesCanvas`, `GlassesText`). The birdbath optics show black as see-through, so the canvas is pure black and surfaces with nothing behind them to blur are opaque; colours, radii and type otherwise come from the active theme's dark side and change with it. The edges look soft through the lenses, so content keeps 144 pt in from the sides and 88 pt from top and bottom. Type runs from 24 pt (caption) to 76 pt (display); Bold Text applies, Dynamic Type does not. There is one highlight: the focused tile grows 8 % and takes a 6 pt ring in the theme's focus colour. The focused title is named large above the rows, so a glance says what a tap will do.
+2. **Pages** read the session's own library, Seerr, downloads and Live TV. Home starts with a row of cards (Search, each movie and show library, Requests when Seerr is set up, Downloads once something is downloaded, Live TV), then Home's rows as arranged on the phone, with the focus on Continue Watching. A library or collection is a poster grid. A title opens on its backdrop, facts and overview, with Play or Resume and Play from Start, then a show's seasons; a season lists its episodes as 16:9 tiles. Search types on a letter board and shows results by kind, then Seerr titles to request. Requests has Seerr's Discover rows; a title's page offers Request for the permitted quality, or Play once it is on the server. Downloads and Live TV (channels on now, then recordings) are grids.
+3. **The player** fits the picture to the canvas, with subtitles in the profile's style. While the controls show, the title sits at the top and a large timeline at the bottom. Options lists Subtitles and Audio, then Playback: Next Episode for an episode, and Use the Phone App; Live TV's Options offers Go Live. A volume bar shows while the buttons change the level. When the glasses go, what played carries on on the phone, paused.
+4. **The phone as remote.** When the glasses connect with Marquee in the foreground, the phone becomes their remote on its own; iOS cannot open an app from the background, so otherwise it happens when Marquee next comes forward. The remote is a window over the app: the whole screen is one touch surface with no targets, on the theme's dark canvas, with the focused title in large type for a glance and the gestures listed faintly. The screen dims to 15 % while it shows and gets its own level back when it goes or Marquee leaves the foreground. Every Options list includes **Use the Phone App**; while glasses are on, Home's TV remote button becomes a glasses button that brings the remote back. The volume buttons keep their job, and the phone stays awake while the glasses show Marquee.
+5. **Gestures**, all usable without looking:
+
+| Gesture | Does |
+|---|---|
+| Swipe | One focus step per 52 pt across or 70 pt down; the first 12 pt lock the axis, and sliding back steps back |
+| Flick | A flick faster than 300 pt/s steps once even when short; above 1000 pt/s the focus coasts on, keeping 85 % of its speed a step, up to 40 steps, and stops at the end of a list |
+| Tap | Chooses the focused thing |
+| Swipe in from the left edge | Back: a touch starting within 20 pt of the edge that travels 80 pt right |
+| Hold (450 ms) | Options for the focused title; in the player, starts a scrub |
+| Hold and slide, in the player | Scrubs: the phone's width spans up to ten minutes, with a detent every 10 s |
+| Hold still after a swipe (350 ms), with tilt on | Tilting keeps scrolling, up to 12 steps a second |
+| Tilt while scrubbing, with tilt on | Fine-tunes, up to 30 s a second |
+
+Tilt reads Core Motion only while the thumb is down, counts from where the phone was when it went down, ignores the first 8 degrees so a hand's tremor moves nothing, and reaches its top rate at 34 degrees.
+
+6. **Haptics** use Core Haptics, one distinct pattern per cue: focus step, a light crisp tap; end of a row or list, a short dull buzz; select, a full crisp tap; back, a strong dull tap and a softer one; scrub detent, a faint sharp tick; play or pause, two rising taps; error, three strong dull taps. A coast plays a step for each tile it passes.
+7. **VoiceOver.** The surface is one direct-interaction element, so the gestures still reach it with VoiceOver on. It reads the focused title and announces each change; its actions are Back, Options and Use the Phone App.
+
 ## 9. Motion and haptics
 
 Motion tokens come from Lucent (`T:motion`, `L:214-227`); native adapters use these values.

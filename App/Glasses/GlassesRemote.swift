@@ -4,7 +4,7 @@ import MarqueeCore
 import SwiftUI
 import UIKit
 
-/// The iPhone as the glasses' remote (DESIGN §8.12): a window over the phone app whose whole screen
+/// The iPhone as the glasses' remote (DESIGN §8.9): a window over the phone app whose whole screen
 /// takes the gestures, dimmed while it shows.
 @MainActor
 final class GlassesTakeover {

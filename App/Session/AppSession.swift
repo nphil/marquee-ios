@@ -73,7 +73,7 @@ final class AppSession {
     let cast: CastCenter
     /// The LumaTV remote (DESIGN §8.7 Integrations), kept per iPhone.
     let remote: TVRemote
-    /// The XR glasses plugin (DESIGN §8.12), kept per iPhone.
+    /// The XR glasses plugin (DESIGN §8.9), kept per iPhone.
     let glasses: GlassesCenter
 
     /// Made again by Delete All Local Data, which removes the stored client identifier.
