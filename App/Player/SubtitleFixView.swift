@@ -12,17 +12,12 @@ struct SubtitleFixSheet: View {
         NavigationStack(path: $path) {
             Group {
                 switch start {
-                case .subtitles: SubtitlesView(model: model, fix: fix)
                 case .wrong: WrongSubtitlesView(model: model, fix: fix)
                 case .search: SubtitleSearchView(model: model, fix: fix)
                 }
             }
             .navigationDestination(for: SubtitleFixPage.self) { page in
                 switch page {
-                case .wrong: WrongSubtitlesView(model: model, fix: fix)
-                case .appearance:
-                    SubtitleStyleView(imageSubtitles: model.subtitleIsImage)
-                        .toolbar { SubtitleFixDone(model: model) }
                 case .search: SubtitleSearchView(model: model, fix: fix)
                 }
             }
@@ -31,73 +26,7 @@ struct SubtitleFixSheet: View {
 }
 
 enum SubtitleFixPage: Hashable {
-    case wrong
-    case appearance
     case search
-}
-struct SubtitlesView: View {
-    @Bindable var model: PlayerModel
-    let fix: SubtitleFix
-    @Environment(\.theme) private var theme
-
-    var body: some View {
-        List {
-            Section("Subtitles") {
-                choice("Off", .off)
-                if let tracks = model.tracks {
-                    if tracks.visibleSubtitles.contains(where: { $0.kind == .onScreenText }) {
-                        choice("On-Screen Text Only", .onScreenTextOnly)
-                    }
-                    ForEach(tracks.visibleSubtitles) { track in
-                        choice(track.label, .track(track.id), detail: (track.badges.map(\.rawValue) + [track.imageFormat].compactMap { $0 }).joined(separator: " · "))
-                    }
-                }
-            }.listRowBackground(theme.sheet)
-            Section {
-                if model.canTimeSubtitles || model.subtitleDrawnByServer != nil {
-                    Button {
-                        model.subtitleSheet = nil
-                        model.openTiming()
-                    } label: {
-                        LabeledContent("Timing", value: model.timingText)
-                    }
-                    .disabled(model.subtitleDrawnByServer != nil)
-                    .accessibilityIdentifier("player.tracks.timing")
-                }
-                NavigationLink("Search Subtitles", value: SubtitleFixPage.search)
-                    .accessibilityIdentifier("player.tracks.search")
-                NavigationLink("Appearance", value: SubtitleFixPage.appearance)
-                    .disabled(model.subtitleDrawnByServer != nil)
-                    .accessibilityIdentifier("player.tracks.style")
-                if model.subtitle?.track != nil {
-                    NavigationLink("Manage Current Subtitle", value: SubtitleFixPage.wrong)
-                        .accessibilityIdentifier("player.tracks.wrong")
-                }
-                if let reason = model.subtitleDrawnByServer { Text(reason).foregroundStyle(theme.ink2) }
-                if let problem = model.subtitleProblem { Text(problem).foregroundStyle(theme.ink2) }
-            }.listRowBackground(theme.sheet)
-        }
-        .themedList(theme)
-        .navigationTitle("Subtitles")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar { SubtitleFixDone(model: model) }
-        .accessibilityIdentifier("player.subtitles")
-    }
-
-    private func choice(_ title: String, _ value: SubtitleChoice, detail: String = "") -> some View {
-        Button { model.subtitlePick = value } label: {
-            HStack {
-                VStack(alignment: .leading) {
-                    Text(title).foregroundStyle(theme.ink)
-                    if !detail.isEmpty { Text(detail).foregroundStyle(theme.ink2).font(.caption) }
-                }
-                Spacer()
-                if model.subtitlePick == value { Image(systemName: "checkmark").foregroundStyle(theme.ink) }
-            }
-            .contentShape(Rectangle())
-        }
-        .accessibilityAddTraits(model.subtitlePick == value ? .isSelected : [])
-    }
 }
 
 /// The subtitle on screen, removing its file from Plex, and a search for another.

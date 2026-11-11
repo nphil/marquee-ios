@@ -133,6 +133,15 @@ struct MediaTracksTests {
 
         let pair = SubtitleLanguages(tracks.visibleSubtitles.filter { [2, 3, 6].contains($0.id) }, yours: [.english])
         #expect(pair.yours.map(\.name) == ["English", "French"] && pair.other.isEmpty)
+
+        // A list the menu has room for stays whole, the viewer's languages still first.
+        let whole = SubtitleLanguages(tracks.visibleSubtitles, yours: [.english], room: 7)
+        #expect(whole.yours.map(\.name) == ["English", "French", "Japanese", "Spanish", "Unknown"] && whole.other.isEmpty)
+        let long = SubtitleLanguages(tracks.visibleSubtitles, yours: [.english], room: 6)
+        #expect(long.yours.map(\.name) == ["English"] && long.other.count == 4)
+        // The subtitle showing keeps its language on the menu, named or not.
+        let showing = SubtitleLanguages(tracks.visibleSubtitles, yours: [.english], showing: tracks.visibleSubtitles.first { $0.id == 7 }, room: 6)
+        #expect(showing.yours.map(\.name) == ["English", "Unknown"] && showing.other.map(\.name) == ["French", "Japanese", "Spanish"])
     }
 
     @Test func memoryIsKeptPerShowNotPerEpisode() throws {

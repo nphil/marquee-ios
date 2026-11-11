@@ -6,7 +6,7 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 - **Sign-in on the phone:** built as Plex's PIN flow (browser sheet, with a link-code fallback at plex.tv/link). The TV uses QR sign-in.
 - **Choosing a server connection:** built as local before remote before relay and https before http, probed in parallel (`docs/core-api.md`). Relay and https are not verified end to end against a live server.
 - **Skip interval default:** the options are 5, 10, 15, 30 or 60 seconds (`locales/en/settings.json` ~778–790). The iPhone default is 10 seconds.
-- **Playback speed:** More menu › Playback Speed: 0.5×, 0.75×, Normal, 1.25×, 1.5×, 1.75×, 2×. Each new item starts at Normal.
+- **Playback speed:** More menu › Speed: 0.5×, 0.75×, Normal, 1.25×, 1.5×, 1.75×, 2×. Each new item starts at Normal.
 - **Watched threshold:** about 90% of the length (`docs/pms-api.md` 1392). This was measured on one server version, so treat it as approximate.
 - **Not verified on real hardware:** SpeechDock word timing, Reveal-as-spoken, and the TV decoder details.
 
@@ -136,7 +136,7 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 - "Track N" tells apart identical rows.
 - The audio menu uses plain-words labels in eleven languages.
 
-**Subtitles menu** (`docs/player-submenus.md` 1–203): Off, Forced only ("On-screen text only"), one section per language, "Other languages N", Timing, Style (size, position, colour), and Search subtitles: Plex's own agents always, Bazarr when it is set up. Per-language pages rank Full, SDH, Forced, Commentary. Image-format badges (PGS, VOBSUB, DVB) show only on image subtitles.
+**Subtitles menu** (`docs/player-submenus.md` 1–203): Off, Forced only ("On-screen text only"), one section per language, "Other languages N", Timing, Style (size, position, colour), and Search subtitles: Plex's own agents always, Bazarr when it is set up. Per-language pages rank Full, SDH, Forced, Commentary. Image-format badges (PGS, VOBSUB, DVB) show only on image subtitles. On the iPhone these are the first rows of the Tracks menu: every track is listed while there are 8 or fewer, and "Other Languages" holds the rest of a longer list.
 
 **"Wrong subtitles?" flow (Bazarr):**
 - Remove an external subtitle from Plex, or search Bazarr by score, language, provider and hearing-impaired flag. Download, then Plex refreshes and the new track is selected.

@@ -52,7 +52,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Up Next card + countdown | Done | Next episode card with countdown. | play queue [code] |
 | Scrub speed (fine/half/quarter) | Done | Drag up or down to scrub slower. | local |
 | Scrub preview thumbnails | Done | Thumbnail while scrubbing. | BIF trickplay [code] |
-| Playback speed 0.5x–2x | Done | More menu › Playback Speed: 0.5×, 0.75×, Normal, 1.25×, 1.5×, 1.75×, 2×; back to Normal for each new item; pitch kept. | local (`AVPlayer.defaultRate`) |
+| Playback speed 0.5x–2x | Done | More menu › Speed: 0.5×, 0.75×, Normal, 1.25×, 1.5×, 1.75×, 2×; back to Normal for each new item; pitch kept. | local (`AVPlayer.defaultRate`) |
 | Quality picker in player | Done | More menu › Quality (Original, 20, 12, 8, 4, 2 Mbps); "Original · Converted" while the server re-encodes. Picking one also sets the default. | `maxVideoBitrate`, `videoResolution` on transcode |
 | Default quality ceiling (Settings) | Done | Video & Playback › Default Quality; Forced Direct Play reads "original quality". | local setting |
 | Normalize loudness / Boost dialog (Plex Pass) | Done | More › Audio Enhancements toggles, shown only for a Plex Pass server; each reason they cannot apply is shown. The server reworks the sound on a copy of the video; on-device processing is not used because AVPlayer gives no audio tap on HLS streams. | `boostDialog=1`, `normalizeLoudness=1` on transcode; `Stream.canNormalizeLoudness` |
@@ -76,14 +76,14 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Feature | Status | Behaviour | API |
 |---|---|---|---|
 | Off / On-Screen Text Only | Done | Forced subtitles only, or none. | streams [code] |
-| One group per language, ranked Full / SDH / Forced / Commentary | Done | Ranked list per language. | streams [code] |
-| Other languages submenu | Done | Languages outside the wanted set, A to Z. | streams [code] |
+| Subtitle tracks on the Tracks menu, ranked Full / SDH / Forced / Commentary | Done | Off and every track stand on the menu itself, the one showing checked, the viewer's languages first. | streams [code] |
+| Other languages submenu | Done | Past 8 tracks, the languages outside the wanted set and the one showing, A to Z. | streams [code] |
 | Sidecar (external) subtitle download | Done | Downloads an external subtitle file and reads it. | `/library/streams/{id}` [code] |
 | Image subtitles (PGS, DVB, VOBSUB) | Done | Drawn as bitmaps. | streams [code] |
 | Image-subtitle badges and no-restyle rule | Done | Image subtitles keep their own size and position; the style page and the track menu say so. | local |
 | Subtitle style (size, position, colour, background, presets, live preview) | Done | The TV's presets, fonts, edges, boxes, rounded corners, padding, edge distance, line spacing, file styling Keep/My Look and Reveal as Spoken (word by word or line by line), with a live preview over sample scenes. | local [code] |
 | Subtitle timing (offset) | Done | Shifts subtitles earlier or later for the playing item. | local offset [code] |
-| Wrong subtitles? flow | Done | In the subtitle menu: remove a separate file from Plex, or open subtitle search. | Plex refresh `/library/metadata/{id}/refresh` [code] |
+| Wrong subtitles? flow | Done | From the Tracks menu: remove a separate file from Plex, or open subtitle search. | Plex refresh `/library/metadata/{id}/refresh` [code] |
 | Search subtitles | Done | One search prefers Bazarr and falls back to Plex if Bazarr is unavailable, fails or has no results in the chosen language. Search more also searches Plex. | Bazarr REST API; Plex `GET`/`PUT /library/metadata/{id}/subtitles` [code] |
 | Check Plex again | Done | Refreshes metadata only, never downloads twice. | `/library/metadata/{id}/refresh` [code] |
 | Downloaded-twin rules (don't offer a second download when one already exists) | Done | A finished download is not fetched again, a Plex result the item already lists is not offered again, and a file fetched again replaces its earlier copy in the menu. | streams, release name and language [docs] |

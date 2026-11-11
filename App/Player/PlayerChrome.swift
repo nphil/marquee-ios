@@ -713,13 +713,18 @@ struct LoadingArc: View {
 
 // MARK: - Menus
 
-/// Audio choices stay in the native menu; subtitles open their own sheet.
+/// Audio and subtitles (DESIGN §8.6, Tracks menu). The subtitle choices stand on the menu itself; the
+/// audio tracks open from one row, so they never push the subtitles off a phone's screen.
 struct TracksMenu: View {
     let model: PlayerModel
 
+    /// The most subtitle tracks the menu lists whole; a longer list keeps the viewer's languages and sends
+    /// the rest behind Other Languages.
+    private static let subtitleRoom = 8
+
     var body: some View {
-        // Opening upward, the automatic order reverses the list and the Subtitles row ends up above the
-        // Audio header; fixed reads Audio, then Subtitles, top down.
+        // Opening upward, the automatic order reverses the list; fixed reads the subtitles, the audio and
+        // then the tools, top down.
         PlayerMenuButton(
             model: model, systemImage: "captions.bubble", label: "Audio and subtitles", identifier: "player.tracks",
             order: .fixed, menu: menu
@@ -730,21 +735,89 @@ struct TracksMenu: View {
     private var menu: UIMenu {
         var sections: [UIMenuElement] = []
         if let tracks = model.tracks {
+            sections.append(UIMenu.section("player.tracks.subtitles", title: "Subtitles", subtitleRows(tracks)))
             if tracks.audio.count > 1 {
                 let playing = model.audioPick
-                sections.append(UIMenu.section("player.tracks.audio", title: "Audio", orderedAudio(tracks).map { track in
-                    let id = track.id
-                    // Choosing the playing track again keeps it.
-                    return UIAction.choice(track.label, detail: detail(track.badges), isOn: playing == id) { [model] in
-                        if model.audioPick != id { model.audioPick = id }
-                    }
-                }))
+                sections.append(UIMenu.section("player.tracks.audio", [
+                    UIMenu.submenu(
+                        "player.tracks.audio.choices", title: "Audio", systemImage: "speaker.wave.2", value: model.audio?.label ?? "",
+                        orderedAudio(tracks).map { track in
+                            let id = track.id
+                            // Choosing the playing track again keeps it.
+                            return UIAction.choice(track.label, detail: detail(track.badges), isOn: playing == id) { [model] in
+                                if model.audioPick != id { model.audioPick = id }
+                            }
+                        }
+                    ),
+                ]))
             }
-            let subtitles = UIAction(title: "Subtitles…") { [model] _ in model.openSubtitleFix(.subtitles) }
-            subtitles.accessibilityIdentifier = "player.tracks.subtitles"
-            sections.append(UIMenu.section("player.tracks.more", [subtitles]))
+            sections.append(UIMenu.section("player.tracks.tools", tools))
         }
         return UIMenu(identifier: UIMenu.Identifier(rawValue: "player.tracks"), children: sections)
+    }
+
+    /// Off, On-Screen Text Only where a track holds it, then the tracks, the viewer's languages first.
+    private func subtitleRows(_ tracks: MediaTracks) -> [UIMenuElement] {
+        let languages = SubtitleLanguages(
+            tracks.visibleSubtitles, yours: model.subtitleLanguages, showing: model.subtitle?.track, room: Self.subtitleRoom
+        )
+        var rows: [UIMenuElement] = [subtitleChoice("Off", .off)]
+        if tracks.visibleSubtitles.contains(where: { $0.kind == .onScreenText }) {
+            rows.append(subtitleChoice("On-Screen Text Only", .onScreenTextOnly))
+        }
+        rows += languages.yours.flatMap(\.tracks).map(subtitleRow)
+        if !languages.other.isEmpty {
+            rows.append(UIMenu.submenu(
+                "player.tracks.languages", title: "Other Languages", systemImage: "globe", value: "\(languages.other.count) languages",
+                languages.other.map { group -> UIMenuElement in
+                    // A lone track's row already starts with its language.
+                    if group.tracks.count == 1 { return subtitleRow(group.tracks[0]) }
+                    return UIMenu.section("player.tracks.language.\(group.id)", title: group.name, group.tracks.map(subtitleRow))
+                }
+            ))
+        }
+        return rows
+    }
+
+    /// What acts on the subtitles, each row opening its own panel. Style and Timing stay but dim, with the
+    /// reason, while the server draws the subtitle into the picture; Timing shows only while a subtitle is on.
+    private var tools: [UIMenuElement] {
+        let drawnByServer = model.subtitleDrawnByServer
+        var rows: [UIMenuElement] = [
+            UIAction.row("Search Subtitles", systemImage: "magnifyingglass", identifier: "player.tracks.search") { [model] in
+                model.openSubtitleFix(.search)
+            },
+            UIAction.row("Subtitle Style", systemImage: "textformat", identifier: "player.tracks.style", isEnabled: drawnByServer == nil) { [model] in
+                model.showsStyle = true
+            },
+        ]
+        if model.canTimeSubtitles || drawnByServer != nil {
+            rows.append(UIAction.row(
+                "Subtitle Timing", systemImage: "clock", value: model.timingText, identifier: "player.tracks.timing",
+                isEnabled: drawnByServer == nil
+            ) { [model] in
+                model.openTiming()
+            })
+        }
+        if model.subtitle?.track != nil {
+            rows.append(UIAction.row("Wrong Subtitles?", systemImage: "exclamationmark.bubble", identifier: "player.tracks.wrong") { [model] in
+                model.openSubtitleFix(.wrong)
+            })
+        }
+        if let drawnByServer { rows.append(UIAction.note(drawnByServer)) }
+        if let problem = model.subtitleProblem { rows.append(UIAction.note(problem)) }
+        return rows
+    }
+
+    private func subtitleRow(_ track: SubtitleTrack) -> UIAction {
+        subtitleChoice(track.label, .track(track.id), detail: detail(track.badges, imageFormat: track.imageFormat))
+    }
+
+    /// Choosing the subtitle showing again keeps it.
+    private func subtitleChoice(_ title: String, _ choice: SubtitleChoice, detail: String? = nil) -> UIAction {
+        UIAction.choice(title, detail: detail, isOn: model.subtitlePick == choice) { [model] in
+            if model.subtitlePick != choice { model.subtitlePick = choice }
+        }
     }
 
     /// The second line of a track row: "Captions", "Audio description", and the picture format of image
@@ -762,28 +835,22 @@ struct TracksMenu: View {
     }
 }
 
-/// Everything the chrome keeps off its edges (DESIGN §8.6): aspect, quality and speed, the audio
-/// enhancements, playback info and stats for nerds.
+/// Everything the chrome keeps off its edges (DESIGN §8.6), in three groups: the picture's quality and
+/// aspect, speed and the audio enhancements, playback info and stats for nerds.
 struct MoreMenu: View {
     let model: PlayerModel
 
     var body: some View {
-        PlayerMenuButton(model: model, systemImage: "ellipsis", label: "More", identifier: "player.more", menu: menu)
+        // Fixed, so the groups read top down above the button as they would below one.
+        PlayerMenuButton(model: model, systemImage: "ellipsis", label: "More", identifier: "player.more", order: .fixed, menu: menu)
     }
 
     private var menu: UIMenu {
-        var sections: [UIMenuElement] = []
-        if model.castDevice == nil {
-            let shown = model.aspect
-            sections.append(UIMenu.section("player.more.picture", [
-                UIMenu.submenu("player.aspect", title: "Aspect", systemImage: "aspectratio", value: shown.title, VideoAspect.allCases.map { aspect in
-                    UIAction.choice(aspect.title, isOn: shown == aspect) { [model] in model.aspectPick = aspect }
-                }),
-            ]))
-        }
-        sections.append(UIMenu.section("player.more.playback", playback))
+        var sections: [UIMenuElement] = [UIMenu.section("player.more.picture", picture)]
+        let sound = playback
+        if !sound.isEmpty { sections.append(UIMenu.section("player.more.playback", sound)) }
         sections.append(UIMenu.section("player.more.panels", [
-            UIAction(title: "Playback Info", image: UIImage(systemName: "info.circle")) { [model] _ in model.showsInfo = true },
+            UIAction.row("Playback Info", systemImage: "info.circle") { [model] in model.showsInfo = true },
             UIAction.choice("Stats for Nerds", systemImage: "chart.bar.xaxis", isOn: model.showsStats) { [model] in
                 model.showsStats.toggle()
             },
@@ -791,8 +858,8 @@ struct MoreMenu: View {
         return UIMenu(identifier: UIMenu.Identifier(rawValue: "player.more"), children: sections)
     }
 
-    /// Quality, the note that the server converts the picture, speed and the audio enhancements.
-    private var playback: [UIMenuElement] {
+    /// Quality, with the note that the server converts the picture, and aspect.
+    private var picture: [UIMenuElement] {
         var rows: [UIMenuElement] = []
         if model.forcesDirectPlay {
             // UIKit has no disabled submenu, so the quality stands as a row that opens nothing.
@@ -809,9 +876,21 @@ struct MoreMenu: View {
             rows.append(UIAction.note("Your Plex server is converting this video."))
         }
         if model.castDevice == nil {
+            let shown = model.aspect
+            rows.append(UIMenu.submenu("player.aspect", title: "Aspect", systemImage: "aspectratio", value: shown.title, VideoAspect.allCases.map { aspect in
+                UIAction.choice(aspect.title, isOn: shown == aspect) { [model] in model.aspectPick = aspect }
+            }))
+        }
+        return rows
+    }
+
+    /// Speed and the audio enhancements; a Chromecast plays at its own speed.
+    private var playback: [UIMenuElement] {
+        var rows: [UIMenuElement] = []
+        if model.castDevice == nil {
             let shown = model.speed
             rows.append(UIMenu.submenu(
-                "player.speed", title: "Playback Speed", systemImage: "gauge.with.dots.needle.67percent", value: Self.title(of: shown),
+                "player.speed", title: "Speed", systemImage: "gauge.with.dots.needle.67percent", value: Self.title(of: shown),
                 Self.speeds.map { speed in
                     UIAction.choice(Self.title(of: speed), isOn: shown == speed) { [model] in model.speedPick = speed }
                 }

@@ -2,9 +2,26 @@
 
 The current state of unfinished work, for an agent picking it up without the conversation. Update it whenever the state changes; delete a section once its work has shipped.
 
-## Combined 0.1.30 release gate
+## 0.1.31 player
 
-The complete batch is integrated on `main` for one unsigned Feather release. Release remains gated by Core, Live engine, App, all four UI shards and the smallest/largest-phone UI run. No partial release is authorised. Failed jobs must be fixed together before another `main` push; branch commits use `[skip ci]`.
+Worktree `/tmp/cs/2407333fa292/batch`, branch `batch`; commits carry `[skip ci]`. Main owns integration, push and release: focused checks and build, the release, then the full GitHub suite and a point release if needed. Linux parses the Swift and runs the MarqueeCore tests; the app builds only in CI.
+
+Done:
+
+- Playback start and the still picture's controls (64483cf). A tap on a paused picture hides the controls and the next tap restores them; no timer hides them while paused; an automatic pause shows them; pinch works on a paused frame.
+- Tracks and More menus. The subtitle choices stand on the Tracks menu, audio opens from one row and the tools (Search Subtitles, Subtitle Style, Subtitle Timing, Wrong Subtitles?) end it; the Subtitles sheet is gone. The More menu reads top down in three groups. `PlayerScreenshotTests` reaches the subtitle flows through the menu, finding rows by label.
+
+Outstanding, in order:
+
+- Settings › Video & Playback › Video Orientation: Follow Device (default), Start in Landscape (opens on its side, then follows later physical turns, never the first upright reading), Lock to Landscape; the app's orientations return on exit; the film and live players both.
+- Picture in Picture on a swipe Home during playback, from the player on its side and upright; inspect, fix only what is broken, name the paths that cannot offer it.
+- ProMotion: inspect for frame-rate caps; note the result.
+
+Unseen until CI and a phone: the shots `player-02-tracks-menu` and `player-03-more-menu`, and the migrated subtitle flows.
+
+## Combined 0.1.30 batch
+
+The complete batch is integrated on `main` for one unsigned Feather release. Branch commits use `[skip ci]`. The 0.1.31 release order above supersedes the previous full-suite pre-release gate.
 
 Included: player controls and episode navigation; configurable tabs, alphabet rail and theme music; Seerr requests; durable downloads and offline playback; Live TV timeshift; unified subtitle controls, fonts and Bazarr/Plex search; optional remote mini bar/Home button with authenticated home presence; source/view-aware Auto quality, recovery and network invalidation; DVR recordings selected only from completed DVR-marked media across the full library.
 
@@ -12,7 +29,7 @@ The Home watchlist loads only while its shelf is shown; new subtitle requests sc
 
 Release review fixes: playback counts as home at a Plex-local address reached without relay or tunnel; the home-presence check stops after the encrypted handshake, so it never replaces the remote's session; a network change restarts playback only when the server address or place changes; the floor note no longer holds the controls; Up Next cannot outlive its episode. Downloads build their background path from path components, wait and retry on transient network errors, refuse an Original the phone cannot play, and auto-delete only titles finished on the phone. Recorded reads only the DVR's target libraries, once per load. Device acceptance of these remains outstanding.
 
-The combined simulator run and screenshot review remain required. Real-iPhone decoding, offline audio/subtitles, background downloads, watch-state reconciliation, tuner timeshift, network handovers and power/heat remain device checks; simulated playback is not acceptance evidence for these. Native picture scaling is retained because extra enhancement has no measured device benefit.
+The combined simulator run and screenshot review remain acceptance work, not a pre-release full-suite gate. Real-iPhone decoding, offline audio/subtitles, background downloads, watch-state reconciliation, tuner timeshift, network handovers and power/heat remain device checks; simulated playback is not acceptance evidence for these. Native picture scaling is retained because extra enhancement has no measured device benefit.
 
 Double-tap only remains the default skip gesture. The server-side VMAF map and remuxed Picture in Picture LIVE-label change are deferred; the latter needs an upstream engine change (`docs/adaptive-playback.md`).
 

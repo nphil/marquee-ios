@@ -130,9 +130,9 @@ extension UIMenu {
     }
 
     /// A row that opens `rows`, with the current `value` under its title.
-    static func submenu(_ identifier: String, title: String, systemImage: String, value: String, _ rows: [UIMenuElement]) -> UIMenu {
+    static func submenu(_ identifier: String, title: String, systemImage: String? = nil, value: String, _ rows: [UIMenuElement]) -> UIMenu {
         let menu = UIMenu(
-            title: title, subtitle: value, image: UIImage(systemName: systemImage),
+            title: title, subtitle: value, image: systemImage.flatMap { UIImage(systemName: $0) },
             identifier: Identifier(rawValue: identifier), children: rows
         )
         menu.accessibilityIdentifier = identifier
@@ -159,6 +159,18 @@ extension UIAction {
             title: title, subtitle: detail, image: systemImage.flatMap { UIImage(systemName: $0) },
             attributes: isEnabled ? [] : .disabled, state: isOn ? .on : .off
         ) { _ in pick() }
+    }
+
+    /// A row that opens a sheet or a panel, with the current `value`, if it has one, under its title.
+    static func row(
+        _ title: String, systemImage: String, value: String? = nil, identifier: String? = nil, isEnabled: Bool = true,
+        open: @escaping @MainActor () -> Void
+    ) -> UIAction {
+        let row = UIAction(
+            title: title, subtitle: value, image: UIImage(systemName: systemImage), attributes: isEnabled ? [] : .disabled
+        ) { _ in open() }
+        row.accessibilityIdentifier = identifier
+        return row
     }
 
     /// Words among the rows: a row that cannot be chosen.
