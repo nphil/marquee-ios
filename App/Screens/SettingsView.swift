@@ -168,6 +168,15 @@ struct SettingsView: View {
                     }
                 }
                 .accessibilityIdentifier("settings.remote")
+                NavigationLink {
+                    GlassesSettingsView()
+                } label: {
+                    LabeledContent("XR Glasses") {
+                        Text(session.glasses.isEnabled ? "On" : "Off")
+                            .foregroundStyle(theme.ink2)
+                    }
+                }
+                .accessibilityIdentifier("settings.glasses")
             }
             .listRowBackground(theme.sheet)
 

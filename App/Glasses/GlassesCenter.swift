@@ -161,7 +161,9 @@ final class GlassesCenter {
         guard let session else { return }
         isConnected = true
         remoteHidden = false
-        navigator = GlassesNavigator(session: session, center: self)
+        let navigator = GlassesNavigator(session: session, center: self)
+        self.navigator = navigator
+        navigator.start()
         session.player.onGlasses = true
         // The phone locking ends the glasses' picture, so the phone stays awake while they are on.
         UIApplication.shared.isIdleTimerDisabled = true
@@ -189,6 +191,18 @@ final class GlassesCenter {
         } else {
             takeover.hide()
         }
+    }
+
+    /// The remote's "Phone App" gesture: the phone app comes back while the glasses keep their screen.
+    func showPhoneApp() {
+        remoteHidden = true
+        syncRemote()
+    }
+
+    /// The glasses button on the phone brings the remote back.
+    func showRemote() {
+        remoteHidden = false
+        syncRemote()
     }
 
     // MARK: Volume
@@ -227,6 +241,9 @@ extension GlassesCenter {
         guard session?.state == .ready, !hasScene else { return }
         sceneConnected()
         if mode == .canvas { GlassesPreview.show(center: self) }
+        if let page = UserDefaults.standard.string(forKey: "marquee.uitest.glassesPage"), let navigator {
+            Task { await navigator.openForUITest(page) }
+        }
     }
 }
 #endif

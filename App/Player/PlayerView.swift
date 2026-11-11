@@ -399,7 +399,7 @@ enum VideoFrame {
 
 /// Sidecar text cues and image subtitles. They sit on the picture and rise above the bottom controls
 /// while those show, so the controls never cover them.
-private struct SubtitleOverlay: View {
+struct SubtitleOverlay: View {
     let model: PlayerModel
     let picture: CGRect
     let screen: CGSize

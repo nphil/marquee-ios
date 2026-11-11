@@ -618,7 +618,7 @@ private struct DiagnosticsLine: View {
 
 /// Hosts a source's video view as it is and sets only how the picture fills the screen: the content
 /// mode, and the video gravity of a player or sample-buffer layer behind it.
-private struct LiveVideoHost: UIViewRepresentable {
+struct LiveVideoHost: UIViewRepresentable {
     let view: UIView
     let fills: Bool
 
