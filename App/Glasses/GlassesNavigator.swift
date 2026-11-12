@@ -885,7 +885,7 @@ extension GlassesNavigator {
         case "search":
             let page = searchPage()
             push(page)
-            page.query = "the"
+            page.query = "e"
             search(page)
         case "requests":
             push(requestsPage())
