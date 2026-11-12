@@ -64,6 +64,14 @@ public actor PlexServerConnection {
         if remembered == connection.uri { remembered = nil }
     }
 
+    /// Records that a request to `url`, made outside this library (a download, the player), got no answer:
+    /// the address it went to is dropped when it is the one in use or remembered.
+    public func reportFailure(at url: URL) {
+        func serves(_ base: URL) -> Bool { base.scheme == url.scheme && base.host == url.host && base.port == url.port }
+        if let current, serves(current.uri) { self.current = nil }
+        if let remembered, serves(remembered) { self.remembered = nil }
+    }
+
     /// Probes every address again, e.g. after the phone changed networks.
     public func refresh() async throws -> PlexConnection {
         current = nil

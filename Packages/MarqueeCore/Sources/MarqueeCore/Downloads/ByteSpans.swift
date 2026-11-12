@@ -112,6 +112,24 @@ extension TransferPlan {
             return false
         }
     }
+
+    /// A failure of the address itself, such as the home address tried away from home: the next request
+    /// probes for one that answers. Having no network at all says nothing about the address.
+    public static func dropsAddress(_ error: any Error) -> Bool {
+        switch error {
+        case let error as URLError:
+            let codes: [URLError.Code] = [
+                .timedOut, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed, .networkConnectionLost, .secureConnectionFailed,
+            ]
+            return codes.contains(error.code)
+        case let failure as NetworkFailure:
+            return failure != .offline && failure != .other
+        case PlexError.unreachable(let failure):
+            return failure != .offline && failure != .other
+        default:
+            return false
+        }
+    }
 }
 
 /// The server answered a transfer request with a status that is not a media reply.

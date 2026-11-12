@@ -2,6 +2,12 @@
 
 The current state of unfinished work, for an agent picking it up without the conversation. Update it whenever the state changes; delete a section once its work has shipped.
 
+## Away from home
+
+A server conversion asks Plex's decision first, as PMS 1.43.5 refused the start of a player's later sessions without one; the player gives the stream 30 s to be ready, tries twice more on a new session with the addresses probed again, then shows the error with Retry. Ending a conversion also reports its playback stopped. Downloads report an address that stops answering, so the next transfer probes again; on cellular only with cellular downloads off a row says Waiting for Wi-Fi and offers Download on Cellular; after two failed tries a row says the server can't be reached while it keeps trying.
+
+Unseen until CI: `DownloadFlowTests.testWaitingForWiFi` and its shot `downloads-waiting-wifi-dark`. On a phone: DEVICE-TEST check 20.
+
 ## 0.1.31 player
 
 Shipped as 0.1.31 (14d0826), 0.1.32 (ed15c7b) and 0.1.33 (b2d6073). 0.1.32 stops the automatic intro skip from restarting its countdown: time read before the jump landed offered the intro again, so `skippedIntroEnd` holds the offer back until the picture reaches the intro's end (needs an iPhone check). 0.1.31 and 0.1.32 drew no Library title: `toolbar(removing: .title)` (e9ff1f1) also removed the menu in the `.title` slot. 0.1.33 puts the menu at `.topBarLeading`, and `testPlacesOffTheBar` passes in all three themes, but the screenshots (`browse-02-library-*`, `places-02-library-menu-*`) show the title twice: the system's large "Movies" at the leading edge and the "Movies ⌄" menu beside it. So `toolbar(removing: .title)` does not hide the `navigationTitle` set inside `SectionBrowser`. Once scrolled, only the menu shows. 0.1.34 (4820f80) hides it with an inline bar whose principal slot is empty (`TitleMenu`); Home and Library set inline-large only on paths without the menu. Its `browse-02-library-rose-pine` and `header-blur-04-library-scrolled-rose-pine` shots show the title once. 0.1.33's run: `testSkipIntroCountsDownThenSkips` and `testHomeRowsDawn` each failed once and passed on retry; shard 2 then went red only because its simulator had shut down before the accessibility pass (CoreSimulator code 405).

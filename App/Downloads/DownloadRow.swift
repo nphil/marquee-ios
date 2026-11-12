@@ -89,6 +89,7 @@ struct DownloadRow: View {
     private static let still = CGSize(width: 128, height: 72)
 
     private var action: DownloadAction { DownloadAction(record.phase) }
+    private var hold: DownloadHold? { session.downloads.hold(for: record) }
 
     var body: some View {
         row
@@ -118,27 +119,37 @@ struct DownloadRow: View {
             .accessibilityLabel(spoken)
             .accessibilityAddTraits(selection.picked.contains(record.id) ? .isSelected : [])
         } else {
-            HStack(alignment: .top, spacing: Space.s1) {
-                Button {
-                    action.perform(record, in: session)
-                } label: {
-                    content
+            VStack(alignment: .leading, spacing: Space.s2) {
+                HStack(alignment: .top, spacing: Space.s1) {
+                    Button {
+                        action.perform(record, in: session)
+                    } label: {
+                        content
+                    }
+                    .buttonStyle(PressButtonStyle(cornerRadius: Radius.row))
+                    .accessibilityLabel(spoken)
+                    .accessibilityHint(action.hint)
+                    .accessibilityIdentifier("\(action.identifier).\(record.id)")
+                    Menu {
+                        DownloadRecordMenu(record: record)
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.body.weight(.semibold))
+                            .foregroundStyle(theme.ink2)
+                            .frame(width: Size.target, height: Size.target)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("More for \(record.title)")
+                    .accessibilityIdentifier("downloads.more.\(record.id)")
                 }
-                .buttonStyle(PressButtonStyle(cornerRadius: Radius.row))
-                .accessibilityLabel(spoken)
-                .accessibilityHint(action.hint)
-                .accessibilityIdentifier("\(action.identifier).\(record.id)")
-                Menu {
-                    DownloadRecordMenu(record: record)
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(theme.ink2)
-                        .frame(width: Size.target, height: Size.target)
-                        .contentShape(Rectangle())
+                if hold == .wifi {
+                    // Under the details, outside the row's own button, which would swallow its tap.
+                    Button("Download on Cellular") { session.downloads.settings.cellular = true }
+                        .buttonStyle(.tonal)
+                        .accessibilityHint("Allows downloads over cellular data")
+                        .accessibilityIdentifier("downloads.cellular.\(record.id)")
+                        .padding(.leading, typeSize.isAccessibilitySize ? 0 : Self.still.width + Space.s3)
                 }
-                .accessibilityLabel("More for \(record.title)")
-                .accessibilityIdentifier("downloads.more.\(record.id)")
             }
         }
     }
@@ -180,7 +191,7 @@ struct DownloadRow: View {
     }
 
     private var spoken: String {
-        DownloadText.spoken(record, named: !inShow)
+        DownloadText.spoken(record, named: !inShow, hold: hold)
     }
 
     /// What a tap does, on the still: a solid canvas circle with an ink glyph, never glass (DESIGN §8.1).
@@ -204,11 +215,18 @@ struct DownloadRow: View {
                     .foregroundStyle(theme.ink2)
                     .monospacedDigit()
             }
-            if let state = DownloadText.state(record) {
-                if case .failed = record.phase {
+            if let state = DownloadText.state(record, hold: hold) {
+                switch (record.phase, hold) {
+                case (.failed, _):
                     StatusLine(symbol: "exclamationmark.circle.fill", tint: theme.danger, text: state)
                         .textRole(.caption)
-                } else {
+                case (_, .wifi):
+                    StatusLine(symbol: "wifi", tint: theme.info, text: state)
+                        .textRole(.caption)
+                case (_, .unreachable):
+                    StatusLine(symbol: "exclamationmark.triangle.fill", tint: theme.warning, text: state)
+                        .textRole(.caption)
+                default:
                     Text(state)
                         .textRole(.caption)
                         .foregroundStyle(theme.ink)

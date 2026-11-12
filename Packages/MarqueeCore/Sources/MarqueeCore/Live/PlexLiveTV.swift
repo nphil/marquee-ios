@@ -91,12 +91,10 @@ public struct PlexLiveTV: Sendable {
         )
     }
 
-    /// The HLS URL of a tuned session. The transcode decision is asked first, as Plex's own app does,
-    /// so a refusal arrives as an error rather than as a playlist that never loads.
+    /// The HLS URL of a tuned session. `transcodeURL` asks the transcode decision first, as Plex's own app
+    /// does, so a refusal arrives as an error rather than as a playlist that never loads.
     public func streamURL(_ request: TranscodeRequest) async throws -> URL {
-        let location = try await library.connection.connection().isLocal ? "lan" : "wan"
-        _ = try await library.send(.get, "/video/:/transcode/universal/decision", request.queryItems(location: location), headers: [:])
-        return try await library.transcodeURL(request)
+        try await library.transcodeURL(request)
     }
 
     public func reportTimeline(_ update: LiveTimelineUpdate) async throws {

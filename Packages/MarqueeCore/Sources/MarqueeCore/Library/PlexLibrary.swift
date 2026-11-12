@@ -267,16 +267,32 @@ public struct PlexLibrary: Sendable {
         return url
     }
 
-    /// The HLS URL of a server transcode. It carries the client identity too, since the server picks the
-    /// output formats by platform and the player cannot send headers.
+    /// The HLS URL of a server transcode, on the address that answered its decision. The decision is asked
+    /// first with the same parameters and session, as Plex's own apps do: without one, PMS 1.43.5 refused
+    /// the `start.m3u8` of a player's later sessions ("session lacking decision", 2026-11-11). The URL
+    /// carries the client identity too, since the server picks the output formats by platform and the
+    /// player cannot send headers.
     public func transcodeURL(_ request: TranscodeRequest) async throws -> URL {
-        let location = try await connection.connection().isLocal ? "lan" : "wan"
+        let (_, address) = try await exchange(isRead: true) { address in
+            try self.request(
+                .get, "/video/:/transcode/universal/decision", request.queryItems(location: Self.location(of: address)),
+                [:], nil, nil, base: address.uri
+            )
+        }
         let identity = http.identity.headers(token: nil)
             .filter { $0.key.hasPrefix("X-Plex-") }
             .sorted { $0.key < $1.key }
             .map { URLQueryItem(name: $0.key, value: $0.value) }
-        let path = "/video/:/transcode/universal/start.m3u8"
-        return try await playbackURL(path: path, query: request.queryItems(location: location) + identity)
+        var query = request.queryItems(location: Self.location(of: address)) + identity
+        if let token = server.accessToken { query.append(URLQueryItem(name: PlexHeader.token, value: token)) }
+        guard let url = PlexURL.make(base: address.uri, path: "/video/:/transcode/universal/start.m3u8", query: query) else {
+            throw PlexError.decoding("bad path")
+        }
+        return url
+    }
+
+    private static func location(of address: PlexConnection) -> String {
+        address.isLocal ? "lan" : "wan"
     }
 
     /// Ends a server transcode session.
@@ -331,8 +347,7 @@ public struct PlexLibrary: Sendable {
         _ = try await send(method, path, query, headers: headers, idempotent: false)
     }
 
-    /// Sends through the chosen address. When it gives no answer, the address is dropped; a read is
-    /// repeated once if probing finds a different one. `PlexLiveTV` sends through here too.
+    /// Sends through the chosen address. `PlexLiveTV` sends through here too.
     func send(
         _ method: HTTPMethod,
         _ path: String,
@@ -341,16 +356,27 @@ public struct PlexLibrary: Sendable {
         idempotent: Bool? = nil,
         timeout: TimeInterval? = nil
     ) async throws -> PlexHTTPResponse {
+        try await exchange(isRead: idempotent ?? (method == .get)) { address in
+            try request(method, path, query, headers, idempotent, timeout, base: address.uri)
+        }.response
+    }
+
+    /// Sends the request `make` builds for the chosen address. When that address gives no answer, it is
+    /// dropped; a read is repeated once if probing finds a different one. Returns the answer and the
+    /// address that gave it.
+    private func exchange(
+        isRead: Bool,
+        _ make: (PlexConnection) throws -> PlexRequest
+    ) async throws -> (response: PlexHTTPResponse, address: PlexConnection) {
         let first = try await connection.connection()
         do {
-            return try await http.send(request(method, path, query, headers, idempotent, timeout, base: first.uri))
+            return (try await http.send(make(first)), first)
         } catch PlexError.unreachable(let failure) {
             await connection.reportFailure(of: first)
-            let isRead = idempotent ?? (method == .get)
             guard isRead, let next = try? await connection.connection(), next != first else {
                 throw PlexError.unreachable(failure)
             }
-            return try await http.send(request(method, path, query, headers, idempotent, timeout, base: next.uri))
+            return (try await http.send(make(next)), next)
         }
     }
 

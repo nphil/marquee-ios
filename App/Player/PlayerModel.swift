@@ -258,7 +258,9 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var wroteBack = false
     @ObservationIgnored private var serverAudio: Int?
     @ObservationIgnored private var serverSubtitle: Int?
-    @ObservationIgnored private var retries = 0
+    @ObservationIgnored private var recovery = StartRecovery()
+    /// Fails a server stream that is not playing `StartRecovery.readyDeadline` after it went to the player.
+    @ObservationIgnored private var startDeadline: Task<Void, Never>?
     @ObservationIgnored private var introCancelled = false
     /// The end of an intro just skipped. Until the picture reaches it, time from before the jump must not offer
     /// the intro again, which restarted its countdown instead of skipping.
@@ -542,7 +544,7 @@ final class PlayerModel: Identifiable {
     }
 
     func retry() {
-        retries = 0
+        recovery.reset()
         if route == nil {
             loadItem(loadingKey ?? item.ratingKey)
         } else {
@@ -1153,6 +1155,7 @@ final class PlayerModel: Identifiable {
             applySubtitleSources()
             startTiming.mark(.stream)
             load(url)
+            if case .transcode = stream { armStartDeadline(generation: generation) }
         } catch {
             guard generation == self.generation, !Task.isCancelled, !(error is CancellationError) else { return }
             streamFailed(PlaybackFailure(text: Self.message(error)))
@@ -1169,6 +1172,22 @@ final class PlayerModel: Identifiable {
         streamText.attach(to: playerItem)
         itemReady = false
         backend.load(playerItem)
+    }
+
+    /// Bounds the player's wait for a server transcode, the one start step without a timeout of its own: a
+    /// transcode asked for away from home waited on "preparing" for good (2026-11-11). A file the phone
+    /// plays fails by itself, and a late one must not count as one it cannot play.
+    private func armStartDeadline(generation: Int) {
+        startDeadline?.cancel()
+        startDeadline = Task { [weak self] in
+            try? await Task.sleep(for: StartRecovery.readyDeadline)
+            guard let self, !Task.isCancelled, generation == self.generation else { return }
+            let seconds = StartRecovery.readyDeadline.components.seconds
+            streamFailed(PlaybackFailure(
+                text: "\(library.server.name) didn't start the video in time.",
+                detail: "Not ready \(seconds) s after the stream was opened"
+            ))
+        }
     }
 
     private func makeItem(_ url: URL) -> AVPlayerItem {
@@ -1274,6 +1293,8 @@ final class PlayerModel: Identifiable {
         eventsTask = nil
         seekTask?.cancel()
         seekTask = nil
+        startDeadline?.cancel()
+        startDeadline = nil
         // A seek let go with its task never reports back.
         isSeeking = false
         if measured { measureLink() }
@@ -1286,14 +1307,23 @@ final class PlayerModel: Identifiable {
         case .remux(let remux):
             remux.stop()
         case .transcode(let session):
-            let library = library
-            Task { try? await library.stopTranscode(session: session) }
+            end(transcode: session, reporter: reporter)
         case .direct, nil:
             break
         }
         stream = nil
         mediaInfo = nil
         stopCast()
+    }
+
+    /// Ends a server transcode the player let go of. The stopped report ends its playback on the server,
+    /// which otherwise stayed open for minutes beside the player's next session (2026-11-11).
+    private func end(transcode session: String, reporter: TimelineReporter?) {
+        let library = library
+        Task { try? await library.stopTranscode(session: session) }
+        guard let reporter, duration > 0 else { return }
+        let time = Int(time * 1000), length = Int(duration * 1000)
+        Task { await reporter.update(.stopped, time: time, duration: length) }
     }
 
     /// Keeps what the ending stream measured of the link to its server, for the next route: the remux's
@@ -1603,8 +1633,7 @@ final class PlayerModel: Identifiable {
         case .remux(let remux):
             remux.stop()
         case .transcode(let session):
-            let library = library
-            Task { try? await library.stopTranscode(session: session) }
+            end(transcode: session, reporter: reporter)
         case .direct, nil:
             break
         }
@@ -1710,19 +1739,19 @@ final class PlayerModel: Identifiable {
                 await startStream(at: at, generation: generation)
             }
         case .serverTranscode:
-            // The server can refuse a new session for a minute or more after a quick stop.
-            let delays: [TimeInterval] = [2, 5, 10, 20, 30]
-            guard retries < delays.count else {
-                fail(failure)
+            guard case .retry(let delay) = recovery.failed() else {
+                fail(PlaybackFailure(text: "\(library.server.name) couldn't start the video.", detail: failure.detail))
                 return
             }
-            let delay = delays[retries]
-            retries += 1
+            // The next try is a new session, on whichever address answers by then.
+            let address = streamConnection
             stopStream()
             enterLoading()
             loadTask = Task { [weak self] in
-                try? await Task.sleep(for: .seconds(delay))
-                guard let self, generation == self.generation, !Task.isCancelled else { return }
+                guard let self else { return }
+                if let address { await library.connection.reportFailure(of: address) }
+                try? await Task.sleep(for: delay)
+                guard generation == self.generation, !Task.isCancelled else { return }
                 await startStream(at: at, generation: generation)
             }
         }
@@ -1773,7 +1802,7 @@ final class PlayerModel: Identifiable {
         fallback = nil
         failureDetail = nil
         wroteBack = false
-        retries = 0
+        recovery.reset()
         introCancelled = false
         skippedIntroEnd = nil
         creditsDismissed = false
@@ -1856,7 +1885,9 @@ final class PlayerModel: Identifiable {
     }
 
     private func arrived() {
-        retries = 0
+        recovery.reset()
+        startDeadline?.cancel()
+        startDeadline = nil
         phase = .playing
         stageTask?.cancel()
         showsStage = false
@@ -2751,7 +2782,7 @@ extension PlayerModel: CastPlayer {
         case nil:
             guard progress.state != .stopped else { return }
             if phase == .loading, progress.state != .buffering {
-                retries = 0
+                recovery.reset()
                 phase = .playing
                 stageTask?.cancel()
                 showsStage = false

@@ -52,9 +52,14 @@ enum DownloadText {
         }
     }
 
-    /// What a download that is not finished is doing; nil once it is done.
-    static func state(_ record: DownloadRecord) -> String? {
-        switch record.phase {
+    /// What a download that is not finished is doing, or why it is not moving; nil once it is done.
+    static func state(_ record: DownloadRecord, hold: DownloadHold?) -> String? {
+        switch hold {
+        case .wifi: return "Waiting for Wi-Fi"
+        case .unreachable(let server): return "Can't reach \(server) · Retrying"
+        case nil: break
+        }
+        return switch record.phase {
         case .waiting: "Waiting"
         case .converting: record.conversion?.progress.map { "Converting · \(percent($0))" } ?? "Converting"
         case .downloading: record.fraction.map { "Downloading · \(percent($0))" } ?? "Downloading"
@@ -71,7 +76,7 @@ enum DownloadText {
 
     /// What VoiceOver reads for a row: the title with its place, what it is, then the state or how far
     /// it was watched. Commas where the screen has dots, which VoiceOver would read out.
-    static func spoken(_ record: DownloadRecord, named: Bool) -> String {
+    static func spoken(_ record: DownloadRecord, named: Bool, hold: DownloadHold?) -> String {
         var parts: [String?] = []
         if record.type == .episode {
             if named { parts += [record.showTitle, record.seasonIndex.map { "Season \($0)" }] }
@@ -83,7 +88,7 @@ enum DownloadText {
             parts.append(Duration.milliseconds(record.duration).formatted(.units(allowed: [.hours, .minutes], width: .wide)))
         }
         parts += factParts(record, estimate: "about ")
-        if let state = state(record) {
+        if let state = state(record, hold: hold) {
             parts.append(state.replacing(" · ", with: ", "))
         } else if record.watchedFraction != nil {
             parts.append(ItemText.spokenLeft(max(1, Int((Double(record.duration - record.watch.offset) / 60_000).rounded(.up)))))

@@ -28,8 +28,9 @@ final class BackgroundTransfer: Sendable {
         /// `written` is flushed into the part file; `length` is the file's, when the server said it.
         case saved(Slice, written: Range<Int64>, length: Int64?)
         case notReady(Slice, retryAfter: Int)
-        /// A connection failure: the slice is tried again later.
-        case interrupted(Slice)
+        /// A connection failure: the slice is tried again later. `dropped` is the address when the failure
+        /// was its own, so the next slice goes to one that answers.
+        case interrupted(Slice, dropped: URL?)
         case failed(Slice, String)
         case stopped(Slice)
     }
@@ -95,6 +96,12 @@ final class BackgroundTransfer: Sendable {
         for task in await session.allTasks where Self.slice(of: task)?.part == part { task.cancel() }
     }
 
+    /// Stops the slices iOS has not begun to receive, so the app can fetch them itself.
+    func cancelUnstarted() async {
+        guard let session else { return }
+        for task in await session.allTasks where task.countOfBytesReceived == 0 && Self.slice(of: task) != nil { task.cancel() }
+    }
+
     fileprivate static func slice(of task: URLSessionTask) -> Slice? {
         task.taskDescription.flatMap { try? JSONDecoder().decode(Slice.self, from: Data($0.utf8)) }
     }
@@ -131,7 +138,7 @@ final class BackgroundTransfer: Sendable {
             case .notReady(let retryAfter):
                 deliver(.notReady(slice, retryAfter: retryAfter))
             case .failed(let status):
-                deliver(TransferPlan.isTransient(TransferStatusError(status: status)) ? .interrupted(slice) : .failed(slice, "The server answered \(status)."))
+                deliver(TransferPlan.isTransient(TransferStatusError(status: status)) ? .interrupted(slice, dropped: nil) : .failed(slice, "The server answered \(status)."))
             }
         }
 
@@ -147,7 +154,8 @@ final class BackgroundTransfer: Sendable {
                 log.error("dl-background refused code=-3000; transport off for this iOS version")
                 refused()
             }
-            deliver(TransferPlan.isTransient(error) ? .interrupted(slice) : .failed(slice, error.localizedDescription))
+            let dropped = TransferPlan.dropsAddress(error) ? task.originalRequest?.url : nil
+            deliver(TransferPlan.isTransient(error) ? .interrupted(slice, dropped: dropped) : .failed(slice, error.localizedDescription))
         }
 
         func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {

@@ -84,6 +84,15 @@ struct DownloadTests {
         #expect(!TransferPlan.isTransient(PlexError.unauthorized))
     }
 
+    @Test func onlyAFailureOfTheAddressMovesADownloadToAnother() {
+        #expect(TransferPlan.dropsAddress(URLError(.cannotConnectToHost)))
+        #expect(TransferPlan.dropsAddress(URLError(.timedOut)))
+        #expect(TransferPlan.dropsAddress(PlexError.unreachable(.hostNotFound)))
+        #expect(!TransferPlan.dropsAddress(URLError(.notConnectedToInternet)))
+        #expect(!TransferPlan.dropsAddress(PlexError.unreachable(.offline)))
+        #expect(!TransferPlan.dropsAddress(TransferStatusError(status: 502)))
+    }
+
     @Test func secondConnectionOnlyAwayFromHomeAndOnlyWhenClearlyFaster() {
         #expect(!TransferPlan.triesSecondConnection(isLocal: true))
         #expect(TransferPlan.triesSecondConnection(isLocal: false))

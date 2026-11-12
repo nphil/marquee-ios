@@ -10,6 +10,14 @@ struct DownloadSettings: Codable {
     var keepAlive = false
 }
 
+/// Why a download on its way is not moving, for its row.
+enum DownloadHold: Equatable {
+    /// Kept to Wi-Fi while the phone is on cellular only.
+    case wifi
+    /// The last tries in a row got no answer from the server; they go on.
+    case unreachable(server: String)
+}
+
 @MainActor @Observable
 final class DownloadCenter {
     let store: DownloadStore
@@ -17,6 +25,8 @@ final class DownloadCenter {
         didSet {
             if let data = try? JSONEncoder().encode(settings) { defaults.set(data, forKey: Self.settingsKey) }
             if !settings.keepAlive { keepAlive.stop() }
+            // A slice iOS holds keeps the cellular rule it started with; one not yet begun starts again under the new one.
+            if settings.cellular != oldValue.cellular { Task { [background] in await background.cancelUnstarted() } }
             if settings.cellular && !oldValue.cellular { wake() }
         }
     }
@@ -25,6 +35,20 @@ final class DownloadCenter {
     var activeCount: Int { records.filter { $0.phase.isActive }.count }
     /// Counts up when a still is saved after its row was first drawn, so lists show it without a relaunch.
     private(set) var artVersion = 0
+    /// The phone is up on cellular only.
+    private(set) var cellularOnly = FakePlex.cellularOnly
+    /// Downloads whose last two tries or more got no answer.
+    private(set) var stalled: Set<String> = []
+
+    /// Downloads kept to Wi-Fi are not fetched; a slice handed to iOS waits there for Wi-Fi.
+    var waitingForWiFi: Bool { cellularOnly && !settings.cellular }
+
+    func hold(for record: DownloadRecord) -> DownloadHold? {
+        guard record.phase.isActive else { return nil }
+        if waitingForWiFi { return .wifi }
+        if stalled.contains(record.id) { return .unreachable(server: library?.server.name ?? "the server") }
+        return nil
+    }
 
     private static let settingsKey = "marquee.downloads.settings"
     private let defaults: UserDefaults
@@ -83,7 +107,8 @@ final class DownloadCenter {
         // The folder is app data in iPhone Storage but never a backup: the videos can be fetched again.
         try? store.prepareRoot()
         allRecords = store.loadIndex()
-        settings = defaults.data(forKey: Self.settingsKey).flatMap { try? JSONDecoder().decode(DownloadSettings.self, from: $0) } ?? DownloadSettings()
+        // The UI tests start every launch from the default settings.
+        settings = FakePlex.isActive ? DownloadSettings() : defaults.data(forKey: Self.settingsKey).flatMap { try? JSONDecoder().decode(DownloadSettings.self, from: $0) } ?? DownloadSettings()
         keepAlive.onSurrender = { [weak self] in self?.handoff() }
         foregroundObserver = NotificationCenter.default.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in self?.foreground() }
@@ -96,6 +121,7 @@ final class DownloadCenter {
             var previous: NetworkPath?
             for await path in NetworkPath.updates() {
                 guard let self else { return }
+                self.cellularOnly = path.isCellularOnly || FakePlex.cellularOnly
                 if path.isConnected, path != previous {
                     self.wake()
                     self.backfill()
@@ -407,6 +433,8 @@ final class DownloadCenter {
 
     private func run() async -> Bool {
         guard let library, let scope else { return false }
+        // A request kept to Wi-Fi fails at once on cellular; iOS holds a background slice until Wi-Fi joins.
+        if waitingForWiFi && !(backgroundHandoff && background.isAvailable) { return false }
         let owner = transferOwner
         let running = await background.running()
         guard !Task.isCancelled, self.scope == scope, transferOwner == owner else { return false }
@@ -441,17 +469,20 @@ final class DownloadCenter {
         retries[id] = attempt
         holds[id] = Date.now.addingTimeInterval(TimeInterval(TransferPlan.retryDelay(attempt: attempt)))
         allRecords[i].phase = .waiting
+        if attempt >= 2 { stalled.insert(id) }
     }
 
     private func clearRetry(_ id: String) {
         retries[id] = nil
         holds[id] = nil
+        stalled.remove(id)
     }
 
     /// Ends every backoff now: the network came back or the user asked for another try.
     private func wake() {
         retries = [:]
         holds = [:]
+        stalled = []
         if backingOff { worker?.cancel() }
         kick()
     }
@@ -524,6 +555,8 @@ final class DownloadCenter {
                 return
             }
             let outcome = await fetcher.fetch(url, headers: library.authorizationHeaders(), range: range, into: file, id: id, cellular: settings.cellular)
+            // The next try probes for an address that answers, e.g. away from home after the home one.
+            if let error = outcome.error, TransferPlan.dropsAddress(error) { await library.connection.reportFailure(at: url) }
             guard let outcomeIndex = transferIndex(id, scope: scope, owner: owner) else { return }
             if case .whole = outcome.reply { allRecords[outcomeIndex].received = ByteSpans() }
             allRecords[outcomeIndex].received.insert(outcome.written)
@@ -559,7 +592,10 @@ final class DownloadCenter {
     private func receivedBackground(_ result: BackgroundTransfer.Result) async {
         let slice: BackgroundTransfer.Slice
         switch result {
-        case .saved(let value, _, _), .notReady(let value, _), .interrupted(let value), .failed(let value, _), .stopped(let value): slice = value
+        case .saved(let value, _, _), .notReady(let value, _), .interrupted(let value, _), .failed(let value, _), .stopped(let value): slice = value
+        }
+        if case .interrupted(_, let dropped?) = result, let record = allRecords.first(where: { $0.id == slice.id }), let library = libraries[record.scope.server] {
+            await library.connection.reportFailure(at: dropped)
         }
         guard let i = allRecords.firstIndex(where: { $0.id == slice.id && relativePart(for: $0) == slice.part && $0.phase.isActive }) else { return }
         let id = allRecords[i].id
@@ -603,6 +639,9 @@ final class DownloadCenter {
     private func foreground() {
         backgroundHandoff = false
         keepAlive.stop(restoringCategory: playbackCount > 0)
+        // A slice iOS has not begun may wait for Wi-Fi or for an address that stopped answering; the app
+        // fetches it now.
+        Task { [background] in await background.cancelUnstarted() }
         kick()
     }
 

@@ -60,7 +60,7 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 - Responses are chunked and must be decoded.
 - Seek uses an `offset` parameter.
 - Stop with `/video/:/transcode/universal/stop`.
-- After a rapid start and stop, retry with backoff for about 60–90 s.
+- A stream not ready 30 s after it went to the player has failed. A failed start is tried twice more, after 2 s and 5 s, each time with a new session, a new decision and the addresses probed again; then the error shows with Retry. Ending a session also reports its playback stopped, which closes it on the server.
 - Adaptive ladder and Original vs HLS: `docs/adaptive-playback.md`. DASH is not supported.
 
 **Playback queue:** `POST /playQueues?continuous=1` for every playback. It returns the rest of the show, so Up Next needs no extra calls. Queue ID and selected item ID must be kept when handing off, or Previous is lost.

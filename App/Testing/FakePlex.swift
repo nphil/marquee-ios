@@ -51,6 +51,9 @@ enum FakePlex {
     /// against a server as slow as a real one.
     static let latency: TimeInterval = isActive ? UserDefaults.standard.double(forKey: "marquee.uitest.latency") / 1000 : 0
 
+    /// The phone counts as up on cellular only (`-marquee.uitest.cellular`), for downloads kept to Wi-Fi.
+    static let cellularOnly = isActive && UserDefaults.standard.bool(forKey: "marquee.uitest.cellular")
+
     /// 9 PM today while active: where an anchored fixture's T lands.
     static let liveEvening: Date? = isActive ? Calendar.current.date(bySettingHour: 21, minute: 0, second: 0, of: Date()) : nil
 

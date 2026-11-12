@@ -11,6 +11,34 @@ final class DownloadFlowTests: XCTestCase {
         try downloadPlayback(mode: "light")
     }
 
+    /// On cellular only with cellular downloads off, a queued download says it waits for Wi-Fi and offers
+    /// cellular, which starts it.
+    @MainActor
+    func testWaitingForWiFi() throws {
+        let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine", arguments: [
+            "-marquee.fakeSignedIn", "YES",
+            "-marquee.uitest.cellular", "YES",
+        ])
+        open(tab: "Library", title: "Movies", in: app)
+        reveal("poster.101", in: app).tap()
+        tap("detail.download", in: app)
+        app.buttons["Original"].tap()
+
+        open(tab: "Home", title: "Home", in: app)
+        openSettings(in: app)
+        reveal("settings.downloads", in: app).tap()
+        tap("downloads.open", in: app)
+        let row = app.buttons["downloads.pause.101"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "The queued download has no row")
+        XCTAssertTrue(row.label.contains("Waiting for Wi-Fi"), "The row does not say it waits for Wi-Fi")
+        waitFor("downloads.cellular.101", in: app)
+        try snap("downloads-waiting-wifi-dark")
+
+        tap("downloads.cellular.101", in: app)
+        XCTAssertTrue(app.buttons["downloads.play.101"].waitForExistence(timeout: 20), "Allowing cellular did not start the download")
+        XCTAssertFalse(element("downloads.cellular.101", in: app).exists, "The cellular offer stayed after it was taken")
+    }
+
     @MainActor
     private func downloadPlayback(mode: String) throws {
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine")

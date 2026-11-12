@@ -174,4 +174,52 @@ struct ConnectionTests {
         }
         #expect(await transport.requests(to: "/:/scrobble").count == 1)
     }
+
+    @Test func transcodeStartsOnTheAddressThatAnsweredItsDecision() async throws {
+        let localHost = Self.local.uri.host
+        let transport = FakeTransport { request, earlier in
+            let localUsed = earlier.contains { $0.url.host == localHost && $0.url.path != "/identity" }
+            switch (request.url.host == localHost, request.url.path) {
+            case (true, "/identity"):
+                if localUsed { throw NetworkFailure.cannotConnect }
+                return Self.identity()
+            case (true, _):
+                throw NetworkFailure.timedOut
+            case (false, "/identity"):
+                return Self.identity()
+            default:
+                return container([:])
+            }
+        }
+        let library = PlexLibrary(server: Self.server([Self.local, Self.remote]), identity: testIdentity, transport: transport)
+        let item = try decode(PlexMetadata.self, ["ratingKey": "12", "key": "/library/metadata/12", "Media": [["id": 1, "Part": [["id": 7]]]]])
+        let route = PlaybackRoute(
+            kind: .serverTranscode, reasons: [.videoCodec("vc1")], audio: nil, audioIsStandIn: false,
+            convertsAudio: false, reencodesVideo: true, subtitle: .none
+        )
+
+        let url = try await library.transcodeURL(TranscodeRequest(item: item, route: route, session: "s-2"))
+
+        let decisions = await transport.requests(to: "/video/:/transcode/universal/decision")
+        #expect(decisions.map(\.url.host) == [localHost, Self.remote.uri.host])
+        #expect(decisions.map { $0.url.query("location") } == ["lan", "wan"])
+        #expect(decisions.allSatisfy { $0.url.query("session") == "s-2" })
+        #expect(url.host == Self.remote.uri.host && url.path == "/video/:/transcode/universal/start.m3u8")
+        #expect(url.query("location") == "wan" && url.query("session") == "s-2")
+    }
+
+    @Test func failedDownloadDropsOnlyTheAddressItWentTo() async throws {
+        let transport = FakeTransport { _, _ in Self.identity() }
+        let connection = PlexServerConnection(server: Self.server([Self.local, Self.remote]), identity: testIdentity, transport: transport)
+        _ = try await connection.connection()
+        let elsewhere = try #require(URL(string: "https://81-2-3-4.abc.plex.direct:32400/library/parts/7/file.mkv"))
+        let here = try #require(URL(string: "https://192-168-1-5.abc.plex.direct:32400/library/parts/7/file.mkv?download=1"))
+
+        await connection.reportFailure(at: elsewhere)
+        let kept = await connection.currentConnection
+        await connection.reportFailure(at: here)
+
+        #expect(kept == Self.local)
+        #expect(await connection.currentConnection == nil)
+    }
 }
