@@ -119,12 +119,21 @@ public enum SubtitlePicker {
         case .foreignAudio, .always:
             let audioIsForeign = audio.map { $0.language.isKnown && !$0.language.matches(settings.language) } ?? false
             guard settings.defaultMode == .always || audioIsForeign,
-                  let best = tracks.visibleSubtitles
-                      .filter({ drawable($0) && $0.language.matches(settings.language) && ($0.kind == .full || $0.kind == .captions) })
-                      .closest(misses: { [$0.kind != .full, $0.isDub, !$0.isExternal] })
+                  let best = usual(in: settings.language, from: tracks, where: drawable)
             else { return SubtitleDecision(track: nil, source: .setting) }
             return automatic(best, source: .setting, audio: audio, tracks: tracks, settings: settings, drawable: drawable)
         }
+    }
+
+    /// The usual subtitles in `language`, what the subtitle menu's language row puts on screen: full
+    /// subtitles before captions for the deaf, then not a dub transcript, then text before pictures, then a
+    /// separate file. Nil when the language has neither kind.
+    public static func usual(
+        in language: TrackLanguage, from tracks: MediaTracks, where allowed: (SubtitleTrack) -> Bool = { _ in true }
+    ) -> SubtitleTrack? {
+        tracks.visibleSubtitles
+            .filter { allowed($0) && $0.language.matches(language) && ($0.kind == .full || $0.kind == .captions) }
+            .closest { [$0.kind != .full, $0.isDub, $0.isImageBased, !$0.isExternal] }
     }
 
     /// The on-screen text track for the playing audio's language, a separate file first; nil when the

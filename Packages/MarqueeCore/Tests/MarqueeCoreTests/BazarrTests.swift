@@ -42,18 +42,32 @@ struct BazarrTests {
         await #expect(throws: BazarrError.unreachable) { try await offline.status() }
     }
 
-    @Test func findsAMovieByIDThenByTitleAndYear() async throws {
-        let (client, _) = Self.client { _ in
-            json(["data": [
-                ["radarrId": 1, "title": "The Matrix", "year": 1999, "imdbId": "tt0133093", "path": "/movies/The Matrix (1999)/matrix.mkv"],
-                ["radarrId": 2, "title": "Dune", "year": 1984, "tmdbId": 841],
-                ["radarrId": 3, "title": "Dune", "year": 2021, "tmdbId": 438631],
-            ]])
+    /// The ids a request names under `name`, as `radarrid[]=2&radarrid[]=3`.
+    static func ids(_ request: PlexRequest, _ name: String) -> [Int] {
+        let items = URLComponents(url: request.url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        return items.filter { $0.name == name }.compactMap { $0.value.flatMap(Int.init) }
+    }
+
+    @Test func findsAMovieThroughTheTitleSearchThenTheWholeList() async throws {
+        let movies = try JSONSerialization.data(withJSONObject: [
+            ["radarrId": 1, "title": "The Matrix", "year": 1999, "imdbId": "tt0133093", "path": "/movies/The Matrix (1999)/matrix.mkv"],
+            ["radarrId": 2, "title": "Dune", "year": 1984, "tmdbId": 841],
+            ["radarrId": 3, "title": "Dune", "year": 2021, "tmdbId": 438631],
+        ])
+        let (client, transport) = Self.client { request in
+            if request.url.path.hasSuffix("/api/system/searches") {
+                return request.url.query("query") == "DUNE" ? json([["sonarrSeriesId": 9], ["radarrId": 2], ["radarrId": 3]]) : json([])
+            }
+            let all = try! JSONSerialization.jsonObject(with: movies) as! [[String: Any]]
+            let named = Self.ids(request, "radarrid[]")
+            return json(["data": named.isEmpty ? all : all.filter { named.contains($0["radarrId"] as! Int) }])
         }
-        let byID = BazarrLookup(title: "Matrix", year: nil, externalIDs: ["imdb://tt0133093"], file: nil)
-        #expect(try await client.find(byID) == .movie(radarrID: 1))
+
         let byTitle = BazarrLookup(title: "DUNE", year: 2021, externalIDs: [], file: nil)
         #expect(try await client.find(byTitle) == .movie(radarrID: 3))
+        #expect(await transport.requests(to: "/bazarr/api/movies").map { Self.ids($0, "radarrid[]") } == [[2, 3]])
+        let byID = BazarrLookup(title: "Matrix", year: nil, externalIDs: ["imdb://tt0133093"], file: nil)
+        #expect(try await client.find(byID) == .movie(radarrID: 1))
         await #expect(throws: BazarrError.notFound) {
             try await client.find(BazarrLookup(title: "Dune", year: nil, externalIDs: [], file: nil))
         }
@@ -61,6 +75,9 @@ struct BazarrTests {
 
     @Test func findsAnEpisodeInTheShow() async throws {
         let (client, transport) = Self.client { request in
+            if request.url.path.hasSuffix("/api/system/searches") {
+                return json([["sonarrSeriesId": 7, "title": "Severance"]])
+            }
             if request.url.path.hasSuffix("/api/series") {
                 return json(["data": [["sonarrSeriesId": 7, "title": "Severance", "year": 2022, "tvdbId": 371980]]])
             }
@@ -71,6 +88,8 @@ struct BazarrTests {
         }
         let lookup = BazarrLookup(title: "Severance", year: 2022, externalIDs: ["tvdb://371980"], season: 1, episode: 2, file: nil)
         #expect(try await client.find(lookup) == .episode(seriesID: 7, episodeID: 71))
+        let series = try #require(await transport.requests(to: "/bazarr/api/series").first)
+        #expect(Self.ids(series, "seriesid[]") == [7])
         let episodes = try #require(await transport.requests(to: "/bazarr/api/episodes").first)
         #expect(episodes.url.query("seriesid[]") == "7")
     }

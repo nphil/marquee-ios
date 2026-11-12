@@ -96,6 +96,21 @@ struct TrackPickerTests {
         #expect(fallback.source == .setting && fallback.track?.id == 3)
     }
 
+    @Test func usualSubtitlesAreFullTextBeforeCaptionsAndPictures() throws {
+        let tracks = try Fixture.tracks([
+            Fixture.audio(1, "eng"),
+            Fixture.subtitle(2, "eng", title: "Forced", forced: true),
+            Fixture.subtitle(3, "eng", hearingImpaired: true),
+            Fixture.subtitle(4, "eng", codec: "pgs"),
+            Fixture.subtitle(5, "eng"),
+            Fixture.subtitle(6, "fre"),
+        ])
+
+        #expect(SubtitlePicker.usual(in: .english, from: tracks)?.id == 5)
+        #expect(SubtitlePicker.usual(in: .english, from: tracks) { $0.id != 5 }?.id == 4)
+        #expect(SubtitlePicker.usual(in: .english, from: tracks) { $0.id == 2 } == nil)
+    }
+
     @Test func rememberedOffAndOnScreenTextStand() throws {
         let tracks = try Fixture.tracks([
             Fixture.audio(1, "eng"),

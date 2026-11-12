@@ -1,11 +1,6 @@
 import Foundation
 
 extension PlexLibrary {
-    /// Deletes a subtitle file the server lists as a separate stream. Embedded tracks cannot be removed.
-    public func removeSubtitle(streamID: Int) async throws {
-        _ = try await send(.delete, "/library/streams/\(streamID)", [], headers: [:], idempotent: false)
-    }
-
     /// Asks the server to look at the item again, which finds subtitle files added next to its video.
     public func refresh(_ ratingKey: String) async throws {
         _ = try await send(.put, "/library/metadata/\(ratingKey)/refresh", [], headers: [:], idempotent: false)

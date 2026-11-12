@@ -3,13 +3,6 @@ import Testing
 @testable import MarqueeCore
 
 struct SubtitleFixTests {
-    @Test func removingASubtitleDeletesItsStream() async throws {
-        let (library, transport) = PlexLibraryTests.library { _ in PlexHTTPResponse(status: 200, body: Data()) }
-        try await library.removeSubtitle(streamID: 389)
-        let request = try #require(await transport.requests(to: "/library/streams/389").first)
-        #expect(request.method == .delete)
-    }
-
     @Test func refreshAsksTheServerToLookAgain() async throws {
         let (library, transport) = PlexLibraryTests.library { _ in PlexHTTPResponse(status: 200, body: Data()) }
         try await library.refresh("5")

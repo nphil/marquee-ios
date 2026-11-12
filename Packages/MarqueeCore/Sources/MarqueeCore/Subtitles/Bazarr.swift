@@ -167,22 +167,41 @@ public struct BazarrClient: Sendable {
     /// The Radarr movie or Sonarr episode for the playing item: by IMDb, TMDB or TVDB id, then by file
     /// name, then by title and year.
     public func find(_ lookup: BazarrLookup) async throws -> BazarrTarget {
-        if lookup.isEpisode {
-            let shows = try await get(DataList<Series>.self, "/api/series", ["start": "0", "length": "-1"]).data
-            guard let show = Self.best(shows, for: lookup) else { throw BazarrError.notFound }
-            let episodes = try await get(DataList<Episode>.self, "/api/episodes", ["seriesid[]": String(show.id)]).data
-            let name = lookup.file.map(Self.fileName)
-            guard let episode = episodes.first(where: { $0.season == lookup.season && $0.episode == lookup.episode })
-                ?? episodes.first(where: { name != nil && $0.path.map(Self.fileName) == name }) else { throw BazarrError.notFound }
-            return .episode(seriesID: show.id, episodeID: episode.id)
+        guard lookup.isEpisode else { return .movie(radarrID: try await title(Movie.self, for: lookup).id) }
+        let show = try await title(Series.self, for: lookup)
+        let episodes = try await get(DataList<Episode>.self, "/api/episodes", ["seriesid[]": String(show.id)]).data
+        let name = lookup.file.map(Self.fileName)
+        guard let episode = episodes.first(where: { $0.season == lookup.season && $0.episode == lookup.episode })
+            ?? episodes.first(where: { name != nil && $0.path.map(Self.fileName) == name }) else { throw BazarrError.notFound }
+        return .episode(seriesID: show.id, episodeID: episode.id)
+    }
+
+    /// The title among those Bazarr's title search names, then in the whole list when none of them
+    /// matches. The search and the titles it names answer in 0.01–0.04 s; a whole list took 0.25–2 s
+    /// (94 KB of series, 413 KB of movies, measured 2026-11).
+    private func title<Title: BazarrTitle>(_ type: Title.Type, for lookup: BazarrLookup) async throws -> Title {
+        let named = try await searched(Title.self, lookup.title)
+        if !named.isEmpty {
+            let found = try await get(DataList<Title>.self, Title.path, items: named.map { URLQueryItem(name: Title.idQuery, value: String($0)) })
+            if let match = Self.best(found.data, for: lookup) { return match }
         }
-        let movies = try await get(DataList<Movie>.self, "/api/movies", ["start": "0", "length": "-1"]).data
-        guard let movie = Self.best(movies, for: lookup) else { throw BazarrError.notFound }
-        return .movie(radarrID: movie.id)
+        let all = try await get(DataList<Title>.self, Title.path, ["start": "0", "length": "-1"]).data
+        guard let match = Self.best(all, for: lookup) else { throw BazarrError.notFound }
+        return match
+    }
+
+    /// The ids of the titles of this kind whose name holds `title`; none from a Bazarr without the search.
+    private func searched<Title: BazarrTitle>(_ type: Title.Type, _ title: String) async throws -> [Int] {
+        do {
+            return try await get([TitleHit].self, "/api/system/searches", ["query": title]).compactMap(Title.id(of:))
+        } catch BazarrError.notBazarr {
+            return []
+        }
     }
 
     /// Every subtitle Bazarr's providers offer for the target, in the languages of its profile, best
-    /// first. Providers can take a minute to answer.
+    /// first. Providers can take a minute or more to answer: 15–18 s warm and 80–100 s cold for an
+    /// episode (measured 2026-11), most of it spent on providers that time out.
     public func search(_ target: BazarrTarget) async throws -> [BazarrSubtitle] {
         let (path, query) = Self.providers(target)
         do {
@@ -193,7 +212,8 @@ public struct BazarrClient: Sendable {
         }
     }
 
-    /// Asks Bazarr to download a search result next to the video file.
+    /// Asks Bazarr to download a search result next to the video file. Bazarr answers once the file is
+    /// saved, after syncing it to the audio when its settings ask for that.
     public func download(_ subtitle: BazarrSubtitle, for target: BazarrTarget) async throws {
         let (path, ids) = Self.providers(target)
         let fields = ids.merging([
@@ -207,7 +227,7 @@ public struct BazarrClient: Sendable {
             .map { PlexURL.encode($0.key) + "=" + PlexURL.encode($0.value) }
             .joined(separator: "&")
         let response = try await send(
-            .post, path, [:], body: Data(body.utf8), contentType: "application/x-www-form-urlencoded", timeout: 120
+            .post, path, [], body: Data(body.utf8), contentType: "application/x-www-form-urlencoded", timeout: 120
         )
         switch response.status {
         case 200..<300: return
@@ -252,7 +272,13 @@ public struct BazarrClient: Sendable {
     // MARK: Transport
 
     private func get<T: Decodable>(_ type: T.Type, _ path: String, _ query: [String: String] = [:], timeout: TimeInterval = 30) async throws -> T {
-        let response = try await send(.get, path, query, timeout: timeout)
+        let items = query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
+        return try await get(type, path, items: items, timeout: timeout)
+    }
+
+    /// For a query that names a field more than once, as `seriesid[]=7&seriesid[]=9`.
+    private func get<T: Decodable>(_ type: T.Type, _ path: String, items: [URLQueryItem], timeout: TimeInterval = 30) async throws -> T {
+        let response = try await send(.get, path, items, timeout: timeout)
         switch response.status {
         case 200..<300:
             guard let value = try? JSONDecoder().decode(T.self, from: response.body) else { throw BazarrError.notBazarr }
@@ -263,11 +289,10 @@ public struct BazarrClient: Sendable {
     }
 
     private func send(
-        _ method: HTTPMethod, _ path: String, _ query: [String: String],
+        _ method: HTTPMethod, _ path: String, _ query: [URLQueryItem],
         body: Data? = nil, contentType: String? = nil, timeout: TimeInterval
     ) async throws -> PlexHTTPResponse {
-        let items = query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
-        guard let url = PlexURL.make(base: config.address, path: path, query: items) else { throw BazarrError.notBazarr }
+        guard let url = PlexURL.make(base: config.address, path: path, query: query) else { throw BazarrError.notBazarr }
         var headers = ["X-API-KEY": config.apiKey, "Accept": "application/json"]
         if let contentType { headers["Content-Type"] = contentType }
         do {
@@ -297,6 +322,11 @@ public struct BazarrClient: Sendable {
         let path: String?
         let externalIDs: Set<String>
 
+        static let path = "/api/movies"
+        static let idQuery = "radarrid[]"
+
+        static func id(of hit: TitleHit) -> Int? { hit.movie }
+
         enum CodingKeys: String, CodingKey { case radarrId, title, year, path, imdbId, tmdbId }
 
         init(from decoder: any Decoder) throws {
@@ -316,6 +346,11 @@ public struct BazarrClient: Sendable {
         let year: Int?
         let path: String?
         let externalIDs: Set<String>
+
+        static let path = "/api/series"
+        static let idQuery = "seriesid[]"
+
+        static func id(of hit: TitleHit) -> Int? { hit.series }
 
         enum CodingKeys: String, CodingKey { case sonarrSeriesId, title, year, path, imdbId, tvdbId }
 
@@ -374,11 +409,31 @@ public struct BazarrClient: Sendable {
 }
 
 private protocol BazarrTitle: Decodable {
+    var id: Int { get }
     var title: String { get }
     var year: Int? { get }
     var path: String? { get }
     /// `imdb://tt0133093`, `tmdb://603`, `tvdb://121361`, as Plex writes them.
     var externalIDs: Set<String> { get }
+    /// Where the titles of this kind are listed, and the query field that names one by id.
+    static var path: String { get }
+    static var idQuery: String { get }
+    /// The title of this kind a title search names, if that hit is one.
+    static func id(of hit: TitleHit) -> Int?
+}
+
+/// One title Bazarr's title search names: a Sonarr series or a Radarr movie.
+private struct TitleHit: Decodable {
+    let series: Int?
+    let movie: Int?
+
+    enum CodingKeys: String, CodingKey { case sonarrSeriesId, radarrId }
+
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        series = c.int(.sonarrSeriesId)
+        movie = c.int(.radarrId)
+    }
 }
 
 extension BazarrTitle {

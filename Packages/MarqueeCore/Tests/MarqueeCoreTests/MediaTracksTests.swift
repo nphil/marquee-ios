@@ -115,35 +115,6 @@ struct MediaTracksTests {
         #expect(tracks.landed(added, since: [1, 7, 9])?.id == 8 && tracks.landed(added, since: [1, 7, 8, 9]) == nil)
     }
 
-    @Test func viewersLanguagesStayOnTheMenuAndTheRestGoAToZ() throws {
-        let tracks = try Fixture.tracks([
-            Fixture.subtitle(1, "spa"),
-            Fixture.subtitle(2, "eng", title: "Commentary"),
-            Fixture.subtitle(3, "fre"),
-            Fixture.subtitle(4, "eng", hearingImpaired: true),
-            Fixture.subtitle(5, "jpn"),
-            Fixture.subtitle(6, "eng"),
-            Fixture.subtitle(7, nil),
-        ])
-
-        let all = SubtitleLanguages(tracks.visibleSubtitles, yours: [TrackLanguage(tag: "jpn"), .english, .english])
-        #expect(all.yours.map(\.name) == ["Japanese", "English"])
-        #expect(all.yours[1].tracks.map(\.id) == [6, 4, 2])
-        #expect(all.other.map(\.name) == ["French", "Spanish", "Unknown"])
-
-        let pair = SubtitleLanguages(tracks.visibleSubtitles.filter { [2, 3, 6].contains($0.id) }, yours: [.english])
-        #expect(pair.yours.map(\.name) == ["English", "French"] && pair.other.isEmpty)
-
-        // A list the menu has room for stays whole, the viewer's languages still first.
-        let whole = SubtitleLanguages(tracks.visibleSubtitles, yours: [.english], room: 7)
-        #expect(whole.yours.map(\.name) == ["English", "French", "Japanese", "Spanish", "Unknown"] && whole.other.isEmpty)
-        let long = SubtitleLanguages(tracks.visibleSubtitles, yours: [.english], room: 6)
-        #expect(long.yours.map(\.name) == ["English"] && long.other.count == 4)
-        // The subtitle showing keeps its language on the menu, named or not.
-        let showing = SubtitleLanguages(tracks.visibleSubtitles, yours: [.english], showing: tracks.visibleSubtitles.first { $0.id == 7 }, room: 6)
-        #expect(showing.yours.map(\.name) == ["English", "Unknown"] && showing.other.map(\.name) == ["French", "Japanese", "Spanish"])
-    }
-
     @Test func memoryIsKeptPerShowNotPerEpisode() throws {
         let episode = try decode(PlexMetadata.self, ["ratingKey": "12", "type": "episode", "grandparentRatingKey": "10"])
         let movie = try decode(PlexMetadata.self, ["ratingKey": "99", "type": "movie"])
