@@ -10,13 +10,16 @@ extension EnvironmentValues {
     @Entry var sheetZoomNamespace: Namespace.ID? = nil
 }
 
-extension ToolbarContent {
-    /// Makes this bar item the place the sheet for `source` zooms out of and back into. Without a
-    /// namespace, as in a preview, the item stays as it is.
-    @ToolbarContentBuilder
-    func sheetZoomSource(_ source: SheetZoomSource, in namespace: Namespace.ID?) -> some ToolbarContent {
+extension View {
+    /// Makes this button the place the sheet for `source` zooms out of and back into, clipped to a circle.
+    /// The source sits on the button rather than on its bar item: the item's source takes the item's own
+    /// shape and frame, and the return showed the round button cut top and bottom for a moment (0.1.34,
+    /// still after the button was made exactly 44 pt in 0.1.35). Without a namespace, as in a preview,
+    /// the button stays as it is.
+    @ViewBuilder
+    func sheetZoomSource(_ source: SheetZoomSource, in namespace: Namespace.ID?) -> some View {
         if let namespace {
-            matchedTransitionSource(id: source, in: namespace)
+            matchedTransitionSource(id: source, in: namespace) { $0.clipShape(Circle()) }
         } else {
             self
         }

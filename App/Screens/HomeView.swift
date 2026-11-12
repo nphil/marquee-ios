@@ -48,14 +48,12 @@ struct HomeView: View {
                     .sharedBackgroundVisibility(.hidden)
                 ToolbarSpacer(.fixed, placement: .topBarTrailing)
             } else if session.remote.isEnabled && session.remote.access == .homeButton && session.place == .home {
-                ToolbarItem(placement: .topBarTrailing) { TVRemoteButton() }
+                ToolbarItem(placement: .topBarTrailing) { TVRemoteButton().sheetZoomSource(.remote, in: sheetNamespace) }
                     .sharedBackgroundVisibility(.hidden)
-                    .sheetZoomSource(.remote, in: sheetNamespace)
                 ToolbarSpacer(.fixed, placement: .topBarTrailing)
             }
-            ToolbarItem(placement: .topBarTrailing) { ProfileButton() }
+            ToolbarItem(placement: .topBarTrailing) { ProfileButton().sheetZoomSource(.settings, in: sheetNamespace) }
                 .sharedBackgroundVisibility(.hidden)
-                .sheetZoomSource(.settings, in: sheetNamespace)
         }
         .modifier(PlacesMenu(places: tabs.isTab(.library) ? [] : store.tabLayout.order.filter {
             !tabs.isTab($0) && $0.isAvailable(in: session)
