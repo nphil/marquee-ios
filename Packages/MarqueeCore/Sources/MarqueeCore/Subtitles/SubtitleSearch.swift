@@ -13,7 +13,8 @@ public struct SubtitleSearch: Sendable {
 
     /// What the search is doing, for its status line.
     public enum Step: Sendable, Equatable {
-        case searching(Source)
+        /// `after` is why Bazarr, asked first, gave no file.
+        case searching(Source, after: BazarrMiss? = nil)
         case downloading(Source)
     }
 
@@ -151,7 +152,7 @@ public struct SubtitleSearch: Sendable {
                 outcome.bazarrMiss = turn.miss
             }
         }
-        await step(.searching(.plex))
+        await step(.searching(.plex, after: outcome.bazarrMiss))
         guard let offers = await plexOffers else {
             outcome.plexFailed = true
             return outcome

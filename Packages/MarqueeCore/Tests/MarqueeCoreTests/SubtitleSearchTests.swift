@@ -69,7 +69,7 @@ struct SubtitleSearchTests {
             let (outcome, steps) = await run(bazarr, library: library, budget: budget)
 
             #expect(outcome.bazarrMiss == miss && outcome.added?.source == .plex && !outcome.plexFailed)
-            #expect(steps == [.searching(.bazarr), .searching(.plex), .downloading(.plex)])
+            #expect(steps == [.searching(.bazarr), .searching(.plex, after: miss), .downloading(.plex)])
             let add = try #require(await plex.requests(to: "/library/metadata/5/subtitles").last)
             #expect(add.method == .put && add.url.query("key") == "/library/streams/40")
         }
