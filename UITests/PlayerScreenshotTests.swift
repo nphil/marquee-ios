@@ -28,7 +28,8 @@ final class PlayerScreenshotTests: XCTestCase {
         XCTAssertTrue(badge.waitForExistence(timeout: 20), "No format badge")
         XCTAssertFalse(controls.exists, "The badge showed while the controls were up")
         let screen = app.windows.firstMatch.frame
-        XCTAssertGreaterThan(badge.frame.midX, screen.midX, "The badge is not on the trailing side")
+        // A wide badge in an upright player can reach past the middle, so its trailing edge is what is checked.
+        XCTAssertGreaterThan(badge.frame.maxX, screen.maxX - 48, "The badge is not on the trailing side")
         XCTAssertLessThan(badge.frame.minY, screen.minY + screen.height * 0.25, "The badge is not at the top")
         XCTAssertLessThanOrEqual(badge.frame.maxX, screen.maxX - 16, "The badge is inside the screen margin")
         try snap("player-11-format-badge-rose-pine")
@@ -474,7 +475,8 @@ private extension XCTestCase {
         XCTAssertNotNil(style, "No Subtitle Style row in the tracks menu")
         style?.tap()
         XCTAssertNotNil(menuRow("Reveal as Spoken", in: app, hasValue: true), "Subtitle Style did not open in the menu")
-        XCTAssertFalse(app.navigationBars.firstMatch.exists, "Subtitle Style opened a sheet")
+        // The page under the player keeps its bar in the tree, so only a bar named for the style would be a sheet.
+        XCTAssertFalse(app.navigationBars["Subtitle Style"].exists, "Subtitle Style opened a sheet")
     }
 
     /// The Find Subtitles banner once its words begin with `title`.
