@@ -254,14 +254,24 @@ private struct DetailPage: View {
                 Button {
                     openRoute(.item(ratingKey: showKey))
                 } label: {
-                    Text(show)
-                        .textRole(.headline)
-                        .foregroundStyle(theme.ink2)
-                        .frame(minHeight: Size.target)
-                        .contentShape(Rectangle())
+                    // The show's name in the accent with a chevron reads as the link it is; the plain grey
+                    // line above the title did not.
+                    HStack(alignment: .firstTextBaseline, spacing: Space.s1) {
+                        Text(show)
+                            .textRole(.title)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        Image(systemName: "chevron.right")
+                            .font(.subheadline.weight(.bold))
+                            .accessibilityHidden(true)
+                    }
+                    .foregroundStyle(theme.accentText)
+                    .frame(minHeight: Size.target, alignment: .leading)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityHint("Opens the show")
+                .accessibilityIdentifier("detail.show")
             }
             Text(item.title)
                 .textRole(.display)

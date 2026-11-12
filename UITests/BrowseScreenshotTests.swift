@@ -98,6 +98,15 @@ extension XCTestCase {
         try snap("browse-07-show-\(suffix)")
         _ = reveal("episode.213", in: app)
         try snap("browse-08-show-episodes-\(suffix)")
+        // The episode's own page, from its More menu, opens with the show's name as a link above the title.
+        let more = app.buttons["More for Llamigos"]
+        XCTAssertTrue(more.waitForExistence(timeout: 5), "No More menu on the episode")
+        more.tap()
+        let details = app.buttons["Details"].firstMatch
+        XCTAssertTrue(details.waitForExistence(timeout: 5), "No Details in the episode menu")
+        details.tap()
+        waitFor("detail.show", in: app)
+        try snap("browse-16-episode-\(suffix)")
     }
 
     /// The watchlist, a saved title the server does not have, then the Live TV tab.

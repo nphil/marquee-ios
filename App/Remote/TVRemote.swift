@@ -223,13 +223,13 @@ struct TVRemoteButton: View {
         } label: {
             Image(systemName: "appletvremote.gen4.fill")
                 // 40% of the disc, the player controls' glyph proportion (Size.controlGlyph).
-                .font(.system(size: (Size.target - Space.s3) * Size.controlGlyph / Size.control, weight: .semibold))
+                .font(.system(size: (Size.barButton - 2 * Space.s1) * Size.controlGlyph / Size.control, weight: .semibold))
                 .foregroundStyle(theme.accentText)
-                .frame(width: Size.target - Space.s3, height: Size.target - Space.s3)
+                .frame(width: Size.barButton - 2 * Space.s1, height: Size.barButton - 2 * Space.s1)
                 .background(theme.sheet, in: Circle())
                 .padding(Space.s1)
                 .overlay(Circle().strokeBorder(theme.accent, lineWidth: 2))
-                .frame(width: Size.target, height: Size.target)
+                .frame(width: Size.barButton, height: Size.barButton)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)

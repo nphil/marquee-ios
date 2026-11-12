@@ -12,11 +12,12 @@ struct ProfileButton: View {
         Button {
             session.showsSettings = true
         } label: {
-            // A 36 pt photo, a 2 pt gap and a 2 pt ring: 44 pt across, in a 48 pt target.
-            AvatarView(user: session.user, size: Size.target - Space.s3)
+            // A 36 pt photo, a 2 pt gap and a 2 pt ring: 44 pt across, which is the whole item. A taller
+            // frame is cut to the bar's 44 pt, and the sheet's zoom back into the button shows that cut.
+            AvatarView(user: session.user, size: Size.barButton - 2 * Space.s1)
                 .padding(Space.s1)
                 .overlay(Circle().strokeBorder(theme.accent, lineWidth: 2))
-                .frame(width: Size.target, height: Size.target)
+                .frame(width: Size.barButton, height: Size.barButton)
                 .contentShape(Circle())
         }
         .accessibilityLabel("Settings")
