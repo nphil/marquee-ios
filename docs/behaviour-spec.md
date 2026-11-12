@@ -25,7 +25,7 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 - **Watchlist:** its own destination, backed by plex.tv, not part of search.
 - **Settings:** two pages, "Video & playback" and "Audio & subtitles". Settings are saved per Plex Home profile. Integrations hold the optional SpeechDock address.
 - **Player:** full-screen video. Control row: Previous, Next, a gap, then Subtitles, Audio, More.
-- **Player overlays:** Up Next card, intro skip button, credits countdown, end-of-item notice, scene-thumbnail seek preview, and a "Wrong subtitles?" flow.
+- **Player overlays:** Up Next card, intro skip button, credits countdown, end-of-item notice, scene-thumbnail seek preview, and the Find Subtitles status.
 
 ---
 
@@ -136,13 +136,11 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 - "Track N" tells apart identical rows.
 - The audio menu uses plain-words labels in eleven languages.
 
-**Subtitles menu** (`docs/player-submenus.md` 1–203): Off, Forced only ("On-screen text only"), one section per language, "Other languages N", Timing, Style (size, position, colour), and Search subtitles: Plex's own agents always, Bazarr when it is set up. Per-language pages rank Full, SDH, Forced, Commentary. Image-format badges (PGS, VOBSUB, DVB) show only on image subtitles. On the iPhone these are the first rows of the Tracks menu: every track is listed while there are 8 or fewer, and "Other Languages" holds the rest of a longer list.
+**Subtitles menu** (`docs/player-submenus.md` 1–203): Off, Forced only ("On-screen text only"), one section per language, "Other languages N", Timing, Style (size, position, colour), and Search subtitles: Plex's own agents always, Bazarr when it is set up. Per-language pages rank Full, SDH, Forced, Commentary. Image-format badges (PGS, VOBSUB, DVB) show only on image subtitles. The iPhone keeps it simpler: Off and the viewer's language, whose row takes the usual track by the same ranking, then Find Subtitles, Subtitle Style and Timing, all in the Tracks menu.
 
-**"Wrong subtitles?" flow (Bazarr):**
-- Remove an external subtitle from Plex, or search Bazarr by score, language, provider and hearing-impaired flag. Download, then Plex refreshes and the new track is selected.
-- States: queued, Plex track found, loading, Active, or a named error.
-- "Check Plex again" refreshes metadata only and never downloads twice.
-- Plex's agent search (`pms-api.md` §8) asks in one two-letter language, the subtitle language by default; a result the item already lists is not offered again, and an added file replaces an earlier copy with the same release name.
+**Find Subtitles:** one action. Bazarr goes first, for at most 20 s; Plex's own agents step in when Bazarr is not set up, cannot be reached, runs out of time or has nothing in the language. The new file is put on screen once Plex lists it. A status over the picture names the source being asked, then the file's source or why nothing came. The TV's "Wrong subtitles?" flow (remove a file, pick from Bazarr's results by score, provider and hearing-impaired flag) is not carried over.
+- A file Plex had not listed when its search ended is looked for first by the next Find, which refreshes metadata only and never downloads twice.
+- Plex's agent search (`pms-api.md` §8) asks in one two-letter language, the subtitle language by default; a result the item already lists is not added again, and an added file replaces an earlier copy with the same release name.
 
 **Subtitle look** (per profile): presets, font, size, colour, opacity, bold, edge, background box, position, line spacing, "Blend with video", "Reveal as spoken", and "My look" file styling. Native ASS/SSA keeps its own styles.
 

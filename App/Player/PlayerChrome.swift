@@ -713,14 +713,12 @@ struct LoadingArc: View {
 
 // MARK: - Menus
 
-/// Audio and subtitles (DESIGN §8.6, Tracks menu). The subtitle choices stand on the menu itself; the
-/// audio tracks open from one row, so they never push the subtitles off a phone's screen.
+/// Audio and subtitles (DESIGN §8.6, Tracks menu). The subtitles are Off or the viewer's language, whose
+/// row puts the usual track on screen; Find Subtitles and Subtitle Style sit in the menu too, so nothing
+/// covers the picture. The audio tracks open from one row.
 struct TracksMenu: View {
     let model: PlayerModel
-
-    /// The most subtitle tracks the menu lists whole; a longer list keeps the viewer's languages and sends
-    /// the rest behind Other Languages.
-    private static let subtitleRoom = 8
+    @Environment(AppSession.self) private var session
 
     var body: some View {
         // Opening upward, the automatic order reverses the list; fixed reads the subtitles, the audio and
@@ -756,40 +754,52 @@ struct TracksMenu: View {
         return UIMenu(identifier: UIMenu.Identifier(rawValue: "player.tracks"), children: sections)
     }
 
-    /// Off, On-Screen Text Only where a track holds it, then the tracks, the viewer's languages first.
+    private var languageName: String { model.subtitleLanguage.name ?? "English" }
+
+    /// Off and the viewer's language. A file without that language finds it from the same row. A track
+    /// showing that neither row means, a forced track the file chose or an earlier pick, stands ticked
+    /// under them.
     private func subtitleRows(_ tracks: MediaTracks) -> [UIMenuElement] {
-        let languages = SubtitleLanguages(
-            tracks.visibleSubtitles, yours: model.subtitleLanguages, showing: model.subtitle?.track, room: Self.subtitleRoom
-        )
-        var rows: [UIMenuElement] = [subtitleChoice("Off", .off)]
-        if tracks.visibleSubtitles.contains(where: { $0.kind == .onScreenText }) {
-            rows.append(subtitleChoice("On-Screen Text Only", .onScreenTextOnly))
+        let showing = model.subtitle?.track
+        let usual = SubtitlePicker.usual(in: model.subtitleLanguage, from: tracks)
+        let finder = model.subtitleFinder
+        var rows: [UIMenuElement] = [
+            UIAction.choice("Off", isOn: showing == nil) { [model] in
+                if model.subtitlePick != .off { model.subtitlePick = .off }
+            },
+        ]
+        if let usual {
+            let id = usual.id
+            rows.append(UIAction.choice(languageName, isOn: showing?.id == id) { [model] in
+                if model.subtitle?.track?.id != id { model.subtitlePick = .track(id) }
+            })
+        } else {
+            rows.append(UIAction.choice(
+                languageName, detail: finder.isSearching ? finder.status?.detail : "None yet. Choose to find them.", isOn: false,
+                isEnabled: !finder.isSearching
+            ) { [model] in
+                model.findSubtitles()
+            })
         }
-        rows += languages.yours.flatMap(\.tracks).map(subtitleRow)
-        if !languages.other.isEmpty {
-            rows.append(UIMenu.submenu(
-                "player.tracks.languages", title: "Other Languages", systemImage: "globe", value: "\(languages.other.count) languages",
-                languages.other.map { group -> UIMenuElement in
-                    // A lone track's row already starts with its language.
-                    if group.tracks.count == 1 { return subtitleRow(group.tracks[0]) }
-                    return UIMenu.section("player.tracks.language.\(group.id)", title: group.name, group.tracks.map(subtitleRow))
-                }
-            ))
+        if let showing, showing.id != usual?.id {
+            rows.append(UIAction.choice(showing.label, detail: detail(showing.badges, imageFormat: showing.imageFormat), isOn: true) {})
         }
         return rows
     }
 
-    /// What acts on the subtitles, each row opening its own panel. Style and Timing stay but dim, with the
-    /// reason, while the server draws the subtitle into the picture; Timing shows only while a subtitle is on.
+    /// Find Subtitles, Subtitle Style and Timing. Style and Timing stay but dim, with the reason, while
+    /// the server draws the subtitle into the picture; Timing shows only while a subtitle is on.
     private var tools: [UIMenuElement] {
         let drawnByServer = model.subtitleDrawnByServer
+        let finder = model.subtitleFinder
         var rows: [UIMenuElement] = [
-            UIAction.row("Search Subtitles", systemImage: "magnifyingglass", identifier: "player.tracks.search") { [model] in
-                model.openSubtitleFix(.search)
+            UIAction.row(
+                "Find \(languageName) Subtitles", systemImage: "magnifyingglass", value: finder.isSearching ? finder.status?.detail : nil,
+                identifier: "player.tracks.find", isEnabled: !finder.isSearching
+            ) { [model] in
+                model.findSubtitles()
             },
-            UIAction.row("Subtitle Style", systemImage: "textformat", identifier: "player.tracks.style", isEnabled: drawnByServer == nil) { [model] in
-                model.showsStyle = true
-            },
+            style(drawnByServer: drawnByServer),
         ]
         if model.canTimeSubtitles || drawnByServer != nil {
             rows.append(UIAction.row(
@@ -799,29 +809,65 @@ struct TracksMenu: View {
                 model.openTiming()
             })
         }
-        if model.subtitle?.track != nil {
-            rows.append(UIAction.row("Wrong Subtitles?", systemImage: "exclamationmark.bubble", identifier: "player.tracks.wrong") { [model] in
-                model.openSubtitleFix(.wrong)
-            })
-        }
         if let drawnByServer { rows.append(UIAction.note(drawnByServer)) }
         if let problem = model.subtitleProblem { rows.append(UIAction.note(problem)) }
         return rows
     }
 
-    private func subtitleRow(_ track: SubtitleTrack) -> UIAction {
-        subtitleChoice(track.label, .track(track.id), detail: detail(track.badges, imageFormat: track.imageFormat))
+    /// The look's main settings, each a submenu whose choices apply at once and keep the menu up, so the
+    /// subtitles behind it show the change. The rest of the look is in Settings. Image subtitles take
+    /// only a tint.
+    private func style(drawnByServer: String?) -> UIMenuElement {
+        guard drawnByServer == nil else {
+            return UIAction.row("Subtitle Style", systemImage: "textformat", identifier: "player.tracks.style", isEnabled: false) {}
+        }
+        let look = session.settings.subtitleStyle
+        guard !model.subtitleIsImage else {
+            return UIMenu.submenu("player.tracks.style", title: "Subtitle Style", systemImage: "textformat", value: look.colour.title, [
+                styleChoices("colour", "Colour", \.colour, SubtitleLook.TextColour.allCases, \.title),
+                keepingOpen(UIAction.choice("Soften Brightness", isOn: look.blendsWithVideo) { [session] in
+                    session.settings.subtitleStyle.blendsWithVideo.toggle()
+                }),
+                UIAction.note("These subtitles are pictures: their size and position are the file's."),
+            ])
+        }
+        let lookName = look.isCustom ? "Custom" : look.preset.title
+        let presets = UIMenu.submenu(
+            "player.tracks.style.look", title: "Look", value: lookName,
+            SubtitleLook.Preset.allCases.map { preset in
+                keepingOpen(UIAction.choice(preset.title, isOn: !look.isCustom && look.preset == preset) { [session] in
+                    session.settings.subtitleStyle.apply(preset)
+                })
+            }
+        )
+        return UIMenu.submenu("player.tracks.style", title: "Subtitle Style", systemImage: "textformat", value: lookName, [
+            presets,
+            styleChoices("size", "Size", \.size, SubtitleLook.sizes) { "\($0)%" },
+            styleChoices("colour", "Colour", \.colour, SubtitleLook.TextColour.allCases, \.title),
+            styleChoices("position", "Position", \.anchor, SubtitleLook.Anchor.allCases, \.title),
+            styleChoices("reveal", "Reveal as Spoken", \.reveal, SubtitleLook.Reveal.allCases, \.title),
+        ])
     }
 
-    /// Choosing the subtitle showing again keeps it.
-    private func subtitleChoice(_ title: String, _ choice: SubtitleChoice, detail: String? = nil) -> UIAction {
-        UIAction.choice(title, detail: detail, isOn: model.subtitlePick == choice) { [model] in
-            if model.subtitlePick != choice { model.subtitlePick = choice }
-        }
+    /// One look setting's values, the current one ticked.
+    private func styleChoices<Value: Equatable>(
+        _ id: String, _ title: String, _ setting: WritableKeyPath<SubtitleLook, Value>, _ values: [Value], _ label: (Value) -> String
+    ) -> UIMenu {
+        let current = session.settings.subtitleStyle[keyPath: setting]
+        return UIMenu.submenu("player.tracks.style.\(id)", title: title, value: label(current), values.map { value in
+            keepingOpen(UIAction.choice(label(value), isOn: value == current) { [session] in
+                session.settings.subtitleStyle[keyPath: setting] = value
+            })
+        })
+    }
+
+    private func keepingOpen(_ action: UIAction) -> UIAction {
+        action.attributes.insert(.keepsMenuPresented)
+        return action
     }
 
     /// The second line of a track row: "Captions", "Audio description", and the picture format of image
-    /// subtitles (behaviour spec §3), so two "English" rows read apart.
+    /// subtitles (behaviour spec §3).
     private func detail(_ badges: [TrackBadge], imageFormat: String? = nil) -> String? {
         let words = badges.map(\.rawValue) + [imageFormat].compactMap { $0 }
         return words.isEmpty ? nil : words.joined(separator: " · ")

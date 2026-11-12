@@ -34,7 +34,7 @@ Living Room has an antenna DVR with one four-tuner HDHomeRun and eight channels,
 
 The player tests play Caminandes episode 2, Gran Dillama (`212`): an intro from 0:05 to 0:35, final credits from 2:10, Spanish audio beside the English, and English, English SDH and Spanish subtitles. `pms/playQueues@continuous=1.json` queues the season around it.
 
-Bazarr, at `http://bazarr.local:6767` when a test passes `-marquee.uitest.bazarr`, knows the Caminandes series and its episodes, and offers three English subtitles and a Spanish one for episode 2. Downloading one adds it to the episode in Plex as an external English subtitle (`21217`); removing that brings the episode back to its own tracks.
+Bazarr, at `http://bazarr.local:6767` when a test passes `-marquee.uitest.bazarr`, finds Caminandes by its title search, knows its episodes, and offers three English subtitles and a Spanish one for episode 2. Downloading one adds it to the episode in Plex as an external English subtitle (`21217`). `http://bazarr-offline.local:6767` cannot be reached. Plex's own agents offer three English subtitles for episode 2; adding the best one lists it as `21218`.
 
 SpeechDock, at `http://speechdock.local:8765` when a test passes `-marquee.uitest.speechDock`, answers its health check as version 1.0.0 and times every cue of a window, its words spread evenly over the time the cue shows.
 

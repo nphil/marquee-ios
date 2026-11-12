@@ -23,7 +23,7 @@ final class BazarrSettings {
         config = storage.bazarr
     }
 
-    /// What the player's "Wrong subtitles?" asks, once an address and key are saved.
+    /// What the player's Find Subtitles asks first, once an address and key are saved.
     var client: BazarrClient? {
         config.map { BazarrClient(config: $0, transport: transport) }
     }
@@ -95,7 +95,7 @@ struct BazarrView: View {
                 if let problem = shownProblem {
                     ProblemLine(text: Self.text(for: problem))
                 } else {
-                    Text("Bazarr finds subtitles from many providers. With its address and API key, “Wrong subtitles?” in the player can use it. The key is in Bazarr under Settings, General, Security.")
+                    Text("Bazarr finds subtitles from many providers. With its address and API key, Find Subtitles in the player asks Bazarr first and Plex when Bazarr has nothing. The key is in Bazarr under Settings, General, Security.")
                         .foregroundStyle(theme.ink2)
                 }
             }
@@ -207,7 +207,7 @@ struct BazarrView: View {
         case 1: " \(linked[0]) is linked."
         default: ""
         }
-        return "Connected · Bazarr \(status.version).\(apps) “Wrong subtitles?” in the player now offers Bazarr."
+        return "Connected · Bazarr \(status.version).\(apps) Find Subtitles in the player now asks Bazarr first."
     }
 
     static func text(for error: BazarrError) -> String {

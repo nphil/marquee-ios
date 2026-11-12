@@ -77,14 +77,6 @@ final class PlayerModel: Identifiable {
         var cause: StallWatch.Cause
     }
 
-    /// The current-subtitle manager and provider-neutral search.
-    enum SubtitleSheet: Identifiable {
-        case wrong
-        case search
-
-        var id: Self { self }
-    }
-
     nonisolated let id = UUID()
 
     private(set) var item: PlexMetadata
@@ -176,12 +168,10 @@ final class PlayerModel: Identifiable {
     /// Auto holds its lowest rung on a link that cannot sustain it; a wait on the network then says why.
     private(set) var belowQualityFloor = false
     var showsInfo = false
-    var showsStyle = false
     var showsStats = false
     var showsEpisodes = false
-    var subtitleSheet: SubtitleSheet?
-    /// The playing item's subtitle removal, search and downloads.
-    private(set) var subtitleFix: SubtitleFix?
+    /// Find Subtitles for the playing item.
+    let subtitleFinder = SubtitleFinder()
 
     let layerView = PlayerLayerView()
     /// The UI tests' stand-in for the picture.
@@ -418,11 +408,10 @@ final class PlayerModel: Identifiable {
     /// Image subtitles keep their own size and position; the look's colour tints them.
     var subtitleIsImage: Bool { subtitle?.track?.isImageBased ?? false }
 
-    /// The viewer's languages for the subtitle menu, most wanted first: the subtitle setting, the playing
-    /// audio, the phone's own.
-    var subtitleLanguages: [TrackLanguage] {
-        [session.settings.subtitles.language] + [audio?.language].compactMap { $0 }
-            + Locale.preferredLanguages.map { TrackLanguage(tag: $0) }
+    /// The language of the subtitle menu's one language row and of Find Subtitles: the subtitle setting.
+    var subtitleLanguage: TrackLanguage {
+        let language = session.settings.subtitles.language
+        return language.isKnown ? language : .english
     }
 
     var preferredAudioLanguage: TrackLanguage? { session.settings.audioLanguage }
@@ -526,7 +515,7 @@ final class PlayerModel: Identifiable {
             task?.cancel()
         }
         sideTasks.forEach { $0.cancel() }
-        subtitleFix?.cancel()
+        subtitleFinder.cancel()
         stopStream()
         backend.tearDown()
         pictureInPicture?.tearDown()
@@ -888,11 +877,7 @@ final class PlayerModel: Identifiable {
         loadingKey = nil
         stallWatch = StallWatch()
         recoveries = nil
-        if subtitleFix?.ratingKey != full.ratingKey {
-            subtitleFix?.cancel()
-            subtitleFix = nil
-            subtitleSheet = nil
-        }
+        subtitleFinder.itemChanged(to: full.ratingKey)
         mediaIndex = isFirstItem && (request.download == nil || request.download?.quality == .original) ? request.mediaIndex : 0
         if isFirstItem, request.download == nil, request.item.media.indices.contains(request.mediaIndex),
            request.item.media[request.mediaIndex].isDVRRecording {
@@ -2328,18 +2313,13 @@ final class PlayerModel: Identifiable {
         showsTiming = false
     }
 
-    // MARK: Wrong subtitles
+    // MARK: Finding subtitles
 
     /// Bazarr, once its address and key are saved in Settings.
     var bazarr: BazarrClient? { session.bazarr.client }
 
-    func openSubtitleFix(_ sheet: SubtitleSheet) {
-        if subtitleFix == nil {
-            let showing = subtitle?.track?.language.code.map { TrackLanguage(code: $0) }
-            subtitleFix = SubtitleFix(model: self, language: showing ?? session.settings.subtitles.language)
-        }
-        subtitleFix?.open()
-        subtitleSheet = sheet
+    func findSubtitles() {
+        subtitleFinder.find(in: self)
     }
 
     /// Reads the item again for its subtitle files. Nil once another item or file plays.
@@ -2354,22 +2334,6 @@ final class PlayerModel: Identifiable {
         pickSubtitle(.track(track.id))
         await loadTask?.value
         return subtitle?.track?.id == track.id && subtitleProblem == nil
-    }
-
-    /// A subtitle file was deleted from the server: it leaves the menu, and the screen if it was showing.
-    func removed(_ track: SubtitleTrack) async {
-        let key = item.ratingKey
-        let reloaded: PlexPart?
-        do { reloaded = try await reloadPart() } catch { reloaded = part }
-        guard key == item.ratingKey, var fresh = reloaded else { return }
-        fresh.streams.removeAll { $0.id == track.id }
-        setPart(fresh)
-        if handSubtitle == .track(track.id) { handSubtitle = nil }
-        if sidecarID == track.id {
-            sidecar = nil
-            sidecarID = nil
-        }
-        if subtitle?.track?.id == track.id { reroute(handPick: false) }
     }
 
     /// What Bazarr is asked to find: the movie, or the episode by its show.

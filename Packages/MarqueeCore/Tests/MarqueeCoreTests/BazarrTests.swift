@@ -98,17 +98,15 @@ struct BazarrTests {
         let (client, transport) = Self.client { _ in
             json(["data": [
                 ["provider": "podnapisi", "subtitle": "b", "language": "en", "score": 61.5, "hearing_impaired": "False",
-                 "forced": "False", "original_format": false, "release_info": ["Show.S01E02.WEB"], "uploader": ""],
+                 "forced": "False", "original_format": false, "release_info": ["Show.S01E02.WEB"]],
                 ["provider": "opensubtitlescom", "subtitle": "a", "language": "en", "score": 93.33, "hearing_impaired": "True",
-                 "forced": "False", "original_format": false, "release_info": [], "uploader": "kim"],
+                 "forced": "False", "original_format": false, "release_info": []],
                 ["provider": "broken"],
             ]])
         }
         let offers = try await client.search(.episode(seriesID: 7, episodeID: 71))
         #expect(offers.map(\.provider) == ["opensubtitlescom", "podnapisi"])
-        #expect(offers[0].isHearingImpaired && offers[0].uploader == "kim")
-        #expect(offers[1].releases == ["Show.S01E02.WEB"] && offers[1].uploader == nil)
-        #expect(offers.map(\.name) == ["OpenSubtitles.com", "Show.S01E02.WEB"])
+        #expect(offers[0].isHearingImpaired && offers[1].releases == ["Show.S01E02.WEB"])
         #expect(offers.map(\.providerName) == ["OpenSubtitles.com", "Podnapisi"])
         let request = try #require(await transport.requests(to: "/bazarr/api/providers/episodes").first)
         #expect(request.url.query("episodeid") == "71" && request.url.query("seriesid") == "7")
@@ -118,7 +116,7 @@ struct BazarrTests {
         let (client, transport) = Self.client { _ in PlexHTTPResponse(status: 204, body: Data()) }
         let offer = BazarrSubtitle(
             provider: "opensubtitlescom", subtitle: "a+b/c=", language: "en", isHearingImpaired: true, isForced: false,
-            score: 93, releases: [], uploader: nil, usesOriginalFormat: false
+            score: 93, releases: [], usesOriginalFormat: false
         )
         try await client.download(offer, for: .movie(radarrID: 3))
         let request = try #require(await transport.requests(to: "/bazarr/api/providers/movies").first)

@@ -24,7 +24,7 @@ struct SubtitleSearchTests {
         [
             "provider": provider, "subtitle": "\(provider)-\(score)", "language": language, "score": score,
             "hearing_impaired": hi ? "True" : "False", "forced": forced ? "True" : "False", "original_format": false,
-            "release_info": ["Alive.2020.1080p.\(provider)"], "uploader": "",
+            "release_info": ["Alive.2020.1080p.\(provider)"],
         ]
     }
 
@@ -93,7 +93,7 @@ struct SubtitleSearchTests {
         BazarrSubtitle(
             provider: offer["provider"] as! String, subtitle: offer["subtitle"] as! String, language: offer["language"] as! String,
             isHearingImpaired: offer["hearing_impaired"] as? String == "True", isForced: offer["forced"] as? String == "True",
-            score: offer["score"] as! Double, releases: offer["release_info"] as! [String], uploader: nil, usesOriginalFormat: false
+            score: offer["score"] as! Double, releases: offer["release_info"] as! [String], usesOriginalFormat: false
         )
     }
 }

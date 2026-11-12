@@ -2,7 +2,6 @@ import MarqueeCore
 import SwiftUI
 
 struct SubtitleStyleView: View {
-    var imageSubtitles = false
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
     @State private var sample = SubtitleSample.accents
@@ -12,69 +11,53 @@ struct SubtitleStyleView: View {
         @Bindable var session = session
         let look = session.settings.subtitleStyle
         List {
-            if imageSubtitles {
-                Section {
-                    Text("These subtitles are images supplied by the video. Colour and brightness tint the image; its text, size and position cannot be changed here.")
-                        .foregroundStyle(theme.ink2)
-                        .accessibilityIdentifier("style.imageNote")
-                }
-                .listRowBackground(theme.sheet)
-                Section("Image appearance") {
-                    picker("Colour", "colour", $session.settings.subtitleStyle.colour, SubtitleLook.TextColour.allCases, \.title)
-                    Toggle("Soften brightness", isOn: $session.settings.subtitleStyle.blendsWithVideo)
-                        .tint(theme.accent)
-                        .accessibilityIdentifier("style.blend")
-                }
-                .listRowBackground(theme.sheet)
-            } else {
-                Section {
-                    SubtitlePreview(look: look, sample: $sample, scene: scene)
-                        .listRowInsets(EdgeInsets())
-                } footer: {
-                    Text(look.isCustom ? "Your own mix of settings. Pick a preset to start over." : look.preset.about)
-                        .foregroundStyle(theme.ink2)
-                        .accessibilityIdentifier("style.about")
-                }
-                .listRowBackground(Color.clear)
-
-                Section("Text appearance") {
-                    Picker("Preset", selection: preset) {
-                        ForEach(SubtitleLook.Preset.allCases, id: \.self) { preset in
-                            Text(preset.title).tag(Optional(preset))
-                        }
-                        if look.isCustom { Text("Custom").tag(SubtitleLook.Preset?.none) }
-                    }
-                    .accessibilityIdentifier("style.preset")
-                    NavigationLink {
-                        fontChoices
-                    } label: {
-                        LabeledContent("Font", value: look.font.title)
-                    }
-                    .accessibilityIdentifier("style.font")
-                    picker("Size", "size", $session.settings.subtitleStyle.size, SubtitleLook.sizes, Self.percent)
-                    picker("Colour", "colour", $session.settings.subtitleStyle.colour, SubtitleLook.TextColour.allCases, \.title)
-                    Toggle("Bold", isOn: $session.settings.subtitleStyle.isBold)
-                        .tint(theme.accent)
-                        .accessibilityIdentifier("style.bold")
-                }
-                .listRowBackground(theme.sheet)
-
-                Section {
-                    NavigationLink("Background & outline") { backgroundOptions }
-                        .accessibilityIdentifier("style.backgroundOptions")
-                    NavigationLink("Position") { positionOptions }
-                        .accessibilityIdentifier("style.positionOptions")
-                    NavigationLink("More options") { moreOptions }
-                        .accessibilityIdentifier("style.moreOptions")
-                    NavigationLink("Preview options") { previewOptions }
-                        .accessibilityIdentifier("style.previewOptions")
-                    if look.isCustom {
-                        Button("Reset to \(look.preset.title)") { session.settings.subtitleStyle.resetToPreset() }
-                            .accessibilityIdentifier("style.reset")
-                    }
-                }
-                .listRowBackground(theme.sheet)
+            Section {
+                SubtitlePreview(look: look, sample: $sample, scene: scene)
+                    .listRowInsets(EdgeInsets())
+            } footer: {
+                Text(look.isCustom ? "Your own mix of settings. Pick a preset to start over." : look.preset.about)
+                    .foregroundStyle(theme.ink2)
+                    .accessibilityIdentifier("style.about")
             }
+            .listRowBackground(Color.clear)
+
+            Section("Text appearance") {
+                Picker("Preset", selection: preset) {
+                    ForEach(SubtitleLook.Preset.allCases, id: \.self) { preset in
+                        Text(preset.title).tag(Optional(preset))
+                    }
+                    if look.isCustom { Text("Custom").tag(SubtitleLook.Preset?.none) }
+                }
+                .accessibilityIdentifier("style.preset")
+                NavigationLink {
+                    fontChoices
+                } label: {
+                    LabeledContent("Font", value: look.font.title)
+                }
+                .accessibilityIdentifier("style.font")
+                picker("Size", "size", $session.settings.subtitleStyle.size, SubtitleLook.sizes, Self.percent)
+                picker("Colour", "colour", $session.settings.subtitleStyle.colour, SubtitleLook.TextColour.allCases, \.title)
+                Toggle("Bold", isOn: $session.settings.subtitleStyle.isBold)
+                    .tint(theme.accent)
+                    .accessibilityIdentifier("style.bold")
+            }
+            .listRowBackground(theme.sheet)
+
+            Section {
+                NavigationLink("Background & outline") { backgroundOptions }
+                    .accessibilityIdentifier("style.backgroundOptions")
+                NavigationLink("Position") { positionOptions }
+                    .accessibilityIdentifier("style.positionOptions")
+                NavigationLink("More options") { moreOptions }
+                    .accessibilityIdentifier("style.moreOptions")
+                NavigationLink("Preview options") { previewOptions }
+                    .accessibilityIdentifier("style.previewOptions")
+                if look.isCustom {
+                    Button("Reset to \(look.preset.title)") { session.settings.subtitleStyle.resetToPreset() }
+                        .accessibilityIdentifier("style.reset")
+                }
+            }
+            .listRowBackground(theme.sheet)
         }
         .themedList(theme)
         .accessibilityIdentifier("style.list")

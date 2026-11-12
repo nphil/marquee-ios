@@ -88,7 +88,6 @@ public struct BazarrSubtitle: Sendable, Hashable, Identifiable {
     public var score: Double
     /// Release names the subtitle was made for.
     public var releases: [String]
-    public var uploader: String?
     public var usesOriginalFormat: Bool
 
     public var id: String { provider + "/" + subtitle }
@@ -97,9 +96,6 @@ public struct BazarrSubtitle: Sendable, Hashable, Identifiable {
 
     /// What the track it becomes holds.
     public var kind: SubtitleTrack.Kind { isForced ? .onScreenText : isHearingImpaired ? .captions : .full }
-
-    /// The release it was made for, else the provider.
-    public var name: String { releases.first { !$0.isEmpty } ?? providerName }
 
     /// The provider as its site names itself; Bazarr sends its own lower-case id.
     public var providerName: String {
@@ -387,7 +383,7 @@ public struct BazarrClient: Sendable {
         let subtitle: BazarrSubtitle?
 
         enum CodingKeys: String, CodingKey {
-            case provider, subtitle, language, score, uploader
+            case provider, subtitle, language, score
             case hearingImpaired = "hearing_impaired", forced, originalFormat = "original_format", releaseInfo = "release_info"
         }
 
@@ -397,12 +393,10 @@ public struct BazarrClient: Sendable {
                 subtitle = nil
                 return
             }
-            let uploader = c.string(.uploader).flatMap { $0.isEmpty ? nil : $0 }
             subtitle = BazarrSubtitle(
                 provider: provider, subtitle: handle, language: language,
                 isHearingImpaired: c.bool(.hearingImpaired) ?? false, isForced: c.bool(.forced) ?? false,
-                score: c.double(.score) ?? 0, releases: c.list(.releaseInfo), uploader: uploader,
-                usesOriginalFormat: c.bool(.originalFormat) ?? false
+                score: c.double(.score) ?? 0, releases: c.list(.releaseInfo), usesOriginalFormat: c.bool(.originalFormat) ?? false
             )
         }
     }

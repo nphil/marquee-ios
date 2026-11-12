@@ -126,13 +126,24 @@ final class PlayerScreenshotTests: XCTestCase {
     }
 
     @MainActor
-    func testWrongSubtitlesAndBazarr() throws {
-        try subtitleFixFlow(mode: "dark", suffix: "rose-pine")
+    func testFindSubtitlesFromBazarr() throws {
+        try findSubtitlesFlow(mode: "dark", suffix: "rose-pine")
     }
 
     @MainActor
-    func testWrongSubtitlesAndBazarrInLightTheme() throws {
-        try subtitleFixFlow(mode: "light", suffix: "paper")
+    func testFindSubtitlesFromBazarrInLightTheme() throws {
+        try findSubtitlesFlow(mode: "light", suffix: "paper")
+    }
+
+    /// Bazarr out of reach: the same Find English Subtitles goes on to Plex's own agents by itself.
+    @MainActor
+    func testFindSubtitlesFallsBackToPlex() throws {
+        let app = launchPlayer(at: 61, paused: true, mode: "dark", bazarr: "http://bazarr-offline.local:6767")
+        tracksMenuRow("Find English Subtitles", in: app).tap()
+        let found = subtitleSearch("English subtitles on", in: app)
+        XCTAssertTrue(found.waitForExistence(timeout: 30), "Plex's file did not come on: \(element("player.subtitleSearch", in: app).label)")
+        XCTAssertTrue(found.label.contains("From Plex"), "The file did not come from Plex: \(found.label)")
+        try snap("player-15-subtitles-from-plex-rose-pine")
     }
 
     @MainActor
@@ -172,15 +183,17 @@ final class PlayerRouteMenuScreenshots: XCTestCase {
     }
 }
 
-final class SubtitleSearchScreenshots: XCTestCase {
+/// Subtitle Style open in the Tracks menu, on a phone on its side and upright. Besides the standard
+/// simulator, CI runs these on the smallest and largest iPhone simulators; the shots carry the screen's size.
+final class SubtitleStyleMenuScreenshots: XCTestCase {
     @MainActor
-    func testSearchPortrait() throws {
-        try subtitleSearchFlow(orientation: .portrait, suffix: "portrait")
+    func testStyleMenuLandscape() throws {
+        try subtitleStyleMenuFlow(orientation: .landscapeLeft)
     }
 
     @MainActor
-    func testSearchLandscape() throws {
-        try subtitleSearchFlow(orientation: .landscapeLeft, suffix: "landscape")
+    func testStyleMenuPortrait() throws {
+        try subtitleStyleMenuFlow(orientation: .portrait)
     }
 }
 
@@ -207,8 +220,8 @@ final class PlayerAccessibilityScreenshots: XCTestCase {
     }
 
     @MainActor
-    func testWrongSubtitlesAndBazarr() throws {
-        try subtitleFixFlow(mode: "dark", suffix: "ax")
+    func testFindSubtitles() throws {
+        try findSubtitlesFlow(mode: "dark", suffix: "ax")
     }
 
     @MainActor
@@ -218,15 +231,21 @@ final class PlayerAccessibilityScreenshots: XCTestCase {
 }
 
 private extension XCTestCase {
+    /// The Subtitle Style submenu over the picture: its rows inside the screen, and no sheet.
     @MainActor
-    func subtitleSearchFlow(orientation: UIDeviceOrientation, suffix: String) throws {
-        let app = launchPlayer(at: 61, paused: true, mode: "dark", bazarr: true)
+    func subtitleStyleMenuFlow(orientation: UIDeviceOrientation) throws {
+        let app = launchPlayer(at: 61, paused: true, mode: "dark")
         XCUIDevice.shared.orientation = orientation
         defer { XCUIDevice.shared.orientation = .portrait }
-        tracksMenuRow("Search Subtitles", in: app).tap()
-        XCTAssertTrue(element("subtitleSearch.language", in: app).waitForExistence(timeout: 10))
-        XCTAssertTrue(element("bazarr.result", in: app).waitForExistence(timeout: 10))
-        try snap("subtitle-search-\(suffix)")
+        openSubtitleStyle(in: app)
+        let screen = app.windows.firstMatch.frame
+        for row in ["Look", "Size", "Colour", "Position", "Reveal as Spoken"] {
+            let item = menuRow(row, in: app, hasValue: true)
+            XCTAssertTrue(item.map { screen.contains($0.frame) } ?? false, "The \(row) row is not on the screen")
+        }
+        let width = Int(min(screen.width, screen.height)), height = Int(max(screen.width, screen.height))
+        let place = orientation.isLandscape ? "landscape" : "portrait"
+        try snap("player-33-subtitle-style-\(place)-\(width)x\(height)-rose-pine")
     }
 
     /// Paused mid-episode: the controls on the phone's side and upright, the audio and subtitles menu
@@ -246,9 +265,10 @@ private extension XCTestCase {
         XCTAssertTrue(labelled("Off", in: app).waitForExistence(timeout: 5), "The tracks menu does not open on the subtitle choices")
         XCTAssertFalse(labelled("Subtitles…", in: app).exists, "The subtitle choices are behind a row of their own")
         try snap("player-02-tracks-menu-\(suffix)")
-        for row in ["English", "Search Subtitles", "Subtitle Style"] {
+        for row in ["English", "Find English Subtitles"] {
             XCTAssertNotNil(menuRow(row, in: app), "No \(row) row in the tracks menu")
         }
+        XCTAssertNotNil(menuRow("Subtitle Style", in: app, hasValue: true), "No Subtitle Style row in the tracks menu")
         dismissMenu(in: app)
 
         tap("player.more", in: app)
@@ -413,82 +433,55 @@ private extension XCTestCase {
         try snap("player-12-next-episode-\(suffix)")
     }
 
-    /// "Wrong Subtitles?" on the episode's own English track, Bazarr's results, a download that Plex
-    /// lists and the player shows, that file removed from Plex again, then one Plex's own agents add.
+    /// Find English Subtitles with Bazarr set up: only Off and English to choose from, Bazarr's best
+    /// English file downloaded, listed by Plex and put on screen with the outcome in a banner, then
+    /// Reveal as Spoken from Subtitle Style in the same menu, SpeechDock timing the file's lines.
     @MainActor
-    func subtitleFixFlow(mode: String, suffix: String) throws {
-        let app = launchPlayer(at: 61, paused: true, mode: mode, bazarr: true, speechDock: true)
+    func findSubtitlesFlow(mode: String, suffix: String) throws {
+        let app = launchPlayer(at: 61, paused: true, mode: mode, bazarr: "http://bazarr.local:6767", speechDock: true)
 
-        tracksMenuRow("English", in: app).tap()
-        openWrongSubtitles(in: app)
-        let removal = element("subtitleFix.removal", in: app)
-        XCTAssertTrue(removal.waitForExistence(timeout: 5), "No removal line")
-        XCTAssertEqual(removal.label, "Part of the video file, so it can't be removed.", "An embedded track offers removal")
-        try snap("player-13-wrong-subtitles-\(suffix)")
+        tap("player.tracks", in: app)
+        XCTAssertTrue(labelled("Off", in: app).waitForExistence(timeout: 5), "The tracks menu did not open")
+        let others = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Spanish' OR label BEGINSWITH 'Español' OR label CONTAINS 'SDH'"))
+        XCTAssertFalse(others.firstMatch.exists, "The subtitle choices list the file's other tracks")
+        let find = menuRow("Find English Subtitles", in: app)
+        XCTAssertNotNil(find, "No Find English Subtitles row")
+        find?.tap()
+        XCTAssertTrue(element("player.subtitleSearch", in: app).waitForExistence(timeout: 5), "No search status over the picture")
+        let found = subtitleSearch("English subtitles on", in: app)
+        XCTAssertTrue(found.waitForExistence(timeout: 30), "Bazarr's file did not come on: \(element("player.subtitleSearch", in: app).label)")
+        XCTAssertTrue(found.label.contains("From Bazarr"), "The file did not come from Bazarr: \(found.label)")
+        try snap("player-13-subtitles-found-\(suffix)")
 
-        scrollList(app.collectionViews["subtitleFix.wrong"], to: element("subtitleFix.findAnother", in: app)).tap()
-        // The language picker comes with the results; at accessibility sizes they start below it.
-        XCTAssertTrue(element("subtitleSearch.language", in: app).waitForExistence(timeout: 10), "No subtitle search")
-        try snap("player-14-bazarr-results-\(suffix)")
-
-        scrollList(app.collectionViews["subtitleFix.search"], to: element("bazarr.result", in: app)).tap()
-        let state = element("bazarr.state", in: app)
-        XCTAssertTrue(state.waitForExistence(timeout: 5), "The download did not start")
-        XCTAssertTrue(state.wait(for: \.label, toEqual: "Active in player", timeout: 20), "The download did not show: \(state.label)")
-        try snap("player-15-bazarr-downloaded-\(suffix)")
-
-        tap("subtitleFix.done", in: app)
-        XCTAssertTrue(element("subtitleFix.search", in: app).waitForNonExistence(timeout: 5), "The sheet did not close")
-        try snap("player-16-downloaded-subtitle-\(suffix)")
-
-        openWrongSubtitles(in: app)
-        let showing = element("subtitleFix.showing", in: app)
-        XCTAssertTrue(showing.waitForExistence(timeout: 5), "Nothing is named as showing")
-        XCTAssertTrue(showing.label.hasSuffix("A separate file next to the video"), "The download is not the subtitle showing: \(showing.label)")
-        scrollList(app.collectionViews["subtitleFix.wrong"], to: element("subtitleFix.remove", in: app)).tap()
-        let confirm = labelled("Remove Subtitle", in: app)
-        XCTAssertTrue(confirm.waitForExistence(timeout: 5), "Removal was not confirmed first")
-        try snap("player-17-remove-subtitle-\(suffix)")
-
-        confirm.tap()
-        XCTAssertTrue(removal.wait(for: \.label, toEqual: "Removed from Plex.", timeout: 10), "No word that the file was removed: \(removal.label)")
-        try snap("player-18-subtitle-removed-\(suffix)")
-
-        scrollList(app.collectionViews["subtitleFix.wrong"], to: element("subtitleFix.findAnother", in: app)).tap()
-        scrollList(app.collectionViews["subtitleFix.search"], to: element("subtitleSearch.more", in: app)).tap()
-        let plexResult = element("plex.result", in: app)
-        XCTAssertTrue(plexResult.waitForExistence(timeout: 10), "No Plex results")
-        try snap("player-19-plex-results-\(suffix)")
-
-        scrollList(app.collectionViews["subtitleFix.search"], to: plexResult).tap()
-        let plexState = element("plex.state", in: app)
-        XCTAssertTrue(plexState.waitForExistence(timeout: 5), "The Plex download did not start")
-        XCTAssertTrue(plexState.wait(for: \.label, toEqual: "Active in player", timeout: 20), "The Plex download did not show: \(plexState.label)")
-        try snap("player-20-plex-added-\(suffix)")
-
-        // Reveal as Spoken on the file Plex added: SpeechDock times its English lines.
-        tap("subtitleFix.done", in: app)
-        XCTAssertTrue(element("subtitleFix.search", in: app).waitForNonExistence(timeout: 5), "The sheet did not close")
-        tracksMenuRow("Subtitle Style", in: app).tap()
-        waitForBar("Subtitle Style", in: app)
-        // A landscape sheet ignores app.swipeUp, so the style list is dragged to the row.
-        scrollList(app.collectionViews["style.list"], to: element("style.moreOptions", in: app)).tap()
-        waitForBar("More options", in: app)
-        reveal("style.reveal", in: app).tap()
-        let word = app.buttons["Word by Word"]
+        openSubtitleStyle(in: app)
+        try snap("player-14-subtitle-style-\(suffix)")
+        let reveal = menuRow("Reveal as Spoken", in: app, hasValue: true)
+        XCTAssertNotNil(reveal, "No Reveal as Spoken row")
+        reveal?.tap()
+        let word = labelled("Word by Word", in: app)
         XCTAssertTrue(word.waitForExistence(timeout: 5), "No Word by Word reveal")
         word.tap()
-        // Done stands on the sheet's first page only; More options has the back button.
-        app.navigationBars["More options"].buttons["Subtitle Style"].tap()
-        app.navigationBars["Subtitle Style"].buttons["Done"].tap()
-        XCTAssertTrue(app.navigationBars["Subtitle Style"].waitForNonExistence(timeout: 5), "The style sheet did not close")
+        XCTAssertTrue(word.waitForExistence(timeout: 2), "Choosing a reveal closed the menu")
+        dismissMenu(in: app)
         try snap("player-21-reveal-as-spoken-\(suffix)")
     }
 
+    /// Opens Subtitle Style from the tracks menu: a submenu over the picture, never a sheet.
     @MainActor
-    func openWrongSubtitles(in app: XCUIApplication) {
-        tracksMenuRow("Wrong Subtitles?", in: app).tap()
-        waitFor("subtitleFix.wrong", in: app)
+    func openSubtitleStyle(in app: XCUIApplication) {
+        tap("player.tracks", in: app)
+        let style = menuRow("Subtitle Style", in: app, hasValue: true)
+        XCTAssertNotNil(style, "No Subtitle Style row in the tracks menu")
+        style?.tap()
+        XCTAssertNotNil(menuRow("Reveal as Spoken", in: app, hasValue: true), "Subtitle Style did not open in the menu")
+        XCTAssertFalse(app.navigationBars.firstMatch.exists, "Subtitle Style opened a sheet")
+    }
+
+    /// The Find Subtitles banner once its words begin with `title`.
+    @MainActor
+    func subtitleSearch(_ title: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "player.subtitleSearch", title)).firstMatch
     }
 
     /// Opens the tracks menu and brings the row with `label` into reach.
@@ -500,10 +493,11 @@ private extension XCTestCase {
         return row ?? labelled(label, in: app)
     }
 
-    /// A row of the open menu by its label, once it can be tapped.
+    /// A row of the open menu by its label, once it can be tapped. A row that `hasValue` may read its
+    /// value as part of the label, so only the start is matched.
     @MainActor
-    func menuRow(_ label: String, in app: XCUIApplication) -> XCUIElement? {
-        let row = labelled(label, in: app)
+    func menuRow(_ label: String, in app: XCUIApplication, hasValue: Bool = false) -> XCUIElement? {
+        let row = hasValue ? app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", label)).firstMatch : labelled(label, in: app)
         // A menu still opening has no rows yet; a drag then would land on the player.
         _ = row.waitForExistence(timeout: 3)
         return scrollMenu(in: app) { row.exists && row.isHittable ? row : nil }
@@ -563,11 +557,11 @@ private extension XCTestCase {
 
     /// Opens the player on episode 212 at `seconds` with the phone on its side, and waits until it
     /// has landed there. `introSkipDelay` overrides the profile's intro countdown for this launch;
-    /// `bazarr` sets up the fake Bazarr; `scrub` holds the scrubber at that fraction; `cast` turns the
+    /// `bazarr` sets up Bazarr at that address; `scrub` holds the scrubber at that fraction; `cast` turns the
     /// Chromecast plugin on with FakeCast's receiver; `stall` keeps playback waiting on data.
     @MainActor
     func launchPlayer(
-        at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, bazarr: Bool = false, speechDock: Bool = false,
+        at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, bazarr: String? = nil, speechDock: Bool = false,
         scrub: Double? = nil, cast: Bool = false, stall: Bool = false, quality: Int? = nil, item: String = "212",
         badgeSeconds: Double? = nil, linkTest: Bool = false
     ) -> XCUIApplication {
@@ -585,7 +579,7 @@ private extension XCTestCase {
         ]
         if let introSkipDelay { arguments += ["-marquee.uitest.introSkipDelay", String(introSkipDelay)] }
         if speechDock { arguments += ["-marquee.uitest.speechDock", "http://speechdock.local:8765"] }
-        if bazarr { arguments += ["-marquee.uitest.bazarr", "http://bazarr.local:6767"] }
+        if let bazarr { arguments += ["-marquee.uitest.bazarr", bazarr] }
         if let scrub { arguments += ["-marquee.uitest.scrub", String(scrub)] }
         if cast { arguments += ["-marquee.uitest.cast", "YES"] }
         if stall { arguments += ["-marquee.uitest.stall", "YES"] }

@@ -337,6 +337,66 @@ struct FallbackBanner: View {
     }
 }
 
+/// Find Subtitles' progress and outcome: up while the search runs, then for six seconds.
+struct SubtitleSearchBanner: View {
+    let finder: SubtitleFinder
+    @Environment(\.theme) private var theme
+    @State private var fresh = true
+
+    var body: some View {
+        ZStack {
+            if let status = finder.status, status.tone == .busy || fresh {
+                HStack(spacing: Space.s3) {
+                    icon(status.tone)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(status.title)
+                            .textRole(.label)
+                            .foregroundStyle(theme.ink)
+                        Text(status.detail)
+                            .textRole(.caption)
+                            .foregroundStyle(theme.ink2)
+                            .lineLimit(2)
+                    }
+                }
+                .padding(.horizontal, Space.s4)
+                .padding(.vertical, Space.s3)
+                .background(theme.glassRaised, in: RoundedRectangle(cornerRadius: Radius.row))
+                .overlay(RoundedRectangle(cornerRadius: Radius.row).strokeBorder(theme.edge, lineWidth: 1))
+                .frame(maxWidth: 520)
+                .transition(.opacity)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("player.subtitleSearch")
+            }
+        }
+        .animation(.easeOut(duration: 0.18), value: finder.status)
+        .animation(.easeOut(duration: 0.18), value: fresh)
+        .task(id: finder.status) {
+            fresh = true
+            guard let status = finder.status, status.tone != .busy else { return }
+            try? await Task.sleep(for: .seconds(6))
+            fresh = false
+        }
+    }
+
+    @ViewBuilder
+    private func icon(_ tone: SubtitleFinder.Status.Tone) -> some View {
+        switch tone {
+        case .busy:
+            ProgressView()
+                .tint(theme.info)
+        case .found:
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(theme.positive)
+        case .missing:
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 20, weight: .semibold))
+                .foregroundStyle(theme.warning)
+        }
+    }
+}
+
 /// Moves the subtitles against the picture, a tenth of a second a step, for the playing item only. It sits
 /// on the side of the picture away from the subtitles, so the line being matched stays in sight.
 struct TimingCapsule: View {

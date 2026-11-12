@@ -89,11 +89,14 @@ struct PlayerView: View {
                     .allowsHitTesting(false)
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.94, anchor: .topTrailing)))
             }
-            if model.fallback != nil {
-                FallbackBanner(model: model)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .padding(.top, model.chromeVisible ? 76 : Space.s3)
+            VStack(spacing: Space.s2) {
+                if model.fallback != nil {
+                    FallbackBanner(model: model)
+                }
+                SubtitleSearchBanner(finder: model.subtitleFinder)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .padding(.top, model.chromeVisible ? 76 : Space.s3)
             episodePanel
         }
         .environment(\.theme, theme)
@@ -116,23 +119,6 @@ struct PlayerView: View {
                 PlaybackInfoView(model: model)
             }
             .panel(model, theme: outerTheme, scheme: outerScheme)
-        }
-        .sheet(isPresented: $model.showsStyle) {
-            NavigationStack {
-                SubtitleStyleView(imageSubtitles: model.subtitleIsImage)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { model.showsStyle = false }
-                        }
-                    }
-            }
-            .panel(model, theme: outerTheme, scheme: outerScheme)
-        }
-        .sheet(item: $model.subtitleSheet) { start in
-            if let fix = model.subtitleFix {
-                SubtitleFixSheet(model: model, fix: fix, start: start)
-                    .panel(model, theme: outerTheme, scheme: outerScheme)
-            }
         }
         .onChange(of: model.phase, initial: true) {
             showFormatBadge()
