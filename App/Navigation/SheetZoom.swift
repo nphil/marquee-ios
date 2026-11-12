@@ -19,7 +19,10 @@ extension View {
     @ViewBuilder
     func sheetZoomSource(_ source: SheetZoomSource, in namespace: Namespace.ID?) -> some View {
         if let namespace {
-            matchedTransitionSource(id: source, in: namespace) { $0.clipShape(Circle()) }
+            // The source takes only rounded rectangles; half the 44 pt button's side makes it a circle.
+            matchedTransitionSource(id: source, in: namespace) {
+                $0.clipShape(RoundedRectangle(cornerRadius: Size.barButton / 2, style: .circular))
+            }
         } else {
             self
         }
