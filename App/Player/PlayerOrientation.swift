@@ -62,6 +62,12 @@ enum PlayerOrientation {
         }
     }
 
+    /// On its side the Dynamic Island sits on the trailing edge when the home indicator side is the left
+    /// one (`landscapeLeft`); both sides report the same safe inset, so only this tells which one holds it.
+    static var cutoutIsTrailing: Bool {
+        scene?.effectiveGeometry.interfaceOrientation == .landscapeLeft
+    }
+
     private static var scene: UIWindowScene? {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
         return scenes.first { $0.activationState == .foregroundActive } ?? scenes.first

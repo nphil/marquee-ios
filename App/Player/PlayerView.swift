@@ -29,6 +29,8 @@ struct PlayerView: View {
     /// The format badge of the item that has started, and the item it was shown for: seeks, stalls and
     /// restarts of the same item never show it again.
     @State private var formatBadge: FormatBadge?
+    /// The badge of a first start still waiting for the controls to fade.
+    @State private var pendingBadge: FormatBadge?
     @State private var badgedItem: String?
     @State private var badgeTask: Task<Void, Never>?
     /// The whole screen, safe areas included. A landscape screen gets the episodes as a side panel.
@@ -78,13 +80,14 @@ struct PlayerView: View {
                 timingCapsule
             }
             if let formatBadge {
-                GeometryReader { proxy in
-                    FormatBadgeView(badge: formatBadge, screenShortSide: min(proxy.size.width, proxy.size.height))
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .padding(.top, 76)
-                }
-                .allowsHitTesting(false)
-                .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.94, anchor: .top)))
+                // The corner of the controls' own margins, inside the safe area; it shows only once the
+                // controls have faded, so they never cover it.
+                FormatBadgeView(badge: formatBadge, screenShortSide: min(screen.width, screen.height))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(.horizontal, Space.inset)
+                    .padding(.vertical, sideLayout ? Space.s4 : Space.s2)
+                    .allowsHitTesting(false)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.94, anchor: .topTrailing)))
             }
             if model.fallback != nil {
                 FallbackBanner(model: model)
@@ -134,6 +137,9 @@ struct PlayerView: View {
         .onChange(of: model.phase, initial: true) {
             showFormatBadge()
             model.viewportChanged(size: screen, scale: displayScale)
+        }
+        .onChange(of: model.chromeVisible) {
+            if model.chromeVisible { hideFormatBadge() } else { revealFormatBadge() }
         }
         .onChange(of: screen) { model.viewportChanged(size: screen, scale: displayScale) }
         .onChange(of: displayScale) { model.viewportChanged(size: screen, scale: displayScale) }
@@ -207,10 +213,16 @@ struct PlayerView: View {
         return Group {
             if model.showsEpisodes, sideLayout {
                 GeometryReader { proxy in
+                    // Both sides report the same inset, but only the one beside the Dynamic Island has
+                    // anything in it: the content keeps clear of that side and runs to the edge on the
+                    // other. The panel grows by the inset so the content keeps its width either way.
+                    let cutout = PlayerOrientation.cutoutIsTrailing ? proxy.safeAreaInsets.trailing : 0
                     HStack(spacing: 0) {
                         Spacer(minLength: 0)
                         EpisodeSheet(model: model, side: true) { model.showsEpisodes = false }
-                            .frame(width: max(280, width - proxy.safeAreaInsets.trailing))
+                            .ignoresSafeArea(.container, edges: .horizontal)
+                            .padding(.trailing, cutout)
+                            .frame(width: width + cutout)
                             .simultaneousGesture(
                                 DragGesture(minimumDistance: 30).onEnded { value in
                                     if value.translation.width > 80, value.translation.width > abs(value.translation.height) * 2 {
@@ -227,6 +239,7 @@ struct PlayerView: View {
                             }
                     }
                 }
+                .ignoresSafeArea(.container, edges: .trailing)
                 .environment(\.theme, outerTheme)
                 .environment(\.colorScheme, outerScheme)
                 .tint(outerTheme.accent)
@@ -242,28 +255,44 @@ struct PlayerView: View {
 
     // MARK: Format badge
 
-    /// When an item first plays, its format shows for 1.4 s and fades.
+    /// When an item first plays, its format is made ready; it shows for 1 s once the controls have faded.
     private func showFormatBadge() {
         guard model.phase == .playing, badgedItem != model.item.ratingKey else { return }
         badgedItem = model.item.ratingKey
         let audio = model.audio.flatMap { track in model.part?.streams.first { $0.id == track.id } }
         let badge = FormatBadge.make(video: model.part?.videoStream, media: model.media, audio: audio, route: model.route)
-        guard !badge.isEmpty else { return }
-        let fade: Animation = reduceMotion ? .easeOut(duration: 0.15) : .easeOut(duration: 0.3)
         badgeTask?.cancel()
+        formatBadge = nil
+        pendingBadge = badge.isEmpty ? nil : badge
+        revealFormatBadge()
+    }
+
+    /// Shows the waiting badge when no controls are up. VoiceOver and Switch Control keep the controls up
+    /// for good, so for them it shows at once.
+    private func revealFormatBadge() {
+        guard let badge = pendingBadge, model.phase == .playing, !model.chromeVisible || voiceOver || switchControl else { return }
+        pendingBadge = nil
+        let fade: Animation = reduceMotion ? .easeOut(duration: 0.15) : .easeOut(duration: 0.3)
         withAnimation(fade) { formatBadge = badge }
         #if DEBUG
         // A UI test lengthens the hold so a slow runner can still see the badge.
         let override = UserDefaults.standard.double(forKey: "marquee.uitest.badgeSeconds")
-        let hold = override > 0 ? override : 1.4
+        let hold = override > 0 ? override : 1
         #else
-        let hold = 1.4
+        let hold = 1.0
         #endif
         badgeTask = Task {
             try? await Task.sleep(for: .seconds(hold))
             guard !Task.isCancelled else { return }
             withAnimation(fade) { formatBadge = nil }
         }
+    }
+
+    /// The controls came back: the badge leaves rather than sit under or beside them.
+    private func hideFormatBadge() {
+        guard formatBadge != nil, !(voiceOver || switchControl) else { return }
+        badgeTask?.cancel()
+        withAnimation(reduceMotion ? .easeOut(duration: 0.15) : .easeOut(duration: 0.3)) { formatBadge = nil }
     }
 
     // MARK: Gestures

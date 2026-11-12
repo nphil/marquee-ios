@@ -104,9 +104,6 @@ struct EpisodeSheet: View {
         .padding(.horizontal, Space.s3)
         .padding(.top, side ? Space.s2 : Space.s4)
         .padding(.bottom, Space.s2)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(theme.edge).frame(height: 1)
-        }
     }
 
     private var seasonTitle: String {

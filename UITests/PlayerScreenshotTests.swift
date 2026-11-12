@@ -16,14 +16,23 @@ final class PlayerScreenshotTests: XCTestCase {
         try panelsFlow(mode: "light", suffix: "paper")
     }
 
-    /// The first start shows the file's format for a moment. The hold is lengthened for this launch so a
+    /// The first start shows the file's format for a moment, but only once the controls have faded, in the
+    /// top trailing corner inside the controls' own margins. The hold is lengthened for this launch so a
     /// loaded runner can catch it; Sintel is 4K Dolby Vision with Atmos.
     @MainActor
     func testFormatBadgeShowsOnFirstStart() throws {
         let app = launchPlayer(at: 0, paused: false, mode: "dark", item: "108", badgeSeconds: 6)
-        waitFor("player.formatBadge", in: app)
+        // The controls are up at first and fade 3 s into the playing picture; the badge waits for that.
+        let controls = element("player.playPause", in: app)
+        let badge = element("player.formatBadge", in: app)
+        XCTAssertTrue(badge.waitForExistence(timeout: 20), "No format badge")
+        XCTAssertFalse(controls.exists, "The badge showed while the controls were up")
+        let screen = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(badge.frame.midX, screen.midX, "The badge is not on the trailing side")
+        XCTAssertLessThan(badge.frame.minY, screen.minY + screen.height * 0.25, "The badge is not at the top")
+        XCTAssertLessThanOrEqual(badge.frame.maxX, screen.maxX - 16, "The badge is inside the screen margin")
         try snap("player-11-format-badge-rose-pine")
-        XCTAssertTrue(element("player.formatBadge", in: app).waitForNonExistence(timeout: 15), "The badge did not fade")
+        XCTAssertTrue(badge.waitForNonExistence(timeout: 15), "The badge did not fade")
     }
 
     @MainActor
@@ -291,6 +300,8 @@ private extension XCTestCase {
         // The list opens on the playing episode, also when large text leaves room for one row.
         let playing = element("player.episode.212", in: app)
         XCTAssertTrue(playing.wait(for: \.isHittable, toEqual: true, timeout: 10), "The list did not open on episode 2")
+        // The rows run to the screen's edge on the side away from the Dynamic Island, with no empty strip.
+        XCTAssertGreaterThanOrEqual(playing.frame.maxX, app.windows.firstMatch.frame.maxX - 20, "The rows stop short of the screen edge")
         try snap("player-05-episodes-\(suffix)")
         // The season menu is pinned in the panel's header, above the list.
         waitFor("player.episodes.close", in: app)
