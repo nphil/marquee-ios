@@ -53,6 +53,7 @@ public enum TranscodeLadder {
     public static func search(
         for target: DownloadTarget,
         attempts: Int = 4,
+        isolation: isolated (any Actor)? = #isolation,
         decide: (Int) async throws -> Answer
     ) async throws -> (cap: Int, answer: Answer) {
         var cap = target.maxVideoBitrateKbps
