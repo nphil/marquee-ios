@@ -8,9 +8,9 @@ A server conversion asks Plex's decision first, as PMS 1.43.5 refused the start 
 
 Unseen until CI: `DownloadFlowTests.testWaitingForWiFi` and its shot `downloads-waiting-wifi-dark`. On a phone: DEVICE-TEST check 20.
 
-## XR glasses (branch `xr`)
+## XR glasses and TV (branch `xr`, TV mode on `tv-mode`)
 
-Built on branch `xr`, not yet on `main`. The XR glasses plugin (DESIGN §8.9) gives glasses that connect as a display (Viture Pro) Marquee's own 1920 × 1080 screen and makes the phone an eyes-free remote. It is off until Settings › XR Glasses turns it on.
+Built on branch `xr`, not yet on `main`. The XR glasses plugin (DESIGN §8.9) gives glasses that connect as a display (Viture Pro) Marquee's own 1920 × 1080 screen and makes the phone an eyes-free remote. It is off until Settings › XR Glasses & TV turns it on. TV mode (branch `tv-mode`, not yet on `main`) lets a TV on USB-C video out or HDMI use the same screen and remote: Core `BigScreen` (display kinds, per-display answers, the layout: 5 % margins and the display's aspect on a TV), `GlassesCenter` decides each display from its kept answer, `BigScreenMetrics` in the environment replaces the fixed canvas size and margins, the TV's own screen decides HDR in `PlaybackCapabilities`, and `GlassesInput` is the one input hook. UI tests `tv-*` and `tv-phone-*`; device check 23. Untested: everything on a real TV, a disabled scene registration handing the display back to iOS for Mirror, and AirPlay.
 
 - Core (`Packages/MarqueeCore/Sources/MarqueeCore/Glasses`): focus grid, swipe steps and coasting, scrub detents, tilt drive, haptic cues, the "When Glasses Connect" choice and the search letter board, with tests.
 - App (`App/Glasses`): `GlassesCenter` (plugin state, connection, the first-connection question), `GlassesScene` (the external-display scene and the black glasses theme), `GlassesNavigator` (pages over the session's own library, Seerr, downloads and Live TV), `GlassesViews` and `GlassesPlayerView`, `GlassesRemote` (the takeover window, touch surface, Core Haptics and Core Motion), `GlassesSettingsView`. `project.yml` adds multiple scenes and the `UIWindowSceneSessionRoleExternalDisplayNonInteractive` configuration.
