@@ -75,8 +75,8 @@ private final class RemoteHost: UIHostingController<GlassesRemoteRoot> {
     override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
 }
 
-/// Home's glasses button while glasses are connected and the phone app shows: it takes the place of the
-/// TV remote button, in the same shape, and brings the glasses' remote back.
+/// Home's big-screen button while a display is connected and the phone app shows: it takes the place of the
+/// TV remote button, in the same shape, and brings the remote back.
 struct GlassesButton: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
@@ -85,7 +85,7 @@ struct GlassesButton: View {
         Button {
             session.glasses.showRemote()
         } label: {
-            Image(systemName: "eyeglasses")
+            Image(systemName: session.glasses.symbol)
                 .font(.system(size: (Size.barButton - 2 * Space.s1) * Size.controlGlyph / Size.control, weight: .semibold))
                 .foregroundStyle(theme.accentText)
                 .frame(width: Size.barButton - 2 * Space.s1, height: Size.barButton - 2 * Space.s1)
@@ -96,10 +96,10 @@ struct GlassesButton: View {
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Glasses Remote")
-        .accessibilityHint("Turns this iPhone into the glasses' remote.")
+        .accessibilityLabel(session.glasses.remoteTitle)
+        .accessibilityHint("Turns this iPhone into the remote for the screen.")
         .accessibilityShowsLargeContentViewer {
-            Label("Glasses Remote", systemImage: "eyeglasses")
+            Label(session.glasses.remoteTitle, systemImage: session.glasses.symbol)
         }
         .accessibilityIdentifier("glasses.button")
     }
@@ -131,7 +131,7 @@ struct GlassesRemoteView: View {
                 .ignoresSafeArea()
             VStack(spacing: Space.s3) {
                 Spacer()
-                Image(systemName: "eyeglasses")
+                Image(systemName: center.symbol)
                     .font(.largeTitle)
                     .foregroundStyle(theme.ink3)
                 Text(navigator.focusTitle)

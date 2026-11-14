@@ -1,23 +1,5 @@
 import Foundation
 
-/// What a connected external display is used for. The first connection asks, and the answer stays
-/// until it is changed in the plugin's settings.
-public enum GlassesUse: String, Codable, CaseIterable, Sendable {
-    case ask
-    /// Marquee draws its own glasses screen and the phone becomes the remote.
-    case glasses
-    /// The display shows a copy of the phone, as iOS does without the plugin.
-    case mirror
-
-    public var title: String {
-        switch self {
-        case .ask: "Ask"
-        case .glasses: "Use as XR Glasses"
-        case .mirror: "Mirror the Phone"
-        }
-    }
-}
-
 /// One key of the letter board search types with on the glasses.
 public enum GlassesKey: Hashable, Sendable {
     case character(Character)

@@ -49,13 +49,11 @@ enum Radius {
     }
 }
 
-/// The glasses screen (DESIGN §8.9): a 1920 × 1080 canvas at scale 1. Its edges look soft through
-/// the lenses, so content keeps well inside the margins, and everything is sized to be read at a glance.
+/// The big screen (DESIGN §8.9): a canvas 1080 high at scale 1, scaled to the display's pixels. Its size
+/// and margins come from the display's `BigScreenLayout`, in the environment as `\.bigScreen`; the tokens
+/// here are the same on glasses and a TV so the layout stays proportional, and everything is sized to be
+/// read at a glance.
 enum GlassesCanvas {
-    static let width: CGFloat = 1920
-    static let height: CGFloat = 1080
-    static let marginX: CGFloat = 144
-    static let marginY: CGFloat = 88
     /// Between rows; between a row's title and its tiles; between tiles; between a tile and its caption.
     static let rowGap: CGFloat = 48
     static let titleGap: CGFloat = 16

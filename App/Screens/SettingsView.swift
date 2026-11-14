@@ -171,7 +171,7 @@ struct SettingsView: View {
                 NavigationLink {
                     GlassesSettingsView()
                 } label: {
-                    LabeledContent("XR Glasses") {
+                    LabeledContent("XR Glasses & TV") {
                         Text(session.glasses.isEnabled ? "On" : "Off")
                             .foregroundStyle(theme.ink2)
                     }

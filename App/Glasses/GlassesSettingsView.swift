@@ -1,8 +1,8 @@
 import MarqueeCore
 import SwiftUI
 
-/// The XR glasses plugin's settings: on or off, what a connected display is for, tilt, and the
-/// remote's gestures.
+/// The big-screen plugin's settings (XR glasses and TVs): on or off, what a connected display is for, what
+/// kind it is, the displays remembered, tilt, and the remote's gestures.
 struct GlassesSettingsView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
@@ -11,21 +11,63 @@ struct GlassesSettingsView: View {
         let glasses = session.glasses
         List {
             Section {
-                Toggle("XR Glasses", isOn: Binding(get: { glasses.isEnabled }, set: { glasses.setEnabled($0) }))
+                Toggle("Big Screen", isOn: Binding(get: { glasses.isEnabled }, set: { glasses.setEnabled($0) }))
                     .accessibilityIdentifier("glasses.enabled")
                 if glasses.isEnabled {
-                    Picker("When Glasses Connect", selection: Binding(get: { glasses.use }, set: { glasses.setUse($0) })) {
-                        ForEach(GlassesUse.allCases, id: \.self) { use in
+                    Picker("When a Display Connects", selection: Binding(get: { glasses.use }, set: { glasses.setUse($0) })) {
+                        ForEach(BigScreenUse.allCases, id: \.self) { use in
                             Text(use.title).tag(use)
                         }
                     }
                     .accessibilityIdentifier("glasses.use")
+                    Picker("Display Type", selection: Binding(get: { glasses.shownKind }, set: { glasses.setKind($0) })) {
+                        ForEach(DisplayKind.allCases, id: \.self) { kind in
+                            Text(kind.title).tag(kind)
+                        }
+                    }
+                    .accessibilityIdentifier("glasses.kind")
                 }
             } footer: {
-                Text("Glasses such as the Viture Pro connect to the iPhone as a display. As XR glasses they get Marquee’s own screen, and the iPhone becomes a remote that works without looking at it. Off, the glasses mirror the phone.")
+                Text("XR glasses such as the Viture Pro, or a TV on USB-C video out or an HDMI adapter, connect to the iPhone as a display. Marquee’s own screen fills it, and the iPhone becomes a remote that works without looking at it. Mirror shows a copy of the phone, as without the plugin. iOS cannot tell glasses from a TV, so Display Type is remembered for each display; with none connected it is what a new display is taken for. A TV keeps clear of its edges and shows the theme’s own dark canvas; glasses show black, which is see-through.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)
+
+            if glasses.isEnabled, let connected = glasses.display {
+                Section("Connected Display") {
+                    LabeledContent(connected.name ?? "Display") {
+                        Text([connected.sizeLabel, "\(connected.refreshRate) Hz"].compactMap { $0 }.joined(separator: " · "))
+                            .foregroundStyle(theme.ink2)
+                    }
+                    .accessibilityIdentifier("glasses.connected")
+                }
+                .listRowBackground(theme.sheet)
+            }
+
+            if glasses.isEnabled, !glasses.displays.displays.isEmpty {
+                Section {
+                    ForEach(glasses.displays.displays) { display in
+                        VStack(alignment: .leading, spacing: Space.s1) {
+                            Text(display.title)
+                                .textRole(.body)
+                                .foregroundStyle(theme.ink)
+                            Text(display.summary)
+                                .textRole(.caption)
+                                .foregroundStyle(theme.ink2)
+                        }
+                        .accessibilityElement(children: .combine)
+                        .swipeActions {
+                            Button("Forget", role: .destructive) { glasses.forget(display.key) }
+                        }
+                    }
+                } header: {
+                    Text("Remembered Displays")
+                } footer: {
+                    Text("Swipe a display to forget it; the next connection asks again.")
+                        .foregroundStyle(theme.ink2)
+                }
+                .listRowBackground(theme.sheet)
+            }
 
             if glasses.isEnabled {
                 Section {
@@ -48,7 +90,7 @@ struct GlassesSettingsView: View {
             }
         }
         .themedList(theme)
-        .navigationTitle("XR Glasses")
+        .navigationTitle("Big Screen: XR Glasses & TV")
         .navigationBarTitleDisplayMode(.inline)
     }
 
