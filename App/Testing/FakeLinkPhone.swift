@@ -77,7 +77,9 @@ final class FakeLinkPhone: LinkWire {
 
     /// Fixes the running clock into the playhead before a change.
     private func settle() {
-        playing?.position = playing?.position(after: Date.now.timeIntervalSince(anchor)) ?? 0
+        if let current = playing {
+            playing?.position = current.position(after: Date.now.timeIntervalSince(anchor))
+        }
         anchor = .now
     }
 
