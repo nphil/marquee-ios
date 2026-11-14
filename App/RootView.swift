@@ -104,17 +104,18 @@ struct RootView: View {
         .onChange(of: BarInputs(theme: theme, typeSize: typeSize, boldText: legibilityWeight == .bold), initial: true) { _, inputs in
             NavigationBarStyle.apply(inputs.theme, typeSize: inputs.typeSize, boldText: inputs.boldText)
         }
-        // The glasses' scene is offered once the phone's screen is up and a server is chosen; the remote
-        // comes up by itself when glasses connect while Marquee is open.
+        // The external display's scene is offered once the phone's screen is up and a server is chosen; the
+        // remote comes up by itself when glasses or a TV connect while Marquee is open.
         .onChange(of: scenePhase == .active && session.state == .ready, initial: true) { _, ready in
             if ready { session.glasses.phoneReady(session: session, themeStore: store) }
         }
         .onChange(of: session.glasses.showsRemote) { session.glasses.syncRemote() }
-        .alert("Use as XR Glasses?", isPresented: Binding(get: { session.glasses.asksToUse }, set: { session.glasses.asksToUse = $0 })) {
-            Button(GlassesUse.glasses.title) { session.glasses.setUse(.glasses) }
-            Button(GlassesUse.mirror.title, role: .cancel) { session.glasses.setUse(.mirror) }
+        .alert(session.glasses.question, isPresented: Binding(get: { session.glasses.asksToUse }, set: { session.glasses.asksToUse = $0 })) {
+            Button("Use as XR Glasses") { session.glasses.answer(.glasses) }
+            Button("Use as TV") { session.glasses.answer(.tv) }
+            Button("Mirror", role: .cancel) { session.glasses.answer(nil) }
         } message: {
-            Text("Marquee shows its own screen on the glasses, and this iPhone becomes a remote that works without looking at it. The answer is kept; Settings › XR Glasses changes it.")
+            Text("Marquee shows its own screen on the display, and this iPhone becomes a remote that works without looking at it. The answer is kept for this display; Settings › Big Screen changes it.")
         }
     }
 

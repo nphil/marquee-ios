@@ -151,3 +151,74 @@ struct GlassesChoicesTests {
         #expect(GlassesKeyboard.rows.flatMap { $0 }.count == 38)
     }
 }
+
+struct BigScreenTests {
+    private let glassesScreen = DisplayIdentity(pixelWidth: 1920, pixelHeight: 1080, refreshRate: 60)
+    private let tvScreen = DisplayIdentity(pixelWidth: 3840, pixelHeight: 2160, refreshRate: 60, name: "  LG OLED  ")
+
+    @Test func glassesKeepTheirCanvasAndWideMargins() {
+        let layout = BigScreenLayout(kind: .glasses, pixelWidth: 3840, pixelHeight: 1080)
+        #expect(layout == .glasses)
+        #expect(layout.width == 1920 && layout.height == 1080)
+        #expect(layout.marginX == 144 && layout.marginY == 88)
+        #expect(layout.usesBlackCanvas)
+    }
+
+    @Test func aTVKeepsFivePercentSafeMarginsAtAnyResolution() {
+        let uhd = BigScreenLayout(kind: .tv, pixelWidth: 3840, pixelHeight: 2160)
+        let hd = BigScreenLayout(kind: .tv, pixelWidth: 1920, pixelHeight: 1080)
+        #expect(uhd == hd)
+        #expect(uhd.width == 1920 && uhd.marginX == 96 && uhd.marginY == 54)
+        #expect(!uhd.usesBlackCanvas)
+        #expect(uhd.scale(fitting: 3840, 2160) == 2)
+    }
+
+    @Test func aTVOfAnotherShapeFillsItWithinLimits() {
+        let ultrawide = BigScreenLayout(kind: .tv, pixelWidth: 2560, pixelHeight: 1080)
+        #expect(ultrawide.width == 2560)
+        #expect(ultrawide.marginX == (ultrawide.width * 0.05).rounded())
+        #expect(BigScreenLayout(kind: .tv, pixelWidth: 3440, pixelHeight: 1440).width == 2560)
+        #expect(BigScreenLayout(kind: .tv, pixelWidth: 5000, pixelHeight: 1000).width == 2560)
+        #expect(BigScreenLayout(kind: .tv, pixelWidth: 1000, pixelHeight: 1000).width == 1440)
+        #expect(BigScreenLayout(kind: .tv, pixelWidth: 0, pixelHeight: 0).width == 1920)
+    }
+
+    @Test func theQuestionNamesTheDisplayByNameThenSize() {
+        #expect(tvScreen.question == "Use Marquee on “LG OLED”?")
+        #expect(glassesScreen.question == "Use Marquee on this 1920 × 1080 display?")
+        #expect(DisplayIdentity(pixelWidth: 0, pixelHeight: 0, refreshRate: 0).question == "Use Marquee on this display?")
+        #expect(DisplayIdentity(pixelWidth: 1080, pixelHeight: 1920, refreshRate: 60).sizeLabel == "1920 × 1080")
+    }
+
+    @Test func aRememberedDisplayOverridesThePagesChoice() {
+        var memory = DisplayMemory()
+        #expect(DisplayOutcome.decide(for: tvScreen, memory: memory, use: .ask, defaultKind: .glasses) == .ask)
+        #expect(DisplayOutcome.decide(for: tvScreen, memory: memory, use: .marquee, defaultKind: .tv) == .marquee(.tv))
+        #expect(DisplayOutcome.decide(for: tvScreen, memory: memory, use: .mirror, defaultKind: .tv) == .mirror)
+
+        memory.remember(tvScreen, kind: .tv, use: .marquee)
+        memory.remember(glassesScreen, kind: .glasses, use: .mirror)
+        #expect(DisplayOutcome.decide(for: tvScreen, memory: memory, use: .mirror, defaultKind: .glasses) == .marquee(.tv))
+        #expect(DisplayOutcome.decide(for: glassesScreen, memory: memory, use: .marquee, defaultKind: .tv) == .mirror)
+    }
+
+    @Test func rememberingReplacesAnAnswerAndNeverKeepsAsk() throws {
+        var memory = DisplayMemory()
+        memory.remember(tvScreen, kind: .glasses, use: .marquee)
+        memory.remember(tvScreen, kind: .tv, use: .marquee)
+        memory.remember(glassesScreen, kind: .glasses, use: .ask)
+        #expect(memory.displays.count == 1)
+        #expect(memory.entry(for: tvScreen)?.kind == .tv)
+        #expect(memory.entry(for: tvScreen)?.summary == "TV · Marquee’s screen")
+
+        let copy = try JSONDecoder().decode(DisplayMemory.self, from: JSONEncoder().encode(memory))
+        #expect(copy == memory)
+        memory.forget(key: tvScreen.key)
+        #expect(memory.displays.isEmpty)
+    }
+
+    @Test func theSavedGlassesAnswerStillReads() {
+        #expect(BigScreenUse(rawValue: "glasses") == .marquee)
+        #expect(BigScreenUse.allCases.map(\.title) == ["Ask", "Use Marquee’s TV Screen", "Mirror"])
+    }
+}

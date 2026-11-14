@@ -10,11 +10,10 @@ struct GlassesPlayerView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
     @Environment(\.displayScale) private var displayScale
-
-    private static let screen = CGSize(width: GlassesCanvas.width, height: GlassesCanvas.height)
+    @Environment(\.bigScreen) private var metrics
 
     var body: some View {
-        let screen = Self.screen
+        let screen = metrics.canvas
         let rect = VideoFrame.rect(aspect: model.aspect, video: model.presentationSize, in: screen, displayScale: displayScale)
         let controls = model.chromeVisible || scrub != nil || !model.isPlaying
         ZStack(alignment: .topLeading) {
@@ -32,7 +31,7 @@ struct GlassesPlayerView: View {
                 .offset(x: rect.minX, y: rect.minY)
                 SubtitleOverlay(
                     model: model, picture: rect, screen: screen,
-                    lift: controls ? GlassesCanvas.marginY + GlassesCanvas.heroHeight / 2 : 0,
+                    lift: controls ? metrics.marginY + GlassesCanvas.heroHeight / 2 : 0,
                     look: session.settings.subtitleStyle
                 )
             }
@@ -44,7 +43,15 @@ struct GlassesPlayerView: View {
         }
         .frame(width: screen.width, height: screen.height)
         .animation(Motion.label, value: controls)
-        .onAppear { model.viewportChanged(size: screen, scale: displayScale) }
+        // A TV plays at its own resolution, so the stream is asked for the display's pixels; the canvas's
+        // points would under-ask on a 4K screen.
+        .onAppear {
+            if let pixels = metrics.pixels {
+                model.viewportChanged(size: pixels, scale: 1)
+            } else {
+                model.viewportChanged(size: screen, scale: displayScale)
+            }
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("glasses.player")
     }
@@ -78,8 +85,8 @@ struct GlassesPlayerView: View {
             }
             timeline
         }
-        .padding(.horizontal, GlassesCanvas.marginX)
-        .padding(.vertical, GlassesCanvas.marginY)
+        .padding(.horizontal, metrics.marginX)
+        .padding(.vertical, metrics.marginY)
     }
 
     private var timeline: some View {
@@ -170,13 +177,14 @@ struct GlassesPlayerView: View {
 struct GlassesLiveView: View {
     let model: LivePlaybackModel
     @Environment(\.theme) private var theme
+    @Environment(\.bigScreen) private var metrics
 
     var body: some View {
         let channel = model.shown
         ZStack(alignment: .topLeading) {
             theme.canvas
             LiveVideoHost(view: model.source.videoView, fills: false)
-                .frame(width: GlassesCanvas.width, height: GlassesCanvas.height)
+                .frame(width: metrics.canvas.width, height: metrics.canvas.height)
             if model.chromeVisible || model.timeshift.isPaused {
                 HStack(spacing: GlassesCanvas.tileGap) {
                     ChannelLogo(channel: channel, side: GlassesCanvas.logo)
@@ -197,8 +205,8 @@ struct GlassesLiveView: View {
                 }
                 .padding(GlassesCanvas.tileGap)
                 .background(theme.glass, in: RoundedRectangle(cornerRadius: GlassesCanvas.radius, style: .continuous))
-                .padding(.horizontal, GlassesCanvas.marginX)
-                .padding(.vertical, GlassesCanvas.marginY)
+                .padding(.horizontal, metrics.marginX)
+                .padding(.vertical, metrics.marginY)
                 .transition(.opacity)
             }
             if model.state == .opening {
@@ -208,7 +216,7 @@ struct GlassesLiveView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .frame(width: GlassesCanvas.width, height: GlassesCanvas.height)
+        .frame(width: metrics.canvas.width, height: metrics.canvas.height)
         .animation(Motion.label, value: model.chromeVisible)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("glasses.live")

@@ -65,6 +65,7 @@ extension GlassesRow {
 struct GlassesPageView: View {
     let page: GlassesPage
     @Environment(\.theme) private var theme
+    @Environment(\.bigScreen) private var screen
 
     var body: some View {
         ZStack(alignment: .topLeading) {
@@ -98,10 +99,10 @@ struct GlassesPageView: View {
                     GlassesRowsView(page: page)
                 }
             }
-            .padding(.horizontal, GlassesCanvas.marginX)
-            .padding(.vertical, GlassesCanvas.marginY)
+            .padding(.horizontal, screen.marginX)
+            .padding(.vertical, screen.marginY)
         }
-        .frame(width: GlassesCanvas.width, height: GlassesCanvas.height, alignment: .topLeading)
+        .frame(width: screen.canvas.width, height: screen.canvas.height, alignment: .topLeading)
     }
 
     private var focusLine: some View {
@@ -370,6 +371,7 @@ private struct GlassesTileView: View {
 struct GlassesPanelView: View {
     let panel: GlassesPanel
     @Environment(\.theme) private var theme
+    @Environment(\.bigScreen) private var screen
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -397,8 +399,8 @@ struct GlassesPanelView: View {
         .frame(width: GlassesCanvas.panelWidth)
         .frame(maxHeight: .infinity)
         .background(theme.sheet, in: RoundedRectangle(cornerRadius: GlassesCanvas.radius, style: .continuous))
-        .padding(.vertical, GlassesCanvas.marginY)
-        .padding(.trailing, GlassesCanvas.marginX)
+        .padding(.vertical, screen.marginY)
+        .padding(.trailing, screen.marginX)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("glasses.panel")
     }
@@ -461,6 +463,7 @@ struct GlassesPanelView: View {
 private struct GlassesToast: View {
     let text: String
     @Environment(\.theme) private var theme
+    @Environment(\.bigScreen) private var screen
 
     var body: some View {
         Text(text)
@@ -470,7 +473,7 @@ private struct GlassesToast: View {
             .frame(height: GlassesCanvas.option)
             .background(theme.glassRaised, in: Capsule())
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-            .padding(.bottom, GlassesCanvas.marginY)
+            .padding(.bottom, screen.marginY)
             .transition(.opacity)
             .accessibilityIdentifier("glasses.toast")
     }

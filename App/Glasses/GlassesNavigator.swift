@@ -1,7 +1,9 @@
 import MarqueeCore
 import SwiftUI
 
-/// One press of the phone remote, as the glasses take it.
+/// One press of a remote, as the big screen takes it, on glasses or a TV. This is the only way input
+/// reaches `GlassesNavigator.handle(_:)`: the iPhone's own touch surface (`RemoteSurfaceView`) sends it, and
+/// another phone's link maps its messages to it. The navigator answers with the haptic cue to play.
 enum GlassesInput: Equatable {
     case move(FocusMove)
     case select

@@ -60,10 +60,14 @@ final class PlaybackCapabilities {
         let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
             .filter { $0.session.role == .windowApplication }
         let scene = scenes.first { $0.activationState == .foregroundActive } ?? scenes.first
-        let screen = scene?.screen
-        let traits = scene?.traitCollection
+        // On a TV the picture goes to the TV, so its screen decides. AVPlayer reports HDR for any screen
+        // that could show it, the phone's included, so a TV with no EDR headroom is SDR here and an HDR
+        // title is tone-mapped for it.
+        let tv = GlassesCenter.live?.tvScreen
+        let screen = tv ?? scene?.screen
+        let traits = tv?.traitCollection ?? scene?.traitCollection
         return HardwareCapabilities.Display(
-            hdrPlaybackEligible: AVPlayer.eligibleForHDRPlayback,
+            hdrPlaybackEligible: AVPlayer.eligibleForHDRPlayback && (tv.map { $0.potentialEDRHeadroom > 1 } ?? true),
             edrHeadroomPotential: Double(screen?.potentialEDRHeadroom ?? 1),
             edrHeadroomCurrent: Double(screen?.currentEDRHeadroom ?? 1),
             maxFramesPerSecond: screen?.maximumFramesPerSecond ?? 60,

@@ -34,6 +34,8 @@ final class SessionStorage {
         static let glassesEnabled = "marquee.glasses.enabled"
         static let glassesUse = "marquee.glasses.use"
         static let glassesTilt = "marquee.glasses.tilt"
+        static let glassesKind = "marquee.glasses.kind"
+        static let glassesDisplays = "marquee.glasses.displays"
         static let tracksPrefix = "marquee."
     }
 
@@ -161,16 +163,28 @@ final class SessionStorage {
         set { defaults.set(newValue.rawValue, forKey: Key.remoteAccess) }
     }
 
-    /// The XR glasses plugin is on, what a connected display is for, and whether tilting the phone
-    /// moves things while the thumb holds. Kept per iPhone, like the glasses.
+    /// The big-screen plugin (XR glasses and TVs) is on, what a connected display is for, which kind a
+    /// display not told apart yet is taken for, the answers kept per display, and whether tilting the phone
+    /// moves things while the thumb holds. Kept per iPhone, like the display.
     var glassesEnabled: Bool {
         get { defaults.bool(forKey: Key.glassesEnabled) }
         set { defaults.set(newValue, forKey: Key.glassesEnabled) }
     }
 
-    var glassesUse: GlassesUse {
-        get { defaults.string(forKey: Key.glassesUse).flatMap(GlassesUse.init(rawValue:)) ?? .ask }
+    var glassesUse: BigScreenUse {
+        get { defaults.string(forKey: Key.glassesUse).flatMap(BigScreenUse.init(rawValue:)) ?? .ask }
         set { defaults.set(newValue.rawValue, forKey: Key.glassesUse) }
+    }
+
+    /// Glasses until a display is told apart, as before TVs were supported.
+    var glassesKind: DisplayKind {
+        get { defaults.string(forKey: Key.glassesKind).flatMap(DisplayKind.init(rawValue:)) ?? .glasses }
+        set { defaults.set(newValue.rawValue, forKey: Key.glassesKind) }
+    }
+
+    var glassesDisplays: DisplayMemory {
+        get { defaults.data(forKey: Key.glassesDisplays).flatMap { try? JSONDecoder().decode(DisplayMemory.self, from: $0) } ?? DisplayMemory() }
+        set { defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.glassesDisplays) }
     }
 
     var glassesTilt: Bool {
