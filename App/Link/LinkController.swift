@@ -11,11 +11,23 @@ final class LinkRemote: RemoteTarget {
     var onCue: ((HapticCue) -> Void)?
     private unowned let link: PhoneLink
     private let haptics = RemoteHaptics()
+    private var clock = ClockOffset()
+    private var pinger: Task<Void, Never>?
 
     init(link: PhoneLink, peer: LinkID, tiltEnabled: Bool) {
         self.link = link
         self.peer = peer
         self.tiltEnabled = tiltEnabled
+        // A few quick pings settle the offset; after that it only needs keeping up with drift.
+        pinger = Task { [weak self] in
+            var count = 0
+            while !Task.isCancelled {
+                guard let self else { return }
+                self.link.send(.ping(sent: ProcessInfo.processInfo.systemUptime))
+                count += 1
+                try? await Task.sleep(for: count < 6 ? .milliseconds(250) : .seconds(3))
+            }
+        }
     }
 
     var phoneName: String { link.linkedPhone(peer)?.name ?? "iPhone" }
@@ -23,9 +35,21 @@ final class LinkRemote: RemoteTarget {
     var status: LinkStatus? { link.presence[peer]?.status }
     var statusAt: Date { link.presence[peer]?.statusAt ?? .now }
 
+    /// Sends an input stamped with when the touch happened, by the other phone's clock once a ping has told
+    /// the two apart, so it can tell how late the input arrived.
     func handle(_ input: GlassesInput) -> HapticCue? {
-        link.send(.input(LinkInput(input)))
+        let touched = input.touchTime ?? ProcessInfo.processInfo.systemUptime
+        link.send(.input(LinkInput(input), at: clock.hostTime(touched)))
         return nil
+    }
+
+    func clockAnswered(sent: Double, host: Double) {
+        clock.add(sent: sent, remote: host, received: ProcessInfo.processInfo.systemUptime)
+    }
+
+    /// Stops asking the other phone for its clock; the remote is going away.
+    func stop() {
+        pinger?.cancel()
     }
 
     func command(_ command: LinkCommand) {

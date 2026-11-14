@@ -182,13 +182,17 @@ extension LinkInput {
         case .holdEnded: self = .holdEnded
         case .slide(let dx, let width): self = .slide(dx: dx, width: width)
         case .nudge(let seconds): self = .nudge(seconds: seconds)
+        case .panBegan: self = .panBegan
+        case .pan(let dx, let dy, _): self = .pan(dx: dx, dy: dy)
+        case .panEnded(let vx, let vy, _): self = .panEnded(vx: vx, vy: vy)
         }
     }
 }
 
 extension GlassesInput {
-    /// The other phone's press as this phone's remote would make it; nil for a slide across no width.
-    init?(_ input: LinkInput) {
+    /// The other phone's press as this phone's remote would make it, `at` when the touch happened by this
+    /// phone's clock; nil for a slide across no width.
+    init?(_ input: LinkInput, at time: TimeInterval?) {
         switch input {
         case .move(let move): self = .move(move)
         case .select: self = .select
@@ -199,6 +203,17 @@ extension GlassesInput {
             guard width > 0 else { return nil }
             self = .slide(dx: dx, width: width)
         case .nudge(let seconds): self = .nudge(seconds)
+        case .panBegan: self = .panBegan
+        case .pan(let dx, let dy): self = .pan(dx: dx, dy: dy, at: time)
+        case .panEnded(let vx, let vy): self = .panEnded(vx: vx, vy: vy, at: time)
+        }
+    }
+
+    /// When the touch behind this input happened, by the phone's clock, for the pans that carry it.
+    var touchTime: TimeInterval? {
+        switch self {
+        case .pan(_, _, let time), .panEnded(_, _, let time): time
+        default: nil
         }
     }
 }

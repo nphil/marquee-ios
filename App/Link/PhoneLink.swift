@@ -282,6 +282,7 @@ final class PhoneLink {
 
     func stopControlling() {
         controlling = nil
+        remote?.stop()
         remote = nil
         window.hide()
     }
@@ -542,10 +543,21 @@ final class PhoneLink {
             rename(peer, to: name)
         case .status(let status):
             presence[peer] = Presence(status: status, statusAt: .now)
-        case .input(let input):
+        case .input(let input, let time):
             guard let session else { return }
-            if let cue = LinkHost.handle(input, in: session) { links[peer]?.wire.send(.cue(cue)) }
+            // A pan's steps come a frame at a time on the display link; each cue goes back as it happens.
+            let reply: GlassesScroller.Cue = { [weak self] cue in
+                self?.links[peer]?.wire.send(.cue(cue))
+                self?.publish()
+            }
+            if let cue = LinkHost.handle(input, at: time, in: session, cues: reply) { reply(cue) }
+            // A pan is many a second, and its steps publish through their cues.
+            if case .pan = input { break }
             publish()
+        case .ping(let sent):
+            links[peer]?.wire.send(.pong(sent: sent, host: ProcessInfo.processInfo.systemUptime))
+        case .pong(let sent, let host):
+            if controlling == peer { remote?.clockAnswered(sent: sent, host: host) }
         case .command(let command):
             guard let session else { return }
             LinkHost.handle(command, in: session)

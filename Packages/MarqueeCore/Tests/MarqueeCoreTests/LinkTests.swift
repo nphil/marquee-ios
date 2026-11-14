@@ -87,6 +87,8 @@ struct LinkMessageTests {
             .hello(name: "Nitin’s iPhone"),
             .input(.move(.left)), .input(.select), .input(.back), .input(.holdBegan), .input(.holdEnded),
             .input(.slide(dx: -12.5, width: 390)), .input(.nudge(seconds: 1.5)),
+            .input(.pan(dx: 3.5, dy: -41.25), at: 10_234.5), .input(.panEnded(vx: 0, vy: -840.5), at: 10_234.6),
+            .input(.panBegan, at: 10_234.4), .input(.select, at: 10_234.7), .ping(sent: 10_000.25), .pong(sent: 10_000.25, host: 55_000.5),
             .command(.playPause), .command(.skip(seconds: -10)), .command(.next), .command(.subtitle(7)), .command(.subtitle(nil)),
             .command(.volume(step: 1)), .command(.volume(step: -1)), .command(.setVolume(0.375)),
             .cue(.scrubDetent), .cue(.volumeStep), .cue(.volumeLimit),
@@ -109,6 +111,9 @@ struct LinkMessageTests {
         #expect(read(#"{"type":"command","command":"volume"}"#) == nil)
         #expect(read(#"{"type":"command","command":"setVolume","level":0.5}"#) == .command(.setVolume(0.5)))
         #expect(read(#"{"type":"status","status":{"inPlayer":false,"volume":0.25}}"#) == .status(LinkStatus(volume: 0.25)))
+        #expect(read(#"{"type":"input","input":"pan","dx":1,"dy":-2,"at":3.5}"#) == .input(.pan(dx: 1, dy: -2), at: 3.5))
+        #expect(read(#"{"type":"input","input":"pan","dx":1}"#) == nil)
+        #expect(read(#"{"type":"pong","sent":1}"#) == nil)
         #expect(read(#"{"type":"teleport"}"#) == nil)
         #expect(read(#"{"type":"input","input":"wiggle"}"#) == nil)
         #expect(read(#"{"type":"input","input":"move","move":"sideways"}"#) == nil)

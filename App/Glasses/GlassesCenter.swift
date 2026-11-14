@@ -160,6 +160,11 @@ final class GlassesCenter {
         isConnected && kind == .tv ? screen : nil
     }
 
+    /// The connected display's screen, whose refresh rate the page's scrolling runs at.
+    var displayScreen: UIScreen? {
+        isConnected ? screen : nil
+    }
+
     /// The remote takes the phone while the glasses show Marquee, a server is chosen, and the phone app
     /// was not picked instead.
     var showsRemote: Bool {

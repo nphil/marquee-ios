@@ -169,40 +169,69 @@ private struct GlassesHeroView: View {
 /// in each row the focused tile kept second from the left once the row runs past the edge.
 private struct GlassesRowsView: View {
     let page: GlassesPage
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         GeometryReader { proxy in
             let rows = page.rows
-            let tops = Self.tops(of: rows)
+            let layout = RowsLayout(rows: rows, height: proxy.size.height)
             let focused = min(page.focus.row, max(rows.count - 1, 0))
-            let total = (tops.last ?? 0) + (rows.last?.height ?? 0)
-            let pinned = rows.indices.contains(focused) && rows[focused].shape == .key ? 0 : tops[safe: focused] ?? 0
-            let shift = min(pinned, max(total - proxy.size.height + GlassesCanvas.focusRoom, 0))
-            let shown = max(focused - 1, 0)..<min(focused + 4, rows.count)
+            // Rows either side of the focus too: a flick lets the page lag a little behind it.
+            let shown = max(focused - 2, 0)..<min(focused + 6, rows.count)
             ZStack(alignment: .topLeading) {
                 ForEach(rows[shown]) { row in
                     let index = rows.firstIndex { $0.id == row.id } ?? 0
-                    GlassesRowView(row: row, column: page.focus.column(inRow: index), focused: index == focused, width: proxy.size.width)
-                        .offset(y: tops[index] - shift + GlassesCanvas.focusRoom)
+                    GlassesRowView(row: row, index: index, page: page, focused: index == focused, width: proxy.size.width)
+                        .modifier(RowOffset(page: page, layout: layout, index: index))
                 }
             }
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
-            .animation(Motion.spring(reduceMotion: reduceMotion), value: page.focus)
         }
         .clipShape(RowsClip())
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("glasses.rows")
     }
+}
 
-    private static func tops(of rows: [GlassesRow]) -> [CGFloat] {
+/// Where each row sits and how far the rows scroll for a focus at any row, including between two.
+private struct RowsLayout {
+    let tops: [CGFloat]
+    /// How far the rows shift to hold row `i` at the top; the letter board stays put while it has the focus.
+    let pins: [CGFloat]
+    let limit: CGFloat
+
+    init(rows: [GlassesRow], height: CGFloat) {
         var tops: [CGFloat] = []
         var y: CGFloat = 0
         for row in rows {
             tops.append(y)
             y += row.height + row.shape.gapBelow
         }
-        return tops
+        self.tops = tops
+        pins = zip(rows, tops).map { $0.shape == .key ? 0 : $1 }
+        let total = (tops.last ?? 0) + (rows.last?.height ?? 0)
+        limit = max(total - height + GlassesCanvas.focusRoom, 0)
+    }
+
+    /// The shift for a focus `row` rows down, which may lie between two rows.
+    func shift(at row: Double) -> CGFloat {
+        guard !pins.isEmpty else { return 0 }
+        let clamped = min(max(row, 0), Double(pins.count - 1))
+        let lower = Int(clamped.rounded(.down))
+        let upper = min(lower + 1, pins.count - 1)
+        let between = CGFloat(clamped - Double(lower))
+        return min(pins[lower] + (pins[upper] - pins[lower]) * between, limit)
+    }
+}
+
+/// Places a row. It alone reads the page's glide, so the rows are not rebuilt for each frame it moves.
+private struct RowOffset: ViewModifier {
+    let page: GlassesPage
+    let layout: RowsLayout
+    let index: Int
+
+    func body(content: Content) -> some View {
+        let row = page.glide?.row ?? Double(page.focus.row)
+        return content.offset(y: layout.tops[index] - layout.shift(at: row) + GlassesCanvas.focusRoom)
     }
 }
 
@@ -220,16 +249,18 @@ private extension Array {
 
 private struct GlassesRowView: View {
     let row: GlassesRow
-    let column: Int
+    let index: Int
+    let page: GlassesPage
     let focused: Bool
     let width: CGFloat
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let size = row.shape.size
         let step = size.width + GlassesCanvas.tileGap
         let length = CGFloat(row.tiles.count) * step - GlassesCanvas.tileGap
-        let shift = min(CGFloat(max(column - 1, 0)) * step, max(length - width, 0))
+        let column = page.focus.column(inRow: index)
         VStack(alignment: .leading, spacing: GlassesCanvas.titleGap) {
             if let title = row.title {
                 Text(title)
@@ -237,15 +268,34 @@ private struct GlassesRowView: View {
                     .foregroundStyle(focused ? theme.ink : theme.ink2)
                     .lineLimit(1)
                     .frame(height: GlassesCanvas.rowTitle, alignment: .bottomLeading)
+                    .animation(Motion.spring(reduceMotion: reduceMotion), value: focused)
             }
             HStack(alignment: .top, spacing: GlassesCanvas.tileGap) {
                 ForEach(Array(row.tiles.enumerated()), id: \.element.id) { index, tile in
                     GlassesTileView(tile: tile, shape: row.shape, focused: focused && index == column)
                 }
             }
-            .offset(x: -shift)
+            .modifier(ColumnOffset(page: page, index: index, step: step, length: length, width: width))
         }
         .frame(width: width, alignment: .leading)
+    }
+}
+
+/// Slides a row's tiles so the focused one stays second from the left once the row runs past the edge. The
+/// focused row follows the page's glide a frame at a time; this modifier alone reads it, so the tiles are
+/// not rebuilt for each frame.
+private struct ColumnOffset: ViewModifier {
+    let page: GlassesPage
+    let index: Int
+    let step: CGFloat
+    let length: CGFloat
+    let width: CGFloat
+
+    func body(content: Content) -> some View {
+        var column = Double(page.focus.column(inRow: index))
+        if let glide = page.glide, index == page.focus.row { column = glide.column }
+        let shift = min(CGFloat(max(column - 1, 0)) * step, max(length - width, 0))
+        return content.offset(x: -shift)
     }
 }
 
@@ -256,6 +306,7 @@ private struct GlassesTileView: View {
     let shape: GlassesTile.Shape
     let focused: Bool
     @Environment(\.theme) private var theme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let size = shape.size
@@ -284,6 +335,7 @@ private struct GlassesTileView: View {
                 .frame(width: size.width, alignment: .leading)
             }
         }
+        .animation(Motion.spring(reduceMotion: reduceMotion), value: focused)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(tile.title)
         .accessibilityValue(tile.subtitle ?? "")

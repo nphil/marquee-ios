@@ -40,6 +40,18 @@ struct GlassesSettingsView: View {
                             .foregroundStyle(theme.ink2)
                     }
                     .accessibilityIdentifier("glasses.connected")
+                    if let summary = glasses.navigator?.localSummary {
+                        LabeledContent("Touch Delay") {
+                            Text(summary).foregroundStyle(theme.ink2)
+                        }
+                        .accessibilityIdentifier("glasses.latency.local")
+                    }
+                    if let summary = glasses.navigator?.linkedSummary {
+                        LabeledContent("Linked Phone Touch Delay") {
+                            Text(summary).foregroundStyle(theme.ink2)
+                        }
+                        .accessibilityIdentifier("glasses.latency.linked")
+                    }
                 }
                 .listRowBackground(theme.sheet)
             }

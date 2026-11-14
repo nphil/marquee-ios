@@ -39,10 +39,11 @@ enum LinkHost {
         value.isFinite ? max(0, value) : 0
     }
 
-    /// A press on the controlling phone's remote; its cue goes back to that phone.
-    static func handle(_ input: LinkInput, in session: AppSession) -> HapticCue? {
-        guard session.glasses.isConnected, let navigator = session.glasses.navigator, let input = GlassesInput(input) else { return nil }
-        return navigator.handle(input)
+    /// A press on the controlling phone's remote, `at` when the touch happened by this phone's clock. Its cue
+    /// goes back to that phone: returned, or through `cues` when a pan's steps come later, a frame at a time.
+    static func handle(_ input: LinkInput, at time: TimeInterval?, in session: AppSession, cues: @escaping GlassesScroller.Cue) -> HapticCue? {
+        guard session.glasses.isConnected, let navigator = session.glasses.navigator, let input = GlassesInput(input, at: time) else { return nil }
+        return navigator.handle(input, cues: cues)
     }
 
     /// A control for the player on this phone's own screen, or the volume it plays at.

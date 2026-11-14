@@ -1,4 +1,5 @@
 import MarqueeCore
+import os
 import SwiftUI
 
 /// One press of a remote, as the big screen takes it, on glasses or a TV. This is the only way input
@@ -15,6 +16,13 @@ enum GlassesInput: Equatable {
     case slide(dx: Double, width: Double)
     /// While held in the player: tilt's fine adjustment, in seconds.
     case nudge(TimeInterval)
+    /// The thumb touched down; a coast stops.
+    case panBegan
+    /// The thumb is `dx`, `dy` points from where it touched down, `at` when (this phone's clock; nil when
+    /// not known). Whole pages scroll with it continuously; panels, the player and live TV step.
+    case pan(dx: Double, dy: Double, at: TimeInterval?)
+    /// The thumb lifted, moving at `vx`, `vy` points a second.
+    case panEnded(vx: Double, vy: Double, at: TimeInterval?)
 }
 
 /// One tile on a glasses page. The page decides what choosing it does.
@@ -56,6 +64,12 @@ struct GlassesHero {
     var backdrop: String?
 }
 
+/// Where a page draws its focus between items, in rows and columns: whole numbers are the items themselves.
+struct GlassesGlide: Equatable {
+    var row: Double
+    var column: Double
+}
+
 /// One page on the glasses: its rows and where the focus sits in them.
 @MainActor @Observable
 final class GlassesPage: Identifiable {
@@ -70,6 +84,9 @@ final class GlassesPage: Identifiable {
     var query = ""
     /// Runs after each focus move, as when a library loads its next page near the end.
     @ObservationIgnored var onMove: (() -> Void)?
+    /// Where the page draws its focus while the thumb or a move has it between items; nil at rest, when the
+    /// focus itself says. Set by `GlassesScroller` once a frame.
+    var glide: GlassesGlide?
     @ObservationIgnored private var tasks: [Task<Void, Never>] = []
 
     init(title: String, style: FocusGrid.Style = .shelves) {
@@ -146,6 +163,17 @@ final class GlassesNavigator {
     @ObservationIgnored private var searchTask: Task<Void, Never>?
     /// Cues that come after the press: a request sent or refused.
     @ObservationIgnored var onCue: ((HapticCue) -> Void)?
+    @ObservationIgnored private let scroller: GlassesScroller
+    @ObservationIgnored private var legacySteps = SwipeSteps()
+    @ObservationIgnored private var legacyCoast: Task<Void, Never>?
+    @ObservationIgnored private var localLatency = LatencyStats()
+    @ObservationIgnored private var linkedLatency = LatencyStats()
+    @ObservationIgnored private var latencyShownAt: TimeInterval = 0
+    private static let log = Logger(subsystem: "com.nphil.marquee", category: "remote")
+    /// How late a touch on this phone's own remote, and on a linked phone's, was when the page applied it
+    /// ("p50 8 ms · p95 14 ms"); refreshed about once a second, for Settings and the debug log.
+    private(set) var localSummary: String?
+    private(set) var linkedSummary: String?
 
     static let gridColumns = 6
     static let channelColumns = 3
@@ -156,6 +184,8 @@ final class GlassesNavigator {
     init(session: AppSession, center: GlassesCenter) {
         self.session = session
         self.center = center
+        scroller = GlassesScroller(screen: { [weak center] in center?.displayScreen })
+        scroller.onLatency = { [weak self] seconds, linked in self?.record(seconds, linked: linked) }
     }
 
     var page: GlassesPage? { pages.last }
@@ -178,6 +208,7 @@ final class GlassesNavigator {
         panel = nil
         startedFor = nil
         searchTask?.cancel()
+        scroller.stop()
         closeLive()
     }
 
@@ -198,8 +229,24 @@ final class GlassesNavigator {
 
     // MARK: Input
 
-    /// Runs one press of the remote and returns the cue the phone plays for it.
+    /// Runs one press of this phone's own remote and returns the cue the phone plays for it.
     func handle(_ input: GlassesInput) -> HapticCue? {
+        handle(input, cues: nil)
+    }
+
+    /// Runs one press, and for a linked phone's, `cues` takes the cues that follow a pan; a pan from this
+    /// phone's own remote cues through `onCue`.
+    func handle(_ input: GlassesInput, cues: GlassesScroller.Cue?) -> HapticCue? {
+        switch input {
+        case .panBegan:
+            return panBegan()
+        case .pan(let dx, let dy, let time):
+            return pan(dx: dx, dy: dy, at: time, cues: cues)
+        case .panEnded(let vx, let vy, _):
+            return panEnded(vx: vx, vy: vy, cues: cues)
+        default:
+            interruptPan()
+        }
         if let panel { return handle(input, in: panel) }
         if let player { return handle(input, player: player) }
         if let live { return handle(input, live: live) }
@@ -207,11 +254,103 @@ final class GlassesNavigator {
         return handle(input, on: page)
     }
 
+    // MARK: Pan
+
+    /// The page the thumb scrolls continuously: the page itself, not a panel, the player or live TV, which
+    /// step by whole items.
+    private var scrollingPage: GlassesPage? {
+        panel == nil && player == nil && live == nil ? page : nil
+    }
+
+    private func panBegan() -> HapticCue? {
+        legacySteps = SwipeSteps()
+        legacyCoast?.cancel()
+        legacyCoast = nil
+        if let page = scrollingPage { scroller.touchDown(on: page) }
+        return nil
+    }
+
+    /// Where a pan's cues go: a linked phone's reply, or this phone's own remote.
+    private func cueSink(_ cues: GlassesScroller.Cue?) -> GlassesScroller.Cue {
+        if let cues { return cues }
+        return { [weak self] cue in self?.onCue?(cue) }
+    }
+
+    private func pan(dx: Double, dy: Double, at time: TimeInterval?, cues: GlassesScroller.Cue?) -> HapticCue? {
+        let sink = cueSink(cues)
+        if let page = scrollingPage {
+            scroller.pan(dx: dx, dy: dy, at: time, on: page, linked: cues != nil, cue: sink)
+            return nil
+        }
+        if let time { record(ProcessInfo.processInfo.systemUptime - time, linked: cues != nil) }
+        for move in legacySteps.moved(dx: dx, dy: dy) {
+            if let cue = step(move) { sink(cue) }
+        }
+        return nil
+    }
+
+    private func panEnded(vx: Double, vy: Double, cues: GlassesScroller.Cue?) -> HapticCue? {
+        if let page = scrollingPage {
+            scroller.lifted(vx: vx, vy: vy, on: page)
+            return nil
+        }
+        let sink = cueSink(cues)
+        let release = legacySteps.released(vx: vx, vy: vy)
+        if let move = release.step, let cue = step(move) { sink(cue) }
+        if let coast = release.coast { coastLegacy(coast.move, speed: coast.speed, cues: sink) }
+        return nil
+    }
+
+    /// One whole item on a panel, the player or live TV.
+    private func step(_ move: FocusMove) -> HapticCue? {
+        if let panel { return handle(.move(move), in: panel) }
+        if let player { return handle(.move(move), player: player) }
+        if let live { return handle(.move(move), live: live) }
+        return nil
+    }
+
+    /// A hard flick keeps stepping after the thumb lifts, slowing as it goes, and stops at an end.
+    private func coastLegacy(_ move: FocusMove, speed: Double, cues: @escaping GlassesScroller.Cue) {
+        let length = move.isHorizontal ? SwipeSteps.stepAcross : SwipeSteps.stepDown
+        let times = SwipeSteps.coast(speed: speed, step: length)
+        legacyCoast = Task { [weak self] in
+            var clock: TimeInterval = 0
+            for time in times {
+                try? await Task.sleep(for: .seconds(time - clock))
+                clock = time
+                guard !Task.isCancelled, let self, let cue = self.step(move) else { return }
+                cues(cue)
+                if cue == .edge { return }
+            }
+        }
+    }
+
+    /// Any other input ends a pan or coast where it is.
+    private func interruptPan() {
+        legacyCoast?.cancel()
+        legacyCoast = nil
+        scroller.interrupt()
+    }
+
+    private func record(_ seconds: TimeInterval, linked: Bool) {
+        if linked { linkedLatency.add(seconds) } else { localLatency.add(seconds) }
+        let now = ProcessInfo.processInfo.systemUptime
+        guard now - latencyShownAt >= 1 else { return }
+        latencyShownAt = now
+        localSummary = localLatency.summary
+        linkedSummary = linkedLatency.summary
+        #if DEBUG
+        Self.log.debug("touch to apply, local \(self.localSummary ?? "-", privacy: .public), linked \(self.linkedSummary ?? "-", privacy: .public)")
+        #endif
+    }
+
     private func handle(_ input: GlassesInput, on page: GlassesPage) -> HapticCue? {
         switch input {
         case .move(let move):
+            let before = (row: page.focus.row, column: page.focus.column)
             guard page.focus.move(move) == .moved else { return .edge }
             page.onMove?()
+            scroller.moved(on: page, from: before)
             return .focusStep
         case .select:
             guard let tile = page.focusedTile else { return .edge }
@@ -224,7 +363,7 @@ final class GlassesNavigator {
         case .holdBegan:
             openOptions(for: page.focusedTile)
             return .select
-        case .holdEnded, .slide, .nudge:
+        case .holdEnded, .slide, .nudge, .panBegan, .pan, .panEnded:
             return nil
         }
     }
@@ -250,7 +389,7 @@ final class GlassesNavigator {
         case .back:
             self.panel = nil
             return .back
-        case .holdBegan, .holdEnded, .slide, .nudge:
+        case .holdBegan, .holdEnded, .slide, .nudge, .panBegan, .pan, .panEnded:
             return nil
         }
     }
@@ -300,6 +439,8 @@ final class GlassesNavigator {
             model.endScrub(at: scrub.time)
             self.scrub = nil
             return .select
+        case .panBegan, .pan, .panEnded:
+            return nil
         }
     }
 
@@ -333,7 +474,7 @@ final class GlassesNavigator {
             ]
             panel = GlassesPanel(title: model.shown.title, options: options)
             return .select
-        case .holdEnded, .slide, .nudge:
+        case .holdEnded, .slide, .nudge, .panBegan, .pan, .panEnded:
             return nil
         }
     }

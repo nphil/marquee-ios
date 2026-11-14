@@ -298,6 +298,9 @@ final class RemoteSurfaceView: UIView {
     private static let scrubRate = 30.0
     /// Points of a two-finger swipe for one volume step.
     private static let volumeStride: CGFloat = 36
+    /// Release velocity is read over this long before the lift, from at most `sampleCount` readings.
+    private static let velocityWindow: TimeInterval = 0.08
+    private static let sampleCount = 32
 
     private weak var target: (any RemoteTarget)?
     private let haptics = RemoteHaptics()
@@ -307,11 +310,10 @@ final class RemoteSurfaceView: UIView {
     private weak var tracked: UITouch?
     private var start = CGPoint.zero
     private var tiltAnchor = CGPoint.zero
-    private var steps = SwipeSteps()
+    private var axisLock = PanScroll()
     private var samples: [(point: CGPoint, time: TimeInterval)] = []
     private var holdTask: Task<Void, Never>?
     private var stillTask: Task<Void, Never>?
-    private var coastTask: Task<Void, Never>?
     /// Tilt scrolling stops pushing into an end it has met, until it turns the other way.
     private var tiltBlocked: FocusMove?
     /// The way tilt last scrolled, which a late edge cue blocks.
@@ -400,11 +402,11 @@ final class RemoteSurfaceView: UIView {
             if phase != .held { abandonTouch() }
             return
         }
-        coastTask?.cancel()
         tracked = touch
         start = touch.location(in: self)
         samples = [(start, touch.timestamp)]
-        steps = SwipeSteps()
+        axisLock = PanScroll()
+        send(.panBegan)
         phase = start.x <= Self.edgeWidth ? .edge : start.y <= Self.topHeight ? .top : .touching
         holdTask = Task { [weak self] in
             try? await Task.sleep(for: Self.holdDelay)
@@ -418,8 +420,12 @@ final class RemoteSurfaceView: UIView {
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = tracked, touches.contains(touch) else { return }
         let point = touch.location(in: self)
-        samples.append((point, touch.timestamp))
-        if samples.count > 6 { samples.removeFirst(samples.count - 6) }
+        // Touches arrive once a frame, each with the readings the screen took since the last: the newest
+        // position goes to the host, and all of them make the release velocity.
+        for reading in event?.coalescedTouches(for: touch) ?? [touch] {
+            samples.append((reading.location(in: self), reading.timestamp))
+        }
+        if samples.count > Self.sampleCount { samples.removeFirst(samples.count - Self.sampleCount) }
         let dx = point.x - start.x, dy = point.y - start.y
         switch phase {
         case .idle, .done:
@@ -433,7 +439,7 @@ final class RemoteSurfaceView: UIView {
                 send(.back)
             } else if abs(dy) >= SwipeSteps.lockDistance, abs(dy) > dx {
                 phase = .touching
-                swipe(dx: dx, dy: dy)
+                swipe(dx: dx, dy: dy, time: touch.timestamp)
             } else if hypot(dx, dy) >= SwipeSteps.lockDistance {
                 holdTask?.cancel()
             }
@@ -444,17 +450,21 @@ final class RemoteSurfaceView: UIView {
                 target?.leave()
             } else if abs(dx) >= SwipeSteps.lockDistance, abs(dx) > dy {
                 phase = .touching
-                swipe(dx: dx, dy: dy)
+                swipe(dx: dx, dy: dy, time: touch.timestamp)
             } else if hypot(dx, dy) >= SwipeSteps.lockDistance {
                 holdTask?.cancel()
             }
         case .tilting:
             guard hypot(point.x - tiltAnchor.x, point.y - tiltAnchor.y) >= SwipeSteps.lockDistance else { return }
             tilt.stop()
+            // The thumb moves again: a new pan from where tilt began.
             phase = .swiping
-            swipe(dx: dx, dy: dy)
+            start = tiltAnchor
+            axisLock = PanScroll()
+            send(.panBegan)
+            swipe(dx: point.x - start.x, dy: point.y - start.y, time: touch.timestamp)
         case .touching, .swiping:
-            swipe(dx: dx, dy: dy)
+            swipe(dx: dx, dy: dy, time: touch.timestamp)
         }
     }
 
@@ -480,11 +490,11 @@ final class RemoteSurfaceView: UIView {
             } else if hypot(point.x - start.x, point.y - start.y) < SwipeSteps.lockDistance {
                 send(.select)
             }
-        case .swiping, .tilting:
+        case .swiping:
             let velocity = velocity(at: (point, touch.timestamp))
-            let release = steps.released(vx: velocity.dx, vy: velocity.dy)
-            if let step = release.step { send(.move(step)) }
-            if let coast = release.coast { self.coast(coast.move, speed: coast.speed) }
+            send(.panEnded(vx: velocity.dx, vy: velocity.dy, at: touch.timestamp))
+        case .tilting:
+            break
         case .held:
             send(.holdEnded)
         case .idle, .done:
@@ -511,8 +521,8 @@ final class RemoteSurfaceView: UIView {
     private func abandonTouch() {
         holdTask?.cancel()
         stillTask?.cancel()
-        coastTask?.cancel()
         tilt.stop()
+        if phase == .swiping { send(.panEnded(vx: 0, vy: 0, at: samples.last?.time)) }
         phase = .done
     }
 
@@ -536,12 +546,15 @@ final class RemoteSurfaceView: UIView {
         haptics.play(cue)
     }
 
-    private func swipe(dx: CGFloat, dy: CGFloat) {
+    /// The thumb is `dx`, `dy` from where it touched down. The first points find the axis here, for holds and
+    /// tilt; the host does the scrolling, and gets one pan a frame, as touches arrive.
+    private func swipe(dx: CGFloat, dy: CGFloat, time: TimeInterval) {
         if hypot(dx, dy) >= SwipeSteps.lockDistance { holdTask?.cancel() }
-        for move in steps.moved(dx: dx, dy: dy) { send(.move(move)) }
-        guard steps.axis != nil else { return }
+        _ = axisLock.moved(dx: dx, dy: dy)
+        guard axisLock.axis != nil else { return }
         phase = .swiping
         stillTask?.cancel()
+        send(.pan(dx: dx, dy: dy, at: time))
         guard target?.tiltEnabled == true else { return }
         stillTask = Task { [weak self] in
             try? await Task.sleep(for: Self.stillDelay)
@@ -550,9 +563,9 @@ final class RemoteSurfaceView: UIView {
         }
     }
 
-    /// Points a second over the last few samples.
+    /// Points a second over the last `velocityWindow` before `last`; none when the thumb had stopped.
     private func velocity(at last: (point: CGPoint, time: TimeInterval)) -> CGVector {
-        guard let first = samples.first, last.time > first.time else { return .zero }
+        guard let first = samples.first(where: { last.time - $0.time <= Self.velocityWindow }), last.time > first.time else { return .zero }
         let seconds = last.time - first.time
         return CGVector(dx: (last.point.x - first.point.x) / seconds, dy: (last.point.y - first.point.y) / seconds)
     }
@@ -571,8 +584,10 @@ final class RemoteSurfaceView: UIView {
     }
 
     private func tiltScroll() {
-        guard let axis = steps.axis else { return }
+        guard let axis = axisLock.axis else { return }
         phase = .tilting
+        // Tilt takes over from the thumb: the page settles on the nearest item.
+        send(.panEnded(vx: 0, vy: 0, at: samples.last?.time))
         tiltAnchor = samples.last?.point ?? start
         tiltBlocked = nil
         tiltMove = nil
@@ -595,20 +610,6 @@ final class RemoteSurfaceView: UIView {
         }
     }
 
-    /// A hard flick keeps stepping after the thumb lifts, slowing as it goes, and stops at an end.
-    private func coast(_ move: FocusMove, speed: Double) {
-        let step = move.isHorizontal ? SwipeSteps.stepAcross : SwipeSteps.stepDown
-        let times = SwipeSteps.coast(speed: speed, step: step)
-        coastTask = Task { [weak self] in
-            var clock: TimeInterval = 0
-            for time in times {
-                try? await Task.sleep(for: .seconds(time - clock))
-                clock = time
-                guard !Task.isCancelled, let self, send(.move(move)) != .edge else { return }
-            }
-        }
-    }
-
     @discardableResult
     private func send(_ input: GlassesInput) -> HapticCue? {
         guard let cue = target?.handle(input) else { return nil }
@@ -623,10 +624,9 @@ final class RemoteSurfaceView: UIView {
 
     private func cueArrived(_ cue: HapticCue) {
         haptics.play(cue)
-        // A linked phone's edge comes after the move that met it; it still stops a coast and tilt.
-        guard cue == .edge else { return }
-        coastTask?.cancel()
-        if phase == .tilting { tiltBlocked = tiltMove }
+        // A linked phone's edge comes after the move that met it; it still stops tilt.
+        guard cue == .edge, phase == .tilting else { return }
+        tiltBlocked = tiltMove
     }
 
     /// A scrub keeps the touch; two fingers then do not turn into a volume swipe.

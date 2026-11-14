@@ -42,13 +42,15 @@ final class FakeLinkPhone: LinkWire {
         switch message {
         case .hello:
             replies.append(.hello(name: Self.name))
-        case .input(let input):
+        case .input(let input, _):
             if let cue = handle(input) { replies.append(.cue(cue)) }
+        case .ping(let sent):
+            replies.append(.pong(sent: sent, host: ProcessInfo.processInfo.systemUptime))
         case .command(let command):
             apply(command)
         case .status:
             break
-        case .join, .welcome, .cue, .unlink:
+        case .join, .welcome, .cue, .pong, .unlink:
             return
         }
         replies.append(.status(status))
@@ -83,6 +85,8 @@ final class FakeLinkPhone: LinkWire {
         anchor = .now
     }
 
+    private var steps = SwipeSteps()
+
     private func handle(_ input: LinkInput) -> HapticCue? {
         guard mode == .tv || mode == .glasses else { return nil }
         settle()
@@ -111,6 +115,16 @@ final class FakeLinkPhone: LinkWire {
             return .back
         case .holdBegan, .holdEnded, .slide, .nudge:
             return nil
+        case .panBegan:
+            steps = SwipeSteps()
+            return nil
+        case .pan(let dx, let dy):
+            var cue: HapticCue?
+            for move in steps.moved(dx: dx, dy: dy) { cue = handle(.move(move)) ?? cue }
+            return cue
+        case .panEnded(let vx, let vy):
+            guard let move = steps.released(vx: vx, vy: vy).step else { return nil }
+            return handle(.move(move))
         }
     }
 

@@ -55,6 +55,12 @@ public enum LinkInput: Sendable, Equatable {
     case holdEnded
     case slide(dx: Double, width: Double)
     case nudge(seconds: Double)
+    /// The thumb touched down; a coast in flight stops.
+    case panBegan
+    /// The thumb is `dx`, `dy` points from where it touched down; sent once a frame while it moves.
+    case pan(dx: Double, dy: Double)
+    /// The thumb lifted, moving at `vx`, `vy` points a second.
+    case panEnded(vx: Double, vy: Double)
 }
 
 /// The controls for a player on the driving phone's own screen.
@@ -203,7 +209,12 @@ public enum LinkMessage: Sendable, Equatable {
     case welcome(LinkIntroduction)
     /// The first message of a session, both ways: the sender's current name.
     case hello(name: String)
-    case input(LinkInput)
+    /// An input, with the time the touch happened by the receiver's clock: the sender converts it with its
+    /// `ClockOffset` once a ping has been answered, and sends nil until then.
+    case input(LinkInput, at: Double? = nil)
+    /// A clock check from the controlling phone, and its answer carrying the driving phone's clock.
+    case ping(sent: Double)
+    case pong(sent: Double, host: Double)
     case command(LinkCommand)
     /// The haptic the driving phone's navigator answered an input with.
     case cue(HapticCue)
@@ -229,6 +240,12 @@ private struct Wire: Codable {
     var input: String?
     var move: String?
     var dx: Double?
+    var dy: Double?
+    var vx: Double?
+    var vy: Double?
+    var at: Double?
+    var sent: Double?
+    var host: Double?
     var width: Double?
     var seconds: Double?
     var command: String?
@@ -253,8 +270,9 @@ private struct Wire: Codable {
         case .hello(let name):
             self.init(type: "hello")
             self.name = name
-        case .input(let input):
+        case .input(let input, let at):
             self.init(type: "input")
+            self.at = at
             switch input {
             case .move(let move):
                 self.input = "move"
@@ -270,7 +288,23 @@ private struct Wire: Codable {
             case .nudge(let seconds):
                 self.input = "nudge"
                 self.seconds = seconds
+            case .panBegan: self.input = "panBegan"
+            case .pan(let dx, let dy):
+                self.input = "pan"
+                self.dx = dx
+                self.dy = dy
+            case .panEnded(let vx, let vy):
+                self.input = "panEnded"
+                self.vx = vx
+                self.vy = vy
             }
+        case .ping(let sent):
+            self.init(type: "ping")
+            self.sent = sent
+        case .pong(let sent, let host):
+            self.init(type: "pong")
+            self.sent = sent
+            self.host = host
         case .command(let command):
             self.init(type: "command")
             switch command {
@@ -305,7 +339,11 @@ private struct Wire: Codable {
         case "join": intro.map(LinkMessage.join)
         case "welcome": intro.map(LinkMessage.welcome)
         case "hello": name.map { LinkMessage.hello(name: $0) }
-        case "input": linkInput.map(LinkMessage.input)
+        case "input":
+            linkInput.map { LinkMessage.input($0, at: at.flatMap { $0.isFinite ? $0 : nil }) }
+        case "ping": sent.map { LinkMessage.ping(sent: $0) }
+        case "pong":
+            if let sent, let host { LinkMessage.pong(sent: sent, host: host) } else { nil }
         case "command": linkCommand.map(LinkMessage.command)
         case "cue": cue.flatMap(HapticCue.init(rawValue:)).map(LinkMessage.cue)
         case "status": status.map(LinkMessage.status)
@@ -325,6 +363,11 @@ private struct Wire: Codable {
             if let dx, let width, dx.isFinite, width.isFinite { .slide(dx: dx, width: width) } else { nil }
         case "nudge":
             if let seconds, seconds.isFinite { .nudge(seconds: seconds) } else { nil }
+        case "panBegan": .panBegan
+        case "pan":
+            if let dx, let dy, dx.isFinite, dy.isFinite { .pan(dx: dx, dy: dy) } else { nil }
+        case "panEnded":
+            if let vx, let vy, vx.isFinite, vy.isFinite { .panEnded(vx: vx, vy: vy) } else { nil }
         default: nil
         }
     }

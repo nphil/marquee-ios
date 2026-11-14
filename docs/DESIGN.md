@@ -478,8 +478,8 @@ A plugin, off until **Big Screen** is turned on in Settings › **XR Glasses & T
 
 | Gesture | Does |
 |---|---|
-| Swipe | One focus step per 52 pt across or 70 pt down; the first 12 pt lock the axis, and sliding back steps back |
-| Flick | A flick faster than 300 pt/s steps once even when short; above 1000 pt/s the focus coasts on, keeping 85 % of its speed a step, up to 40 steps, and stops at the end of a list |
+| Swipe | A row or grid follows the finger continuously, in proportion, at the display's refresh rate; focus moves to the next item at 52 pt across or 70 pt down (plus a small hysteresis so a still finger does not flicker), the first 12 pt lock the axis, and lifting settles the focus on the item nearest the page's position |
+| Flick | Lifting above 200 pt/s hands the finger's velocity to a coast that slows like a scroll view (0.998 of its speed a millisecond) and settles on an item; a long row coasts up to 40 items and stops at its end |
 | Tap | Chooses the focused thing |
 | Swipe in from the left edge | Back: a touch starting within 20 pt of the edge that travels 80 pt right |
 | Swipe down from the top edge | Leaves the remote for the phone app: a touch starting within 24 pt of the top edge that travels 80 pt down |
@@ -489,12 +489,14 @@ A plugin, off until **Big Screen** is turned on in Settings › **XR Glasses & T
 | Tilt while scrubbing, with tilt on | Fine-tunes, up to 30 s a second |
 | Two fingers up or down | Volume: one step (a sixteenth of the range) per 36 pt, of this phone's own level, or of the linked phone's when the remote drives one (§8.10) |
 
+On a page, a swipe is `PanScroll` (Core): the remote sends the finger's position once a frame from its coalesced touches, never more often, and the host applies it on the external display's own display link, smoothing the page's offset with critically damped springs (follow at 100 rad/s, settle at 24 rad/s); while the finger moves the position is extended one frame ahead from the last readings (at most 34 ms), and trusted as it is after 80 ms of silence. Focus changes at the tile boundary; nothing animates per 52 pt step. A panel, the player and Live TV have no scroll position to follow and step by 52 pt or 70 pt as before, with the older coast. Reduce Motion snaps without springs. The page clamps at its ends with the end buzz, with no rubber band.
+
 Tilt reads Core Motion only while the thumb is down, counts from where the phone was when it went down, ignores the first 8 degrees so a hand's tremor moves nothing, and reaches its top rate at 34 degrees.
 
 The way out is also on screen: a strip under the top edge holds a labelled **Phone App** button and a **Settings** gear, which leaves the remote and opens Marquee's Settings. They need a deliberate tap, and the gesture surface fills the rest. Leaving keeps the TV or glasses on their screen; Home's TV or glasses button brings the remote back, and the first time the remote is put away a toast says so. A linked phone's remote has the same Settings gear beside **Done** in its header, and the same swipe down closes it.
 
-6. **Haptics** use Core Haptics, one distinct pattern per cue: focus step, a light crisp tap; end of a row or list, a short dull buzz; select, a full crisp tap; back, a strong dull tap and a softer one; scrub detent, a faint sharp tick; play or pause, two rising taps; error, three strong dull taps; volume step, a soft round thump; volume at silent or full, two firm thumps. A coast plays a step for each tile it passes.
-7. **Input hook.** Every remote input is a `GlassesInput` (move, select, back, hold began, hold ended, slide, nudge) handed to `GlassesNavigator.handle(_:)`, which returns the haptic cue to play. The iPhone's own touch surface sends it, and another phone's link maps its messages to it; the navigator knows nothing of the source and works the same on glasses and a TV.
+6. **Haptics** use Core Haptics, one distinct pattern per cue: focus step, a light crisp tap; end of a row or list, a short dull buzz; select, a full crisp tap; back, a strong dull tap and a softer one; scrub detent, a faint sharp tick; play or pause, two rising taps; error, three strong dull taps; volume step, a soft round thump; volume at silent or full, two firm thumps. A scroll plays a step for each tile it passes, a coast included.
+7. **Input hook.** Every remote input is a `GlassesInput` (move, select, back, hold began, hold ended, slide, nudge, and for a finger on a page: pan began, pan, pan ended) handed to `GlassesNavigator.handle(_:)`, which returns the haptic cue to play. The iPhone's own touch surface sends it, and another phone's link maps its messages to it; the navigator knows nothing of the source and works the same on glasses and a TV. A pan carries the touch's own timestamp; a linked phone converts it to the host's clock from pings (five quick ones at the start, then one every 3 s; NTP-style, trusting the shortest round trip). The host records touch-to-apply delay for this phone's remote and for a linked one, shows the median and 95th percentile in Settings › XR Glasses & TV › Connected Display, and logs them in debug builds.
 8. **VoiceOver.** The surface is one direct-interaction element, so the gestures still reach it with VoiceOver on. It reads the focused title and announces each change; its actions are Back, Options, Volume Up, Volume Down and Use the Phone App.
 
 ### 8.10 Linked phones
