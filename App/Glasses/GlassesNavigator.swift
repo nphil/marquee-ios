@@ -370,6 +370,14 @@ final class GlassesNavigator {
                 })
             }
         }
+        // The phone's own buttons do nothing over HDMI, so the screen offers the steps; the list stays open.
+        for (id, title, step) in [("volume.up", "Volume Up", 1), ("volume.down", "Volume Down", -1)] {
+            options.append(GlassesOption(id: id, title: title, section: "Volume") { [weak self] in
+                OutputVolume.shared.step(step)
+                self?.openTracks(model)
+                self?.panel?.focus = self?.panel?.options.firstIndex { $0.id == id } ?? 0
+            })
+        }
         if model.hasNext {
             options.append(GlassesOption(id: "next", title: "Next Episode", section: "Playback") { model.next() })
         }

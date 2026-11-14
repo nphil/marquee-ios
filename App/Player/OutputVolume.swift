@@ -9,8 +9,10 @@ protocol GainSink: AnyObject {
     func apply(gain: Float)
 }
 
-/// The players' own volume, 0 to 1, which every player registered here follows. It is the fallback for a
-/// system output volume the app cannot set.
+/// The players' own volume, 0 to 1, which every player registered here follows. Over HDMI and the other
+/// routes whose system volume is fixed it is the only volume there is; elsewhere it is the fallback for a
+/// system volume the app cannot set. It starts at full and lasts the session, so the next film or channel
+/// plays at the same level.
 @MainActor
 final class PlaybackGain {
     static let shared = PlaybackGain()
@@ -22,17 +24,21 @@ final class PlaybackGain {
     private(set) var level: Float = 1
     private var sinks: [Entry] = []
 
+    /// What the players are given: the level squared, since loudness is heard on a curve, so each step is
+    /// about as big a change at the bottom as at the top.
+    var applied: Float { level * level }
+
     /// A new player takes the level at once.
     func register(_ sink: any GainSink) {
         sinks.removeAll { $0.sink == nil }
         sinks.append(Entry(sink: sink))
-        if level != 1 { sink.apply(gain: level) }
+        if level != 1 { sink.apply(gain: applied) }
     }
 
     func set(_ level: Float) {
         self.level = level
         sinks.removeAll { $0.sink == nil }
-        for entry in sinks { entry.sink?.apply(gain: level) }
+        for entry in sinks { entry.sink?.apply(gain: applied) }
     }
 }
 
@@ -159,8 +165,15 @@ final class OutputVolume {
     private func routeChanged() {
         let fixed = Self.onFixedLevelRoute
         defer { wasFixedLevel = fixed }
-        guard wasFixedLevel, !fixed, !usesGain, gain.level != 1 else { return }
-        gain.set(1)
+        if wasFixedLevel, !fixed, !usesGain, gain.level != 1 { gain.set(1) }
+        syncPCM()
+    }
+
+    /// A player's volume only quietens sound the phone decodes, and a Dolby stream may go to the TV as it
+    /// is. While the volume is below full on those routes stereo is asked for, which the phone decodes.
+    private func syncPCM() {
+        let attenuating = gain.level < 1 && Self.onFixedLevelRoute
+        try? AVAudioSession.sharedInstance().setSupportsMultichannelContent(!attenuating)
     }
 
     private func enqueue(_ change: Change) {
@@ -191,6 +204,7 @@ final class OutputVolume {
             usesGain = true
             setGain(gainTarget)
         }
+        syncPCM()
     }
 
     /// The system level bar does not move for the players' own volume, so the big screen is told.

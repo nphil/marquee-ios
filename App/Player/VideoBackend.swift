@@ -217,7 +217,7 @@ final class AVPlayerBackend: VideoBackend, GainSink {
         avPlayer = next
         next.defaultRate = rate
         next.isMuted = false
-        next.volume = PlaybackGain.shared.level
+        next.volume = PlaybackGain.shared.applied
         observePlayer()
         if let item = next.currentItem { observe(item) }
         next.play()
