@@ -383,7 +383,7 @@ final class PhoneLink {
     }
 
     private func browse() {
-        let browser = NWBrowser(for: .bonjour(type: LinkTransport.serviceType, domain: "local."), using: NWParameters())
+        let browser = NWBrowser(for: .bonjour(type: LinkTransport.serviceType, domain: "local."), using: LinkTransport.browseParameters())
         browser.browseResultsChangedHandler = { [weak self] results, _ in
             let names = results.compactMap { result -> String? in
                 guard case .service(let name, _, _, _) = result.endpoint else { return nil }

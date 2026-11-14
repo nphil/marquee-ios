@@ -16,13 +16,22 @@ protocol LinkWire: AnyObject {
 enum LinkTransport {
     static let serviceType = "_marquee-link._tcp"
 
-    /// TCP with Nagle off, so a swipe goes out the moment it is sealed, on the local network only: a
-    /// cellular path can only fail slowly.
+    /// TCP with Nagle off, so a swipe goes out the moment it is sealed. Peer-to-peer Wi-Fi (AWDL, as AirDrop
+    /// uses) lets two phones near each other find and reach each other with no shared network, or none at
+    /// all, as long as Wi-Fi is on. Cellular is never used: it can only fail slowly.
     static func parameters() -> NWParameters {
         let tcp = NWProtocolTCP.Options()
         tcp.noDelay = true
         let parameters = NWParameters(tls: nil, tcp: tcp)
+        parameters.includePeerToPeer = true
         parameters.prohibitedInterfaceTypes = [.cellular]
+        return parameters
+    }
+
+    /// Browsing takes the same peer-to-peer path, or a nearby phone off any shared network is never seen.
+    static func browseParameters() -> NWParameters {
+        let parameters = NWParameters()
+        parameters.includePeerToPeer = true
         return parameters
     }
 
