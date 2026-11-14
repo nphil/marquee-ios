@@ -574,6 +574,8 @@ final class RemoteSurfaceView: UIView {
     }
 }
 
+extension RemoteSurfaceView: UIGestureRecognizerDelegate {}
+
 /// Plays the remote's touch vocabulary (`HapticCue`) on the Taptic Engine.
 @MainActor
 final class RemoteHaptics {
