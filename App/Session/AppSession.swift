@@ -517,7 +517,7 @@ final class AppSession {
     /// `marquee.uitest.introSkipDelay` lengthens the intro countdown for this launch only, so a test can
     /// wait for the controls to hide before it taps the offer; `marquee.uitest.directPlay` sets Direct Play
     /// (`disabled` sends the item through a server transcode); `marquee.uitest.quality` sets the quality by its raw
-    /// value, -1 for Auto; `marquee.uitest.videoOrientation` sets Video Orientation by its raw value.
+    /// value, -1 for Auto; `marquee.uitest.creditsAutoplay` sets what autoplay does at the credits by its raw value; `marquee.uitest.videoOrientation` sets Video Orientation by its raw value.
     private func playForUITest(_ library: PlexLibrary) {
         let defaults = UserDefaults.standard
         guard FakePlex.isActive, let key = defaults.string(forKey: "marquee.uitest.play") else { return }
@@ -527,6 +527,9 @@ final class AppSession {
             if delay > 0 { profileSettings.introSkipDelay = delay }
             if let mode = defaults.string(forKey: "marquee.uitest.directPlay").flatMap(DirectPlayMode.init(rawValue:)) {
                 profileSettings.directPlay = mode
+            }
+            if let mode = defaults.string(forKey: "marquee.uitest.creditsAutoplay").flatMap(CreditsAutoplay.init(rawValue:)) {
+                profileSettings.creditsAutoplay = mode
             }
             if let raw = defaults.string(forKey: "marquee.uitest.quality").flatMap(Int.init) {
                 profileSettings.quality = VideoQuality(rawValue: raw).map(QualitySetting.fixed) ?? .auto

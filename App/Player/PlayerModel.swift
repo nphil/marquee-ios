@@ -2068,6 +2068,10 @@ final class PlayerModel: Identifiable {
             next()
             return
         }
+        if session.settings.autoplay.playsNextAtEnd(creditsWatched: creditsDismissed), queue?.item(after: item) != nil {
+            next()
+            return
+        }
         if !markedWatched { markWatched() }
         report(.stopped)
         cancelCountdown()
@@ -2382,6 +2386,13 @@ final class PlayerModel: Identifiable {
         if skippedIntroEnd == nil, let intro = item.markers(.intro).first(where: { $0.contains(ms) }), Double(intro.end) / 1000 - movie > 1 {
             next = .skipIntro(end: Double(intro.end) / 1000)
         } else if !creditsDismissed, let credits = finalCredits, ms >= credits.start, let upcoming = queue?.item(after: item) {
+            if session.settings.autoplay.atCredits == .playNow {
+                // Binge mode: no card. The flag keeps later ticks from repeating the jump; `go` clears it for the next episode.
+                guard offer == nil, phase == .playing, isPlaying, !isBuffering, !isScrubbing, menusOpen == 0 else { return }
+                creditsDismissed = true
+                go(to: upcoming)
+                return
+            }
             next = .upNext(upcoming)
         }
         guard next != offer else { return }
@@ -2398,8 +2409,8 @@ final class PlayerModel: Identifiable {
             guard settings.introSkipDelay > 0, !introCancelled else { return }
             runCountdown(TimeInterval(settings.introSkipDelay)) { [weak self] in self?.skipIntro() }
         case .upNext?:
-            guard settings.nextEpisodeDelay > 0, !countdownStopped, menusOpen == 0, !isScrubbing else { return }
-            runCountdown(TimeInterval(settings.nextEpisodeDelay)) { [weak self] in self?.next() }
+            guard case .countdown(let seconds) = settings.autoplay.atCredits, !countdownStopped, menusOpen == 0, !isScrubbing else { return }
+            runCountdown(TimeInterval(seconds)) { [weak self] in self?.next() }
         case .lowerQuality?, nil:
             break
         }

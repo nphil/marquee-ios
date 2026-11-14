@@ -124,6 +124,20 @@ final class PlayerScreenshotTests: XCTestCase {
         try upNextFlow(suffix: "rose-pine")
     }
 
+    /// Skip Credits Instantly: the credits marker moves straight to episode 3, with no Up Next card.
+    @MainActor
+    func testSkipCreditsInstantly() throws {
+        let app = launchPlayer(at: 132, paused: false, mode: "dark", instantCredits: true)
+        let title = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier == 'player.title' AND label CONTAINS 'Llamigos'")).firstMatch
+        if !title.waitForExistence(timeout: 8), !element("player.playPause", in: app).exists {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        }
+        XCTAssertTrue(title.waitForExistence(timeout: 5), "Episode 3 is not playing")
+        XCTAssertFalse(element("player.playNext", in: app).exists, "The Up Next card showed")
+        try snap("player-22-skip-credits-instantly-rose-pine")
+    }
+
     @MainActor
     func testFindSubtitlesFromBazarr() throws {
         try findSubtitlesFlow(mode: "dark", suffix: "rose-pine")
@@ -561,7 +575,7 @@ private extension XCTestCase {
     /// Chromecast plugin on with FakeCast's receiver; `stall` keeps playback waiting on data.
     @MainActor
     func launchPlayer(
-        at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, bazarr: String? = nil, speechDock: Bool = false,
+        at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, instantCredits: Bool = false, bazarr: String? = nil, speechDock: Bool = false,
         scrub: Double? = nil, cast: Bool = false, stall: Bool = false, quality: Int? = nil, item: String = "212",
         badgeSeconds: Double? = nil, linkTest: Bool = false
     ) -> XCUIApplication {
@@ -578,6 +592,7 @@ private extension XCTestCase {
             "-marquee.uitest.frame", "art/caminandes-backdrop.jpg",
         ]
         if let introSkipDelay { arguments += ["-marquee.uitest.introSkipDelay", String(introSkipDelay)] }
+        if instantCredits { arguments += ["-marquee.uitest.creditsAutoplay", "skipInstantly"] }
         if speechDock { arguments += ["-marquee.uitest.speechDock", "http://speechdock.local:8765"] }
         if let bazarr { arguments += ["-marquee.uitest.bazarr", bazarr] }
         if let scrub { arguments += ["-marquee.uitest.scrub", String(scrub)] }

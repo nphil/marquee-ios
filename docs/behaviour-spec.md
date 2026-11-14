@@ -167,7 +167,10 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 
 **Credits and Next episode:**
 - The countdown starts only at a real credits marker with a queued next episode. Delay 3/5/10/15/30 s, default 5.
-- Off turns off auto-next. The Next button stays.
+- Autoplay Next Episode (profile setting, on by default) turns auto-next on or off; the Next button stays either way. Off: the Up Next card is still offered at the credits marker but waits for a tap.
+- On, Credits is Countdown (the delay above) or Skip Credits Instantly: the next episode starts at the marker with no card.
+- On, an episode with no credits marker plays the next one when it ends, except after "Watch credits".
+- Profiles saved with a Next Episode delay migrate: a delay above 0 is on with Countdown and that delay, 0 is off.
 - "Watch credits" stops the countdown for the whole episode.
 - Pause, buffering, menus and input all interrupt the countdown.
 - Duration-based guesses are not markers and never show a credits prompt.

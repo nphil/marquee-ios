@@ -38,15 +38,33 @@ struct VideoPlaybackSettingsView: View {
                     }
                 }
                 .accessibilityIdentifier("video.introSkip")
-                Picker("Next Episode", selection: $session.settings.nextEpisodeDelay) {
-                    Text("Off").tag(0)
-                    ForEach(ProfileSettings.countdowns, id: \.self) { seconds in
-                        Text("After \(Self.seconds(seconds))").tag(seconds)
+            } footer: {
+                Text("Intro countdowns start only at intro markers from Plex.")
+                    .foregroundStyle(theme.ink2)
+            }
+            .listRowBackground(theme.sheet)
+
+            Section {
+                Toggle("Autoplay Next Episode", isOn: $session.settings.autoplaysNext)
+                    .accessibilityIdentifier("video.autoplayNext")
+                if session.settings.autoplaysNext {
+                    Picker("Credits", selection: $session.settings.creditsAutoplay) {
+                        ForEach(CreditsAutoplay.allCases, id: \.self) { mode in
+                            Text(mode.title).tag(mode)
+                        }
+                    }
+                    .accessibilityIdentifier("video.credits")
+                    if session.settings.creditsAutoplay == .countdown {
+                        Picker("Countdown", selection: $session.settings.nextEpisodeDelay) {
+                            ForEach(ProfileSettings.countdowns, id: \.self) { seconds in
+                                Text(Self.seconds(seconds)).tag(seconds)
+                            }
+                        }
+                        .accessibilityIdentifier("video.nextEpisode")
                     }
                 }
-                .accessibilityIdentifier("video.nextEpisode")
             } footer: {
-                Text("Countdowns start only at intro and credits markers from Plex.")
+                Text(Self.autoplayNote(session.settings.autoplay))
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)
@@ -165,6 +183,17 @@ struct VideoPlaybackSettingsView: View {
             } else {
                 session.settings.directPlay = mode
             }
+        }
+    }
+
+    private static func autoplayNote(_ rule: AutoplayNext) -> String {
+        switch rule.atCredits {
+        case .offer:
+            "Off: an episode ends on its own. At Plex's credits marker, Up Next is offered and waits for a tap."
+        case .countdown(let seconds):
+            "At Plex's credits marker, Up Next counts down \(seconds) s, then the next episode plays. An episode with no credits marker goes on when it ends."
+        case .playNow:
+            "At Plex's credits marker the next episode starts at once, with no card. An episode with no credits marker goes on when it ends."
         }
     }
 

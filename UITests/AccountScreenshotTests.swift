@@ -151,6 +151,12 @@ extension XCTestCase {
         reveal("settings.video", in: app).tap()
         waitForBar("Video & Playback", in: app)
         try snap("acct-05-video-\(suffix)", turned: turned)
+        reveal("video.credits", in: app).tap()
+        let instant = app.buttons["Skip Credits Instantly"]
+        XCTAssertTrue(instant.waitForExistence(timeout: 5), "No Skip Credits Instantly choice")
+        instant.tap()
+        XCTAssertFalse(element("video.nextEpisode", in: app).exists, "The countdown choice stays with Skip Credits Instantly")
+        try snap("acct-05b-video-credits-\(suffix)", turned: turned)
         goBack(from: "Video & Playback", in: app)
 
         reveal("settings.audio", in: app).tap()

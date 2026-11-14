@@ -10,7 +10,11 @@ struct ProfileSettings: Equatable, Sendable {
     var skipTaps = SkipTapMode.doubleTap
     /// Seconds before an intro skips itself; 0 skips only when asked.
     var introSkipDelay = 5
-    /// Seconds of countdown at the credits before the next episode; 0 turns auto-next off.
+    /// Autoplay Next Episode: the next episode follows by itself, at the credits and at the end.
+    var autoplaysNext = true
+    /// What autoplay does at a credits marker.
+    var creditsAutoplay = CreditsAutoplay.countdown
+    /// Seconds of the Up Next countdown at the credits (always above 0; Off is `autoplaysNext`).
     var nextEpisodeDelay = 5
     var directPlay = DirectPlayMode.auto
     var aspect = VideoAspect.fit
@@ -41,13 +45,17 @@ struct ProfileSettings: Equatable, Sendable {
     /// The theme tune's volume, 0 to 1.
     var themeMusicVolume = 0.5
 
+    var autoplay: AutoplayNext {
+        AutoplayNext(enabled: autoplaysNext, credits: creditsAutoplay, delay: nextEpisodeDelay)
+    }
+
     static let skipIntervals = [5, 10, 15, 30, 60]
     static let countdowns = [3, 5, 10, 15, 30]
 }
 
 extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
-        case skipInterval, skipTaps, introSkipDelay, nextEpisodeDelay, directPlay, aspect, videoOrientation, readsTunerDirectly
+        case skipInterval, skipTaps, introSkipDelay, nextEpisodeDelay, autoplaysNext, creditsAutoplay, directPlay, aspect, videoOrientation, readsTunerDirectly
         case audioLanguage, subtitles, remembersTracks, subtitleStyle, homeRows
         case posterLabels, audioEnhancements, hiddenLibraries, playsTrailers, playsThemeMusic, themeMusicVolume
         /// "quality" held a fixed quality before Auto existed (`LegacyKeys`).
@@ -65,7 +73,12 @@ extension ProfileSettings: Codable {
         skipInterval = value(.skipInterval) ?? skipInterval
         skipTaps = value(.skipTaps) ?? skipTaps
         introSkipDelay = value(.introSkipDelay) ?? introSkipDelay
-        nextEpisodeDelay = value(.nextEpisodeDelay) ?? nextEpisodeDelay
+        // Saved before the toggle, the delay alone said it: 0 was Off.
+        let savedDelay: Int? = value(.nextEpisodeDelay)
+        let migrated = savedDelay.map(AutoplayNext.init(legacyDelay:)) ?? AutoplayNext()
+        nextEpisodeDelay = migrated.delay
+        autoplaysNext = value(.autoplaysNext) ?? migrated.enabled
+        creditsAutoplay = value(.creditsAutoplay) ?? creditsAutoplay
         directPlay = value(.directPlay) ?? directPlay
         aspect = value(.aspect) ?? aspect
         videoOrientation = value(.videoOrientation) ?? videoOrientation
