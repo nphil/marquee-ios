@@ -109,8 +109,10 @@ final class SystemVolume {
     }
 }
 
-/// What a linked phone's remote changes on the phone that plays: the system output volume, else the
-/// players' own. Changes run one after another, so presses in quick succession add up.
+/// What a linked phone's remote changes on the phone that plays. On HDMI, a line out or a USB audio
+/// device the players' own volume is the one used, since iOS may send those at a fixed level whatever the
+/// system volume says; on the speaker, headphones and Bluetooth it is the system output volume, and the
+/// players' own when that cannot be set. Changes run one after another, so presses in quick succession add up.
 @MainActor
 final class OutputVolume {
     static let shared = OutputVolume()
@@ -120,14 +122,30 @@ final class OutputVolume {
         case set(Float)
     }
 
+    /// Whether sound leaves by a digital or line output.
+    static var onFixedLevelRoute: Bool {
+        AVAudioSession.sharedInstance().currentRoute.outputs.contains {
+            [.HDMI, .displayPort, .lineOut, .usbAudio].contains($0.portType)
+        }
+    }
+
     private let system = SystemVolume.shared
     private let gain = PlaybackGain.shared
     /// The system volume could not be set the last time, so the players' own is in use.
     private(set) var usesGain = false
+    private var wasFixedLevel = OutputVolume.onFixedLevelRoute
     private var queue: Task<Void, Never>?
 
+    init() {
+        NotificationCenter.default.addObserver(
+            forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.routeChanged() }
+        }
+    }
+
     /// The level the phone plays at, 0 to 1.
-    var level: Float { usesGain ? gain.level : system.level }
+    var level: Float { usesGain || Self.onFixedLevelRoute ? gain.level : system.level }
 
     func step(_ steps: Int) {
         enqueue(.step(steps))
@@ -135,6 +153,14 @@ final class OutputVolume {
 
     func set(_ level: Double) {
         enqueue(.set(Float(LinkVolume.clamped(level))))
+    }
+
+    /// Back on the speaker or headphones the system volume rules again, so the players' own goes back to full.
+    private func routeChanged() {
+        let fixed = Self.onFixedLevelRoute
+        defer { wasFixedLevel = fixed }
+        guard wasFixedLevel, !fixed, !usesGain, gain.level != 1 else { return }
+        gain.set(1)
     }
 
     private func enqueue(_ change: Change) {
@@ -146,23 +172,30 @@ final class OutputVolume {
     }
 
     private func run(_ change: Change) async {
-        let systemTarget: Float
         let gainTarget: Float
+        let systemTarget: Float
         switch change {
         case .step(let steps):
-            systemTarget = Float(LinkVolume.stepped(Double(system.level), by: steps))
             gainTarget = Float(LinkVolume.stepped(Double(gain.level), by: steps))
+            systemTarget = Float(LinkVolume.stepped(Double(system.level), by: steps))
         case .set(let level):
-            systemTarget = level
             gainTarget = level
+            systemTarget = level
         }
-        if await system.set(systemTarget) {
+        if Self.onFixedLevelRoute {
+            setGain(gainTarget)
+        } else if await system.set(systemTarget) {
             usesGain = false
             if gain.level != 1 { gain.set(1) }
         } else {
             usesGain = true
-            gain.set(gainTarget)
-            GlassesCenter.live?.showVolume(gainTarget)
+            setGain(gainTarget)
         }
+    }
+
+    /// The system level bar does not move for the players' own volume, so the big screen is told.
+    private func setGain(_ level: Float) {
+        gain.set(level)
+        GlassesCenter.live?.showVolume(level)
     }
 }
