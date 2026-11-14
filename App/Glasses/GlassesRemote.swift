@@ -566,12 +566,11 @@ final class RemoteSurfaceView: UIView {
         coastTask?.cancel()
         if phase == .tilting { tiltBlocked = tiltMove }
     }
-}
 
-extension RemoteSurfaceView: UIGestureRecognizerDelegate {
-    /// A scrub keeps the touch; a second finger then does nothing.
-    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-        phase != .held
+    /// A scrub keeps the touch; two fingers then do not turn into a volume swipe.
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        guard let pan = gestureRecognizer as? UIPanGestureRecognizer, pan.minimumNumberOfTouches == 2 else { return true }
+        return phase != .held
     }
 }
 
