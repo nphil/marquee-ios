@@ -177,6 +177,15 @@ struct SettingsView: View {
                     }
                 }
                 .accessibilityIdentifier("settings.glasses")
+                NavigationLink {
+                    LinkSettingsView()
+                } label: {
+                    LabeledContent("Linked Phones") {
+                        Text(session.link.isEnabled ? "On" : "Off")
+                            .foregroundStyle(theme.ink2)
+                    }
+                }
+                .accessibilityIdentifier("settings.link")
             }
             .listRowBackground(theme.sheet)
 
@@ -222,7 +231,7 @@ struct SettingsView: View {
                     .accessibilityIdentifier("settings.deleteData.confirm")
                     Button("Cancel", role: .cancel) {}
                 } message: {
-                    Text("This signs out and removes everything Marquee keeps on this iPhone: the sign-in, every profile's settings, remembered tracks, themes, Live TV lists, paired TVs and cached artwork. Nothing on the Plex server changes.")
+                    Text("This signs out and removes everything Marquee keeps on this iPhone: the sign-in, every profile's settings, remembered tracks, themes, Live TV lists, paired TVs, linked phones and cached artwork. Nothing on the Plex server changes.")
                 }
             } footer: {
                 Text("Signs out and returns Marquee to how it was when first installed.")

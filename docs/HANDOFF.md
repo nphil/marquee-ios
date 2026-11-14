@@ -18,6 +18,16 @@ Built on branch `xr`, not yet on `main`. The XR glasses plugin (DESIGN §8.9) gi
 
 Not proven on hardware: device checks 21 and 22 (DEVICE-TEST). In particular the Viture's scene connecting with the non-interactive external-display role, the tilt direction and feel, the haptics' feel, the brightness dim and restore, legibility through the birdbath, and HDR on the glasses (playback capabilities are read from the phone's screen). Next: those checks on an iPhone with the glasses, then merge to `main`.
 
+## Linked phones (branch `phone-link`)
+
+Built on branch `phone-link`, not yet on `main`. Linked Phones (DESIGN §8.10) lets one iPhone with Marquee control another: the eyes-free remote while the other drives a TV or XR glasses, a few player controls while it plays on its own screen. It is off until Settings › Linked Phones turns it on.
+
+- Core (`Packages/MarqueeCore/Sources/MarqueeCore/Link`): the code's link, HKDF keys, the wire messages, status pacing and the dialing rules, with `LinkTests`. On Linux the Core builds against swift-crypto for CryptoKit (`Package.swift`).
+- App (`App/Link`): `PhoneLink` (plugin state, linking, Bonjour advertising and browsing, connections, status), `LinkNetwork` (Network.framework connections around LumaRemoteCore's Noise handshake and sealed frames), `LinkStore` (the id and keys in the Keychain), `LinkHost` (status from the session; inputs to the glasses navigator, commands to the player), `LinkController` (the controlling phone's window: `GlassesRemoteView` through the `RemoteTarget` protocol, or the player controls), `LinkSettingsView`, `LinkScanView`.
+- UI tests: `LinkScreenshotTests` and `LinkAccessibilityScreenshots`; `FakeLinkPhone` stands in for the other phone (`-marquee.uitest.linkPeer tv|glasses|phone|idle`) and `-marquee.uitest.linkScan YES` for the camera.
+
+On merging with `tv-mode`: `LinkHost` reports `.glasses` for any big screen and `GlassesNavigator.symbol` is always `eyeglasses`; both should follow the connected display's kind. Not proven on hardware: device check 24 (DEVICE-TEST), in particular Bonjour discovery and the Local Network prompt, camera reading, finding each other again after a lock or a Wi-Fi change, the delay and feel of haptics over the network, and an unlink reaching the other phone. Unseen until CI: the app build and the `link-*` shots.
+
 ## 0.1.36
 
 Shipped 0.1.35 (fix batch) and 0.1.36 (920da41, XR glasses plugin, off until enabled). 0.1.36's run: the subtitle-search tests pass; `testFormatBadgeShowsOnFirstStart` and `testStyleMenuLandscape` (smallest phone) failed on coordinate-fragile assertions (the recording shows the badge in the top trailing corner), relaxed in the next commit, which is unverified until a run. `testAutoBuffersInsteadOfDroppingBelowPictureFloor` failed once ("controls did not come back"); watch for a repeat.

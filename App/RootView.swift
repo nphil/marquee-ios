@@ -101,6 +101,10 @@ struct RootView: View {
             default: break
             }
         }
+        // Linked phones listen and call only while Marquee is up; iOS stops local networking behind it.
+        .onChange(of: scenePhase == .background, initial: true) { _, background in
+            session.link.setForeground(!background, session: session, themeStore: store)
+        }
         .onChange(of: BarInputs(theme: theme, typeSize: typeSize, boldText: legibilityWeight == .bold), initial: true) { _, inputs in
             NavigationBarStyle.apply(inputs.theme, typeSize: inputs.typeSize, boldText: inputs.boldText)
         }

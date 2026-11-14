@@ -4,6 +4,47 @@ import MarqueeCore
 import SwiftUI
 import UIKit
 
+/// What the eyes-free remote drives: the big screen's pages through `GlassesNavigator`, or a linked
+/// phone's through `LinkRemote` (DESIGN §8.10).
+@MainActor
+protocol RemoteTarget: AnyObject {
+    /// Applies an input and returns the cue to play at once: nil when the input did nothing, or when its
+    /// cue comes later through `onCue`, as a linked phone's always does (`answersLater`).
+    func handle(_ input: GlassesInput) -> HapticCue?
+    /// Cues that come after their input.
+    var onCue: ((HapticCue) -> Void)? { get set }
+    var answersLater: Bool { get }
+    var focusTitle: String { get }
+    var focusDetail: String? { get }
+    /// The symbol over the title: what the remote drives.
+    var symbol: String { get }
+    var inPlayer: Bool { get }
+    var isScrubbing: Bool { get }
+    var tiltEnabled: Bool { get }
+    /// VoiceOver's Options action in the player: the tracks.
+    func openOptions()
+    /// VoiceOver's action that puts the remote away, and its name.
+    var leaveTitle: String { get }
+    func leave()
+}
+
+extension GlassesNavigator: RemoteTarget {
+    var answersLater: Bool { false }
+    var symbol: String { "eyeglasses" }
+    var inPlayer: Bool { player != nil }
+    var isScrubbing: Bool { scrub != nil }
+    var tiltEnabled: Bool { session.glasses.tiltEnabled }
+    var leaveTitle: String { "Use the Phone App" }
+
+    func openOptions() {
+        if let player { openTracks(player) }
+    }
+
+    func leave() {
+        session.glasses.showPhoneApp()
+    }
+}
+
 /// The iPhone as the glasses' remote (DESIGN §8.9): a window over the phone app whose whole screen
 /// takes the gestures, dimmed while it shows.
 @MainActor
@@ -20,9 +61,9 @@ final class GlassesTakeover {
 
     nonisolated init() {}
 
-    func show(center: GlassesCenter, navigator: GlassesNavigator, store: ThemeStore) {
+    func show(navigator: GlassesNavigator, store: ThemeStore) {
         guard window == nil, let scene = GlassesCenter.phoneScene() else { return }
-        let host = RemoteHost(rootView: GlassesRemoteRoot(center: center, navigator: navigator, store: store))
+        let host = RemoteHost(rootView: GlassesRemoteRoot(navigator: navigator, store: store))
         host.overrideUserInterfaceStyle = .dark
         host.view.accessibilityViewIsModal = true
         let window = Window(windowScene: scene)
@@ -107,12 +148,11 @@ struct GlassesButton: View {
 
 /// The remote follows the active theme's dark side, as the glasses do.
 struct GlassesRemoteRoot: View {
-    let center: GlassesCenter
     let navigator: GlassesNavigator
     let store: ThemeStore
 
     var body: some View {
-        GlassesRemoteView(center: center, navigator: navigator)
+        GlassesRemoteView(target: navigator)
             .environment(\.theme, store.selected(for: .dark))
             .environment(\.colorScheme, .dark)
     }
@@ -121,8 +161,7 @@ struct GlassesRemoteRoot: View {
 /// What the phone shows while it is the remote: the focused thing for a glance, and the gestures,
 /// faint. Nothing on it is a target; the whole screen is one surface.
 struct GlassesRemoteView: View {
-    let center: GlassesCenter
-    let navigator: GlassesNavigator
+    let target: any RemoteTarget
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -131,14 +170,14 @@ struct GlassesRemoteView: View {
                 .ignoresSafeArea()
             VStack(spacing: Space.s3) {
                 Spacer()
-                Image(systemName: "eyeglasses")
+                Image(systemName: target.symbol)
                     .font(.largeTitle)
                     .foregroundStyle(theme.ink3)
-                Text(navigator.focusTitle)
+                Text(target.focusTitle)
                     .textRole(.title)
                     .foregroundStyle(theme.ink2)
                     .lineLimit(2)
-                if let detail = navigator.focusDetail {
+                if let detail = target.focusDetail {
                     Text(detail)
                         .textRole(.body)
                         .foregroundStyle(theme.ink3)
@@ -153,7 +192,7 @@ struct GlassesRemoteView: View {
             .padding(Space.inset)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
-            RemoteSurface(center: center, navigator: navigator, label: navigator.focusTitle, value: navigator.focusDetail)
+            RemoteSurface(target: target, label: target.focusTitle, value: target.focusDetail)
                 .ignoresSafeArea()
                 .accessibilityIdentifier("glasses.remote")
         }
@@ -161,13 +200,12 @@ struct GlassesRemoteView: View {
 }
 
 private struct RemoteSurface: UIViewRepresentable {
-    let center: GlassesCenter
-    let navigator: GlassesNavigator
+    let target: any RemoteTarget
     let label: String
     let value: String?
 
     func makeUIView(context: Context) -> RemoteSurfaceView {
-        RemoteSurfaceView(center: center, navigator: navigator)
+        RemoteSurfaceView(target: target)
     }
 
     func updateUIView(_ view: RemoteSurfaceView, context: Context) {
@@ -205,8 +243,7 @@ final class RemoteSurfaceView: UIView {
     private static let scrollRate = 12.0
     private static let scrubRate = 30.0
 
-    private weak var glasses: GlassesCenter?
-    private weak var navigator: GlassesNavigator?
+    private weak var target: (any RemoteTarget)?
     private let haptics = RemoteHaptics()
     private let tilt = RemoteTilt()
 
@@ -221,28 +258,29 @@ final class RemoteSurfaceView: UIView {
     private var coastTask: Task<Void, Never>?
     /// Tilt scrolling stops pushing into an end it has met, until it turns the other way.
     private var tiltBlocked: FocusMove?
+    /// The way tilt last scrolled, which a late edge cue blocks.
+    private var tiltMove: FocusMove?
 
-    init(center: GlassesCenter, navigator: GlassesNavigator) {
-        self.glasses = center
-        self.navigator = navigator
+    init(target: any RemoteTarget) {
+        self.target = target
         super.init(frame: .zero)
         isMultipleTouchEnabled = false
         isAccessibilityElement = true
         accessibilityTraits = [.allowsDirectInteraction]
         accessibilityHint = "Swipe to move, tap to choose, swipe in from the left edge to go back, hold for options or to scrub."
         accessibilityCustomActions = [
-            UIAccessibilityCustomAction(name: "Back") { [weak self] _ in self?.send(.back) != nil },
+            UIAccessibilityCustomAction(name: "Back") { [weak self] _ in self?.act(.back) ?? false },
             UIAccessibilityCustomAction(name: "Options") { [weak self] _ in
-                guard let self, let navigator = self.navigator else { return false }
-                if let player = navigator.player { navigator.openTracks(player) } else { send(.holdBegan) }
+                guard let self, let target = self.target else { return false }
+                if target.inPlayer { target.openOptions() } else { send(.holdBegan) }
                 return true
             },
-            UIAccessibilityCustomAction(name: "Use the Phone App") { [weak self] _ in
-                self?.glasses?.showPhoneApp()
+            UIAccessibilityCustomAction(name: target.leaveTitle) { [weak self] _ in
+                self?.target?.leave()
                 return true
             },
         ]
-        navigator.onCue = { [weak self] cue in self?.haptics.play(cue) }
+        target.onCue = { [weak self] cue in self?.cueArrived(cue) }
     }
 
     @available(*, unavailable)
@@ -260,15 +298,15 @@ final class RemoteSurfaceView: UIView {
     // MARK: VoiceOver
 
     override func accessibilityActivate() -> Bool {
-        send(.select) != nil
+        act(.select)
     }
 
     override func accessibilityPerformEscape() -> Bool {
-        send(.back) != nil
+        act(.back)
     }
 
     override func accessibilityPerformMagicTap() -> Bool {
-        send(.select) != nil
+        act(.select)
     }
 
     override func accessibilityScroll(_ direction: UIAccessibilityScrollDirection) -> Bool {
@@ -280,7 +318,7 @@ final class RemoteSurfaceView: UIView {
         default: nil
         }
         guard let move else { return false }
-        return send(.move(move)) != nil
+        return act(.move(move))
     }
 
     // MARK: Touches
@@ -381,7 +419,7 @@ final class RemoteSurfaceView: UIView {
         guard steps.axis != nil else { return }
         phase = .swiping
         stillTask?.cancel()
-        guard glasses?.tiltEnabled == true else { return }
+        guard target?.tiltEnabled == true else { return }
         stillTask = Task { [weak self] in
             try? await Task.sleep(for: Self.stillDelay)
             guard !Task.isCancelled, let self, phase == .swiping else { return }
@@ -400,7 +438,7 @@ final class RemoteSurfaceView: UIView {
 
     private func holdBegan() {
         send(.holdBegan)
-        guard navigator?.player != nil, navigator?.scrub != nil, glasses?.tiltEnabled == true else { return }
+        guard let target, target.inPlayer, target.isScrubbing, target.tiltEnabled else { return }
         let drive = TiltDrive(topRate: Self.scrubRate)
         tilt.start { [weak self] roll, _, seconds in
             let amount = drive.amount(at: roll, for: seconds)
@@ -414,6 +452,7 @@ final class RemoteSurfaceView: UIView {
         phase = .tilting
         tiltAnchor = samples.last?.point ?? start
         tiltBlocked = nil
+        tiltMove = nil
         var drive = TiltDrive(topRate: Self.scrollRate)
         tilt.start { [weak self] roll, pitch, seconds in
             guard let self else { return }
@@ -423,6 +462,7 @@ final class RemoteSurfaceView: UIView {
             let move: FocusMove = axis == .horizontal ? (count > 0 ? .right : .left) : (count > 0 ? .down : .up)
             guard move != tiltBlocked else { return }
             tiltBlocked = nil
+            tiltMove = move
             for _ in 0..<abs(count) {
                 if send(.move(move)) == .edge {
                     tiltBlocked = move
@@ -448,9 +488,22 @@ final class RemoteSurfaceView: UIView {
 
     @discardableResult
     private func send(_ input: GlassesInput) -> HapticCue? {
-        guard let cue = navigator?.handle(input) else { return nil }
+        guard let cue = target?.handle(input) else { return nil }
         haptics.play(cue)
         return cue
+    }
+
+    /// VoiceOver's answer: whether the input did something, or went to a target that answers later.
+    private func act(_ input: GlassesInput) -> Bool {
+        send(input) != nil || target?.answersLater == true
+    }
+
+    private func cueArrived(_ cue: HapticCue) {
+        haptics.play(cue)
+        // A linked phone's edge comes after the move that met it; it still stops a coast and tilt.
+        guard cue == .edge else { return }
+        coastTask?.cancel()
+        if phase == .tilting { tiltBlocked = tiltMove }
     }
 }
 

@@ -22,7 +22,7 @@ Read first: `docs/HANDOFF.md` (unfinished work, how it lands, decisions already 
 
 ## Module map
 
-`Packages/MarqueeCore` (Foundation only; `Security` only in `KeychainStore`), under `Sources/MarqueeCore/`:
+`Packages/MarqueeCore` (Foundation only; `Security` only in `KeychainStore`; CryptoKit only in `LinkKeys`, swift-crypto in its place on Linux), under `Sources/MarqueeCore/`:
 
 | Folder | Holds |
 |---|---|
@@ -34,12 +34,13 @@ Read first: `docs/HANDOFF.md` (unfinished work, how it lands, decisions already 
 | `Live/` | Plex Live TV and DVR (`PlexLiveTV`), guide models and `GuideCache`, recordings, `LiveRouteDecider`, `HDHomeRunClient` for the direct tuner path |
 | `Subtitles/` | `Bazarr` client (search, download), `SpeechDock` (word timing: the file as the service reads it, request windows, client), `SubtitleLook` (presets, fonts, edges, boxes, position), `SubtitleTiming` (offset), `SubtitleReveal` (Reveal as Spoken modes) |
 | `Navigation/` | `Destination` and `TabLayout`: the person's tabs and their rules |
+| `Link/` | Linked phones: `LinkInvite` (the QR code's link, ids, names), `LinkKeys` (HKDF keys), `LinkMessage` (preamble, messages, status, `LinkDialing`, `LinkStatusPacer`) |
 
 Reveal as Spoken gets its word timing from SpeechDock through `App/Player/WordTiming.swift`. Remote server content in the App is `App/Browse/Remote.swift`.
 
 `Packages/MarqueeLive` (iOS only, FFmpeg through VideoEngine): `LiveEngine` (demux, decode, playout, tuner connection; no AVFoundation), `MarqueeLive` (`LiveStreamPlayer`, sample-buffer output, Picture in Picture and Now Playing types that the app does not use yet), `LiveFixtures` (synthetic tuner and stream).
 
-`App/`: `Account/` and `Session/` (sign-in, `AppSession`, `SessionStorage`), `RootView.swift` (root switch and `MainTabs`: the tabs from `TabLayout`; Settings is a sheet from Home), `Navigation/` (`Route`, `BrowseStack`, `Destinations`: each destination's tab and page, `openDestination`; `SheetZoom`: the Home buttons Settings and the remote zoom out of), `Browse/` (routes, detail, `Remote`, `LibraryChanges`, item actions, toasts, `ThemeMusicPlayer`), `Screens/` (Home, Library, Search, Watchlist, Tab Bar, `LiveTV/`), `Player/` (`PlayerModel`, backends, chrome, trickplay, sidecar subtitles, `Live/` router and sources), `Settings/`, `Remote/` (the LumaTV remote integration around LumaRemoteKit; its UI tests pair with the kit's `LumaRemoteFakeTV`), `Images/` (`ImagePipeline`), `Theme/`, `DesignSystem/`, `Testing/` (Debug-only `FakePlex`, `FakeTuner`).
+`App/`: `Account/` and `Session/` (sign-in, `AppSession`, `SessionStorage`), `RootView.swift` (root switch and `MainTabs`: the tabs from `TabLayout`; Settings is a sheet from Home), `Navigation/` (`Route`, `BrowseStack`, `Destinations`: each destination's tab and page, `openDestination`; `SheetZoom`: the Home buttons Settings and the remote zoom out of), `Browse/` (routes, detail, `Remote`, `LibraryChanges`, item actions, toasts, `ThemeMusicPlayer`), `Screens/` (Home, Library, Search, Watchlist, Tab Bar, `LiveTV/`), `Player/` (`PlayerModel`, backends, chrome, trickplay, sidecar subtitles, `Live/` router and sources), `Settings/`, `Remote/` (the LumaTV remote integration around LumaRemoteKit; its UI tests pair with the kit's `LumaRemoteFakeTV`), `Link/` (linked phones: `PhoneLink` finds and talks to them over Bonjour and LumaRemoteCore's Noise channel, `LinkHost` answers as the host, `LinkController` is the controlling phone's remote, the settings page and scanner; the keys in `LinkStore`), `Images/` (`ImagePipeline`), `Theme/`, `DesignSystem/`, `Testing/` (Debug-only `FakePlex`, `FakeTuner`, `FakeLinkPhone`).
 
 Other: `UITests/` (UI tests; `UITests/FakePlex/` fixtures and rules in its `README.md`), `Resources/` (`themes.json`, Manrope, licences), `tools/check_themes.py`, `project.yml` (XcodeGen; the `.xcodeproj` is not stored), `.github/workflows/ios.yml`.
 

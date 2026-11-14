@@ -32,6 +32,8 @@ enum Size {
     static let controlGlyphMax: CGFloat = 28
     /// The icon column of a menu row at the default text size; it scales with Dynamic Type.
     static let menuGlyph: CGFloat = 28
+    /// The link code Linked Phones shows (DESIGN §8.10): big enough for a phone held at arm's length.
+    static let linkCode: CGFloat = 240
 }
 
 enum Radius {
