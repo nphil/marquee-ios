@@ -27,6 +27,15 @@
       },
       "versions": [
         {
+          "version": "0.1.43",
+          "buildVersion": "0.1.43",
+          "date": "2026-11-14T06:00:54Z",
+          "localizedDescription": "Unsigned IPA, built from 3a4e09c.",
+          "downloadURL": "https://github.com/nphil/marquee-ios/releases/download/v0.1.43/Marquee.ipa",
+          "size": 22392120,
+          "minOSVersion": "27.0"
+        },
+        {
           "version": "0.1.42",
           "buildVersion": "0.1.42",
           "date": "2026-11-14T05:17:39Z",
