@@ -195,7 +195,8 @@ final class PhoneLink {
         }
         #endif
         let mine = LinkIntroduction(id: me, name: name, share: LinkKeys.randomBytes(LinkKeys.shareLength))
-        let stream = LinkTransport.dial(invite.id)
+        let failure = DialFailure()
+        let stream = LinkTransport.dial(invite.id, failure: failure)
         let preamble = LinkPreamble(mode: .pairing, caller: me)
         let psk = LinkKeys.pairingKey(secret: invite.secret)
         let inviter = try? await withDeadline(Self.pairingDeadline, onTimeout: { stream.abort() }) {
@@ -207,7 +208,7 @@ final class PhoneLink {
             return inviter
         }
         guard let inviter else {
-            return .failed("Couldn’t reach \(invite.name). Both iPhones need Marquee open on the same Wi-Fi, with the code still showing.")
+            return .failed(await LinkTransport.unreachableReason(invite.name, failure: failure))
         }
         let key = LinkKeys.linkKey(secret: invite.secret, inviter: inviter.id, inviterShare: inviter.share, guest: me, guestShare: mine.share)
         let named = LinkName.clean(inviter.name)

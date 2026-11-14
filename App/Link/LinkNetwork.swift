@@ -37,16 +37,48 @@ enum LinkTransport {
 
     /// A call to a phone's Bonjour instance, which is named by its link id. A path that waits or fails ends
     /// the connection at once, so a read throws instead of hanging; the caller's deadline bounds the rest.
-    static func dial(_ id: LinkID) -> TCPStream {
+    /// `failure` keeps what the system said when it did.
+    static func dial(_ id: LinkID, failure: DialFailure? = nil) -> TCPStream {
         let endpoint = NWEndpoint.service(name: id.description, type: serviceType, domain: "local.", interface: nil)
         let connection = NWConnection(to: endpoint, using: parameters())
         connection.stateUpdateHandler = { state in
             switch state {
-            case .waiting, .failed: connection.cancel()
+            case .waiting(let error), .failed(let error):
+                failure?.record(error)
+                connection.cancel()
             default: break
             }
         }
         return TCPStream.accept(connection)
+    }
+
+    /// kDNSServiceErr_PolicyDenied: the person has not allowed Local Network for the app.
+    private static let policyDenied: Int32 = -65570
+
+    /// Why a call to `name` did not get through, in words for the person: Local Network refused, Wi-Fi
+    /// switched off (peer-to-peer needs the radio on, not a network), or neither is known.
+    static func unreachableReason(_ name: String, failure: DialFailure) async -> String {
+        if case .dns(let code)? = failure.error, code == policyDenied {
+            return "Marquee isn’t allowed to find nearby iPhones. Allow Local Network for Marquee in Settings › Privacy & Security › Local Network."
+        }
+        if await !wifiAvailable() {
+            return "Turn on Wi-Fi on this iPhone (you don’t need to join a network), then try again."
+        }
+        return "Couldn’t reach \(name). Keep both iPhones near each other with Wi-Fi switched on (it needn’t be connected to a network), or on the same Wi-Fi, with Marquee open on both and the code still showing. Make sure the other iPhone has Marquee 0.1.39 or later."
+    }
+
+    /// Whether this iPhone has a Wi-Fi interface up at all.
+    private static func wifiAvailable() async -> Bool {
+        let monitor = NWPathMonitor()
+        let answered = AnswerOnce()
+        return await withCheckedContinuation { continuation in
+            monitor.pathUpdateHandler = { path in
+                guard answered.first() else { return }
+                monitor.cancel()
+                continuation.resume(returning: path.availableInterfaces.contains { $0.type == .wifi })
+            }
+            monitor.start(queue: .global())
+        }
     }
 
     /// The caller's side: the preamble and the first handshake message in one write, then the answer.
@@ -72,6 +104,30 @@ enum LinkTransport {
         let (reply, session) = try handshake.writeSecond()
         stream.send(reply)
         return LinkChannel(stream: stream, session: session)
+    }
+}
+
+/// What the system said when a call failed.
+final class DialFailure: Sendable {
+    private let stored = Mutex<NWError?>(nil)
+
+    var error: NWError? { stored.withLock { $0 } }
+
+    func record(_ error: NWError) {
+        stored.withLock { $0 = $0 ?? error }
+    }
+}
+
+/// True once, for the first caller: a path monitor reports again and again, and a continuation resumes once.
+private final class AnswerOnce: Sendable {
+    private let done = Mutex(false)
+
+    func first() -> Bool {
+        done.withLock {
+            let first = !$0
+            $0 = true
+            return first
+        }
     }
 }
 

@@ -333,7 +333,7 @@ private struct LinkWaitingView: View {
                 .foregroundStyle(theme.ink2)
             Text(remote.isConnected
                 ? "The controls show here once \(remote.phoneName) plays something or drives a big screen."
-                : "Both iPhones need Marquee open on the same Wi-Fi.")
+                : "Keep both iPhones near each other with Wi-Fi switched on, or on the same Wi-Fi, with Marquee open on both.")
                 .textRole(.body)
                 .foregroundStyle(theme.ink3)
         }

@@ -138,7 +138,7 @@ struct LinkScanView: View {
                 .textRole(.title)
                 .foregroundStyle(theme.ink)
                 .accessibilityIdentifier("link.confirm.title")
-            Text("Either iPhone can then control what the other plays, whenever both are on the same Wi-Fi. Either can unlink at any time.")
+            Text("Either iPhone can then control what the other plays, whenever both are near each other with Wi-Fi switched on, or on the same Wi-Fi. Either can unlink at any time.")
                 .textRole(.body)
                 .foregroundStyle(theme.ink2)
             Button {

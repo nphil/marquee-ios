@@ -25,7 +25,7 @@ struct LinkSettingsView: View {
                 Toggle("Linked Phones", isOn: Binding(get: { link.isEnabled }, set: { link.setEnabled($0) }))
                     .accessibilityIdentifier("link.enabled")
             } footer: {
-                Text("Two iPhones with Marquee, linked once, can control each other on the same Wi-Fi: either one becomes the remote for the TV or glasses the other drives, or for what it plays.")
+                Text("Two iPhones with Marquee, linked once, can control each other when they are near each other with Wi-Fi switched on (it needn’t be connected to a network), or on the same Wi-Fi: either one becomes the remote for the TV or glasses the other drives, or for what it plays.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)
@@ -168,7 +168,7 @@ struct LinkCodeView: View {
                     Text(link.name)
                         .textRole(.headline)
                         .foregroundStyle(theme.ink)
-                    Text("On the other iPhone, open Marquee › Settings › Linked Phones › Scan Link Code. Both need to be on the same Wi-Fi.")
+                    Text("On the other iPhone, open Marquee › Settings › Linked Phones › Scan Link Code. Keep both iPhones near each other with Wi-Fi switched on, or on the same Wi-Fi.")
                         .textRole(.body)
                         .foregroundStyle(theme.ink2)
                         .multilineTextAlignment(.center)
