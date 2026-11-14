@@ -52,6 +52,35 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
         }
     }
 
+    /// A conversion the server streams while it converts, saved one segment at a time into the part
+    /// file (`StreamedFile`).
+    public struct Stream: Hashable, Sendable, Codable {
+        /// The server's transcode session; a new one replaces it once the server has dropped it.
+        public var session: String
+        /// Seconds of the title saved, from its start.
+        public var saved: Double = 0
+        /// Segments appended, and the part file's length after them.
+        public var pieces = 0
+        public var bytes: Int64 = 0
+        /// The latest frame times saved, which a new session's segments must follow.
+        public var timestamps = TransportStream.Timestamps()
+        /// A new session began: its segments are trimmed until video and audio follow on.
+        public var joining = false
+        /// Sessions begun in a row without a segment saved.
+        public var restarts = 0
+        /// Where the session's playlist ends, seconds from the title's start.
+        public var end: Double?
+
+        public init(session: String) {
+            self.session = session
+        }
+
+        /// Every segment is saved; the hundredth of a second matches `HLSPlaylist.next(after:in:)`.
+        public var isComplete: Bool {
+            end.map { saved + 0.01 >= $0 } ?? false
+        }
+    }
+
     /// A separate subtitle file of the title, saved beside the video.
     public struct Subtitle: Hashable, Sendable, Codable {
         public var streamID: Int
@@ -73,19 +102,18 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
             self.height = height
         }
 
-        /// Nil when the server did not say how large the original is.
-        public init?(media: PlexMedia, quality: DownloadQuality) {
-            switch quality {
-            case .converted(let preset):
-                let target = PresetTarget.target(for: preset, media: media)
+        /// The target's frame for a conversion; for the original, nil when the server did not say how
+        /// large it is.
+        public init?(media: PlexMedia, target: DownloadTarget?) {
+            if let target {
                 self.init(width: target.width, height: target.height)
-            case .original:
-                let video = media.parts.first?.videoStream
-                guard let width = media.width ?? video?.width, let height = media.height ?? video?.height, width > 0, height > 0 else {
-                    return nil
-                }
-                self.init(width: width, height: height)
+                return
             }
+            let video = media.parts.first?.videoStream
+            guard let width = media.width ?? video?.width, let height = media.height ?? video?.height, width > 0, height > 0 else {
+                return nil
+            }
+            self.init(width: width, height: height)
         }
     }
 
@@ -114,6 +142,13 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
     public var expectedLength: Int64?
     public var received = ByteSpans()
     public var conversion: Conversion?
+    /// What a converted download asks the server for; absent on conversions saved by older versions,
+    /// which kept it in `conversion`.
+    public var target: DownloadTarget?
+    /// Set while the server streams the conversion; the download queue's `conversion` is the fallback.
+    public var stream: Stream?
+    /// The server would not stream the conversion, so the download queue makes it.
+    public var streamFailed: Bool?
     /// The video's name in the download's folder once complete, such as `media.mkv`.
     public var fileName: String?
     public var subtitles: [Subtitle] = []
@@ -126,7 +161,10 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
     /// the saved description.
     public var frame: Frame?
 
-    public init(item: PlexMetadata, scope: DownloadScope, quality: DownloadQuality, mediaIndex: Int, addedAt: Date, expectedLength: Int64? = nil) {
+    public init(
+        item: PlexMetadata, scope: DownloadScope, quality: DownloadQuality, target: DownloadTarget? = nil, mediaIndex: Int,
+        addedAt: Date, expectedLength: Int64? = nil
+    ) {
         self.scope = scope
         ratingKey = item.ratingKey
         type = item.type
@@ -140,18 +178,21 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
         thumb = item.type == .episode ? item.grandparentThumb ?? item.thumb : item.thumb
         duration = item.duration
         self.quality = quality
+        self.target = target
         self.mediaIndex = mediaIndex
         phase = .waiting
         self.expectedLength = expectedLength
         partialID = UUID()
         self.addedAt = addedAt
         watch = OfflineWatch(offset: item.viewOffset, watched: item.viewCount > 0)
-        frame = item.media.indices.contains(mediaIndex) ? Frame(media: item.media[mediaIndex], quality: quality) : nil
+        frame = item.media.indices.contains(mediaIndex) ? Frame(media: item.media[mediaIndex], target: target) : nil
     }
 
-    /// The share on the iPhone, 0…1; nil before the length is known in any way.
+    /// The share on the iPhone, 0…1; nil before the length is known in any way. A streamed conversion
+    /// counts the running time saved, which is its conversion and its download at once.
     public var fraction: Double? {
         if phase == .done { return 1 }
+        if let stream, duration > 0 { return min(1, stream.saved * 1000 / Double(duration)) }
         guard let total = length ?? expectedLength, total > 0 else { return nil }
         return min(1, Double(received.byteCount) / Double(total))
     }

@@ -39,7 +39,7 @@ The preparation deadline is checked against playback even while the standby play
 
 ## Per-title quality scores
 
-`QualityScores` holds a title's VMAF score per rung. With scores, Auto climbs no higher than the lowest rung within 1.5 points of the best score, so a cartoon that looks the same at 8 Mbps does not pull 20. Nothing supplies scores yet; a server-side analysis would fill them per title.
+`QualityScores` holds a title's VMAF score per rung. With scores, Auto climbs no higher than the lowest rung within 1.5 points of the best score, so a cartoon that looks the same at 8 Mbps does not pull 20. Nothing supplies scores for playback yet. HomeLabber's quality map scores titles for the download tiers (`QualityMapEntry.curve`, H.264 from 480p to 1080p) and could fill them.
 
 ## Open: Picture in Picture shows LIVE for a remux
 

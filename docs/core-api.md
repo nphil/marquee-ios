@@ -143,6 +143,14 @@ The endpoints and the route rules are in `docs/LIVE-TV.md`.
 - `SeerrUser`, `SeerrPermissions`, `SeerrServerSettings`, `SeerrTitle`, `SeerrDetails`, `SeerrMedia`, `SeerrRequest` and `SeerrSeason` describe the account, catalogue and request state. Permission and server settings control standard and 4K requests, partial season requests and specials.
 - `SeerrMedia.badge(is4K:)`, `SeerrRequest.badge` and `openRequest(is4K:)` describe status and the latest open request. `plexLink(serverID:)` returns a matching Plex item or an unconfirmed rating key that must be checked against the TMDB identifier before use. `SeerrDetails.seasonChoices(is4K:settings:)`, `canRequest(is4K:user:settings:)` and `order(seasons:is4K:settings:)` enforce quality and season choices; `watchlistAddRequests(user:pulsarr:)` detects automatic Watchlist requests. `TMDBImage.url(_:pixels:)` selects an image size.
 
+## Downloads (`Downloads/`)
+
+- `DownloadQuality`: Original or a `DownloadTier` (High, Medium, Low, aiming at VMAF 95, 90 and 85). `DownloadQualityPlan(media:animated:hevc:originalPlays:map:)`: the Download menu's `Option`s (quality, `DownloadTarget`, measured or estimated, bytes, resolution) and `option(for:)`, a default quality's choice. Estimates follow the version's height, video bitrate, codec, frame rate and animation genres (`isAnimated(genres:)`); no tier exceeds the original's bitrate, and a 4K HEVC High joins for a 4K original on a phone that decodes HEVC.
+- `HomeLabberConfig.parse(address:token:)`; `HomeLabberClient`: `status()` (`QualityMapStatus`) and `entry(server:ratingKey:)` (a `QualityMapEntry`, nil until measured), sent with HomeLabber's bearer token.
+- `TranscodeLadder.search(for:attempts:decide:)`: the `maxVideoBitrate` cap whose decision comes closest to a target's bitrate at its height.
+- `HLSPlaylist`: a master playlist's `variant(in:)`; a media playlist's `segments(in:)` and `next(after:in:)`.
+- `StreamedFile`: one `.ts` from a conversion's segments. `prepare` drops a write cut short, `append(_:ending:to:stream:)` trims a new session's repeat (`TransportStream`), and `pieces(of:)` with `absorb(into:stream:)` join the segments iOS fetched in the background, in order.
+
 ## Navigation (`Navigation/`)
 
 - `Destination`: Home, Library, Live TV, Watchlist, Search, Requests, Downloads.

@@ -74,7 +74,7 @@ public struct DownloadStore: Sendable {
         guard let data = try? Data(contentsOf: metadataFile(for: record)),
               let item = try? PlexMetadata.fromSnapshot(data),
               item.media.indices.contains(record.mediaIndex) else { return nil }
-        return DownloadRecord.Frame(media: item.media[record.mediaIndex], quality: record.quality)
+        return DownloadRecord.Frame(media: item.media[record.mediaIndex], target: record.target ?? record.conversion?.target)
     }
 
     /// The artwork path to keep as the title's still, from its saved description.

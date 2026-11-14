@@ -35,6 +35,8 @@ struct DownloadButton: View {
             .buttonStyle(.round)
             .accessibilityLabel("Download")
             .accessibilityIdentifier("detail.download")
+            // HomeLabber's scores and the show's genres, so the sizes are ready when the menu opens.
+            .task(id: item.ratingKey) { await session.downloads.prepareChoices(for: item) }
         }
     }
 }
@@ -77,22 +79,43 @@ struct DownloadEpisodesItem: View {
     }
 }
 
+/// Original, then High, Medium and Low as the server converts them, each with its picture size and
+/// about how large it comes to, and under a conversion whether that is measured or estimated. The
+/// default quality's choice is ticked.
 private struct DownloadQualityChoices: View {
     let item: PlexMetadata
     let mediaIndex: Int
     @Environment(AppSession.self) private var session
 
     var body: some View {
-        ForEach(DownloadQuality.choices, id: \.self) { quality in
-            Button {
-                Task { await session.downloads.enqueue(item: item, quality: quality, mediaIndex: mediaIndex, capabilities: await session.player.capabilities.current()) }
-            } label: {
-                if quality == session.downloads.settings.quality {
-                    Label(quality.title, systemImage: "checkmark")
-                } else {
-                    Text(quality.title)
-                }
+        let downloads = session.downloads
+        let capabilities = session.player.capabilities.hardware.map(PlaybackCapabilities.device)
+        if let plan = downloads.plan(for: item, mediaIndex: mediaIndex, capabilities: capabilities) {
+            let ticked = plan.option(for: downloads.settings.quality)?.id
+            ForEach(plan.options) { option in
+                choice(option.quality, id: option.id, title: DownloadText.choice(option), detail: DownloadText.basis(option), ticked: option.id == ticked)
             }
+        } else {
+            ForEach(DownloadQuality.choices, id: \.self) { quality in
+                choice(quality, id: nil, title: quality.title, detail: nil, ticked: quality == downloads.settings.quality)
+            }
+        }
+    }
+
+    private func choice(_ quality: DownloadQuality, id: String?, title: String, detail: String?, ticked: Bool) -> some View {
+        Button {
+            Task {
+                await session.downloads.enqueue(
+                    item: item, quality: quality, choice: id, mediaIndex: mediaIndex, capabilities: await session.player.capabilities.current()
+                )
+            }
+        } label: {
+            if ticked {
+                Label(title, systemImage: "checkmark")
+            } else {
+                Text(title)
+            }
+            if let detail { Text(detail) }
         }
     }
 }

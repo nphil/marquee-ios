@@ -16,9 +16,16 @@ struct DownloadTests {
         ],
     ] }
 
+    /// Medium at 720 for an hour comes to (3400 + 192) kbit/s.
+    static let medium = DownloadTarget(videoKbps: 3400, height: 720)
+
     static func record(_ json: [String: Any]? = nil, quality: DownloadQuality = .original) throws -> DownloadRecord {
         let item = try decode(PlexMetadata.self, json ?? episode)
-        return DownloadRecord(item: item, scope: DownloadScope(server: "machine-1", profile: ""), quality: quality, mediaIndex: 0, addedAt: Date(timeIntervalSince1970: 0))
+        let target = quality == .original ? nil : medium
+        return DownloadRecord(
+            item: item, scope: DownloadScope(server: "machine-1", profile: ""), quality: quality, target: target, mediaIndex: 0,
+            addedAt: Date(timeIntervalSince1970: 0)
+        )
     }
 
     /// An episode of show `show`, or a movie without one, in `phase`; finished at `finished` seconds.
@@ -112,24 +119,6 @@ struct DownloadTests {
         #expect(RangeReply.judge(status: 404, contentRange: nil, contentLength: nil, retryAfter: nil, requested: asked) == .failed(status: 404))
     }
 
-    // MARK: Quality
-
-    @Test func conversionNeverAsksForMoreThanTheSource() throws {
-        let item = try decode(PlexMetadata.self, Self.episode)
-        let scope = PresetTarget.target(for: .mbps20, media: item.media[0])
-        #expect(scope == DownloadTarget(maxVideoBitrateKbps: 6000, width: 1920, height: 800))
-        let uhd = PresetTarget.target(for: .mbps4, media: item.media[1])
-        #expect(uhd == DownloadTarget(maxVideoBitrateKbps: 4000, width: 1280, height: 720))
-    }
-
-    @Test func sizeEstimates() throws {
-        let item = try decode(PlexMetadata.self, Self.episode)
-        let target = DownloadTarget(maxVideoBitrateKbps: 4000, width: 1280, height: 720)
-        #expect(DownloadQuality.original.estimatedBytes(media: item.media[0], target: nil) == 2_000_000_000)
-        // (4000 + 192) kbps for an hour.
-        #expect(DownloadQuality.converted(.mbps4).estimatedBytes(media: item.media[0], target: target) == 1_886_400_000)
-    }
-
     // MARK: Watching offline
 
     @Test func offlineViewingIsToldInOrder() {
@@ -195,7 +184,7 @@ struct DownloadTests {
             }
         }
         let queue = try await library.downloadQueue()
-        let target = DownloadTarget(maxVideoBitrateKbps: 4000, width: 1280, height: 720)
+        let target = Self.medium
 
         let item = try await library.addToDownloadQueue(queue, ratingKey: "301", mediaIndex: 1, target: target)
 
@@ -267,7 +256,7 @@ struct DownloadTests {
         let root = FileManager.default.temporaryDirectory.appending(path: "downloads-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         let store = DownloadStore(root: root)
-        var record = try Self.record(quality: .converted(.mbps4))
+        var record = try Self.record(quality: .tier(.medium))
         record.scope = DownloadScope(server: "../machine", profile: "uuid-1")
         record.received = ByteSpans([0..<10])
         record.subtitles = [DownloadRecord.Subtitle(streamID: 77, fileName: "subtitle-77.srt")]
@@ -307,7 +296,7 @@ struct DownloadTests {
         let store = DownloadStore(root: root)
         var json = Self.episode
         json["thumb"] = "/library/metadata/301/thumb/1"
-        var record = try Self.record(json, quality: .converted(.mbps4))
+        var record = try Self.record(json, quality: .tier(.medium))
         record.frame = nil
         try store.makeFolder(for: record)
         #expect(store.savedFrame(for: record) == nil && store.savedStillPath(for: record) == nil)
@@ -322,7 +311,7 @@ struct DownloadTests {
     @Test func pictureSizeIsTheConversionsTargetOrTheVersionsOwn() throws {
         let original = try Self.record()
         #expect(original.frame == DownloadRecord.Frame(width: 1920, height: 800) && original.resolution == "1080p")
-        let converted = try Self.record(quality: .converted(.mbps4))
+        let converted = try Self.record(quality: .tier(.medium))
         #expect(converted.frame == DownloadRecord.Frame(width: 1280, height: 720) && converted.resolution == "720p")
         var sizeless = Self.episode
         sizeless["Media"] = [["id": 1, "Part": [["id": 11, "key": "/library/parts/11/1700000000/file.mkv"]]]]

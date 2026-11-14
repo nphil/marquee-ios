@@ -8,6 +8,12 @@ A server conversion asks Plex's decision first, as PMS 1.43.5 refused the start 
 
 Unseen until CI: `DownloadFlowTests.testWaitingForWiFi` and its shot `downloads-waiting-wifi-dark`. On a phone: DEVICE-TEST check 20.
 
+## Quality downloads (branch `quality-downloads`)
+
+Built on branch `quality-downloads`, not yet on `main`. The Download menu offers Original, High, Medium and Low, each with its picture and download size; the tiers aim at VMAF 95, 90 and 85 (Core `DownloadQualityPlan`), measured by HomeLabber's quality map when its plugin is set up (Settings › Integrations › HomeLabber Quality Map), else estimated. A tier is converted while it downloads: the app saves the server's HLS segments into one `media.ts` (Core `StreamedFile`), hands up to 400 segments to iOS in the background, starts a new session where the saved segments end after a pause, a kill or an expired session, and falls back to the download queue when the server will not stream it. HomeLabber's side is its `media-quality` branch.
+
+Unseen until CI: the app build, `DownloadFlowTests.testStreamedDownload` with its shots `downloads-quality-menu-dark` and `downloads-streamed-dark`, and the settings flow's `acct-09c-homelabber-*`. On a phone and the real server: DEVICE-TEST check 25, in particular segment order in the background, the transcoder's throttle and idle reaping for a session that only downloads, the splice at a resume, a 4K HEVC tier, and offline playback of the joined file.
+
 ## XR glasses and TV (branch `xr`, TV mode on `tv-mode`)
 
 Built on branch `xr`, not yet on `main`. The XR glasses plugin (DESIGN §8.9) gives glasses that connect as a display (Viture Pro) Marquee's own 1920 × 1080 screen and makes the phone an eyes-free remote. It is off until Settings › XR Glasses & TV turns it on. TV mode (branch `tv-mode`, not yet on `main`) lets a TV on USB-C video out or HDMI use the same screen and remote: Core `BigScreen` (display kinds, per-display answers, the layout: 5 % margins and the display's aspect on a TV), `GlassesCenter` decides each display from its kept answer, `BigScreenMetrics` in the environment replaces the fixed canvas size and margins, the TV's own screen decides HDR in `PlaybackCapabilities`, and `GlassesInput` is the one input hook. UI tests `tv-*` and `tv-phone-*`; device check 23. Untested: everything on a real TV, a disabled scene registration handing the display back to iOS for Mirror, and AirPlay.
@@ -60,14 +66,13 @@ Release review fixes: playback counts as home at a Plex-local address reached wi
 
 The combined simulator run and screenshot review remain acceptance work, not a pre-release full-suite gate. Real-iPhone decoding, offline audio/subtitles, background downloads, watch-state reconciliation, tuner timeshift, network handovers and power/heat remain device checks; simulated playback is not acceptance evidence for these. Native picture scaling is retained because extra enhancement has no measured device benefit.
 
-Double-tap only remains the default skip gesture. The server-side VMAF map and remuxed Picture in Picture LIVE-label change are deferred; the latter needs an upstream engine change (`docs/adaptive-playback.md`).
+Double-tap only remains the default skip gesture. The remuxed Picture in Picture LIVE-label change is deferred; it needs an upstream engine change (`docs/adaptive-playback.md`).
 
 ## Parked ideas
 
 Not to be built until Nitin asks. Recorded so the design is not lost.
 
 - **YouTube-style mini player.**
-- **Download while the server converts.** A converted download today waits for Plex's download queue to finish the whole file before fetching it, so the total is conversion time plus transfer time. Fetching the streaming transcode's HLS segments as they appear (AVAssetDownloadURLSession, which also runs in the background) would make it about the longer of the two and skip the queue wait. To check against the real server: whether the transcoder throttle holds back a session that only downloads, the "playing" session it shows, and assembly into a playable offline file. Keep the queue path as the fallback.
 - **Touch-surface TV remote (LumaRemoteKit and the LumaTV phone-remote plugin).** Parked, not part of this release: a TV-themed touch surface with continuous scrolling, stable tap targets, thumb-engaged Core Motion assistance and TV-confirmed haptics. Investigate Wi-Fi Aware support in the LG radio, firmware and driver, plus the sideload signing entitlement, then compare against the existing encrypted UDP path. The proposed 20–40 ms touch-to-display target is unmeasured. Bluetooth LE is not inherently faster; its actual connection timing must be measured. The optional mini bar and automatic away hiding are separate, active release requirements.
 
 ## Standing rules (also in AGENTS.md)

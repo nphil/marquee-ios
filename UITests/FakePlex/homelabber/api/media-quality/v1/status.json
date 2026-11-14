@@ -1,0 +1,8 @@
+{
+ "enabled": true,
+ "scored": 812,
+ "total": 1204,
+ "running": false,
+ "lastRun": "2026-11-12T03:10:00Z",
+ "encoder": "h264_vaapi"
+}

@@ -1,0 +1,62 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "generalDecisionCode": 1001,
+  "generalDecisionText": "Direct play not available; Conversion OK.",
+  "Metadata": [
+   {
+    "ratingKey": "101",
+    "key": "/library/metadata/101",
+    "type": "movie",
+    "title": "Big Buck Bunny",
+    "duration": 596000,
+    "Media": [
+     {
+      "id": 1010,
+      "duration": 596000,
+      "bitrate": 2792,
+      "width": 1280,
+      "height": 720,
+      "videoResolution": "720",
+      "videoCodec": "h264",
+      "audioCodec": "aac",
+      "container": "mpegts",
+      "protocol": "hls",
+      "selected": true,
+      "Part": [
+       {
+        "id": 1011,
+        "duration": 596000,
+        "container": "mpegts",
+        "decision": "transcode",
+        "selected": true,
+        "Stream": [
+         {
+          "id": 10111,
+          "streamType": 1,
+          "codec": "h264",
+          "bitrate": 2600,
+          "width": 1280,
+          "height": 720,
+          "decision": "transcode",
+          "location": "segments-video"
+         },
+         {
+          "id": 10112,
+          "streamType": 2,
+          "codec": "aac",
+          "bitrate": 192,
+          "channels": 2,
+          "selected": true,
+          "decision": "transcode",
+          "location": "segments-audio"
+         }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

@@ -19,7 +19,7 @@ struct DownloadSettingsView: View {
                 }
                 .accessibilityIdentifier("downloads.quality")
             } footer: {
-                Text("Original keeps the server's file. Other choices ask the server to convert it before downloading.")
+                Text("Original keeps the server's file. High, Medium and Low ask the server to convert it while it downloads, each at the size the title needs for that quality.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)

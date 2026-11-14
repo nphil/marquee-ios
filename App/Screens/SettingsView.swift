@@ -142,6 +142,15 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings.bazarr")
                 NavigationLink {
+                    HomeLabberView()
+                } label: {
+                    LabeledContent("HomeLabber Quality Map") {
+                        Text(session.homelabber.config == nil ? "Off" : "On")
+                            .foregroundStyle(theme.ink2)
+                    }
+                }
+                .accessibilityIdentifier("settings.homelabber")
+                NavigationLink {
                     SeerrView()
                 } label: {
                     LabeledContent("Seerr") {

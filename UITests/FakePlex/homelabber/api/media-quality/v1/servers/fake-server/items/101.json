@@ -1,0 +1,22 @@
+{
+ "ratingKey": "101",
+ "mediaId": "1010",
+ "scoredAt": "2026-11-12T03:10:00Z",
+ "encoder": "h264_vaapi",
+ "sourceHeight": 1080,
+ "fps": 24,
+ "tiers": {
+  "high": { "kbps": 4800, "vmaf": 95.2, "height": 1080 },
+  "medium": { "kbps": 2600, "vmaf": 90.4, "height": 720 },
+  "low": { "kbps": 1500, "vmaf": 85.6, "height": 720 }
+ },
+ "curve": [
+  { "kbps": 1000, "vmaf": 80.9, "height": 720 },
+  { "kbps": 1500, "vmaf": 85.6, "height": 720 },
+  { "kbps": 2600, "vmaf": 90.4, "height": 720 },
+  { "kbps": 3400, "vmaf": 92.1, "height": 720 },
+  { "kbps": 3400, "vmaf": 91.0, "height": 1080 },
+  { "kbps": 4800, "vmaf": 95.2, "height": 1080 },
+  { "kbps": 6500, "vmaf": 96.8, "height": 1080 }
+ ]
+}

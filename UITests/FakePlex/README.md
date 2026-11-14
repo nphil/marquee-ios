@@ -4,7 +4,7 @@ The UI tests launch the app with `MARQUEE_FAKE_PLEX` set to this folder. `App/Te
 
 ## Rules
 
-- A request reads `<prefix>/<path>.json`: prefix `plextv` for plex.tv, `discover` for discover.provider.plex.tv, `bazarr`, `speechdock` or `seerr` for hosts beginning with those names, and `pms` for any other host. `GET /library/metadata/12` on the fake server reads `pms/library/metadata/12.json`.
+- A request reads `<prefix>/<path>.json`: prefix `plextv` for plex.tv, `discover` for discover.provider.plex.tv, `bazarr`, `speechdock`, `seerr` or `homelabber` for hosts beginning with those names, and `pms` for any other host. `GET /library/metadata/12` on the fake server reads `pms/library/metadata/12.json`.
 - `<path>@<name>=<value>.json` wins over `<path>.json` when the request has that query item, e.g. `plextv/api/v2/home/users/<uuid>/switch@pin=1234.json`.
 - After a write (any method but GET) to `/a/b`, `<path>@after=a_b.json` wins over every other fixture of the path; of several, the one for the latest write. `pms/library/metadata/212@after=api_providers_episodes.json` is the episode once Bazarr has downloaded a subtitle for it.
 - `/:/scrobble` and `/:/unscrobble` are remembered for the run: afterwards every list reads as the server would show it, a title taking the latest write for itself, its season or its show (`viewCount`, `viewedLeafCount`, no `viewOffset`), and a title marked watched leaves the `home.continue` hub. The fixture files themselves never change.
@@ -17,7 +17,8 @@ The UI tests launch the app with `MARQUEE_FAKE_PLEX` set to this folder. `App/Te
 - Without a fixture, `firstCharacter` is counted from the `all` list beside it, and `/library/all` joins the `all` lists of the sections in `pms/library/sections.json`.
 - `/photo/:/transcode` serves the file at its `url` item, and any URL ending in `.jpg` or `.png` serves the file at its own path, so `/art/sintel-poster.jpg` and `https://metadata-static.plex.tv/art/sintel-poster.jpg` both read `art/sintel-poster.jpg`.
 - TMDB images at `image.tmdb.org/t/p/<size>/art/...` read the corresponding file under `art/`.
-- A write, or a path with `/:/` in it (`/:/timeline`, `/video/:/transcode/universal/decision`) or under `/actions/`, without a fixture answers 200 `{}`. Any other missing fixture answers 404. A `DELETE` always answers 200 and the title stays in the fixtures, as a server lists a deleted title until its trash is emptied.
+- A write, or a path with `/:/` in it (`/:/timeline`, `/video/:/transcode/universal/stop`) or under `/actions/`, without a fixture answers 200 `{}`. Any other missing fixture answers 404. A `DELETE` always answers 200 and the title stays in the fixtures, as a server lists a deleted title until its trash is emptied.
+- A download converted while it downloads reads `pms/video/:/transcode/universal/decision.json`, a 720p H.264 conversion of Big Buck Bunny at 2600 kbit/s, then `start.m3u8.bin` beside it, which leads to a 20-second playlist of three segments of null transport stream packets under `session/fake/base/`. Every conversion and session reads the same files.
 - The server root `/` reads `pms/root.json`: Living Room allows deleting media from the apps.
 - Every channel's tune, `POST /livetv/dvrs/<dvr>/channels/<channel>/tune`, reads `pms/livetv/tune.json`: a rolling grab holding a 720p MPEG-2 session, the shape PMS 1.43.5 answers with. The player shows the `-marquee.uitest.frame` picture for every channel.
 - Scene thumbnails, `GET /library/parts/<id>/indexes/sd`, read the BIF file `pms/library/parts/<id>/indexes/sd.bif`. Part 2121 (Caminandes episode 2) has 15 frames, one per 10 s, cut from the fixture artwork.
@@ -39,6 +40,8 @@ Bazarr, at `http://bazarr.local:6767` when a test passes `-marquee.uitest.bazarr
 SpeechDock, at `http://speechdock.local:8765` when a test passes `-marquee.uitest.speechDock`, answers its health check as version 1.0.0 and times every cue of a window, its words spread evenly over the time the cue shows.
 
 Seerr, at `http://seerr.local:5055` when a test passes `-marquee.uitest.seerr`, provides the Discover page's trending, popular and upcoming shelves and genre cards, the genre, language, region and streaming service lists the browse filters offer, an Action list (`discover/movies@genre=28.json`: Charge and Hero), a search for Wing, requestable Wing It!, partly available Caminandes, and a pending Sintel request. A request write adds Wing It! to My Requests and marks its detail page pending. IDs and request state are synthetic.
+
+HomeLabber, at `http://homelabber.local:3000` when a test passes `-marquee.uitest.homelabber`, has measured 812 of 1,204 titles. Big Buck Bunny's map entry (`servers/fake-server/items/101.json`) puts High at 4800 kbit/s in 1080p, Medium at 2600 and Low at 1500 in 720p.
 
 ## Artwork
 

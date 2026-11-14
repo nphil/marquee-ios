@@ -24,6 +24,8 @@ final class SessionStorage {
         static let speechDockAddress = "marquee.speechDock.address"
         static let bazarrAddress = "marquee.bazarr.address"
         static let bazarrKey = "marquee.bazarr.key"
+        static let homelabberAddress = "marquee.homelabber.address"
+        static let homelabberToken = "marquee.homelabber.token"
         static let seerrAddress = "marquee.seerr.address"
         static let seerrKey = "marquee.seerr.key"
         static let seerrSession = "marquee.seerr.session"
@@ -138,6 +140,19 @@ final class SessionStorage {
         }
     }
 
+    /// HomeLabber's address and its read-only token for the quality map; the token is a secret like
+    /// Bazarr's key. Kept through sign-out.
+    var homelabber: HomeLabberConfig? {
+        get {
+            guard let address = defaults.url(forKey: Key.homelabberAddress), let token = secret(Key.homelabberToken) else { return nil }
+            return HomeLabberConfig(address: address, token: String(decoding: token, as: UTF8.self))
+        }
+        set {
+            defaults.set(newValue?.address, forKey: Key.homelabberAddress)
+            setSecret(newValue.map { Data($0.token.utf8) }, for: Key.homelabberToken)
+        }
+    }
+
     /// Seerr's address, and its API key when it signs in with one rather than the Plex profile; the key
     /// is a secret like Bazarr's. Kept through sign-out.
     var seerr: SeerrConfig? {
@@ -224,6 +239,7 @@ final class SessionStorage {
     func eraseAll() {
         clearSignIn()
         seerr = nil
+        homelabber = nil
         defaults.removePersistentDomain(forName: domain)
     }
 

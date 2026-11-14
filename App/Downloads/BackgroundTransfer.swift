@@ -6,7 +6,8 @@ import UIKit
 
 /// Hands one 64 MB slice of a download at a time to iOS, which fetches it while the app is suspended
 /// or closed and wakes the app when it lands. Each slice is copied into the part file at its offset
-/// and flushed, so every landed slice is kept whatever happens next.
+/// and flushed, so every landed slice is kept whatever happens next. A streamed conversion hands over
+/// its next segments instead, each kept beside the part file until the app appends it.
 ///
 /// iOS's hand-over of a finished background file can fail with `NSURLErrorCannotCreateFile` (-3000)
 /// for no reason the app can see; Stashy measured it on every slice of every file on one iOS build.
@@ -20,6 +21,15 @@ final class BackgroundTransfer: Sendable {
         let part: String
         let lower: Int64
         let upper: Int64
+        /// Set for a segment of a streamed conversion, which lands beside the part file as a piece
+        /// (`StreamedFile`); `upper - lower` is then about its size.
+        var segment: Segment?
+
+        struct Segment: Codable, Sendable, Hashable {
+            let number: Int
+            /// Seconds into the title.
+            let end: Double
+        }
 
         var range: Range<Int64> { lower..<upper }
     }
@@ -32,6 +42,8 @@ final class BackgroundTransfer: Sendable {
         /// was its own, so the next slice goes to one that answers.
         case interrupted(Slice, dropped: URL?)
         case failed(Slice, String)
+        /// The server dropped the streamed conversion's session, so the segments after it fail too.
+        case expired(Slice)
         case stopped(Slice)
     }
 
@@ -53,6 +65,9 @@ final class BackgroundTransfer: Sendable {
         let configuration = URLSessionConfiguration.background(withIdentifier: Self.identifier)
         configuration.sessionSendsLaunchEvents = true
         configuration.isDiscretionary = false
+        // A streamed conversion's segments go one at a time, in order: PMS 1.43.5 moves its transcode
+        // to a segment asked for far ahead.
+        configuration.httpMaximumConnectionsPerHost = 1
         let delegate = Delegate(onResult: onResult) {
             UserDefaults.standard.set(Self.systemVersion, forKey: Self.brokenKey)
         }
@@ -74,7 +89,7 @@ final class BackgroundTransfer: Sendable {
         guard isAvailable, let session else { return }
         var request = URLRequest(url: url)
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
-        request.setValue("bytes=\(slice.lower)-\(slice.upper - 1)", forHTTPHeaderField: "Range")
+        if slice.segment == nil { request.setValue("bytes=\(slice.lower)-\(slice.upper - 1)", forHTTPHeaderField: "Range") }
         request.allowsCellularAccess = cellular
         let task = session.downloadTask(with: request)
         task.taskDescription = (try? JSONEncoder().encode(slice)).map { String(decoding: $0, as: UTF8.self) }
@@ -123,6 +138,10 @@ final class BackgroundTransfer: Sendable {
         func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
             guard let slice = BackgroundTransfer.slice(of: downloadTask) else { return }
             let http = downloadTask.response as? HTTPURLResponse
+            if let segment = slice.segment {
+                deliver(keep(location, of: slice, segment: segment, status: http?.statusCode ?? 0))
+                return
+            }
             let reply = RangeReply.judge(
                 status: http?.statusCode ?? 0,
                 contentRange: http?.value(forHTTPHeaderField: "Content-Range"),
@@ -179,6 +198,25 @@ final class BackgroundTransfer: Sendable {
                     await work()
                 }
             }
+        }
+
+        /// Moves a landed segment beside the part file as its piece. A dropped session answers 404, and
+        /// a segment before its start a placeholder.
+        private func keep(_ location: URL, of slice: Slice, segment: Slice.Segment, status: Int) -> Result {
+            let length = (try? location.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            if status == 404 || ((200..<300).contains(status) && StreamedFile.isPlaceholder(length)) { return .expired(slice) }
+            guard (200..<300).contains(status) else {
+                return TransferPlan.isTransient(TransferStatusError(status: status)) ? .interrupted(slice, dropped: nil) : .failed(slice, "The server answered \(status).")
+            }
+            let part = DownloadStore.file(forPart: slice.part, under: BackgroundTransfer.supportDirectory)
+            let piece = part.deletingLastPathComponent().appending(path: StreamedFile.pieceName(of: part, number: segment.number, end: segment.end))
+            do {
+                try? FileManager.default.removeItem(at: piece)
+                try FileManager.default.moveItem(at: location, to: piece)
+            } catch {
+                return .failed(slice, "The download could not be saved.")
+            }
+            return .saved(slice, written: 0..<Int64(length), length: nil)
         }
 
         /// Copies the landed file into the part at `offset`, up to `limit`, and flushes it.

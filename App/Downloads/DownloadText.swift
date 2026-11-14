@@ -40,15 +40,21 @@ enum DownloadText {
             parts.append((record.length == nil && record.phase != .done ? estimate : "") + size(bytes))
         }
         if let resolution = record.resolution { parts.append(resolution) }
-        parts.append(quality(record.quality))
+        parts.append(record.quality.title)
         return parts
     }
 
-    /// "Original", or the bitrate a conversion was asked for; its picture size is named beside it.
-    static func quality(_ quality: DownloadQuality) -> String {
-        switch quality {
-        case .original: "Original"
-        case .converted(let preset): preset.maxBitrateKbps.map { "\($0 / 1000) Mbps" } ?? preset.title
+    /// A Download menu choice: "Medium · 720p · 1.1 GB".
+    static func choice(_ option: DownloadQualityPlan.Option) -> String {
+        [option.quality.title, option.resolution, option.bytes.map(size)].compactMap(\.self).joined(separator: " · ")
+    }
+
+    /// Under a conversion's choice: from HomeLabber's measured scores, or estimated here.
+    static func basis(_ option: DownloadQualityPlan.Option) -> String? {
+        switch option.basis {
+        case .original: nil
+        case .measured: "Measured"
+        case .estimated: "Estimated"
         }
     }
 

@@ -291,6 +291,19 @@ public struct PlexLibrary: Sendable {
         return url
     }
 
+    /// What the server would make for a transcode, without starting it: `Metadata[0].Media[0]`
+    /// describes the output, its video stream's `bitrate` the encoder's rate. A downloaded conversion
+    /// keeps the last one as its description.
+    public func transcodeDecision(_ request: TranscodeRequest) async throws -> PlexMetadataSnapshot {
+        let (response, _) = try await exchange(isRead: true) { address in
+            try self.request(
+                .get, "/video/:/transcode/universal/decision", request.queryItems(location: Self.location(of: address)),
+                [:], nil, nil, base: address.uri
+            )
+        }
+        return PlexMetadataSnapshot(item: try PlexMetadata.fromSnapshot(response.body), data: response.body)
+    }
+
     private static func location(of address: PlexConnection) -> String {
         address.isLocal ? "lan" : "wan"
     }

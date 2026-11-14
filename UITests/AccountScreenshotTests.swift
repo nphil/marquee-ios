@@ -137,13 +137,13 @@ extension XCTestCase {
         waitForBar("Home", in: app)
     }
 
-    /// Each Settings page in list order, SpeechDock's and Bazarr's connection tests, a licence and the
-    /// sign-out confirmation; `turned` takes each shot in landscape.
+    /// Each Settings page in list order, the SpeechDock, Bazarr and HomeLabber connection tests, a
+    /// licence and the sign-out confirmation; `turned` takes each shot in landscape.
     @MainActor
     func settingsFlow(mode: String, suffix: String, turned: Bool = false) throws {
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", arguments: [
             "-marquee.fakeSignedIn", "YES", "-marquee.uitest.bazarr", "http://bazarr.local:6767",
-            "-marquee.uitest.speechDock", "http://speechdock.local:8765",
+            "-marquee.uitest.speechDock", "http://speechdock.local:8765", "-marquee.uitest.homelabber", "http://homelabber.local:3000",
         ])
         openSettings(in: app)
         try snap("acct-04-settings-\(suffix)", turned: turned)
@@ -192,6 +192,14 @@ extension XCTestCase {
         XCTAssertTrue(linked.waitForExistence(timeout: 10), "No linked Sonarr and Radarr after the connection test")
         try snap("acct-09b-bazarr-\(suffix)", turned: turned)
         goBack(from: "Bazarr", in: app)
+
+        reveal("settings.homelabber", in: app).tap()
+        waitForBar("HomeLabber Quality Map", in: app)
+        tap("homelabber.test", in: app)
+        let measured = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS '812 of 1,204 titles measured'")).firstMatch
+        XCTAssertTrue(measured.waitForExistence(timeout: 10), "No measuring progress after the connection test")
+        try snap("acct-09c-homelabber-\(suffix)", turned: turned)
+        goBack(from: "HomeLabber Quality Map", in: app)
 
         reveal("settings.notices", in: app).tap()
         waitForBar("Open-Source Notices", in: app)

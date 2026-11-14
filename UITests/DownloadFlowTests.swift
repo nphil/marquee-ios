@@ -22,7 +22,7 @@ final class DownloadFlowTests: XCTestCase {
         open(tab: "Library", title: "Movies", in: app)
         reveal("poster.101", in: app).tap()
         tap("detail.download", in: app)
-        app.buttons["Original"].tap()
+        choice("Original", in: app).tap()
 
         open(tab: "Home", title: "Home", in: app)
         openSettings(in: app)
@@ -39,13 +39,40 @@ final class DownloadFlowTests: XCTestCase {
         XCTAssertFalse(element("downloads.cellular.101", in: app).exists, "The cellular offer stayed after it was taken")
     }
 
+    /// With HomeLabber's map the Download menu offers measured sizes; Medium is converted while it
+    /// downloads, and the saved row names its tier and picture size.
+    @MainActor
+    func testStreamedDownload() throws {
+        let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine", arguments: [
+            "-marquee.fakeSignedIn", "YES", "-marquee.uitest.homelabber", "http://homelabber.local:3000",
+        ])
+        open(tab: "Library", title: "Movies", in: app)
+        reveal("poster.101", in: app).tap()
+        tap("detail.download", in: app)
+        let medium = choice("Medium · 720p", in: app)
+        XCTAssertTrue(medium.waitForExistence(timeout: 5), "No Medium choice in 720p")
+        XCTAssertTrue(medium.label.contains("Measured"), "Medium is not HomeLabber's measured size: \(medium.label)")
+        try snap("downloads-quality-menu-dark")
+        medium.tap()
+        XCTAssertTrue(app.buttons["Downloaded"].waitForExistence(timeout: 20), "The converted download did not finish")
+
+        open(tab: "Home", title: "Home", in: app)
+        openSettings(in: app)
+        reveal("settings.downloads", in: app).tap()
+        tap("downloads.open", in: app)
+        let play = app.buttons["downloads.play.101"]
+        XCTAssertTrue(play.waitForExistence(timeout: 10), "Saved download has no Play button")
+        XCTAssertTrue(play.label.contains("720p") && play.label.contains("Medium"), "The row does not say how the download was made: \(play.label)")
+        try snap("downloads-streamed-dark")
+    }
+
     @MainActor
     private func downloadPlayback(mode: String) throws {
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine")
         open(tab: "Library", title: "Movies", in: app)
         reveal("poster.101", in: app).tap()
         tap("detail.download", in: app)
-        app.buttons["Original"].tap()
+        choice("Original", in: app).tap()
         XCTAssertTrue(app.buttons["Downloaded"].waitForExistence(timeout: 20))
 
         open(tab: "Home", title: "Home", in: app)
@@ -84,5 +111,11 @@ final class DownloadFlowTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Remove Download?"].waitForExistence(timeout: 10))
         app.buttons["Remove Download"].tap()
         XCTAssertTrue(app.staticTexts["No Downloads"].waitForExistence(timeout: 10))
+    }
+
+    /// A Download menu choice; its label goes on to the picture and download sizes.
+    @MainActor
+    private func choice(_ start: String, in app: XCUIApplication) -> XCUIElement {
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", start)).firstMatch
     }
 }

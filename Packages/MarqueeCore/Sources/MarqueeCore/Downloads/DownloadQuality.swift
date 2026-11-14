@@ -1,82 +1,151 @@
 import Foundation
 
-/// What a download keeps: the server's file as it is, or the server's conversion at one of the
-/// streaming quality presets.
-public enum DownloadQuality: Hashable, Sendable, Codable {
-    case original
-    case converted(VideoQuality)
+/// A converted download's quality. Each tier aims for a VMAF score against the original, measured at
+/// the picture size the tier is made at.
+public enum DownloadTier: String, Hashable, Sendable, Codable, CaseIterable {
+    case high, medium, low
 
-    /// Original, then every preset from the highest.
-    public static let choices: [DownloadQuality] = [.original]
-        + VideoQuality.allCases.filter { $0.maxBitrateKbps != nil && $0.frame != nil }.map { .converted($0) }
-
-    /// "Original", "8 Mbps 1080p".
-    public var title: String {
+    /// The VMAF score aimed for.
+    public var vmaf: Double {
         switch self {
-        case .original: VideoQuality.original.title
-        case .converted(let preset): preset.title
+        case .high: 95
+        case .medium: 90
+        case .low: 85
         }
     }
 
-    /// About how many bytes the download takes: the version's files for Original, the target's video
-    /// bitrate plus the audio over the running time for a conversion. Nil when the server lists neither.
-    public func estimatedBytes(media: PlexMedia, target: DownloadTarget?) -> Int64? {
+    public var title: String {
         switch self {
-        case .original:
-            let sizes = media.parts.compactMap(\.size)
-            return sizes.isEmpty ? nil : Int64(sizes.reduce(0, +))
-        case .converted:
-            guard let target, media.duration > 0 else { return nil }
-            let kbps = Int64(target.maxVideoBitrateKbps + DownloadTarget.audioKbps)
-            return kbps * 1000 / 8 * Int64(media.duration) / 1000
+        case .high: "High"
+        case .medium: "Medium"
+        case .low: "Low"
         }
     }
 }
 
-/// What a converted download asks the server for.
+/// What a download keeps: the server's file as it is, or the server's conversion at a tier.
+public enum DownloadQuality: Hashable, Sendable, Codable {
+    case original
+    case tier(DownloadTier)
+
+    /// Original, then the tiers from the highest.
+    public static let choices: [DownloadQuality] = [.original] + DownloadTier.allCases.map(DownloadQuality.tier)
+
+    /// "Original", "Medium".
+    public var title: String {
+        switch self {
+        case .original: "Original"
+        case .tier(let tier): tier.title
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey { case original, tier, converted }
+    private enum ValueKeys: String, CodingKey { case value = "_0" }
+
+    /// Downloads and settings saved before the tiers named a streaming preset's bitrate (`converted`);
+    /// it becomes the tier of about that size.
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        if values.contains(.tier) {
+            self = .tier(try values.nestedContainer(keyedBy: ValueKeys.self, forKey: .tier).decode(DownloadTier.self, forKey: .value))
+        } else if values.contains(.converted) {
+            let kbps = try values.nestedContainer(keyedBy: ValueKeys.self, forKey: .converted).decode(Int.self, forKey: .value)
+            self = .tier(kbps >= 8_000 ? .high : kbps >= 4_000 ? .medium : .low)
+        } else {
+            self = .original
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .original:
+            _ = values.nestedContainer(keyedBy: ValueKeys.self, forKey: .original)
+        case .tier(let tier):
+            var nested = values.nestedContainer(keyedBy: ValueKeys.self, forKey: .tier)
+            try nested.encode(tier, forKey: .value)
+        }
+    }
+}
+
+/// What a converted download asks the server for: a video bitrate at a picture size.
 public struct DownloadTarget: Hashable, Sendable, Codable {
     /// The server converts the audio to stereo AAC at about this rate.
     public static let audioKbps = 192
 
+    /// The video bitrate wanted, in kbit/s.
+    public var videoKbps: Int
+    /// The `maxVideoBitrate` sent for it: the server's encoder makes less than the cap allows, and picks
+    /// the picture size from the cap, so the cap is found by asking the server's decisions.
     public var maxVideoBitrateKbps: Int
+    /// The frame the picture is fitted into: 854x480, 1280x720, 1920x1080 or 3840x2160.
     public var width: Int
     public var height: Int
+    /// "h264", or "hevc" for the 4K choice.
+    public var codec: String
+
+    /// `height` is a size class: 480, 720, 1080 or 2160.
+    public init(videoKbps: Int, height: Int, codec: String = "h264") {
+        self.videoKbps = videoKbps
+        self.height = height
+        width = PictureClass.width(of: height)
+        self.codec = codec
+        maxVideoBitrateKbps = TranscodeLadder.firstCap(videoKbps: videoKbps, height: height)
+    }
 
     /// "1280x720".
     public var videoResolution: String { "\(width)x\(height)" }
 
-    public init(maxVideoBitrateKbps: Int, width: Int, height: Int) {
-        self.maxVideoBitrateKbps = maxVideoBitrateKbps
-        self.width = width
-        self.height = height
+    /// About how many bytes the video and audio come to over `duration` milliseconds.
+    public func bytes(duration: Int) -> Int64 {
+        Int64(videoKbps + Self.audioKbps) * 1000 / 8 * Int64(max(0, duration)) / 1000
+    }
+
+    private enum CodingKeys: String, CodingKey { case videoKbps, maxVideoBitrateKbps, width, height, codec }
+
+    /// Conversions saved before the tiers kept only the cap and the frame.
+    public init(from decoder: any Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        maxVideoBitrateKbps = try values.decode(Int.self, forKey: .maxVideoBitrateKbps)
+        videoKbps = try values.decodeIfPresent(Int.self, forKey: .videoKbps) ?? maxVideoBitrateKbps
+        width = try values.decode(Int.self, forKey: .width)
+        height = try values.decode(Int.self, forKey: .height)
+        codec = try values.decodeIfPresent(String.self, forKey: .codec) ?? "h264"
     }
 }
 
-/// Turns a preset into what the server converts one title to. `PresetTarget` takes the preset as it
-/// is. A per-title picker conforms in its place, for example one that measures a title's VMAF at a few
-/// bitrates and keeps the lowest that holds a score; the download's quality stays the preset it was
-/// asked for.
-public protocol DownloadTargetPicking: Sendable {
-    func target(for preset: VideoQuality, media: PlexMedia) async -> DownloadTarget
-}
+/// Plex's picture-size classes, as its `videoResolution` names them.
+public enum PictureClass {
+    /// Smallest first.
+    public static let heights = [480, 720, 1080, 2160]
 
-public struct PresetTarget: DownloadTargetPicking {
-    public init() {}
-
-    public func target(for preset: VideoQuality, media: PlexMedia) async -> DownloadTarget {
-        Self.target(for: preset, media: media)
-    }
-
-    /// The preset's bitrate and frame, never above the source's own: the server does not enlarge a
-    /// picture, and a bitrate above the file's only makes a bigger file of the same picture.
-    public static func target(for preset: VideoQuality, media: PlexMedia) -> DownloadTarget {
-        let frame = preset.frame ?? (1920, 1080)
-        var kbps = preset.maxBitrateKbps ?? VideoQuality.mbps8.rawValue
-        if let source = media.bitrate, source > 0 { kbps = min(kbps, source) }
-        guard let width = media.width, let height = media.height, width > 0, height > 0,
-              width <= frame.width, height <= frame.height else {
-            return DownloadTarget(maxVideoBitrateKbps: kbps, width: frame.width, height: frame.height)
+    /// The class a version is in: Plex's `videoResolution`, else the width in `FormatBadge`'s bands
+    /// (a 1920x800 scope film is 1080), else the height.
+    public static func of(_ media: PlexMedia) -> Int? {
+        switch media.videoResolution?.lowercased() {
+        case "4k", "2160", "2160p": return 2160
+        case "1080", "1080p": return 1080
+        case "720", "720p": return 720
+        case "480", "576", "sd", "480p", "576p": return 480
+        default: break
         }
-        return DownloadTarget(maxVideoBitrateKbps: kbps, width: width, height: height)
+        let video = media.parts.first?.videoStream
+        if let width = media.width ?? video?.width, width > 0 {
+            return width >= 3200 ? 2160 : width >= 1800 ? 1080 : width >= 1200 ? 720 : 480
+        }
+        if let height = media.height ?? video?.height, height > 0 {
+            return height >= 1500 ? 2160 : height >= 900 ? 1080 : height >= 600 ? 720 : 480
+        }
+        return nil
+    }
+
+    public static func width(of height: Int) -> Int {
+        switch height {
+        case 2160: 3840
+        case 1080: 1920
+        case 720: 1280
+        case 480: 854
+        default: height * 16 / 9
+        }
     }
 }

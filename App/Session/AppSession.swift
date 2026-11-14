@@ -47,7 +47,7 @@ final class AppSession {
     let player = PlayerCenter()
     /// The theme tune of the show page on screen.
     let themeMusic = ThemeMusicPlayer()
-    let downloads = DownloadCenter()
+    let downloads: DownloadCenter
     /// The profile switcher sheet, opened from the Settings Account row.
     var showsProfileSwitcher = false
     /// The active profile's playback, audio and subtitle settings; every change is saved at once.
@@ -67,6 +67,8 @@ final class AppSession {
     private var settingsLoaded = false
     /// Bazarr (DESIGN §8.7 Integrations), kept per iPhone.
     let bazarr: BazarrSettings
+    /// HomeLabber's quality map for download sizes (DESIGN §8.7 Integrations), kept per iPhone.
+    let homelabber: HomeLabberSettings
     /// Seerr (DESIGN §8.7 Integrations, §8.8 Requests), kept per iPhone.
     let seerr: SeerrSettings
     /// The Chromecast plugin (DESIGN §8.7 Integrations), kept per iPhone.
@@ -103,7 +105,10 @@ final class AppSession {
         let pathMetrics = PathMetrics()
         self.pathMetrics = pathMetrics
         transport = URLSessionTransport(session: URLSession(configuration: configuration, delegate: pathMetrics, delegateQueue: nil))
+        let downloads = DownloadCenter()
+        self.downloads = downloads
         bazarr = BazarrSettings(storage: storage, transport: transport)
+        homelabber = HomeLabberSettings(storage: storage, transport: transport, downloads: downloads)
         seerr = SeerrSettings(storage: storage)
         speechDock = SpeechDockSettings(storage: storage, transport: transport)
         cast = CastCenter(storage: storage)
@@ -368,12 +373,16 @@ final class AppSession {
     /// with an address saves a Bazarr there, answered by the fake Plex's `bazarr` fixtures;
     /// `-marquee.uitest.seerr` saves a Seerr signing in with an API key, answered by the `seerr`
     /// fixtures; `-marquee.uitest.speechDock` does the same for SpeechDock and its `speechdock`
-    /// fixtures, and `-marquee.uitest.remote YES` turns the LumaTV remote on.
+    /// fixtures, `-marquee.uitest.homelabber` for HomeLabber and its `homelabber` fixtures, and
+    /// `-marquee.uitest.remote YES` turns the LumaTV remote on.
     private func restoreUITest() {
         let arguments = UserDefaults.standard
         if let address = arguments.string(forKey: "marquee.uitest.bazarr").flatMap(URL.init(string:)) {
             // Bazarr's page offers Test Connection only for a key of Bazarr's format, 16 to 64 letters and digits.
             bazarr.save(BazarrConfig(address: address, apiKey: "fakefakefakefakefakefakefakefake"))
+        }
+        if let address = arguments.string(forKey: "marquee.uitest.homelabber").flatMap(URL.init(string:)) {
+            homelabber.save(HomeLabberConfig(address: address, token: "fakefakefakefakefakefakefakefake"))
         }
         if let address = arguments.string(forKey: "marquee.uitest.seerr").flatMap(URL.init(string:)) {
             // The fake server cannot set Seerr's session cookie, so the tests sign in with a key.

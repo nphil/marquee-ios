@@ -91,6 +91,26 @@ final class DownloadCenter {
     @ObservationIgnored private lazy var background = BackgroundTransfer { [weak self] result in
         await self?.receivedBackground(result)
     }
+    /// HomeLabber's quality map while its plugin is set up; AppSession keeps it current.
+    @ObservationIgnored var qualityMap: HomeLabberClient? {
+        didSet {
+            guard qualityMap?.config != oldValue?.config else { return }
+            qualityMaps = [:]
+            unscored = []
+        }
+    }
+    /// HomeLabber's scores fetched for the Download menus, by title.
+    private(set) var qualityMaps: [String: QualityMapEntry] = [:]
+    /// Whether a show is animation, which its episodes do not say themselves.
+    private(set) var animatedShows: [String: Bool] = [:]
+    @ObservationIgnored private var unscored: Set<String> = []
+    /// After HomeLabber does not answer, the menus leave it alone for a minute: away from home every
+    /// question would wait for its timeout.
+    @ObservationIgnored private var qualityMapQuietUntil = Date.distantPast
+    /// Segments handed to iOS at a time; at Plex's 8 s segments, most of an hour.
+    private static let handoffSegments = 400
+    /// Sessions begun again in a row without a segment saved before the download queue takes over.
+    private static let sessionRestarts = 3
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -141,6 +161,9 @@ final class DownloadCenter {
         keepAlive.stop()
         self.library = library
         self.scope = scope
+        qualityMaps = [:]
+        animatedShows = [:]
+        unscored = []
         if let library { libraries[library.server.id] = library }
         // iOS relaunches the app in the background to deliver a finished slice; the in-app fetcher
         // would be suspended within seconds there.
@@ -150,8 +173,46 @@ final class DownloadCenter {
         backfill()
     }
 
-    func enqueue(item: PlexMetadata, quality: DownloadQuality, mediaIndex: Int, capabilities: DeviceCapabilities) async {
-        if let message = await add(item: item, quality: quality, mediaIndex: mediaIndex, capabilities: capabilities) { error = message }
+    /// - Parameter choice: The menu choice's `DownloadQualityPlan.Option.id`, which tells the 4K choice
+    ///   from High; without one, the quality's choice.
+    func enqueue(item: PlexMetadata, quality: DownloadQuality, choice: String? = nil, mediaIndex: Int, capabilities: DeviceCapabilities) async {
+        if let message = await add(item: item, quality: quality, choice: choice, mediaIndex: mediaIndex, capabilities: capabilities) { error = message }
+    }
+
+    /// The Download menu's choices for one version of a title, from what is known now: HomeLabber's
+    /// scores once `prepareChoices` has them, else the estimate. Unknown capabilities leave Original
+    /// in the menu; the Download tap checks it.
+    func plan(for item: PlexMetadata, mediaIndex: Int, capabilities: DeviceCapabilities?) -> DownloadQualityPlan? {
+        guard item.media.indices.contains(mediaIndex) else { return nil }
+        let media = item.media[mediaIndex]
+        let originalPlays = media.parts.count == 1
+            && capabilities.map { DownloadPlayability.refusal(media: media, part: media.parts[0], capabilities: $0) == nil } ?? true
+        let animated = item.type == .episode
+            ? item.grandparentRatingKey.flatMap { animatedShows[$0] } ?? false
+            : DownloadQualityPlan.isAnimated(genres: item.genres)
+        return DownloadQualityPlan(
+            media: media, animated: animated, hevc: capabilities?.hevc ?? false, originalPlays: originalPlays, map: qualityMaps[item.ratingKey]
+        )
+    }
+
+    /// Fetches what the choices need beyond the title's own answer: HomeLabber's scores for it and,
+    /// for an episode, whether its show is animation.
+    func prepareChoices(for item: PlexMetadata) async {
+        guard let library else { return }
+        if item.type == .episode, let show = item.grandparentRatingKey, animatedShows[show] == nil,
+           let found = try? await library.metadata(show) {
+            animatedShows[show] = DownloadQualityPlan.isAnimated(genres: found.genres)
+        }
+        guard let qualityMap, qualityMaps[item.ratingKey] == nil, !unscored.contains(item.ratingKey), qualityMapQuietUntil < .now else { return }
+        do {
+            if let entry = try await qualityMap.entry(server: library.server.clientIdentifier, ratingKey: item.ratingKey) {
+                qualityMaps[item.ratingKey] = entry
+            } else {
+                unscored.insert(item.ratingKey)
+            }
+        } catch {
+            qualityMapQuietUntil = Date.now.addingTimeInterval(60)
+        }
     }
 
     /// Queues each episode of a season or show that is not already downloaded or queued, in episode order, at
@@ -181,7 +242,7 @@ final class DownloadCenter {
     }
 
     /// Queues one title; returns why it was refused, or nil when queued or when the sign-in changed meanwhile.
-    private func add(item: PlexMetadata, quality: DownloadQuality, mediaIndex: Int, capabilities: DeviceCapabilities) async -> String? {
+    private func add(item: PlexMetadata, quality: DownloadQuality, choice: String? = nil, mediaIndex: Int, capabilities: DeviceCapabilities) async -> String? {
         guard let library, let scope, !removing.contains(item.ratingKey), !records.contains(where: { $0.ratingKey == item.ratingKey }) else { return nil }
         let owner = enqueueOwner
         do {
@@ -189,14 +250,23 @@ final class DownloadCenter {
             guard self.scope == scope, enqueueOwner == owner, snapshot.item.media.indices.contains(mediaIndex) else { return nil }
             let media = snapshot.item.media[mediaIndex]
             guard !media.parts.isEmpty else { throw DownloadFailure.message("No media file is available.") }
-            guard quality != .original || media.parts.count == 1 else { throw DownloadFailure.message("Original downloads with multiple parts are not supported. Choose a converted quality.") }
+            if quality != .original {
+                await prepareChoices(for: snapshot.item)
+                guard self.scope == scope, enqueueOwner == owner else { return nil }
+            }
+            // A tier above the original's bitrate comes to Original or to the tier above it.
+            let choices = plan(for: snapshot.item, mediaIndex: mediaIndex, capabilities: capabilities)
+            let option = choices?.options.first { $0.id == choice } ?? choices?.option(for: quality)
+            let chosen = option?.quality ?? .original
+            guard chosen != .original || media.parts.count == 1 else { throw DownloadFailure.message("Original downloads with multiple parts are not supported. Choose a converted quality.") }
             // Offline there is no server to re-encode, so the phone has to play the original itself.
-            if quality == .original, let reason = DownloadPlayability.refusal(media: media, part: media.parts[0], capabilities: capabilities) {
+            if chosen == .original, let reason = DownloadPlayability.refusal(media: media, part: media.parts[0], capabilities: capabilities) {
                 throw DownloadFailure.message(reason)
             }
-            let target: DownloadTarget?
-            if case .converted(let preset) = quality { target = PresetTarget.target(for: preset, media: media) } else { target = nil }
-            var record = DownloadRecord(item: snapshot.item, scope: scope, quality: quality, mediaIndex: mediaIndex, addedAt: .now, expectedLength: quality.estimatedBytes(media: media, target: target))
+            var record = DownloadRecord(
+                item: snapshot.item, scope: scope, quality: chosen, target: option?.target, mediaIndex: mediaIndex, addedAt: .now,
+                expectedLength: option?.bytes
+            )
             let poster: Data?
             if let thumb = record.thumb { poster = try? await PlexFetch.data(thumb, library: library, session: metadataSession) }
             else { poster = nil }
@@ -238,6 +308,7 @@ final class DownloadCenter {
         persist()
         worker?.cancel()
         if let part { Task { await background.cancel(part: part) } }
+        stopSession(of: allRecords[index])
     }
 
     func resume(_ id: String) {
@@ -256,6 +327,7 @@ final class DownloadCenter {
         worker?.cancel()
         persist()
         do { try store.remove(record) } catch { self.error = error.localizedDescription }
+        stopSession(of: record)
         let part = relativePart(for: record)
         Task {
             if let part { await background.cancel(part: part) }
@@ -317,6 +389,9 @@ final class DownloadCenter {
         Task {
             for record in old {
                 if let part = relativePart(for: record) { await background.cancel(part: part) }
+                if let session = record.stream?.session, record.phase != .done, let library = known[record.scope.server] {
+                    try? await library.stopTranscode(session: session)
+                }
                 // Best effort: an unreachable server keeps its converted file until it expires.
                 if let conversion = record.conversion, let library = known[record.scope.server] {
                     try? await library.removeFromDownloadQueue(conversion.queue, item: conversion.item)
@@ -493,9 +568,12 @@ final class DownloadCenter {
         let item = try PlexMetadata.fromSnapshot(Data(contentsOf: store.metadataFile(for: record)))
         guard item.media.indices.contains(record.mediaIndex), let part = item.media[record.mediaIndex].parts.first else { throw DownloadFailure.message("The saved media description is missing.") }
         var url: URL
-        if case .converted(let preset) = record.quality {
+        if record.quality != .original {
+            if record.conversion == nil, record.streamFailed != true, try await stream(id, item: item, library: library, scope: scope, owner: owner) {
+                return
+            }
             if record.conversion == nil {
-                let target = PresetTarget.target(for: preset, media: item.media[record.mediaIndex])
+                guard let target = Self.target(of: record, media: item.media[record.mediaIndex]) else { throw DownloadFailure.message("The saved media description is missing.") }
                 let queue = try await library.downloadQueue()
                 try Task.checkCancellation()
                 guard let queuedIndex = transferIndex(id, scope: scope, owner: owner), allRecords[queuedIndex].phase.isActive else { return }
@@ -535,7 +613,7 @@ final class DownloadCenter {
             i = current
             record = allRecords[i]
             if let length = record.length, record.received.isComplete(length: length) {
-                try finish(id: id, part: part)
+                try finish(id: id, ext: record.quality == .original ? part.container ?? "mkv" : "mp4")
                 return
             }
             let length = record.length ?? Int64.max / 2
@@ -576,23 +654,237 @@ final class DownloadCenter {
         }
     }
 
-    private func finish(id: String, part: PlexPart) throws {
+    private func finish(id: String, ext: String) throws {
         guard let i = index(id) else { return }
         let record = allRecords[i]
-        let ext = (record.quality == .original ? (part.container ?? "mkv") : "mp4").filter { $0.isLetter || $0.isNumber }
-        let name = "media.\(ext)"
+        let name = "media.\(ext.filter { $0.isLetter || $0.isNumber })"
         let destination = store.folder(for: record).appending(path: name)
         try FileManager.default.moveItem(at: store.partialFile(for: record), to: destination)
         allRecords[i].fileName = name
+        if let stream = record.stream { allRecords[i].length = stream.bytes }
         allRecords[i].phase = .done
         allRecords[i].finishedAt = .now
         persist()
     }
 
+    /// What a conversion asks for; a waiting download saved by an older version has only its tier.
+    private static func target(of record: DownloadRecord, media: PlexMedia) -> DownloadTarget? {
+        if let target = record.target { return target }
+        guard record.quality != .original else { return nil }
+        return DownloadQualityPlan(media: media, animated: false, hevc: false, originalPlays: false, map: nil).option(for: record.quality)?.target
+    }
+
+    /// A transcode session's segments and the playlist they are relative to.
+    private struct StreamSession {
+        var playlist: URL
+        var segments: [HLSPlaylist.Segment]
+    }
+
+    /// The server converts the title while the phone saves its segments (`StreamedFile`), so the
+    /// download starts at once. Each run, and each session the server dropped, starts a new session
+    /// where the saved segments end. Returns false when the server will not stream the conversion,
+    /// for the download queue to make it.
+    private func stream(_ id: String, item: PlexMetadata, library: PlexLibrary, scope: DownloadScope, owner: UUID) async throws -> Bool {
+        guard let i = transferIndex(id, scope: scope, owner: owner), allRecords[i].phase.isActive else { return true }
+        let record = allRecords[i]
+        let media = item.media[record.mediaIndex]
+        // A transcode session plays one part.
+        guard media.parts.count == 1, var target = Self.target(of: record, media: media) else { return refuseStream(id, library: library) }
+        let file = store.partialFile(for: record)
+        var stream = record.stream ?? DownloadRecord.Stream(session: UUID().uuidString)
+        try StreamedFile.prepare(file, stream: &stream)
+        let absorbed = try StreamedFile.absorb(into: file, stream: &stream)
+        allRecords[i].stream = stream
+        allRecords[i].phase = .downloading
+        persist()
+        // Pieces left after a gap belong to a session that ends now.
+        for piece in absorbed + StreamedFile.pieces(of: file).map(\.url) { try? FileManager.default.removeItem(at: piece) }
+        if stream.isComplete {
+            try finishStream(id, session: stream.session, library: library)
+            return true
+        }
+        // The first session asks decisions for the cap whose output comes closest to the target's
+        // bitrate; the last decision describes the file offline.
+        if !FileManager.default.fileExists(atPath: store.decisionFile(for: record).path(percentEncoded: false)) {
+            var decisions: [Int: PlexMetadataSnapshot] = [:]
+            let found: (cap: Int, answer: TranscodeLadder.Answer)
+            do {
+                found = try await TranscodeLadder.search(for: target) { cap in
+                    var asked = target
+                    asked.maxVideoBitrateKbps = cap
+                    let decision = try await library.transcodeDecision(TranscodeRequest(download: item, mediaIndex: record.mediaIndex, target: asked, session: stream.session))
+                    decisions[cap] = decision
+                    return Self.answer(decision) ?? TranscodeLadder.Answer(videoKbps: target.videoKbps, height: target.height)
+                }
+            } catch let error where !(error is CancellationError) && !TransferPlan.isTransient(error) {
+                return refuseStream(id, library: library)
+            }
+            try Task.checkCancellation()
+            target.maxVideoBitrateKbps = found.cap
+            try decisions[found.cap]?.data.write(to: store.decisionFile(for: record), options: .atomic)
+        }
+        guard var session = try await startSession(&stream, item: item, mediaIndex: record.mediaIndex, target: target, library: library) else {
+            return refuseStream(id, library: library)
+        }
+        // Saves the stream, and with it the session that pausing or removing stops; false once the
+        // download is paused, removed or taken over by another run, and this session is ended.
+        func kept() -> Bool {
+            guard let current = transferIndex(id, scope: scope, owner: owner), allRecords[current].phase.isActive else {
+                Task { [name = stream.session] in try? await library.stopTranscode(session: name) }
+                return false
+            }
+            allRecords[current].target = target
+            allRecords[current].stream = stream
+            persist()
+            return true
+        }
+        guard kept() else { return true }
+        while let next = HLSPlaylist.next(after: stream.saved, in: session.segments) {
+            if backgroundHandoff && background.isAvailable, let current = index(id), let part = relativePart(for: allRecords[current]) {
+                handOff(session, from: next, pieces: stream.pieces, id: id, part: part, target: target, library: library)
+                return true
+            }
+            let segment = session.segments[next]
+            guard let url = URL(string: segment.uri, relativeTo: session.playlist)?.absoluteURL else { return refuseStream(id, library: library) }
+            let (data, status) = try await streamData(url, library: library)
+            try Task.checkCancellation()
+            if status == 404 || ((200..<300).contains(status) && StreamedFile.isPlaceholder(data.count)) {
+                // The server dropped the session, or the segment lies before where it began.
+                stream.restarts += 1
+                guard stream.restarts <= Self.sessionRestarts,
+                      let again = try await startSession(&stream, item: item, mediaIndex: record.mediaIndex, target: target, library: library) else {
+                    return refuseStream(id, library: library)
+                }
+                session = again
+            } else {
+                guard (200..<300).contains(status) else { throw TransferStatusError(status: status) }
+                try StreamedFile.append(data, ending: segment.end, to: file, stream: &stream)
+                meter.commit(Int64(data.count), for: id)
+                clearRetry(id)
+            }
+            guard kept() else { return true }
+        }
+        try finishStream(id, session: stream.session, library: library)
+        return true
+    }
+
+    /// Starts the server's transcode where the saved segments end, under a new session; nil when the
+    /// server will not stream it.
+    private func startSession(
+        _ stream: inout DownloadRecord.Stream, item: PlexMetadata, mediaIndex: Int, target: DownloadTarget, library: PlexLibrary
+    ) async throws -> StreamSession? {
+        let old = stream.session
+        Task { try? await library.stopTranscode(session: old) }
+        stream.session = UUID().uuidString
+        stream.joining = stream.pieces > 0
+        let request = TranscodeRequest(download: item, mediaIndex: mediaIndex, target: target, offset: stream.saved, session: stream.session)
+        let master: URL
+        do {
+            master = try await library.transcodeURL(request)
+        } catch let error where !(error is CancellationError) && !TransferPlan.isTransient(error) {
+            return nil
+        }
+        let (masterData, masterStatus) = try await streamData(master, library: library)
+        try Self.throwIfTransient(masterStatus)
+        guard (200..<300).contains(masterStatus), let variant = HLSPlaylist.variant(in: String(decoding: masterData, as: UTF8.self)),
+              let playlist = URL(string: variant, relativeTo: master)?.absoluteURL else { return nil }
+        let (data, status) = try await streamData(playlist, library: library)
+        try Self.throwIfTransient(status)
+        guard (200..<300).contains(status), let segments = HLSPlaylist.segments(in: String(decoding: data, as: UTF8.self)) else { return nil }
+        stream.end = segments.last?.end
+        return StreamSession(playlist: playlist, segments: segments)
+    }
+
+    /// A playlist or segment of a streamed conversion, kept to Wi-Fi like the rest of the download.
+    private func streamData(_ url: URL, library: PlexLibrary) async throws -> (Data, Int) {
+        var request = URLRequest(url: url, timeoutInterval: 60)
+        for (name, value) in library.authorizationHeaders() { request.setValue(value, forHTTPHeaderField: name) }
+        request.allowsCellularAccess = settings.cellular
+        do {
+            let (data, response) = try await metadataSession.data(for: request)
+            return (data, (response as? HTTPURLResponse)?.statusCode ?? 0)
+        } catch {
+            // The next try probes for an address that answers, e.g. away from home after the home one.
+            if TransferPlan.dropsAddress(error) { await library.connection.reportFailure(at: url) }
+            throw error
+        }
+    }
+
+    private static func throwIfTransient(_ status: Int) throws {
+        let error = TransferStatusError(status: status)
+        if TransferPlan.isTransient(error) { throw error }
+    }
+
+    /// What a decision says the server will make: the picture's size class and the video's bitrate.
+    private static func answer(_ decision: PlexMetadataSnapshot) -> TranscodeLadder.Answer? {
+        guard let media = decision.item.media.first, let height = PictureClass.of(media),
+              let kbps = media.parts.first?.videoStream?.bitrate else { return nil }
+        return TranscodeLadder.Answer(videoKbps: kbps, height: height)
+    }
+
+    /// Hands the next segments to iOS, which fetches them one at a time while the app is suspended.
+    private func handOff(_ session: StreamSession, from next: Int, pieces: Int, id: String, part: String, target: DownloadTarget, library: PlexLibrary) {
+        let headers = library.authorizationHeaders()
+        for (offset, segment) in session.segments[next...].prefix(Self.handoffSegments).enumerated() {
+            guard let url = URL(string: segment.uri, relativeTo: session.playlist)?.absoluteURL else { return }
+            let size = max(1, target.bytes(duration: Int(segment.duration * 1000)))
+            let slice = BackgroundTransfer.Slice(id: id, part: part, lower: 0, upper: size, segment: .init(number: pieces + offset, end: segment.end))
+            background.start(slice, url: url, headers: headers, cellular: settings.cellular)
+        }
+    }
+
+    /// Ends the server's transcode and keeps the saved segments as the download's `media.ts`.
+    private func finishStream(_ id: String, session: String, library: PlexLibrary) throws {
+        Task { try? await library.stopTranscode(session: session) }
+        try finish(id: id, ext: "ts")
+    }
+
+    /// The server will not stream this conversion: what the stream saved is dropped, and the download
+    /// queue makes the conversion instead. Returns false for `transfer` to go on to the queue.
+    private func refuseStream(_ id: String, library: PlexLibrary) -> Bool {
+        guard let i = index(id) else { return false }
+        if let session = allRecords[i].stream?.session { Task { try? await library.stopTranscode(session: session) } }
+        let file = store.partialFile(for: allRecords[i])
+        for piece in StreamedFile.pieces(of: file) { try? FileManager.default.removeItem(at: piece.url) }
+        try? FileManager.default.removeItem(at: file)
+        allRecords[i].stream = nil
+        allRecords[i].streamFailed = true
+        persist()
+        return false
+    }
+
+    /// Ends a paused or removed download's transcode on the server, best effort.
+    private func stopSession(of record: DownloadRecord) {
+        guard let session = record.stream?.session, record.phase != .done, let library = libraries[record.scope.server] else { return }
+        Task { try? await library.stopTranscode(session: session) }
+    }
+
+    /// Appends the segments iOS saved while the app was away; the download is done once all are in.
+    private func absorbPieces(at i: Int) {
+        guard var stream = allRecords[i].stream else { return }
+        let id = allRecords[i].id
+        let file = store.partialFile(for: allRecords[i])
+        let before = stream.bytes
+        do {
+            try StreamedFile.prepare(file, stream: &stream)
+            let done = try StreamedFile.absorb(into: file, stream: &stream)
+            allRecords[i].stream = stream
+            persist()
+            for piece in done { try? FileManager.default.removeItem(at: piece) }
+            meter.commit(max(0, stream.bytes - before), for: id)
+            if stream.isComplete, let library = libraries[allRecords[i].scope.server] {
+                try finishStream(id, session: stream.session, library: library)
+            }
+        } catch {
+            allRecords[i].phase = .failed(error.localizedDescription)
+        }
+    }
+
     private func receivedBackground(_ result: BackgroundTransfer.Result) async {
         let slice: BackgroundTransfer.Slice
         switch result {
-        case .saved(let value, _, _), .notReady(let value, _), .interrupted(let value, _), .failed(let value, _), .stopped(let value): slice = value
+        case .saved(let value, _, _), .notReady(let value, _), .interrupted(let value, _), .failed(let value, _), .expired(let value), .stopped(let value):
+            slice = value
         }
         if case .interrupted(_, let dropped?) = result, let record = allRecords.first(where: { $0.id == slice.id }), let library = libraries[record.scope.server] {
             await library.connection.reportFailure(at: dropped)
@@ -601,8 +893,12 @@ final class DownloadCenter {
         let id = allRecords[i].id
         switch result {
         case .saved(_, let written, let length):
-            allRecords[i].received.insert(written)
-            if let length { allRecords[i].length = length }
+            if slice.segment != nil {
+                absorbPieces(at: i)
+            } else {
+                allRecords[i].received.insert(written)
+                if let length { allRecords[i].length = length }
+            }
             clearRetry(id)
         case .notReady(_, let delay):
             holds[id] = Date.now.addingTimeInterval(TimeInterval(delay))
@@ -610,9 +906,11 @@ final class DownloadCenter {
             scheduleRetry(at: i)
         case .failed(_, let message):
             allRecords[i].phase = .failed(message)
-        case .stopped: break
+        case .expired, .stopped: break
         }
         persist()
+        // The segments handed over after an expired one would fail too; the next run starts a new session.
+        if case .expired = result { await background.cancel(part: slice.part) }
         kick()
     }
 
