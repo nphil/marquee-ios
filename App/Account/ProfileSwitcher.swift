@@ -12,8 +12,8 @@ struct ProfileButton: View {
         Button {
             session.showsSettings = true
         } label: {
-            // A 36 pt photo, a 2 pt gap and a 2 pt ring: 44 pt across, which is the whole item. A taller
-            // frame is cut to the bar's 44 pt, and the sheet's zoom back into the button shows that cut.
+            // The photo, a gap and a 2 pt ring fill exactly the bar item's height (`Size.barButton`); a taller
+            // frame is cut by the bar, at rest and in the sheet's zoom back into the button.
             AvatarView(user: session.user, size: Size.barButton - 2 * Space.s1)
                 .padding(Space.s1)
                 .overlay(Circle().strokeBorder(theme.accent, lineWidth: 2))

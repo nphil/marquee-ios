@@ -18,9 +18,9 @@ enum Space {
 enum Size {
     static let target: CGFloat = 48
     /// A round button standing in the navigation bar without its glass capsule (Home's profile and
-    /// remote buttons). The bar gives an item 44 pt of height, so the ring is exactly that and nothing
-    /// overflows the item's bounds, which a sheet's zoom clips to.
-    static let barButton: CGFloat = 44
+    /// remote buttons). Measured on iOS 27 (0.1.37), the bar gives such an item 36 pt of height and cuts
+    /// anything taller, both at rest and in a sheet's zoom back into it, so the ring is exactly that.
+    static let barButton: CGFloat = 36
     static let rowMin: CGFloat = 56
     /// Minimum poster and theme-tile width in an adaptive grid: 3 columns at 390 pt, 2 at 320 pt.
     static let gridMin: CGFloat = 104
