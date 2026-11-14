@@ -286,6 +286,12 @@ final class PhoneLink {
         window.hide()
     }
 
+    /// Puts the remote away and opens this iPhone's Settings.
+    func openSettings() {
+        stopControlling()
+        session?.showsSettings = true
+    }
+
     /// Input or a command from this phone's remote, for the phone it controls.
     func send(_ message: LinkMessage) {
         guard let controlling else { return }

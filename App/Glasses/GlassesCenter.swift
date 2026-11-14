@@ -27,6 +27,8 @@ final class GlassesCenter {
     private(set) var isConnected = false
     /// The phone app was chosen over the remote; the display button brings the remote back.
     var remoteHidden = false
+    /// Said once, the first time the person puts the remote away; the phone app shows it as a toast.
+    private(set) var leaveHint: String?
     /// "Use Marquee on this display?" waits for an answer.
     var asksToUse = false
     /// The glasses' pages; made when they connect.
@@ -337,6 +339,20 @@ final class GlassesCenter {
     func showPhoneApp() {
         remoteHidden = true
         syncRemote()
+    }
+
+    /// The person put the remote away (its Phone App button, swipe or Settings): the first time, the phone
+    /// app says that the screen keeps running and where the remote comes back from.
+    func leaveRemote() {
+        showPhoneApp()
+        guard !storage.glassesLeftRemote else { return }
+        storage.glassesLeftRemote = true
+        let words = layoutKind == .tv ? "The TV keeps its screen. The TV button" : "The glasses keep their screen. The glasses button"
+        leaveHint = "\(words) on Home brings the remote back."
+    }
+
+    func clearLeaveHint() {
+        leaveHint = nil
     }
 
     /// The glasses button on the phone brings the remote back.

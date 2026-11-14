@@ -38,6 +38,7 @@ final class SessionStorage {
         static let glassesEnabled = "marquee.glasses.enabled"
         static let glassesUse = "marquee.glasses.use"
         static let glassesTilt = "marquee.glasses.tilt"
+        static let glassesLeftRemote = "marquee.glasses.leftRemote"
         static let glassesKind = "marquee.glasses.kind"
         static let glassesDisplays = "marquee.glasses.displays"
         static let tracksPrefix = "marquee."
@@ -219,6 +220,12 @@ final class SessionStorage {
     var glassesTilt: Bool {
         get { defaults.object(forKey: Key.glassesTilt) as? Bool ?? true }
         set { defaults.set(newValue, forKey: Key.glassesTilt) }
+    }
+
+    /// The person has put the remote away once, and been told how to bring it back.
+    var glassesLeftRemote: Bool {
+        get { defaults.bool(forKey: Key.glassesLeftRemote) }
+        set { defaults.set(newValue, forKey: Key.glassesLeftRemote) }
     }
 
     /// Sign-out: the token, the servers and the Seerr session made with the token leave the Keychain;

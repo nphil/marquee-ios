@@ -482,6 +482,7 @@ A plugin, off until **Big Screen** is turned on in Settings › **XR Glasses & T
 | Flick | A flick faster than 300 pt/s steps once even when short; above 1000 pt/s the focus coasts on, keeping 85 % of its speed a step, up to 40 steps, and stops at the end of a list |
 | Tap | Chooses the focused thing |
 | Swipe in from the left edge | Back: a touch starting within 20 pt of the edge that travels 80 pt right |
+| Swipe down from the top edge | Leaves the remote for the phone app: a touch starting within 24 pt of the top edge that travels 80 pt down |
 | Hold (450 ms) | Options for the focused title; in the player, starts a scrub |
 | Hold and slide, in the player | Scrubs: the phone's width spans up to ten minutes, with a detent every 10 s |
 | Hold still after a swipe (350 ms), with tilt on | Tilting keeps scrolling, up to 12 steps a second |
@@ -489,6 +490,8 @@ A plugin, off until **Big Screen** is turned on in Settings › **XR Glasses & T
 | Two fingers up or down | Volume: one step (a sixteenth of the range) per 36 pt, of this phone's own level, or of the linked phone's when the remote drives one (§8.10) |
 
 Tilt reads Core Motion only while the thumb is down, counts from where the phone was when it went down, ignores the first 8 degrees so a hand's tremor moves nothing, and reaches its top rate at 34 degrees.
+
+The way out is also on screen: a strip under the top edge holds a labelled **Phone App** button and a **Settings** gear, which leaves the remote and opens Marquee's Settings. They need a deliberate tap, and the gesture surface fills the rest. Leaving keeps the TV or glasses on their screen; Home's TV or glasses button brings the remote back, and the first time the remote is put away a toast says so. A linked phone's remote has the same Settings gear beside **Done** in its header, and the same swipe down closes it.
 
 6. **Haptics** use Core Haptics, one distinct pattern per cue: focus step, a light crisp tap; end of a row or list, a short dull buzz; select, a full crisp tap; back, a strong dull tap and a softer one; scrub detent, a faint sharp tick; play or pause, two rising taps; error, three strong dull taps; volume step, a soft round thump; volume at silent or full, two firm thumps. A coast plays a step for each tile it passes.
 7. **Input hook.** Every remote input is a `GlassesInput` (move, select, back, hold began, hold ended, slide, nudge) handed to `GlassesNavigator.handle(_:)`, which returns the haptic cue to play. The iPhone's own touch surface sends it, and another phone's link maps its messages to it; the navigator knows nothing of the source and works the same on glasses and a TV.

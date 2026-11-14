@@ -194,6 +194,26 @@ final class GlassesScreenshotTests: XCTestCase {
         waitFor("glasses.remote", in: app)
     }
 
+    /// The remote's top strip puts it away without ending the display, says so once, and Home brings it back;
+    /// Settings leaves it and opens the sheet.
+    @MainActor
+    func testExitStripLeavesAndComesBack() throws {
+        let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine",
+                         arguments: ["-marquee.fakeSignedIn", "YES", "-marquee.uitest.glasses", "remote"])
+        waitFor("glasses.remote", in: app)
+        try snap("glasses-phone-05-exit-strip")
+        tap("glasses.exit", in: app)
+        waitFor("glasses.button", in: app)
+        XCTAssertFalse(element("glasses.remote", in: app).exists, "The remote stayed up after Phone App")
+        let hint = app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'brings the remote back'")).firstMatch
+        XCTAssertTrue(hint.waitForExistence(timeout: 5), "The first exit did not say how to bring the remote back")
+        tap("glasses.button", in: app)
+        waitFor("glasses.remote", in: app)
+        tap("glasses.settings", in: app)
+        waitFor("settings.done", in: app)
+        XCTAssertFalse(element("glasses.remote", in: app).exists, "The remote stayed up over Settings")
+    }
+
     @MainActor
     func testSettings() throws {
         let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine")

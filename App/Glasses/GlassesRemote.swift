@@ -28,7 +28,12 @@ protocol RemoteTarget: AnyObject {
     func stepVolume(_ step: Int) -> HapticCue
     /// VoiceOver's action that puts the remote away, and its name.
     var leaveTitle: String { get }
+    /// The top strip's button that puts the remote away, and its symbol.
+    var leaveLabel: String { get }
+    var leaveSymbol: String { get }
     func leave()
+    /// Puts the remote away and opens Marquee's Settings on this iPhone.
+    func openSettings()
 }
 
 extension GlassesNavigator: RemoteTarget {
@@ -38,6 +43,8 @@ extension GlassesNavigator: RemoteTarget {
     var isScrubbing: Bool { scrub != nil }
     var tiltEnabled: Bool { session.glasses.tiltEnabled }
     var leaveTitle: String { "Use the Phone App" }
+    var leaveLabel: String { "Phone App" }
+    var leaveSymbol: String { "iphone" }
 
     func openOptions() {
         if let player { openTracks(player) }
@@ -51,7 +58,12 @@ extension GlassesNavigator: RemoteTarget {
     }
 
     func leave() {
-        session.glasses.showPhoneApp()
+        session.glasses.leaveRemote()
+    }
+
+    func openSettings() {
+        session.glasses.leaveRemote()
+        session.showsSettings = true
     }
 }
 
@@ -172,6 +184,8 @@ struct GlassesRemoteRoot: View {
 /// faint. Nothing on it is a target; the whole screen is one surface.
 struct GlassesRemoteView: View {
     let target: any RemoteTarget
+    /// The strip with the way out; a linked phone's own header carries it instead.
+    var showsStrip = true
     @Environment(\.theme) private var theme
 
     var body: some View {
@@ -194,7 +208,7 @@ struct GlassesRemoteView: View {
                         .lineLimit(1)
                 }
                 Spacer()
-                Text("Swipe to move · Tap to choose\nSwipe in from the left edge to go back\nHold for options, or in a video to scrub\nTwo fingers up or down for volume")
+                Text("Swipe to move · Tap to choose\nSwipe in from the left edge to go back\nSwipe down from the top edge to leave\nHold for options, or in a video to scrub\nTwo fingers up or down for volume")
                     .textRole(.caption)
                     .foregroundStyle(theme.ink3)
             }
@@ -205,6 +219,32 @@ struct GlassesRemoteView: View {
             RemoteSurface(target: target, label: target.focusTitle, value: target.focusDetail)
                 .ignoresSafeArea()
                 .accessibilityIdentifier("glasses.remote")
+            if showsStrip {
+                exitStrip
+            }
+        }
+    }
+
+    /// The way out, above the gesture surface and clear of the top edge, which is a gesture of its own:
+    /// labelled buttons that need a deliberate tap, so a swipe never lands on them.
+    private var exitStrip: some View {
+        VStack {
+            HStack(spacing: Space.s3) {
+                Button { target.leave() } label: {
+                    Label(target.leaveLabel, systemImage: target.leaveSymbol)
+                }
+                .buttonStyle(.pill)
+                .accessibilityIdentifier("glasses.exit")
+                Spacer(minLength: Space.s3)
+                Button { target.openSettings() } label: {
+                    Label("Settings", systemImage: "gearshape").labelStyle(.iconOnly)
+                }
+                .buttonStyle(.pill)
+                .accessibilityIdentifier("glasses.settings")
+            }
+            .padding(.horizontal, Space.inset)
+            .padding(.top, Space.s7)
+            Spacer()
         }
     }
 }
@@ -234,6 +274,8 @@ final class RemoteSurfaceView: UIView {
         case touching
         /// Started at the left edge: a swipe right from there goes back.
         case edge
+        /// Started at the top edge: a swipe down from there leaves the remote.
+        case top
         case swiping
         /// Swiped, then held still: tilt scrolls.
         case tilting
@@ -249,6 +291,8 @@ final class RemoteSurfaceView: UIView {
     /// Touches starting this close to the left edge can go back once they travel `backTravel` right.
     private static let edgeWidth: CGFloat = 20
     private static let backTravel: CGFloat = 80
+    /// Touches starting this close to the top edge can leave once they travel `backTravel` down.
+    private static let topHeight: CGFloat = 24
     /// Tilt's top rates: focus steps a second when scrolling, playhead seconds a second when scrubbing.
     private static let scrollRate = 12.0
     private static let scrubRate = 30.0
@@ -281,7 +325,7 @@ final class RemoteSurfaceView: UIView {
         isMultipleTouchEnabled = true
         isAccessibilityElement = true
         accessibilityTraits = [.allowsDirectInteraction]
-        accessibilityHint = "Swipe to move, tap to choose, swipe in from the left edge to go back, hold for options or to scrub, two fingers up or down for volume."
+        accessibilityHint = "Swipe to move, tap to choose, swipe in from the left edge to go back, swipe down from the top edge to leave, hold for options or to scrub, two fingers up or down for volume."
         accessibilityCustomActions = [
             UIAccessibilityCustomAction(name: "Back") { [weak self] _ in self?.act(.back) ?? false },
             UIAccessibilityCustomAction(name: "Options") { [weak self] _ in
@@ -361,10 +405,10 @@ final class RemoteSurfaceView: UIView {
         start = touch.location(in: self)
         samples = [(start, touch.timestamp)]
         steps = SwipeSteps()
-        phase = start.x <= Self.edgeWidth ? .edge : .touching
+        phase = start.x <= Self.edgeWidth ? .edge : start.y <= Self.topHeight ? .top : .touching
         holdTask = Task { [weak self] in
             try? await Task.sleep(for: Self.holdDelay)
-            guard !Task.isCancelled, let self, phase == .touching || phase == .edge else { return }
+            guard !Task.isCancelled, let self, phase == .touching || phase == .edge || phase == .top else { return }
             phase = .held
             holdBegan()
         }
@@ -393,6 +437,17 @@ final class RemoteSurfaceView: UIView {
             } else if hypot(dx, dy) >= SwipeSteps.lockDistance {
                 holdTask?.cancel()
             }
+        case .top:
+            if dy >= Self.backTravel, dy > abs(dx) {
+                holdTask?.cancel()
+                phase = .done
+                target?.leave()
+            } else if abs(dx) >= SwipeSteps.lockDistance, abs(dx) > dy {
+                phase = .touching
+                swipe(dx: dx, dy: dy)
+            } else if hypot(dx, dy) >= SwipeSteps.lockDistance {
+                holdTask?.cancel()
+            }
         case .tilting:
             guard hypot(point.x - tiltAnchor.x, point.y - tiltAnchor.y) >= SwipeSteps.lockDistance else { return }
             tilt.stop()
@@ -415,6 +470,13 @@ final class RemoteSurfaceView: UIView {
             let velocity = velocity(at: (point, touch.timestamp))
             if point.x - start.x >= SwipeSteps.lockDistance, velocity.dx >= SwipeSteps.flickSpeed {
                 send(.back)
+            } else if hypot(point.x - start.x, point.y - start.y) < SwipeSteps.lockDistance {
+                send(.select)
+            }
+        case .top:
+            let velocity = velocity(at: (point, touch.timestamp))
+            if point.y - start.y >= SwipeSteps.lockDistance, velocity.dy >= SwipeSteps.flickSpeed {
+                target?.leave()
             } else if hypot(point.x - start.x, point.y - start.y) < SwipeSteps.lockDistance {
                 send(.select)
             }

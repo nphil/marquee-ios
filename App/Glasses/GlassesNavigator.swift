@@ -392,7 +392,7 @@ final class GlassesNavigator {
     }
 
     private func phoneAppOption() -> GlassesOption {
-        GlassesOption(id: "phone", title: "Use the Phone App") { [weak self] in self?.center?.showPhoneApp() }
+        GlassesOption(id: "phone", title: "Use the Phone App") { [weak self] in self?.center?.leaveRemote() }
     }
 
     private func goHome() {

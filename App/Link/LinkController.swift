@@ -55,6 +55,8 @@ final class LinkRemote: RemoteTarget {
     /// outside a scrub do nothing there.
     var isScrubbing: Bool { inPlayer }
     var leaveTitle: String { "Done" }
+    var leaveLabel: String { "Close" }
+    var leaveSymbol: String { "xmark" }
 
     /// Down in the other phone's player opens its tracks, as on its own remote.
     func openOptions() {
@@ -63,6 +65,10 @@ final class LinkRemote: RemoteTarget {
 
     func leave() {
         link.stopControlling()
+    }
+
+    func openSettings() {
+        link.openSettings()
     }
 }
 
@@ -130,7 +136,7 @@ struct LinkControlView: View {
             theme.canvas
                 .ignoresSafeArea()
             if remote.status?.screen != nil {
-                GlassesRemoteView(target: remote)
+                GlassesRemoteView(target: remote, showsStrip: false)
             } else if let playing = remote.status?.nowPlaying {
                 LinkPlayerControls(remote: remote, playing: playing)
             } else {
@@ -154,6 +160,11 @@ struct LinkControlView: View {
             .accessibilityElement(children: .combine)
             .allowsHitTesting(false)
             Spacer(minLength: Space.s3)
+            Button { remote.openSettings() } label: {
+                Label("Settings", systemImage: "gearshape").labelStyle(.iconOnly)
+            }
+            .buttonStyle(.pill)
+            .accessibilityIdentifier("link.settings")
             Button("Done") { remote.leave() }
                 .buttonStyle(.pill)
                 .accessibilityIdentifier("link.done")

@@ -186,6 +186,11 @@ private struct MainTabs: View {
         .environment(toasts)
         .environment(changes)
         .onChange(of: session.server?.id) { changes.forgetDeletions() }
+        .onChange(of: session.glasses.leaveHint) { _, hint in
+            guard let hint else { return }
+            toasts.show(hint)
+            session.glasses.clearLeaveHint()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { toasts.finish() }
         }
