@@ -21,6 +21,7 @@ final class FakeLinkPhone: LinkWire {
     private let deliver: @MainActor (LinkMessage) -> Void
     private var focus = 0
     private var playing: LinkNowPlaying?
+    private var volume = 0.5
     /// When the playhead was last set; a playing clock runs on from it.
     private var anchor = Date.now
 
@@ -65,12 +66,12 @@ final class FakeLinkPhone: LinkWire {
         case .tv, .glasses:
             return LinkStatus(
                 screen: mode == .tv ? .tv : .glasses, focus: Self.titles[focus], focusDetail: "Movie",
-                inPlayer: playing != nil, nowPlaying: nowPlaying
+                inPlayer: playing != nil, nowPlaying: nowPlaying, volume: volume
             )
         case .phone:
-            return LinkStatus(nowPlaying: nowPlaying)
+            return LinkStatus(nowPlaying: nowPlaying, volume: volume)
         case .idle:
-            return LinkStatus()
+            return LinkStatus(volume: volume)
         }
     }
 
@@ -112,6 +113,16 @@ final class FakeLinkPhone: LinkWire {
     }
 
     private func apply(_ command: LinkCommand) {
+        switch command {
+        case .volume(let step):
+            volume = LinkVolume.stepped(volume, by: step)
+            return
+        case .setVolume(let level):
+            volume = LinkVolume.clamped(level)
+            return
+        default:
+            break
+        }
         settle()
         guard var current = playing else { return }
         switch command {
@@ -123,6 +134,8 @@ final class FakeLinkPhone: LinkWire {
             current = LinkNowPlaying(title: "Tears of Steel", detail: "2012 · Science Fiction", isPlaying: true, position: 0, duration: 734)
         case .subtitle(let id):
             current.subtitle = id
+        case .volume, .setVolume:
+            break
         }
         playing = current
     }

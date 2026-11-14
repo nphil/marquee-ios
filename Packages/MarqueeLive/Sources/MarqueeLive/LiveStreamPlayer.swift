@@ -50,6 +50,11 @@ public final class LiveStreamPlayer {
     public private(set) var behindLive = 0.0
     /// How far back playback can go now, in whole seconds. Refreshed every second.
     public private(set) var reach = 0.0
+    /// The sound's own level, 0 to 1, on top of the system volume.
+    public var volume: Float {
+        get { output.audio.volume }
+        set { output.audio.volume = newValue }
+    }
     public let view: LiveVideoView
     /// Nil where the device has no Picture in Picture.
     @ObservationIgnored public private(set) var pictureInPicture: LivePictureInPicture?

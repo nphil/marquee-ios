@@ -64,6 +64,38 @@ public enum LinkCommand: Sendable, Equatable {
     case next
     /// A subtitle track by its id, or nil for Off.
     case subtitle(Int?)
+    /// Louder (+1) or quieter (-1) by `LinkVolume` steps; the sender need not know the level.
+    case volume(step: Int)
+    /// The volume, 0 to 1.
+    case setVolume(Double)
+}
+
+/// The volume of the phone that plays, which the phone controlling it changes a step at a time.
+public enum LinkVolume {
+    /// Steps from silent to full, as the volume buttons make them.
+    public static let steps = 16
+
+    /// `level` within 0 to 1; a level that is not a number is silent.
+    public static func clamped(_ level: Double) -> Double {
+        level.isFinite ? min(max(level, 0), 1) : 0
+    }
+
+    /// The level `step` steps from `level`, on the grid of `1 / steps`: a level between two grid points
+    /// first moves to the next one in that direction.
+    public static func stepped(_ level: Double, by step: Int) -> Double {
+        let level = clamped(level)
+        guard step != 0 else { return level }
+        let position = level * Double(steps)
+        let nearest = position.rounded()
+        let base = abs(position - nearest) < 0.01 ? nearest : position.rounded(step > 0 ? .down : .up)
+        return min(max(base + Double(step), 0), Double(steps)) / Double(steps)
+    }
+
+    /// Whether a step would go past silent or full, which the remote answers with a firmer haptic.
+    public static func hitsLimit(_ level: Double, step: Int) -> Bool {
+        let level = clamped(level)
+        return (step < 0 && level <= 0.001) || (step > 0 && level >= 0.999)
+    }
 }
 
 /// The big screen a phone drives.
@@ -126,16 +158,19 @@ public struct LinkStatus: Sendable, Equatable, Codable {
     /// The big screen shows the player.
     public var inPlayer: Bool
     public var nowPlaying: LinkNowPlaying?
+    /// The volume of what it plays, 0 to 1; nil when not known.
+    public var volume: Double?
 
     public static let maxText = 120
     public static let maxSubtitles = 40
 
-    public init(screen: LinkScreen? = nil, focus: String? = nil, focusDetail: String? = nil, inPlayer: Bool = false, nowPlaying: LinkNowPlaying? = nil) {
+    public init(screen: LinkScreen? = nil, focus: String? = nil, focusDetail: String? = nil, inPlayer: Bool = false, nowPlaying: LinkNowPlaying? = nil, volume: Double? = nil) {
         self.screen = screen
         self.focus = focus
         self.focusDetail = focusDetail
         self.inPlayer = inPlayer
         self.nowPlaying = nowPlaying
+        self.volume = volume
     }
 
     /// Whether a controlling phone has anything to drive.
@@ -147,6 +182,7 @@ public struct LinkStatus: Sendable, Equatable, Codable {
         var status = self
         status.focus = cut(focus)
         status.focusDetail = cut(focusDetail)
+        status.volume = volume.flatMap { $0.isFinite ? LinkVolume.clamped($0) : nil }
         if var playing = nowPlaying {
             playing.title = String(playing.title.prefix(Self.maxText))
             playing.detail = cut(playing.detail)
@@ -197,6 +233,8 @@ private struct Wire: Codable {
     var seconds: Double?
     var command: String?
     var track: Int?
+    var step: Int?
+    var level: Double?
     var cue: String?
     var status: LinkStatus?
 
@@ -244,6 +282,12 @@ private struct Wire: Codable {
             case .subtitle(let track):
                 self.command = "subtitle"
                 self.track = track
+            case .volume(let step):
+                self.command = "volume"
+                self.step = step
+            case .setVolume(let level):
+                self.command = "setVolume"
+                self.level = level
             }
         case .cue(let cue):
             self.init(type: "cue")
@@ -292,6 +336,9 @@ private struct Wire: Codable {
             if let seconds, seconds.isFinite { .skip(seconds: seconds) } else { nil }
         case "next": .next
         case "subtitle": .subtitle(track)
+        case "volume": step.map { .volume(step: $0) }
+        case "setVolume":
+            if let level, level.isFinite { .setVolume(level) } else { nil }
         default: nil
         }
     }

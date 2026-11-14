@@ -88,7 +88,7 @@ extension AVPlayerItem {
 }
 
 @MainActor
-final class AVPlayerBackend: VideoBackend {
+final class AVPlayerBackend: VideoBackend, GainSink {
     /// The player on screen; a switch to the standby replaces it.
     private(set) var avPlayer = AVPlayer()
     var player: AVPlayer? { avPlayer }
@@ -105,6 +105,13 @@ final class AVPlayerBackend: VideoBackend {
     init() {
         avPlayer.allowsExternalPlayback = true
         observePlayer()
+        PlaybackGain.shared.register(self)
+    }
+
+    /// The sound follows `PlaybackGain`, which stands in for a system volume the app cannot set.
+    func apply(gain: Float) {
+        avPlayer.volume = gain
+        standby?.volume = gain
     }
 
     var itemTime: TimeInterval {
@@ -210,6 +217,7 @@ final class AVPlayerBackend: VideoBackend {
         avPlayer = next
         next.defaultRate = rate
         next.isMuted = false
+        next.volume = PlaybackGain.shared.level
         observePlayer()
         if let item = next.currentItem { observe(item) }
         next.play()

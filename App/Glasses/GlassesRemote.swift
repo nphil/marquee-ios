@@ -23,6 +23,9 @@ protocol RemoteTarget: AnyObject {
     var tiltEnabled: Bool { get }
     /// VoiceOver's Options action in the player: the tracks.
     func openOptions()
+    /// Louder (+1) or quieter (-1) by one step, from two fingers swiping or a volume button; returns the
+    /// cue to play at once, firmer at silent and full.
+    func stepVolume(_ step: Int) -> HapticCue
     /// VoiceOver's action that puts the remote away, and its name.
     var leaveTitle: String { get }
     func leave()
@@ -38,6 +41,13 @@ extension GlassesNavigator: RemoteTarget {
 
     func openOptions() {
         if let player { openTracks(player) }
+    }
+
+    /// The glasses' own phone is the one that plays, so its volume changes, and the display shows the bar.
+    func stepVolume(_ step: Int) -> HapticCue {
+        let limit = LinkVolume.hitsLimit(Double(OutputVolume.shared.level), step: step)
+        OutputVolume.shared.step(step)
+        return limit ? .volumeLimit : .volumeStep
     }
 
     func leave() {
@@ -184,7 +194,7 @@ struct GlassesRemoteView: View {
                         .lineLimit(1)
                 }
                 Spacer()
-                Text("Swipe to move · Tap to choose\nSwipe in from the left edge to go back\nHold for options, or in a video to scrub")
+                Text("Swipe to move · Tap to choose\nSwipe in from the left edge to go back\nHold for options, or in a video to scrub\nTwo fingers up or down for volume")
                     .textRole(.caption)
                     .foregroundStyle(theme.ink3)
             }
@@ -242,6 +252,8 @@ final class RemoteSurfaceView: UIView {
     /// Tilt's top rates: focus steps a second when scrolling, playhead seconds a second when scrubbing.
     private static let scrollRate = 12.0
     private static let scrubRate = 30.0
+    /// Points of a two-finger swipe for one volume step.
+    private static let volumeStride: CGFloat = 36
 
     private weak var target: (any RemoteTarget)?
     private let haptics = RemoteHaptics()
@@ -260,14 +272,16 @@ final class RemoteSurfaceView: UIView {
     private var tiltBlocked: FocusMove?
     /// The way tilt last scrolled, which a late edge cue blocks.
     private var tiltMove: FocusMove?
+    /// Volume steps the current two-finger swipe has sent.
+    private var volumeSent = 0
 
     init(target: any RemoteTarget) {
         self.target = target
         super.init(frame: .zero)
-        isMultipleTouchEnabled = false
+        isMultipleTouchEnabled = true
         isAccessibilityElement = true
         accessibilityTraits = [.allowsDirectInteraction]
-        accessibilityHint = "Swipe to move, tap to choose, swipe in from the left edge to go back, hold for options or to scrub."
+        accessibilityHint = "Swipe to move, tap to choose, swipe in from the left edge to go back, hold for options or to scrub, two fingers up or down for volume."
         accessibilityCustomActions = [
             UIAccessibilityCustomAction(name: "Back") { [weak self] _ in self?.act(.back) ?? false },
             UIAccessibilityCustomAction(name: "Options") { [weak self] _ in
@@ -279,8 +293,21 @@ final class RemoteSurfaceView: UIView {
                 self?.target?.leave()
                 return true
             },
+            UIAccessibilityCustomAction(name: "Volume Up") { [weak self] _ in
+                self?.stepVolume(1)
+                return true
+            },
+            UIAccessibilityCustomAction(name: "Volume Down") { [weak self] _ in
+                self?.stepVolume(-1)
+                return true
+            },
         ]
         target.onCue = { [weak self] cue in self?.cueArrived(cue) }
+        let pan = UIPanGestureRecognizer(target: self, action: #selector(volumeSwiped(_:)))
+        pan.minimumNumberOfTouches = 2
+        pan.maximumNumberOfTouches = 2
+        pan.delegate = self
+        addGestureRecognizer(pan)
     }
 
     @available(*, unavailable)
@@ -324,7 +351,11 @@ final class RemoteSurfaceView: UIView {
     // MARK: Touches
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        guard phase == .idle, let touch = touches.first else { return }
+        guard phase == .idle, let touch = touches.first else {
+            // A second finger turns the touch into the volume swipe.
+            if phase != .held { abandonTouch() }
+            return
+        }
         coastTask?.cancel()
         tracked = touch
         start = touch.location(in: self)
@@ -337,6 +368,7 @@ final class RemoteSurfaceView: UIView {
             phase = .held
             holdBegan()
         }
+        if touches.count > 1 { abandonTouch() }
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -411,6 +443,35 @@ final class RemoteSurfaceView: UIView {
         tilt.stop()
         tracked = nil
         phase = .idle
+    }
+
+    /// The first finger's touch ends without doing anything more: a second finger came down.
+    private func abandonTouch() {
+        holdTask?.cancel()
+        stillTask?.cancel()
+        coastTask?.cancel()
+        tilt.stop()
+        phase = .done
+    }
+
+    /// Two fingers up or down: one volume step for each `volumeStride` points.
+    @objc private func volumeSwiped(_ pan: UIPanGestureRecognizer) {
+        switch pan.state {
+        case .began:
+            volumeSent = 0
+        case .changed:
+            let total = Int((-pan.translation(in: self).y / Self.volumeStride).rounded(.towardZero))
+            let delta = total - volumeSent
+            volumeSent = total
+            for _ in 0..<abs(delta) { stepVolume(delta > 0 ? 1 : -1) }
+        default:
+            break
+        }
+    }
+
+    private func stepVolume(_ step: Int) {
+        guard let cue = target?.stepVolume(step) else { return }
+        haptics.play(cue)
     }
 
     private func swipe(dx: CGFloat, dy: CGFloat) {
@@ -507,9 +568,16 @@ final class RemoteSurfaceView: UIView {
     }
 }
 
+extension RemoteSurfaceView: UIGestureRecognizerDelegate {
+    /// A scrub keeps the touch; a second finger then does nothing.
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        phase != .held
+    }
+}
+
 /// Plays the remote's touch vocabulary (`HapticCue`) on the Taptic Engine.
 @MainActor
-private final class RemoteHaptics {
+final class RemoteHaptics {
     private var engine: CHHapticEngine?
     private var patterns: [HapticCue: CHHapticPattern] = [:]
 

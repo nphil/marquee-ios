@@ -88,8 +88,9 @@ struct LinkMessageTests {
             .input(.move(.left)), .input(.select), .input(.back), .input(.holdBegan), .input(.holdEnded),
             .input(.slide(dx: -12.5, width: 390)), .input(.nudge(seconds: 1.5)),
             .command(.playPause), .command(.skip(seconds: -10)), .command(.next), .command(.subtitle(7)), .command(.subtitle(nil)),
-            .cue(.scrubDetent),
-            .status(LinkStatus(screen: .tv, focus: "Dune", focusDetail: "2021", inPlayer: true, nowPlaying: playing)),
+            .command(.volume(step: 1)), .command(.volume(step: -1)), .command(.setVolume(0.375)),
+            .cue(.scrubDetent), .cue(.volumeStep), .cue(.volumeLimit),
+            .status(LinkStatus(screen: .tv, focus: "Dune", focusDetail: "2021", inPlayer: true, nowPlaying: playing, volume: 0.75)),
             .status(LinkStatus()),
             .unlink,
         ]
@@ -104,10 +105,30 @@ struct LinkMessageTests {
         #expect(read(#"{"type":"command","command":"subtitle"}"#) == .command(.subtitle(nil)))
         #expect(read(#"{"type":"cue","cue":"edge"}"#) == .cue(.edge))
         #expect(read(#"{"type":"status","status":{"screen":"glasses","inPlayer":false}}"#) == .status(LinkStatus(screen: .glasses)))
+        #expect(read(#"{"type":"command","command":"volume","step":-1}"#) == .command(.volume(step: -1)))
+        #expect(read(#"{"type":"command","command":"volume"}"#) == nil)
+        #expect(read(#"{"type":"command","command":"setVolume","level":0.5}"#) == .command(.setVolume(0.5)))
+        #expect(read(#"{"type":"status","status":{"inPlayer":false,"volume":0.25}}"#) == .status(LinkStatus(volume: 0.25)))
         #expect(read(#"{"type":"teleport"}"#) == nil)
         #expect(read(#"{"type":"input","input":"wiggle"}"#) == nil)
         #expect(read(#"{"type":"input","input":"move","move":"sideways"}"#) == nil)
         #expect(read("not json") == nil)
+    }
+
+    @Test func volumeMovesInSixteenthsAndStopsAtTheEnds() {
+        #expect(LinkVolume.stepped(0.5, by: 1) == 9.0 / 16)
+        #expect(LinkVolume.stepped(0.5, by: -1) == 7.0 / 16)
+        #expect(LinkVolume.stepped(0.53, by: 1) == 9.0 / 16)
+        #expect(LinkVolume.stepped(0.53, by: -1) == 0.5)
+        #expect(LinkVolume.stepped(0.98, by: 1) == 1)
+        #expect(LinkVolume.stepped(0.02, by: -1) == 0)
+        #expect(LinkVolume.stepped(.nan, by: 1) == 1.0 / 16)
+        #expect(LinkVolume.stepped(0.3, by: 0) == 0.3)
+        #expect(LinkVolume.hitsLimit(1, step: 1) && LinkVolume.hitsLimit(0, step: -1))
+        #expect(!LinkVolume.hitsLimit(1, step: -1) && !LinkVolume.hitsLimit(0.5, step: 1))
+        let loud = LinkStatus(volume: 7).limited()
+        #expect(loud.volume == 1)
+        #expect(LinkStatus(volume: .infinity).limited().volume == nil)
     }
 
     @Test func thePreambleCarriesModeAndCaller() {

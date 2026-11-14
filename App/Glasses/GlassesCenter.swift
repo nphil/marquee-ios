@@ -347,18 +347,22 @@ final class GlassesCenter {
 
     // MARK: Volume
 
-    /// Read only: the volume buttons keep their own job, and the glasses show the level as it changes.
+    /// The glasses show the level as the buttons, or a linked phone's remote, change it.
     private func watchVolume() {
         let audio = AVAudioSession.sharedInstance()
         volume = audio.outputVolume
         volumeObservation = audio.observe(\.outputVolume, options: [.new]) { _, change in
             guard let level = change.newValue else { return }
-            Task { @MainActor in
-                guard let center = GlassesCenter.live, center.isConnected else { return }
-                center.volume = level
-                center.volumeChanged = .now
-            }
+            Task { @MainActor in GlassesCenter.live?.showVolume(level) }
         }
+    }
+
+    /// Puts the level bar on the big screen for a moment; the players' own level shows through here when
+    /// the system volume cannot be set.
+    func showVolume(_ level: Float) {
+        guard isConnected else { return }
+        volume = level
+        volumeChanged = .now
     }
 }
 

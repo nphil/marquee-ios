@@ -13,7 +13,7 @@ import UIKit
 /// channel, and the old picture stays until the new one's first. A refusal (503, or 805 when the TV is in use) ends
 /// the tune with the tuner's own sentence.
 @MainActor @Observable
-final class DirectLiveSource: LiveVideoSource {
+final class DirectLiveSource: LiveVideoSource, GainSink {
     let player = LiveStreamPlayer()
     private(set) var channel: LiveChannel?
 
@@ -24,6 +24,12 @@ final class DirectLiveSource: LiveVideoSource {
 
     init() {
         player.onStateChange = { [weak self] state in self?.stateChanged(state) }
+        PlaybackGain.shared.register(self)
+    }
+
+    /// The sound follows `PlaybackGain`, which stands in for a system volume the app cannot set.
+    func apply(gain: Float) {
+        player.volume = gain
     }
 
     var videoView: UIView { player.view }

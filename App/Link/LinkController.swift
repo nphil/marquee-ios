@@ -10,6 +10,7 @@ final class LinkRemote: RemoteTarget {
     let tiltEnabled: Bool
     var onCue: ((HapticCue) -> Void)?
     private unowned let link: PhoneLink
+    private let haptics = RemoteHaptics()
 
     init(link: PhoneLink, peer: LinkID, tiltEnabled: Bool) {
         self.link = link
@@ -29,6 +30,20 @@ final class LinkRemote: RemoteTarget {
 
     func command(_ command: LinkCommand) {
         link.send(.command(command))
+    }
+
+    /// The other phone's volume, 0 to 1, as it last said.
+    var volume: Double? { status?.volume }
+
+    func stepVolume(_ step: Int) -> HapticCue {
+        let limit = volume.map { LinkVolume.hitsLimit($0, step: step) } ?? false
+        link.send(.command(.volume(step: step)))
+        return limit ? .volumeLimit : .volumeStep
+    }
+
+    /// A step from the buttons on the screen or on the phone's side, with its own haptic.
+    func press(volume step: Int) {
+        haptics.play(stepVolume(step))
     }
 
     var answersLater: Bool { true }
@@ -56,6 +71,7 @@ final class LinkRemote: RemoteTarget {
 @MainActor
 final class LinkControllerWindow {
     private var window: UIWindow?
+    private let buttons = VolumeButtons()
 
     func show(remote: LinkRemote, session: AppSession, store: ThemeStore) {
         guard window == nil, let scene = GlassesCenter.phoneScene() else { return }
@@ -68,10 +84,12 @@ final class LinkControllerWindow {
         window.makeKeyAndVisible()
         self.window = window
         UIAccessibility.post(notification: .screenChanged, argument: host.view)
+        buttons.start { [weak remote] step in remote?.press(volume: step) }
     }
 
     func hide() {
         guard let window else { return }
+        buttons.stop()
         window.isHidden = true
         self.window = nil
         window.windowScene?.windows.first { !$0.isHidden }?.makeKey()
@@ -217,10 +235,46 @@ private struct LinkPlayerControls: View {
                     .accessibilityIdentifier("link.next")
                 }
             }
+            volumeRow
             Spacer()
         }
         .padding(Space.inset)
         .frame(maxWidth: .infinity)
+    }
+
+    /// Quieter and louder with the other phone's level between; this phone's own volume buttons do the same.
+    private var volumeRow: some View {
+        let level = remote.volume
+        return HStack(spacing: Space.s4) {
+            Button {
+                remote.press(volume: -1)
+            } label: {
+                Image(systemName: "minus")
+            }
+            .buttonStyle(PlayerButtonStyle())
+            .accessibilityLabel("Volume down")
+            .accessibilityIdentifier("link.volumeDown")
+
+            VStack(spacing: Space.s1) {
+                Image(systemName: level == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                    .foregroundStyle(theme.ink3)
+                ProgressView(value: level ?? 0)
+                    .tint(theme.accent)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Volume")
+            .accessibilityValue(level.map { "\(Int(($0 * 100).rounded())) percent" } ?? "Unknown")
+            .accessibilityIdentifier("link.volume")
+
+            Button {
+                remote.press(volume: 1)
+            } label: {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(PlayerButtonStyle())
+            .accessibilityLabel("Volume up")
+            .accessibilityIdentifier("link.volumeUp")
+        }
     }
 
     private var progress: some View {

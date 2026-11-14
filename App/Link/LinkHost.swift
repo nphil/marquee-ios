@@ -16,6 +16,7 @@ enum LinkHost {
         if let model = session.player.active {
             status.nowPlaying = nowPlaying(model)
         }
+        status.volume = Double(OutputVolume.shared.level)
         return status
     }
 
@@ -44,8 +45,16 @@ enum LinkHost {
         return navigator.handle(input)
     }
 
-    /// A control for the player on this phone's own screen.
+    /// A control for the player on this phone's own screen, or the volume it plays at.
     static func handle(_ command: LinkCommand, in session: AppSession) {
+        switch command {
+        case .volume(let step):
+            return OutputVolume.shared.step(step)
+        case .setVolume(let level):
+            return OutputVolume.shared.set(level)
+        case .playPause, .skip, .next, .subtitle:
+            break
+        }
         guard let model = session.player.active else { return }
         switch command {
         case .playPause:
@@ -58,6 +67,8 @@ enum LinkHost {
             guard let id else { return model.pickSubtitle(.off) }
             guard model.tracks?.visibleSubtitles.contains(where: { $0.id == id }) == true else { return }
             model.pickSubtitle(.track(id))
+        case .volume, .setVolume:
+            break
         }
     }
 }

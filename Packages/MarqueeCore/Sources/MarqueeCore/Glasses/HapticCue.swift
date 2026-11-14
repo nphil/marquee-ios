@@ -17,6 +17,10 @@ public enum HapticCue: String, CaseIterable, Sendable {
     case playPause
     /// Something failed: three heavy dull knocks.
     case error
+    /// The volume moved one step: a soft, round thump.
+    case volumeStep
+    /// The volume met silent or full: two firm thumps.
+    case volumeLimit
 
     public struct Event: Sendable, Equatable, Hashable {
         /// Seconds from the start of the cue.
@@ -38,6 +42,8 @@ public enum HapticCue: String, CaseIterable, Sendable {
         case .scrubDetent: [Self.tap(0, 0.3, 1)]
         case .playPause: [Self.tap(0, 0.55, 0.5), Self.tap(0.1, 0.95, 0.5)]
         case .error: [Self.tap(0, 1, 0.15), Self.tap(0.12, 1, 0.15), Self.tap(0.24, 1, 0.15)]
+        case .volumeStep: [Self.tap(0, 0.5, 0.25)]
+        case .volumeLimit: [Self.tap(0, 1, 0.25), Self.tap(0.07, 1, 0.25)]
         }
     }
 
