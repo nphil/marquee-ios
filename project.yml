@@ -74,13 +74,14 @@ targets:
         CADisableMinimumFrameDurationOnPhone: true
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
-        NSLocalNetworkUsageDescription: Marquee looks for Plex servers and LumaTV on the local network, plays from the servers and works as the TV's remote, and finds Chromecasts there while its Chromecast plugin is on.
+        NSLocalNetworkUsageDescription: Marquee looks for Plex servers and LumaTV on the local network, plays from the servers and works as the TV's remote, finds Chromecasts there while its Chromecast plugin is on, and reaches linked iPhones while Linked Phones is on.
         NSBonjourServices:
           - _plex._tcp
           - _googlecast._tcp
           - _CC1AD845._googlecast._tcp
           - _lumatv-remote._tcp
-        NSCameraUsageDescription: Marquee scans the code a LumaTV shows to pair the remote with it.
+          - _marquee-link._tcp
+        NSCameraUsageDescription: Marquee scans the code a LumaTV shows to pair the remote with it, and the code another iPhone shows to link with it.
         CFBundleURLTypes:
           # The link in a LumaTV's pairing QR code.
           - CFBundleURLName: com.nphil.marquee.lumaremote

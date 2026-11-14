@@ -75,6 +75,8 @@ final class AppSession {
     let remote: TVRemote
     /// The XR glasses plugin (DESIGN §8.9), kept per iPhone.
     let glasses: GlassesCenter
+    /// Linked phones (DESIGN §8.10), kept per iPhone.
+    let link: PhoneLink
 
     /// Made again by Delete All Local Data, which removes the stored client identifier.
     private(set) var identity: PlexClientIdentity
@@ -107,6 +109,7 @@ final class AppSession {
         cast = CastCenter(storage: storage)
         remote = TVRemote(storage: storage, inMemory: FakePlex.isActive)
         glasses = GlassesCenter(storage: storage)
+        link = PhoneLink(storage: storage, inMemory: FakePlex.isActive)
         restore()
         watchNetwork()
         watchForeground()
@@ -276,6 +279,7 @@ final class AppSession {
         storage.eraseAll()
         remote.eraseAll()
         glasses.reset()
+        link.eraseAll()
         downloads.eraseAll()
         identity = Self.identity(defaults: storage.defaults)
         URLCache.shared.removeAllCachedResponses()
@@ -383,6 +387,7 @@ final class AppSession {
         }
         #if DEBUG
         glasses.simulate(arguments: arguments)
+        link.simulate(arguments: arguments)
         #endif
         let pick: ServerPick
         if arguments.bool(forKey: "marquee.fakeSignedIn") {

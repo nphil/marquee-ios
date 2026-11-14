@@ -327,7 +327,7 @@ final class GlassesCenter {
     /// Puts up or takes down the remote's window over the phone app.
     func syncRemote() {
         if showsRemote, let store = themeStore, let navigator {
-            takeover.show(center: self, navigator: navigator, store: store)
+            takeover.show(navigator: navigator, store: store)
         } else {
             takeover.hide()
         }

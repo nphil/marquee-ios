@@ -29,6 +29,8 @@ final class SessionStorage {
         static let seerrSession = "marquee.seerr.session"
         static let seerrPulsarr = "marquee.seerr.pulsarr"
         static let castEnabled = "marquee.cast.enabled"
+        static let linkEnabled = "marquee.link.enabled"
+        static let linkName = "marquee.link.name"
         static let remoteEnabled = "marquee.remote.enabled"
         static let remoteAccess = "marquee.remote.access"
         static let glassesEnabled = "marquee.glasses.enabled"
@@ -110,6 +112,18 @@ final class SessionStorage {
     var castEnabled: Bool {
         get { defaults.bool(forKey: Key.castEnabled) }
         set { defaults.set(newValue, forKey: Key.castEnabled) }
+    }
+
+    /// The linked-phones plugin is on, and the name the other phones show for this one (empty for the
+    /// default). Kept per iPhone; the links themselves are in the Keychain (`LinkStore`).
+    var linkEnabled: Bool {
+        get { defaults.bool(forKey: Key.linkEnabled) }
+        set { defaults.set(newValue, forKey: Key.linkEnabled) }
+    }
+
+    var linkName: String {
+        get { defaults.string(forKey: Key.linkName) ?? "" }
+        set { defaults.set(newValue, forKey: Key.linkName) }
     }
 
     /// Bazarr's address and API key; the key is a secret like the Plex sign-in. Kept through sign-out.
