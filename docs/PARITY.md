@@ -3,7 +3,7 @@
 Behaviour only (clean room): TV-side rows come from the TV app's user-facing strings and docs, never its code.
 
 ## Legend
-- **Done**: works in the iPhone app.
+- **Done**: implemented in the iPhone app; hardware acceptance is recorded separately in `docs/DEVICE-TEST.md` and the request backlog in `docs/PLAN.md`.
 - **Partial**: some of it exists; the gap is named.
 - **Missing**: no iPhone code found.
 - **N/A**: does not apply on a phone (D-pad navigation etc.).
