@@ -83,6 +83,10 @@ Other: `UITests/` (UI tests; `UITests/FakePlex/` fixtures and rules in its `READ
 
 Debug builds only (`#if DEBUG`). The UI tests set `MARQUEE_FAKE_PLEX` to `UITests/FakePlex/` and a request reads the matching JSON fixture (rules in `UITests/FakePlex/README.md`). Launch arguments such as `-marquee.fakeSignedIn YES`, `-marquee.fakeServerList`, `-marquee.uitest.play`, `-marquee.uitest.fakeTuner` set up a screen directly; `StillFrameBackend` stands in for AVPlayer because the simulator decodes no video. A new behaviour needs a fixture and a screenshot or assertion there, and an Increase Contrast / accessibility-size variant when it adds a screen.
 
+## Reading a phone's log
+
+Settings › Integrations › Diagnostic Logs sends the app's log to an ntfy topic (DESIGN §8.12). On `https://ntfy.nateshome.net` the topic `marquee-logs` takes anonymous writes only: the phone needs no token, and nothing reads it over HTTP. Agents read it on BeastNAS through HomeLabber's `run_command`: `sqlite3 -readonly /mnt/nvme/appdata/Ntfy/cache.db "select mid, time, title, message, attachment_name from messages where topic='marquee-logs' order by time"`. A report's whole journal is the file named by its `mid` in `/mnt/nvme/appdata/Ntfy/attachments/`. Messages are kept 12 h, attachments 3 h. No token goes in a doc, commit or memory.
+
 ## Release flow
 
 Push to `main`. When `core`, `live` and `app` pass, `release` publishes `Marquee.ipa` as the next patch GitHub release and commits the new version to `apps.json`; full UI acceptance continues independently. Sideloaders update from `https://raw.githubusercontent.com/nphil/marquee-ios/main/apps.json`. There is no changelog file; each release’s notes name the commit it was built from, and `git log` is the history. Installing on the iPhone is Nitin’s action; state which release to install.

@@ -4,15 +4,15 @@ The current state of unfinished work, for an agent picking it up without the con
 
 The canonical request list and implementation order are in [PLAN.md](PLAN.md). It separates released code from hardware acceptance and retains every request without rebuilding shipped features.
 
-## Latest release: 0.1.44
+## Latest release: 0.1.45
 
-Published from `4b00f27`, with the Feather source updated in `964dd90`. Software HDMI volume shipped in 0.1.42; the remote exit/Settings strip and continuous page/grid touchpad shipped in 0.1.44. These still need DEVICE-TEST checks 24, 27 and 28, including the Apple TV Remote comparison.
+Published from `ddce805`, with the Feather source updated in `a3bb9e8`; it adds diagnostic logs (below). Software HDMI volume shipped in 0.1.42; the remote exit/Settings strip and continuous page/grid touchpad shipped in 0.1.44. These still need DEVICE-TEST checks 24, 27 and 28, including the Apple TV Remote comparison.
 
-Run `43566194650`: App, Core, Live engine and Release passed; four UI jobs failed, one at simulator boot. The reported `testStyleMenuLandscape` and `testSkipCreditsInstantly` failures remain unresolved. Read their artifacts before changing code or assertions; do not classify them or older Up Next failures as harmless flakes without evidence.
+Run `44225884414` (0.1.45): App, Core, Live engine and Release passed. Its UI failures `testStyleMenuLandscape` (N3) and "Episode 3 is not playing" in `testUpNext`, `testUpNextCountsDownThenPlaysNext` and `testSkipCreditsInstantly` (N4) also failed before 0.1.45; `testDirectPlayerRosePine` failed at its controls coming back, and at another step in run `43562385063`. Read their artifacts before changing code or assertions; do not classify them as harmless flakes without evidence.
 
-## Diagnostic logs: next release
+## Diagnostic logs: released in 0.1.45
 
-Settings › Integrations › Diagnostic Logs sends the app's log to an ntfy topic (DESIGN §8.12). A phone's log is read with `curl -s -H "Authorization: Bearer $TOKEN" "https://ntfy.nateshome.net/<topic>/json?poll=1&since=12h"`: one JSON message per line, and a report's journal at `attachment.url` in its message (kept 3 h). The token's ntfy user needs write on the topic for the phone and read for the reader; the token stays out of docs and memory. The skip-intro miss is not yet explained: the next `offers skip.missed` line carries the seekable range, the remux's written time and the item time. DEVICE-TEST check 29 is open.
+Settings › Integrations › Diagnostic Logs sends the app's log to the write-only ntfy topic `marquee-logs` (DESIGN §8.12); AGENTS.md says how to read it. 0.1.45 crashes on opening Report a Problem; `09bfb76` fixes it for the next release. The skip-intro miss is not yet explained: the next `offers skip.missed` line carries the seekable range, the remux's written time and the item time. DEVICE-TEST check 29 is open.
 
 ## Next build: profile settings close button
 
