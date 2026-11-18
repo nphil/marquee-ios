@@ -234,6 +234,18 @@ private struct RootDiagnostics: ViewModifier {
         var reduceTransparency: Bool
     }
 
+    /// The TV remote's link as a word; the cases may carry the paired TV and its keys.
+    private var remoteState: String {
+        switch session.remote.model.connection {
+        case .none: "not-paired"
+        case .connecting: "connecting"
+        case .connected: "connected"
+        case .offline: "offline"
+        case .incompatible: "incompatible"
+        case .unpaired: "unpaired"
+        }
+    }
+
     func body(content: Content) -> some View {
         let display = Display(
             theme: theme, scheme: scheme, typeSize: typeSize, bold: legibilityWeight == .bold, contrast: contrast == .increased,
@@ -277,5 +289,8 @@ private struct RootDiagnostics: ViewModifier {
             .diagPresentation("remote", isPresented: session.remote.isPresented)
             .diagPresentation("player", isPresented: session.player.presented != nil)
             .diagPresentation("glasses.ask", isPresented: session.glasses.asksToUse)
+            .onChange(of: remoteState) { _, state in
+                Diag.event(.link, "remote.connection", ["state": state], ["offline", "incompatible", "unpaired"].contains(state) ? .notice : .info)
+            }
     }
 }

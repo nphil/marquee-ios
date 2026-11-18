@@ -295,8 +295,10 @@ final class DownloadCenter {
             allRecords.append(record)
             persist()
             kick()
+            Diag.event(.download, "added", ["item": item.ratingKey, "quality": "\(chosen)", "bytes": option?.bytes])
             return nil
         } catch {
+            Diag.event(.download, "add.failed", ["item": item.ratingKey, "error": error], .warning)
             return self.scope == scope && enqueueOwner == owner ? error.localizedDescription : nil
         }
     }
@@ -522,13 +524,16 @@ final class DownloadCenter {
             backingOff = false
             guard !Task.isCancelled, transferOwner == owner else { return false }
         }
+        Diag.event(.download, "transfer.start", ["id": record.id, "quality": "\(record.quality)"])
         do { try await transfer(record.id, library: library, scope: scope, owner: owner) }
         catch is CancellationError { }
         catch {
             if !Task.isCancelled, let i = transferIndex(record.id, scope: scope, owner: owner), allRecords[i].phase.isActive {
                 if TransferPlan.isTransient(error) {
+                    Diag.event(.download, "transfer.retry", ["id": record.id, "attempt": (retries[record.id] ?? 0) + 1, "error": error], .notice)
                     scheduleRetry(at: i)
                 } else {
+                    Diag.event(.download, "transfer.failed", ["id": record.id, "error": error], .warning)
                     allRecords[i].phase = .failed(error.localizedDescription)
                 }
                 persist()
@@ -664,6 +669,7 @@ final class DownloadCenter {
         if let stream = record.stream { allRecords[i].length = stream.bytes }
         allRecords[i].phase = .done
         allRecords[i].finishedAt = .now
+        Diag.event(.download, "finished", ["id": id, "bytes": allRecords[i].length, "quality": "\(record.quality)"])
         persist()
     }
 

@@ -92,6 +92,7 @@ final class SeerrSettings {
                 result = .connected(version: version, user: try await client.signIn())
             } catch {
                 result = .failed(error as? SeerrError ?? .unreachable)
+                Diag.event(.integration, "seerr.test.failed", ["error": error], .warning)
             }
             guard !Task.isCancelled else { return }
             check = result

@@ -208,12 +208,15 @@ final class PhoneLink {
             return inviter
         }
         guard let inviter else {
-            return .failed(await LinkTransport.unreachableReason(invite.name, failure: failure))
+            let reason = await LinkTransport.unreachableReason(invite.name, failure: failure)
+            Diag.event(.link, "phone.join.failed", ["reason": reason], .warning)
+            return .failed(reason)
         }
         let key = LinkKeys.linkKey(secret: invite.secret, inviter: inviter.id, inviterShare: inviter.share, guest: me, guestShare: mine.share)
         let named = LinkName.clean(inviter.name)
         let phone = LinkedPhone(id: inviter.id, name: named.isEmpty ? invite.name : named, key: key, linkedAt: .now)
         add(phone)
+        Diag.event(.link, "phone.linked", ["name": phone.name])
         return .linked(phone.name)
     }
 
@@ -378,7 +381,8 @@ final class PhoneLink {
             MainActor.assumeIsolated { self?.answer(TCPStream.accept(connection)) }
         }
         listener.stateUpdateHandler = { [weak self, weak listener] state in
-            guard case .failed = state else { return }
+            guard case .failed(let error) = state else { return }
+            Diag.event(.link, "listener.failed", ["error": error], .warning)
             MainActor.assumeIsolated {
                 guard let self, let listener, self.listener === listener else { return }
                 listener.cancel()
@@ -405,7 +409,9 @@ final class PhoneLink {
             switch state {
             case .ready: (denied, failed) = (false, false)
             case .waiting(let error): (denied, failed) = (Self.isDenial(error), false)
-            case .failed(let error): (denied, failed) = (Self.isDenial(error), true)
+            case .failed(let error):
+                (denied, failed) = (Self.isDenial(error), true)
+                Diag.event(.link, "browse.failed", ["error": error, "denied": denied], .warning)
             default: return
             }
             MainActor.assumeIsolated {
@@ -512,6 +518,7 @@ final class PhoneLink {
         presence[peer] = Presence()
         wire.send(.hello(name: name))
         publish()
+        Diag.event(.link, "phone.connected", ["name": linkedPhone(peer)?.name, "dialed": caller != peer])
         if let channel = wire as? LinkChannel {
             links[peer]?.reader = Task { [weak self] in
                 while let message = try? await channel.receive() {
@@ -527,6 +534,7 @@ final class PhoneLink {
         connection.reader?.cancel()
         connection.wire.close()
         presence[peer] = nil
+        Diag.event(.link, "phone.disconnected", ["name": linkedPhone(peer)?.name])
     }
 
     private func ended(_ peer: LinkID, token: Int) {

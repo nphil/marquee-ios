@@ -50,6 +50,7 @@ final class HomeLabberSettings {
                 result = .connected(try await client.status())
             } catch {
                 result = .failed(error as? HomeLabberError ?? .unreachable)
+                Diag.event(.integration, "homelabber.test.failed", ["error": error], .warning)
             }
             guard !Task.isCancelled else { return }
             check = result

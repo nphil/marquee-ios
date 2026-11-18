@@ -46,6 +46,7 @@ final class BazarrSettings {
                 result = .connected(try await client.status())
             } catch {
                 result = .failed(error as? BazarrError ?? .unreachable)
+                Diag.event(.integration, "bazarr.test.failed", ["error": error], .warning)
             }
             guard !Task.isCancelled else { return }
             check = result

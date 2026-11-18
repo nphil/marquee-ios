@@ -40,6 +40,7 @@ final class SubtitleFinder {
         guard !isSearching, model.tracks != nil else { return }
         itemChanged(to: model.item.ratingKey)
         let words = Words(language: model.subtitleLanguage)
+        Diag.event(.subtitles, "find", ["bazarr": model.bazarr != nil, "pending": unlisted != nil])
         status = words.busy(unlisted != nil ? Words.checking : model.bazarr != nil ? Words.askingBazarr : Words.askingPlex)
         task = Task { await self.run(model, words: words) }
     }
@@ -62,6 +63,7 @@ final class SubtitleFinder {
     }
 
     private func run(_ model: PlayerModel, words: Words) async {
+        let started = ContinuousClock.now
         if let file = unlisted {
             unlisted = nil
             guard await listing(file, model, words: words, waits: [0]) == .notYet else { return }
@@ -71,18 +73,22 @@ final class SubtitleFinder {
         let outcome = await search.run(
             lookup: { await model.bazarrLookup() }, target: target, tracks: model.tracks, tried: tried
         ) { step in
+            Diag.event(.subtitles, "find.step", ["step": "\(step)", "ms": Diag.ms(since: started)])
             await self.say(words.status(for: step))
         }
         guard !Task.isCancelled else { return }
         target = outcome.target
         guard let added = outcome.added else {
+            Diag.event(.subtitles, "find.nothing", ["bazarr": outcome.bazarrMiss.map { "\($0)" }, "ms": Diag.ms(since: started)], .notice)
             Haptics.error()
             status = words.nothing(outcome)
             return
         }
+        Diag.event(.subtitles, "find.added", ["source": added.source.rawValue, "ms": Diag.ms(since: started)])
         tried.insert(added)
         status = words.busy(Words.waiting)
         guard await listing(Unlisted(added: added, before: before), model, words: words, waits: Self.waits) == .notYet else { return }
+        Diag.event(.subtitles, "find.not-listed", ["source": added.source.rawValue, "ms": Diag.ms(since: started)], .notice)
         Haptics.error()
         status = words.notListed(added.source)
     }
@@ -112,6 +118,7 @@ final class SubtitleFinder {
                 try await model.library.refresh(model.item.ratingKey)
                 file.refreshed = true
             } catch {
+                Diag.event(.subtitles, "find.refresh-failed", ["error": error], .warning)
                 return uncheckable(file)
             }
         }
@@ -122,11 +129,13 @@ final class SubtitleFinder {
             do {
                 tracks = try await model.reloadTracks()
             } catch {
+                Diag.event(.subtitles, "find.reload-failed", ["error": error], .warning)
                 return uncheckable(file)
             }
             guard let tracks, !Task.isCancelled else { return .gone }
             if let track = file.added.track(in: tracks, since: file.before) {
                 let shows = await model.show(track)
+                Diag.event(.subtitles, "find.shown", ["shows": shows, "track": track.id, "problem": model.subtitleProblem], shows ? .info : .warning)
                 guard !Task.isCancelled else { return .gone }
                 if shows { Haptics.success() } else { Haptics.error() }
                 status = shows ? words.found(file.added) : words.notShown(problem: model.subtitleProblem)

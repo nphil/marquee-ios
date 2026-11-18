@@ -47,6 +47,7 @@ final class SpeechDockSettings {
                 result = .connected(version: try await client.health())
             } catch {
                 result = .failed(error as? SpeechDock.Failure ?? .unreachable)
+                Diag.event(.integration, "speechdock.test.failed", ["error": error], .warning)
             }
             guard !Task.isCancelled else { return }
             check = result
