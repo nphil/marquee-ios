@@ -10,6 +10,10 @@ Published from `4b00f27`, with the Feather source updated in `964dd90`. Software
 
 Run `43566194650`: App, Core, Live engine and Release passed; four UI jobs failed, one at simulator boot. The reported `testStyleMenuLandscape` and `testSkipCreditsInstantly` failures remain unresolved. Read their artifacts before changing code or assertions; do not classify them or older Up Next failures as harmless flakes without evidence.
 
+## Diagnostic logs: next release
+
+Settings › Integrations › Diagnostic Logs sends the app's log to an ntfy topic (DESIGN §8.12). A phone's log is read with `curl -s -H "Authorization: Bearer $TOKEN" "https://ntfy.nateshome.net/<topic>/json?poll=1&since=12h"`: one JSON message per line, and a report's journal at `attachment.url` in its message (kept 3 h). The token's ntfy user needs write on the topic for the phone and read for the reader; the token stays out of docs and memory. The skip-intro miss is not yet explained: the next `offers skip.missed` line carries the seekable range, the remux's written time and the item time. DEVICE-TEST check 29 is open.
+
 ## Next build: profile settings close button
 
 Replace the profile Settings screen's Done button with an X matching the profile button's size and alignment, so closing the screen collapses cleanly back into the profile icon. Check the return animation as well as the icon at rest.

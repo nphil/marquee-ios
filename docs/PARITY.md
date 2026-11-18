@@ -113,9 +113,10 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Language | N/A | The interface language follows the iPhone's per-app language in iOS Settings. | local |
 | Trailers auto-play | Done | Settings › Video & Playback › Play Trailers Automatically, on by default, per profile. After 2 s on a movie's or show's page its trailer plays in the hero with sound, once, from a file the iPhone plays untouched; no watch state is written. It waits in Low Power Mode, with Reduce Motion, on cellular or in Low Data Mode, while the app is inactive, the hero is scrolled off or the player is open; the sound follows the silent switch and mixes with other apps, and a trailer is silent over audio already playing. | `/library/metadata/{key}/extras`, part file [code] |
 | Favourite libraries | Done | Settings › Favorite Libraries: switched-off libraries leave Home's shelves and the Library title menu; one always stays on. | local |
-| Privacy / consent (crash, product reports) | N/A | Nothing is reported from the iPhone app, so there is no consent to ask for; Delete All Local Data covers what is stored on the phone. | none (local) |
+| Privacy / consent (crash, product reports) | N/A | Nothing goes to Plex or a third party, so there is no consent to ask for. Diagnostic Logs sends only to the owner's own ntfy server and is off until set up; Delete All Local Data covers what is stored on the phone. | none (local) |
 | Delete all local data | Done | Settings › Delete All Local Data, after a confirmation: signs out and removes Keychain items, preferences, themes, cached artwork and guide data; the sign-in screen says what happened. | local |
 | Appearance | Done | Settings › Appearance: Theme (theme picker), Tab Bar, Header Style, Show Scroll Bars. | local [code] |
+| Diagnostic logs | Done | Settings › Integrations › Diagnostic Logs: the app's log to the owner's ntfy topic, live or as Report a Problem with a screenshot and the journal; off until a server and topic are set. | ntfy `POST /<topic>`, `PUT` attachment [code] |
 | Sign out | Done | Confirmation dialog. | local [code] |
 
 ## 8. Profiles
