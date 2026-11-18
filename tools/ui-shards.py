@@ -44,6 +44,8 @@ SECONDS = {
     "BrowseScreenshotTests/testWatchlistRosePine": 39,
     "DeleteMediaTests/testDeleteFromDetailRemovesTheTitleEverywhere": 94,
     "DeleteMediaTests/testDeleteOfAWatchlistedTitleLeavesTheWatchlist": 64,
+    "DiagnosticsAccessibilityScreenshots/testDiagnosticLogs": 50,
+    "DiagnosticsScreenshotTests/testDiagnosticLogsAndReport": 70,
     "DownloadFlowTests/testDownloadPlaybackDark": 92,
     "DownloadFlowTests/testDownloadPlaybackLight": 105,
     "EpisodeSeasonTests/testSwitchingSeasonsShowsOnlySelectedEpisodes": 48,
