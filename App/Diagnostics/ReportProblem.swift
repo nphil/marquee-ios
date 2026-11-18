@@ -16,6 +16,9 @@ final class ReportCenter {
     /// The active theme and scheme, for the sheet and the floating button, which hang outside RootView.
     var theme = ThemeCatalog.bundled.defaultDark
     var scheme: ColorScheme?
+    /// The sheet's lists use `themedList`, whose scroll header reads the store from the environment; the
+    /// sheet hangs outside RootView, so without it SwiftUI traps on opening (0.1.45).
+    @ObservationIgnored var store: ThemeStore?
     private(set) var isOpen = false
     @ObservationIgnored weak var session: AppSession?
     @ObservationIgnored private weak var sheet: UIViewController?
@@ -26,9 +29,9 @@ final class ReportCenter {
 
     /// Opens the sheet with `screenshot`, taken before whatever led here covered the screen.
     func open(from source: Source, screenshot: UIImage?) {
-        guard !isOpen, let session, session.diagnostics.config != nil, let top = Self.topController() else { return }
+        guard !isOpen, let session, let store, session.diagnostics.config != nil, let top = Self.topController() else { return }
         Diag.event(.ui, "report.open", ["from": source.rawValue, "screenshot": screenshot != nil])
-        let host = UIHostingController(rootView: ReportSheet(session: session, center: self, screenshot: screenshot, source: source))
+        let host = UIHostingController(rootView: ReportSheet(session: session, store: store, center: self, screenshot: screenshot, source: source))
         host.overrideUserInterfaceStyle = switch scheme {
         case .light: .light
         case .dark: .dark
@@ -90,6 +93,7 @@ final class ReportCenter {
 /// The sheet in its own hosting controller, drawn in the app's theme.
 private struct ReportSheet: View {
     let session: AppSession
+    let store: ThemeStore
     let center: ReportCenter
     let screenshot: UIImage?
     let source: ReportCenter.Source
@@ -97,6 +101,7 @@ private struct ReportSheet: View {
     var body: some View {
         ReportProblemView(screenshot: screenshot, source: source, close: center.close)
             .environment(session)
+            .environment(store)
             .environment(\.theme, center.theme)
             .tint(center.theme.accentText)
             .onDisappear { center.closed() }
@@ -297,7 +302,7 @@ enum Reporter {
         switch outcome.answer {
         case .accepted, .attachmentRefused: return nil
         case .needsToken: text = "The server wants an access token, or does not know this one. Check it in Diagnostic Logs."
-        case .refused: text = "The server refused the token for this topic. It needs permission to write there."
+        case .refused: text = "The server refused to let this iPhone write to the topic. Check it in Diagnostic Logs."
         case .rateLimited: text = "The server is limiting how fast this iPhone sends. Try again in a minute."
         case .serverError(let status), .unexpected(let status): text = "The server answered with an error (\(status)). Try again later."
         case nil: text = "Can't reach the server. Check the address and that this iPhone is online."

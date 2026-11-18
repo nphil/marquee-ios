@@ -193,7 +193,7 @@ struct DiagnosticsView: View {
         case .needsToken:
             ProblemLine(text: "The server wants an access token, or does not know this one. Check the token.")
         case .refused:
-            ProblemLine(text: "The server refused the token for this topic. The token's user needs permission to write to it.")
+            ProblemLine(text: "The server refused to let this iPhone write to the topic. The topic must accept messages without a token, or the token's user needs permission to write to it.")
         case .unreachable:
             ProblemLine(text: "Can't reach the server. Check the address, and that this iPhone is online.")
         case .failed(let status):
@@ -205,7 +205,7 @@ struct DiagnosticsView: View {
     private func liveStatus(_ diagnostics: DiagnosticsSettings) -> some View {
         switch diagnostics.live {
         case .refused:
-            ProblemLine(text: "Live logs stopped: the server refused the token. They start again once a test gets through.")
+            ProblemLine(text: "Live logs stopped: the server refused them. They start again once a test gets through.")
         case .retrying:
             Text("Live logs are waiting for the server. They are kept on this iPhone and sent once it answers.")
                 .foregroundStyle(theme.ink2)

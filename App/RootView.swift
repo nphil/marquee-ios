@@ -213,6 +213,7 @@ private struct MainTabs: View {
 /// floating button draw in.
 private struct RootDiagnostics: ViewModifier {
     @Environment(AppSession.self) private var session
+    @Environment(ThemeStore.self) private var store
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.legibilityWeight) private var legibilityWeight
@@ -268,6 +269,7 @@ private struct RootDiagnostics: ViewModifier {
             .onChange(of: display, initial: true) { _, display in
                 ReportCenter.shared.theme = display.theme
                 ReportCenter.shared.scheme = display.scheme
+                ReportCenter.shared.store = store
                 Diag.event(.ui, "display", [
                     "theme": display.theme.name, "scheme": display.scheme.map { "\($0)" } ?? "system", "textSize": "\(display.typeSize)",
                     "bold": display.bold, "contrast": display.contrast, "reduceMotion": display.reduceMotion,
