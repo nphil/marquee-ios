@@ -27,5 +27,6 @@ struct ProblemLine: View {
 
     var body: some View {
         StatusLine(symbol: "exclamationmark.circle.fill", tint: theme.danger, text: text)
+            .diagShown(text, category: "problem")
     }
 }

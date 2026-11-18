@@ -1,6 +1,5 @@
 import Foundation
 import MarqueeCore
-import OSLog
 import Synchronization
 import UIKit
 
@@ -128,7 +127,6 @@ final class BackgroundTransfer: Sendable {
         private let onResult: @Sendable (Result) async -> Void
         private let delivery = Mutex<Task<Void, Never>?>(nil)
         private let refused: @Sendable () -> Void
-        private let log = Logger(subsystem: "com.nphil.marquee", category: "downloads")
 
         init(onResult: @escaping @Sendable (Result) async -> Void, refused: @escaping @Sendable () -> Void) {
             self.onResult = onResult
@@ -170,9 +168,10 @@ final class BackgroundTransfer: Sendable {
                 return
             }
             if code == NSURLErrorCannotCreateFile {
-                log.error("dl-background refused code=-3000; transport off for this iOS version")
+                Diag.event(.download, "background.refused", ["code": code, "note": "transport off for this iOS version"], .error)
                 refused()
             }
+            Diag.event(.download, "background.error", ["error": error, "transient": TransferPlan.isTransient(error)], .notice)
             let dropped = TransferPlan.dropsAddress(error) ? task.originalRequest?.url : nil
             deliver(TransferPlan.isTransient(error) ? .interrupted(slice, dropped: dropped) : .failed(slice, error.localizedDescription))
         }

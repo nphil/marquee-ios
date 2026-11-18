@@ -6,13 +6,16 @@ import SwiftUI
 /// the tab bar is away.
 struct BrowseStack<Root: View>: View {
     private let root: Root
+    /// The tab's name in the diagnostic log.
+    private let tab: String
 
     @State private var path: [Route] = []
     @State private var tabBar = TabBarScroll()
     @Namespace private var zoom
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    init(@ViewBuilder root: () -> Root) {
+    init(tab: String = "", @ViewBuilder root: () -> Root) {
+        self.tab = tab
         self.root = root()
     }
 
@@ -31,6 +34,15 @@ struct BrowseStack<Root: View>: View {
                 }
                 // The page arriving after a push or a pop shows the tab bar, as a page at its top does.
                 .onChange(of: path.count) { tabBar.show(reduceMotion: reduceMotion) }
+        }
+        .onChange(of: path) { old, new in
+            let names = new.map(\.diagName)
+            DiagScreen.stacks[tab] = names
+            if new.count > old.count {
+                Diag.event(.nav, "push", ["tab": tab, "route": names.last, "depth": new.count])
+            } else {
+                Diag.event(.nav, "pop", ["tab": tab, "to": names.last ?? "root", "depth": new.count])
+            }
         }
     }
 

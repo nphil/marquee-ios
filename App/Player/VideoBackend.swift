@@ -1,4 +1,5 @@
 import AVFoundation
+import MarqueeCore
 import UIKit
 
 /// What a backend reports to the player model.
@@ -99,6 +100,7 @@ final class AVPlayerBackend: VideoBackend, GainSink {
     private var playerObservations: [NSKeyValueObservation] = []
     private var itemObservations: [NSKeyValueObservation] = []
     private var itemNotifications: [any NSObjectProtocol] = []
+    private var playerNotifications: [any NSObjectProtocol] = []
     /// The second, silent player holding the next stream (`openStandby`).
     private var standby: AVPlayer?
 
@@ -253,6 +255,17 @@ final class AVPlayerBackend: VideoBackend, GainSink {
                 Task { @MainActor in self?.externalChanged() }
             },
         ]
+        playerNotifications = [
+            NotificationCenter.default.addObserver(forName: AVPlayer.rateDidChangeNotification, object: avPlayer, queue: .main) { note in
+                let reason = note.userInfo?[AVPlayer.rateDidChangeReasonKey] as? String
+                let rate = (note.object as? AVPlayer)?.rate
+                // A rate the app did not set: an interruption, or the app leaving the screen.
+                let unasked = reason.map { $0 != AVPlayer.RateDidChangeReason.setRateCalled.rawValue } ?? false
+                Diag.event(.player, "avplayer.rate", [
+                    "rate": rate, "reason": reason.map { Self.short($0, prefix: "AVPlayerRateDidChangeReason", suffix: "") },
+                ], unasked ? .notice : .debug)
+            },
+        ]
     }
 
     private func stopObservingPlayer() {
@@ -261,6 +274,8 @@ final class AVPlayerBackend: VideoBackend, GainSink {
         switchObserver = nil
         playerObservations.forEach { $0.invalidate() }
         playerObservations = []
+        for token in playerNotifications { NotificationCenter.default.removeObserver(token) }
+        playerNotifications = []
     }
 
     private func observe(_ item: AVPlayerItem) {
@@ -281,6 +296,20 @@ final class AVPlayerBackend: VideoBackend, GainSink {
                 let failure = PlaybackFailure(note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? NSError)
                 MainActor.assumeIsolated { self?.onEvent?(.failed(failure)) }
             },
+            center.addObserver(forName: AVPlayerItem.playbackStalledNotification, object: item, queue: .main) { _ in
+                Diag.event(.player, "item.stalled", [:], .notice)
+            },
+            center.addObserver(forName: AVPlayerItem.newErrorLogEntryNotification, object: item, queue: .main) { note in
+                // The entry's address is a stream's, token and all, so it stays out of the log.
+                guard let event = (note.object as? AVPlayerItem)?.errorLog()?.events.last else { return }
+                Diag.event(.player, "item.error-log", [
+                    "status": event.errorStatusCode, "domain": event.errorDomain, "comment": event.errorComment,
+                ], .notice)
+            },
+            center.addObserver(forName: AVPlayerItem.newAccessLogEntryNotification, object: item, queue: .main) { note in
+                guard let event = (note.object as? AVPlayerItem)?.accessLog()?.events.last else { return }
+                Diag.event(.player, "item.access-log", list: Self.accessFields(event))
+            },
         ]
     }
 
@@ -293,6 +322,11 @@ final class AVPlayerBackend: VideoBackend, GainSink {
 
     private func stateChanged() {
         let status = avPlayer.timeControlStatus
+        let reason = status == .waitingToPlayAtSpecifiedRate ? avPlayer.reasonForWaitingToPlay?.rawValue : nil
+        Diag.event(.player, "avplayer.state", [
+            "status": Self.word(status), "reason": reason.map { Self.short($0, prefix: "AVPlayerWaiting", suffix: "Reason") },
+            "rate": avPlayer.rate, "keepUp": avPlayer.currentItem?.isPlaybackLikelyToKeepUp, "ahead": bufferedAhead,
+        ], reason == nil ? .debug : .info)
         onEvent?(.state(isPlaying: status != .paused, isBuffering: status == .waitingToPlayAtSpecifiedRate))
     }
 
@@ -304,9 +338,12 @@ final class AVPlayerBackend: VideoBackend, GainSink {
         guard let item = avPlayer.currentItem else { return }
         switch item.status {
         case .readyToPlay:
+            Diag.event(.player, "item.ready", ["duration": itemDuration, "keepUp": item.isPlaybackLikelyToKeepUp])
             onEvent?(.ready)
         case .failed:
-            onEvent?(.failed(PlaybackFailure(item.error as NSError?, comment: item.errorLog()?.events.last?.errorComment)))
+            let comment = item.errorLog()?.events.last?.errorComment
+            Diag.event(.player, "item.failed", ["error": item.error.map { DiagFormat.describe($0) }, "comment": comment], .error)
+            onEvent?(.failed(PlaybackFailure(item.error as NSError?, comment: comment)))
         default:
             break
         }
@@ -315,5 +352,33 @@ final class AVPlayerBackend: VideoBackend, GainSink {
     private func sizeChanged() {
         guard let size = avPlayer.currentItem?.presentationSize, size.width > 0 else { return }
         onEvent?(.presentationSize(size))
+    }
+
+    nonisolated private static func word(_ status: AVPlayer.TimeControlStatus) -> String {
+        switch status {
+        case .paused: "paused"
+        case .waitingToPlayAtSpecifiedRate: "waiting"
+        case .playing: "playing"
+        @unknown default: "unknown"
+        }
+    }
+
+    /// AVFoundation's constant names without their common prefix and suffix.
+    nonisolated private static func short(_ name: String, prefix: String, suffix: String) -> String {
+        var name = Substring(name)
+        if name.hasPrefix(prefix) { name = name.dropFirst(prefix.count) }
+        if !suffix.isEmpty, name.hasSuffix(suffix) { name = name.dropLast(suffix.count) }
+        return String(name)
+    }
+
+    nonisolated private static func accessFields(_ event: AVPlayerItemAccessLogEvent) -> [(String, Any?)] {
+        // Negative values are unknown.
+        func kbps(_ bits: Double) -> Int? { bits.isFinite && bits > 0 ? Int(bits / 1000) : nil }
+        return [
+            ("indicatedKbps", kbps(event.indicatedBitrate)), ("observedKbps", kbps(event.observedBitrate)),
+            ("switchKbps", kbps(event.switchBitrate)), ("stalls", event.numberOfStalls),
+            ("dropped", event.numberOfDroppedVideoFrames), ("requests", event.numberOfMediaRequests),
+            ("watched", event.durationWatched), ("startup", event.startupTime),
+        ]
     }
 }

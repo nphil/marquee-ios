@@ -17,6 +17,7 @@ final class ToastCenter {
 
     func show(_ message: String, undo: (@MainActor () -> Void)? = nil, commit: (@MainActor () -> Void)? = nil) {
         finish()
+        Diag.event(.ui, "toast", ["text": message, "undo": undo != nil])
         let toast = Toast(message: message, undo: undo, commit: commit)
         current = toast
         AccessibilityNotification.Announcement(message).post()
@@ -31,6 +32,7 @@ final class ToastCenter {
 
     func undo() {
         guard let toast = current else { return }
+        Diag.event(.ui, "toast.undo", ["text": toast.message])
         expiry?.cancel()
         current = nil
         toast.undo?()

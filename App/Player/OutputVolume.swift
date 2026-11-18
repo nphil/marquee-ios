@@ -141,6 +141,8 @@ final class OutputVolume {
     private(set) var usesGain = false
     private var wasFixedLevel = OutputVolume.onFixedLevelRoute
     private var queue: Task<Void, Never>?
+    /// Whether multichannel sound is allowed, as last set: the log notes each change.
+    private var multichannel: Bool?
 
     init() {
         NotificationCenter.default.addObserver(
@@ -165,7 +167,10 @@ final class OutputVolume {
     private func routeChanged() {
         let fixed = Self.onFixedLevelRoute
         defer { wasFixedLevel = fixed }
-        if wasFixedLevel, !fixed, !usesGain, gain.level != 1 { gain.set(1) }
+        if wasFixedLevel, !fixed, !usesGain, gain.level != 1 {
+            Diag.event(.audio, "gain.reset", ["was": gain.level])
+            gain.set(1)
+        }
         syncPCM()
     }
 
@@ -173,7 +178,14 @@ final class OutputVolume {
     /// is. While the volume is below full on those routes stereo is asked for, which the phone decodes.
     private func syncPCM() {
         let attenuating = gain.level < 1 && Self.onFixedLevelRoute
-        try? AVAudioSession.sharedInstance().setSupportsMultichannelContent(!attenuating)
+        do {
+            try AVAudioSession.sharedInstance().setSupportsMultichannelContent(!attenuating)
+        } catch {
+            Diag.event(.audio, "multichannel.fail", ["wanted": !attenuating, "error": error], .warning)
+        }
+        guard multichannel != !attenuating else { return }
+        multichannel = !attenuating
+        Diag.event(.audio, attenuating ? "stereo" : "multichannel", ["gain": gain.level, "fixedRoute": Self.onFixedLevelRoute])
     }
 
     private func enqueue(_ change: Change) {
@@ -197,10 +209,13 @@ final class OutputVolume {
         }
         if Self.onFixedLevelRoute {
             setGain(gainTarget)
+            Diag.event(.audio, "volume", ["via": "gain", "level": gainTarget, "fixedRoute": true], .debug)
         } else if await system.set(systemTarget) {
             usesGain = false
             if gain.level != 1 { gain.set(1) }
+            Diag.event(.audio, "volume", ["via": "system", "level": systemTarget], .debug)
         } else {
+            if !usesGain { Diag.event(.audio, "volume.system-refused", ["level": systemTarget], .notice) }
             usesGain = true
             setGain(gainTarget)
         }

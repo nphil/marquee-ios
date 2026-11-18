@@ -67,9 +67,17 @@ final class WordTiming {
             offset: offset, cues: window
         )
         let client = client
+        let started = ContinuousClock.now
+        Diag.event(.subtitles, "speechdock.ask", ["cues": window.count, "generation": generation], .debug)
         task = Task { [weak self] in
-            let answer = try? await client.align(request)
-            self?.receive(answer, for: request)
+            let answer: SpeechDock.Answer?
+            do {
+                answer = try await client.align(request)
+            } catch {
+                answer = nil
+                if !Task.isCancelled { Diag.event(.subtitles, "speechdock.failed", ["error": error, "ms": Diag.ms(since: started)], .notice) }
+            }
+            self?.receive(answer, for: request, ms: Diag.ms(since: started))
         }
     }
 
@@ -81,14 +89,18 @@ final class WordTiming {
 
     private func read(_ data: Data?) {
         task = nil
-        guard !stopped, let data, let all = SpeechDock.cues(data) else { return stop() }
+        guard !stopped, let data, let all = SpeechDock.cues(data) else {
+            if !stopped { Diag.event(.subtitles, "speechdock.file", ["read": data != nil, "parsed": false], .notice) }
+            return stop()
+        }
         cues = SpeechDock.alignable(all)
+        Diag.event(.subtitles, "speechdock.file", ["cues": all.count, "timeable": cues.count])
         guard !cues.isEmpty else { return stop() }
         digest = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
         changed()
     }
 
-    private func receive(_ answer: SpeechDock.Answer?, for request: SpeechDock.Request) {
+    private func receive(_ answer: SpeechDock.Answer?, for request: SpeechDock.Request, ms: Int) {
         guard !stopped, request.generation == generation else { return }
         task = nil
         // Unreachable, or not SpeechDock: the estimate stays for this file.
@@ -100,10 +112,13 @@ final class WordTiming {
                 if let words = answer.words[cue.ordinal] { starts[cue.start] = words }
             }
             changed()
+            Diag.event(.subtitles, "speechdock.timed", ["cues": request.cues.count, "ms": ms], .debug)
         case .busy:
             // Its one worker and its one waiting place are taken.
+            Diag.event(.subtitles, "speechdock.busy", ["ms": ms])
             waitsUntil = .now + 2
         case .refused:
+            Diag.event(.subtitles, "speechdock.refused", ["ms": ms], .notice)
             stop()
         }
     }

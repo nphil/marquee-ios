@@ -1,4 +1,5 @@
 import AVFoundation
+import MarqueeCore
 
 /// The audio session for video: the playback category in movie mode, so sound keeps going with the
 /// silent switch on, behind the Lock Screen and in Picture in Picture; and the pauses the system asks
@@ -26,6 +27,7 @@ final class AudioSession {
             center.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] note in
                 let reason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt).flatMap { AVAudioSession.RouteChangeReason(rawValue: $0) }
                 guard reason == .oldDeviceUnavailable else { return }
+                Diag.event(.audio, "route.lost", ["pauses": true], .notice)
                 MainActor.assumeIsolated { self?.onRouteLost?() }
             },
         ]
@@ -35,15 +37,28 @@ final class AudioSession {
     /// settles audio with other apps, and iOS 27 warns about calling it there.
     func activate() {
         let session = AVAudioSession.sharedInstance()
-        try? session.setCategory(.playback, mode: .moviePlayback)
-        session.activate { _, _ in }
+        do {
+            try session.setCategory(.playback, mode: .moviePlayback)
+        } catch {
+            Diag.event(.audio, "session.category.fail", ["error": error], .warning)
+        }
+        let started = ContinuousClock.now
+        session.activate { activated, error in
+            let session = AVAudioSession.sharedInstance()
+            Diag.event(.audio, "session.active", [
+                "ok": activated, "error": error, "ms": Diag.ms(since: started), "category": session.category.rawValue,
+                "mode": session.mode.rawValue, "outputs": SystemMonitor.outputs(session), "channels": session.outputNumberOfChannels,
+                "maxChannels": session.maximumOutputNumberOfChannels, "rendering": SystemMonitor.word(session.renderingMode),
+            ], activated ? .info : .warning)
+        }
     }
 
     /// Lets the music another app paused resume.
     func deactivate(completion: @escaping @MainActor @Sendable () -> Void = {}) {
         for token in tokens { NotificationCenter.default.removeObserver(token) }
         tokens = []
-        AVAudioSession.sharedInstance().deactivate(options: .notifyOthersOnDeactivation) { _, _ in
+        AVAudioSession.sharedInstance().deactivate(options: .notifyOthersOnDeactivation) { deactivated, error in
+            Diag.event(.audio, "session.inactive", ["ok": deactivated, "error": error], deactivated ? .info : .notice)
             Task { @MainActor in completion() }
         }
     }

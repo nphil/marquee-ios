@@ -1,26 +1,21 @@
 import AVFoundation
 import CoreMedia
 import MarqueeCore
-import os
 import SwiftUI
 import UIKit
 import VideoEngine
 
-/// The engine's events and FFmpeg's lines in the unified log. The remux's sources name only the host
-/// and file, so no token reaches the log.
+/// The engine's events and FFmpeg's lines in the diagnostic log; FFmpeg's only under Detailed. The
+/// remux's sources name only the host and file, so no token reaches the log.
 enum EngineLog {
-    static let logger: EngineLogger = {
-        let log = Logger(subsystem: "com.nphil.marquee", category: "engine")
-        return EngineLogger(
-            event: { tag, fields in
-                let text = fields.map { "\($0.0)=\($0.1)" }.joined(separator: " ")
-                log.info("\(tag, privacy: .public) \(text, privacy: .public)")
-            },
-            message: { line in
-                log.debug("\(line, privacy: .public)")
-            }
-        )
-    }()
+    static let logger = EngineLogger(
+        event: { tag, fields in
+            Diag.event(.player, "engine." + tag, list: fields.map { ($0.0, $0.1) }, tag.hasSuffix("-fail") ? .warning : .info)
+        },
+        message: { line in
+            Diag.event(.player, "ffmpeg", ["line": line], .debug)
+        }
+    )
 }
 
 /// Fetches a file from the server with the authorization headers, so the token stays out of the URL.

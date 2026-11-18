@@ -26,6 +26,19 @@ enum Route: Hashable {
         }
     }
 
+    /// The route in the diagnostic log: its kind and the key that finds it again.
+    var diagName: String {
+        switch self {
+        case .item(let ratingKey, _): "item/\(ratingKey)"
+        case .hub(let key, _): "hub/\(key)"
+        case .watchlist(let item, _): "watchlist/\(item.ratingKey)"
+        case .person(let id, _, _): "person/\(id)"
+        case .destination(let destination): "destination/\(destination.rawValue)"
+        case .seerrTitle(let title, _): "seerr/\(title.kind.rawValue)/\(title.tmdbID)"
+        case .seerrBrowse: "seerr-browse"
+        }
+    }
+
     /// Where tapping a title goes: a collection lists its titles, anything else opens its detail page.
     static func to(_ item: PlexMetadata, zoomID: String? = nil) -> Route {
         item.type == .collection ? .hub(key: item.key, title: item.title) : .item(ratingKey: item.ratingKey, zoomID: zoomID)

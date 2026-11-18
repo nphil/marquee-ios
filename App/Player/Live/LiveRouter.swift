@@ -2,7 +2,6 @@ import AVFoundation
 import Darwin
 import MarqueeCore
 import Observation
-import os
 import UIKit
 
 /// The live player's source. Before every tune it picks the phone's own path to the tuner or a Plex tune
@@ -45,7 +44,6 @@ final class LiveRouter: LiveVideoSource {
     @ObservationIgnored private var noticeTask: Task<Void, Never>?
     @ObservationIgnored private var recordingGuard: Task<Void, Never>?
 
-    private static let log = Logger(subsystem: "com.nphil.marquee", category: "LiveTV")
     /// The schedule is read this often while the phone holds the tuner, and a recording this close is announced.
     private static let guardInterval: TimeInterval = 60
     /// The phone lets go of the tuner this long before a recording's grab starts.
@@ -77,7 +75,7 @@ final class LiveRouter: LiveVideoSource {
         let route = await decide(channel)
         guard mine == generation else { return }
         self.route = route
-        Self.log.info("live-route \(channel.number, privacy: .public) \(Self.describe(route), privacy: .public)")
+        Diag.event(.live, "route", ["channel": channel.number, "route": Self.describe(route)], .notice)
         switch route {
         case .direct:
             await show(direct, generation: mine)
@@ -208,7 +206,7 @@ final class LiveRouter: LiveVideoSource {
         if case .network = error {
             reachability[channel.device.key] = (false, .now)
         }
-        Self.log.info("live-fallback \(channel.number, privacy: .public) \(String(describing: error), privacy: .public)")
+        Diag.event(.live, "fallback", ["channel": channel.number, "error": error], .warning)
         recordingGuard?.cancel()
         ownState = .opening
         say("Couldn't play from the tuner; playing through Plex", for: .seconds(8))
@@ -276,7 +274,7 @@ final class LiveRouter: LiveVideoSource {
 
     private func handOver(to recording: ScheduledRecording, watching channel: LiveChannel) {
         let number = recording.channelNumber ?? channel.number
-        Self.log.info("live-guard \(channel.number, privacy: .public) recording \(number, privacy: .public)")
+        Diag.event(.live, "guard", ["channel": channel.number, "recording": number], .notice)
         if recording.channelKey == channel.id {
             // Plex shares its recording's tuner with a viewer of the same channel.
             say("Recording \(number) now; playing through Plex", for: .seconds(8))

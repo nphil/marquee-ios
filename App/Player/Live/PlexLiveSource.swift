@@ -45,7 +45,6 @@ final class PlexLiveSource: LiveVideoSource {
     private var isPaused: Bool { intent.isPaused }
 
     private static let signposter = OSSignposter(subsystem: "com.nphil.marquee", category: "LiveTV")
-    private static let log = Logger(subsystem: "com.nphil.marquee", category: "LiveTV")
 
     /// One tune and the transcode that reads it.
     private struct Stream {
@@ -233,7 +232,7 @@ final class PlexLiveSource: LiveVideoSource {
     private func started(_ stream: Stream) {
         let line = Self.diagnostics(stream)
         diagnosticsLine = line
-        Self.log.info("\(line, privacy: .public)")
+        Diag.event(.live, "started", ["line": line], .notice)
         Task { await self.report() }
         if saidThroughPlex {
             show(nil)

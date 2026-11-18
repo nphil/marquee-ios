@@ -16,10 +16,14 @@ final class Remote<Value: Sendable> {
     @ObservationIgnored private var generation = 0
 
     /// Loads afresh. A load that a newer one overtook, or whose task was cancelled, changes nothing.
-    func load(_ fetch: @MainActor () async throws -> Value) async {
+    /// `file` names the screen in the diagnostic log.
+    func load(_ fetch: @MainActor () async throws -> Value, file: String = #fileID) async {
         generation &+= 1
         let current = generation
         isLoading = true
+        let screen = file.split(separator: "/").last.map { String($0.prefix { $0 != "." }) } ?? file
+        let started = ContinuousClock.now
+        Diag.event(.net, "load.start", ["screen": screen, "attempt": attempt, "kept": value != nil], .debug)
         let outcome: Result<Value, any Error>
         do {
             outcome = .success(try await fetch())
@@ -29,13 +33,16 @@ final class Remote<Value: Sendable> {
         guard current == generation else { return }
         isLoading = false
         guard !Task.isCancelled else { return }
+        let ms = Diag.ms(since: started)
         switch outcome {
         case .success(let fresh):
+            Diag.event(.net, "load.ok", ["screen": screen, "ms": ms], ms > 2000 ? .info : .debug)
             value = fresh
             loadedAt = .now
             failure = nil
             self.error = nil
         case .failure(let error):
+            Diag.event(.net, "load.fail", ["screen": screen, "ms": ms, "error": error, "shown": value == nil ? "page" : "banner"], .notice)
             failure = error as? PlexError ?? .unreachable(.other)
             self.error = error
         }

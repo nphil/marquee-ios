@@ -1,5 +1,5 @@
 import AVFoundation
-import OSLog
+import MarqueeCore
 import UIKit
 
 /// Keeps the app running in the background while downloads remain, so the transfer in the app goes on
@@ -11,7 +11,7 @@ import UIKit
 /// assertion of its own while this runs. Each cycle plays an inaudible tone, swaps the assertion and
 /// pauses, then waits 10 s. Ported from Stashy, where it held 290 s of background runtime and 725 MB
 /// on its first device run (2026-07-26). Apple documents none of this, so an iOS update can end it
-/// without a sound: the log to check is `dl-keepalive tick=` climbing past 30 s while the file grows.
+/// without a sound: the log to check is `keepalive.tick` with `up` climbing past 30 s while the file grows.
 @MainActor
 final class DownloadKeepAlive {
     /// True while the pump owns the app's background window.
@@ -19,7 +19,6 @@ final class DownloadKeepAlive {
     /// Called when the pump gives up while work remains, so the download can hand itself over.
     var onSurrender: (@MainActor () -> Void)?
 
-    private let log = Logger(subsystem: "com.nphil.marquee", category: "downloads")
     private var player: AVAudioPlayer?
     private var pump: Task<Void, Never>?
     private var assertion: UIBackgroundTaskIdentifier = .invalid
@@ -36,7 +35,7 @@ final class DownloadKeepAlive {
     func start(while needed: @escaping @MainActor () -> Bool) {
         guard !isRunning, needed() else { return }
         guard let tone = Self.toneURL() else {
-            log.error("dl-keepalive start=no-tone")
+            Diag.event(.download, "keepalive.start", ["result": "no-tone"], .error)
             onSurrender?()
             return
         }
@@ -46,7 +45,7 @@ final class DownloadKeepAlive {
         refusals = 0
         startedAt = .now
         observeInterruptions()
-        log.notice("dl-keepalive start")
+        Diag.event(.download, "keepalive.start", [:], .notice)
         pump = Task { await run(tone: tone) }
     }
 
@@ -71,7 +70,7 @@ final class DownloadKeepAlive {
             restored = true
         }
         let up = Int(Date.now.timeIntervalSince(startedAt))
-        log.notice("dl-keepalive stop ticks=\(self.ticks, privacy: .public) up=\(up, privacy: .public) restored=\(restored, privacy: .public)")
+        Diag.event(.download, "keepalive.stop", ["ticks": ticks, "up": up, "restored": restored], .notice)
     }
 
     // MARK: The pump
@@ -82,7 +81,7 @@ final class DownloadKeepAlive {
         let active = await Task.detached { Self.activateMixingSession() }.value
         guard !Task.isCancelled, isRunning else { return }
         guard active, let player = try? AVAudioPlayer(contentsOf: tone) else {
-            log.error("dl-keepalive start=session-failed")
+            Diag.event(.download, "keepalive.start", ["result": "session-failed"], .error)
             surrender()
             return
         }
@@ -105,7 +104,7 @@ final class DownloadKeepAlive {
             if assertion == .invalid {
                 // Three refusals in a row: the technique is not working here.
                 refusals += 1
-                log.notice("dl-keepalive refused=\(self.refusals, privacy: .public)")
+                Diag.event(.download, "keepalive.refused", ["refusals": refusals], .notice)
                 guard refusals < 3 else {
                     surrender()
                     return
@@ -116,7 +115,7 @@ final class DownloadKeepAlive {
             refusals = 0
             ticks += 1
             let up = Int(Date.now.timeIntervalSince(startedAt))
-            log.notice("dl-keepalive tick=\(self.ticks, privacy: .public) up=\(up, privacy: .public)")
+            Diag.event(.download, "keepalive.tick", ["tick": ticks, "up": up])
             do { try await Task.sleep(for: .seconds(10)) } catch { return }
         }
     }
@@ -135,7 +134,7 @@ final class DownloadKeepAlive {
 
     /// Gives up while work remains, unlike `stop()`, which means nothing is left to do.
     private func surrender() {
-        log.notice("dl-keepalive surrender ticks=\(self.ticks, privacy: .public)")
+        Diag.event(.download, "keepalive.surrender", ["ticks": ticks], .notice)
         let handBack = onSurrender
         stop()
         handBack?()
@@ -152,7 +151,7 @@ final class DownloadKeepAlive {
 
     private func expire(_ generation: Int) {
         guard generation == assertionGeneration else { return }
-        log.notice("dl-keepalive expired=\(generation, privacy: .public)")
+        Diag.event(.download, "keepalive.expired", ["generation": generation], .notice)
         endAssertion()
     }
 
@@ -180,7 +179,7 @@ final class DownloadKeepAlive {
         guard isRunning else { return }
         let reclaimed = (try? AVAudioSession.sharedInstance().setActive(true)) != nil
         if reclaimed, player?.isPlaying == false { player?.play() }
-        log.notice("dl-keepalive interrupt=\(reclaimed ? "reclaimed" : "held", privacy: .public)")
+        Diag.event(.download, "keepalive.interrupt", ["result": reclaimed ? "reclaimed" : "held"], .notice)
     }
 
     // MARK: The tone

@@ -1,5 +1,4 @@
 import MarqueeCore
-import os
 import SwiftUI
 
 /// One press of a remote, as the big screen takes it, on glasses or a TV. This is the only way input
@@ -169,7 +168,6 @@ final class GlassesNavigator {
     @ObservationIgnored private var localLatency = LatencyStats()
     @ObservationIgnored private var linkedLatency = LatencyStats()
     @ObservationIgnored private var latencyShownAt: TimeInterval = 0
-    private static let log = Logger(subsystem: "com.nphil.marquee", category: "remote")
     /// How late a touch on this phone's own remote, and on a linked phone's, was when the page applied it
     /// ("p50 8 ms · p95 14 ms"); refreshed about once a second, for Settings and the debug log.
     private(set) var localSummary: String?
@@ -339,9 +337,7 @@ final class GlassesNavigator {
         latencyShownAt = now
         localSummary = localLatency.summary
         linkedSummary = linkedLatency.summary
-        #if DEBUG
-        Self.log.debug("touch to apply, local \(self.localSummary ?? "-", privacy: .public), linked \(self.linkedSummary ?? "-", privacy: .public)")
-        #endif
+        Diag.event(.bigscreen, "remote.latency", ["local": localSummary, "linked": linkedSummary], .debug)
     }
 
     private func handle(_ input: GlassesInput, on page: GlassesPage) -> HapticCue? {
