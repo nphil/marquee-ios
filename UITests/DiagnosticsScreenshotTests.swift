@@ -13,8 +13,7 @@ final class DiagnosticsScreenshotTests: XCTestCase {
         button.tap()
         let note = element("report.note", in: app)
         XCTAssertTrue(note.waitForExistence(timeout: 10), "No Report a Problem sheet")
-        note.tap()
-        note.typeText("The intro kept playing after the countdown.")
+        enter("The intro kept playing after the countdown.", into: note)
         try snap("diagnostics-04-report-rose-pine")
         tap("report.send", in: app)
         XCTAssertTrue(label(containing: "Sent as report", in: app).waitForExistence(timeout: 15), "The report was not sent")
@@ -32,8 +31,8 @@ final class DiagnosticsAccessibilityScreenshots: XCTestCase {
 }
 
 extension XCTestCase {
-    /// Opens Diagnostic Logs, snaps it empty, then sets it up with the fake ntfy; Return in the token field
-    /// saves and sends the test message.
+    /// Opens Diagnostic Logs, snaps it empty, then sets it up with the fake ntfy; Return in each field moves to
+    /// the next, and in the token field saves and sends the test message.
     @MainActor
     func diagnosticsSetUp(mode: String, suffix: String) throws -> XCUIApplication {
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine")
@@ -41,17 +40,27 @@ extension XCTestCase {
         reveal("settings.diagnostics", in: app).tap()
         waitForBar("Diagnostic Logs", in: app)
         try snap("diagnostics-01-empty-\(suffix)")
-        for (identifier, text) in [("diagnostics.server", "https://ntfy.local"), ("diagnostics.topic", "marquee-test"), ("diagnostics.token", "\n")] {
-            let field = reveal(identifier, in: app)
-            field.tap()
-            field.typeText(text)
+        for (identifier, text) in [("diagnostics.server", "https://ntfy.local\n"), ("diagnostics.topic", "marquee-test\n"), ("diagnostics.token", "\n")] {
+            enter(text, into: reveal(identifier, in: app))
         }
-        XCTAssertTrue(
-            label(containing: "A test message went to the topic", in: app).waitForExistence(timeout: 15),
-            "The test message was not sent"
-        )
+        // The status is the footer at the end of the list, which exists only once it scrolls in.
+        let status = reveal("diagnostics.status", in: app)
+        let sent = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS %@", "A test message went to the topic"), object: status)
+        XCTAssertEqual(XCTWaiter.wait(for: [sent], timeout: 15), .completed, "The test message was not sent: \(status.label)")
         try snap("diagnostics-02-set-up-\(suffix)")
         return app
+    }
+
+    /// Types into `field`, tapping it first only when it lacks the keyboard. A tap can land while the list is
+    /// still settling and leave the focus where it was, so it is tried twice.
+    @MainActor
+    func enter(_ text: String, into field: XCUIElement) {
+        let focused = NSPredicate(format: "hasKeyboardFocus == true")
+        for _ in 0..<2 where !focused.evaluate(with: field) {
+            field.tap()
+            _ = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: focused, object: field)], timeout: 2)
+        }
+        field.typeText(text)
     }
 
     func label(containing text: String, in app: XCUIApplication) -> XCUIElement {
