@@ -60,7 +60,10 @@ public actor PlexServerConnection {
 
     /// Records that a request through `connection` got no answer; the next request probes again.
     public func reportFailure(of connection: PlexConnection) {
-        if current == connection { current = nil }
+        if current == connection {
+            current = nil
+            DiagHub.emit(.plex, "connection.dropped", ["server": server.name, "class": connection.kindWord, "address": connection.displayAddress], level: .notice)
+        }
         if remembered == connection.uri { remembered = nil }
     }
 
@@ -68,7 +71,10 @@ public actor PlexServerConnection {
     /// the address it went to is dropped when it is the one in use or remembered.
     public func reportFailure(at url: URL) {
         func serves(_ base: URL) -> Bool { base.scheme == url.scheme && base.host == url.host && base.port == url.port }
-        if let current, serves(current.uri) { self.current = nil }
+        if let current, serves(current.uri) {
+            self.current = nil
+            DiagHub.emit(.plex, "connection.dropped", ["server": server.name, "class": current.kindWord, "address": current.displayAddress, "by": "outside request"], level: .notice)
+        }
         if let remembered, serves(remembered) { self.remembered = nil }
     }
 
@@ -118,6 +124,12 @@ public actor PlexServerConnection {
     private func log(_ round: ProbeRound) {
         probeRounds.append(round)
         if probeRounds.count > 8 { probeRounds.removeFirst(probeRounds.count - 8) }
+        let outcomes = round.lines.joined(separator: "; ")
+        if let picked = round.picked {
+            DiagHub.emit(.plex, "probe", ["server": server.name, "class": picked.kindWord, "address": picked.displayAddress, "results": outcomes])
+        } else {
+            DiagHub.emit(.plex, "probe.none", ["server": server.name, "results": outcomes], level: .warning)
+        }
     }
 
     private enum ProbeEvent: Sendable {

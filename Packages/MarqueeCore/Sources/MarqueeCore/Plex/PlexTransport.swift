@@ -18,7 +18,43 @@ public struct URLSessionTransport: PlexTransport {
         self.restricted = RestrictedSession(configuration: session.configuration)
     }
 
+    /// Sends the request and reports it to the diagnostics log: failures always, successes only under the
+    /// Detailed setting. Probes of `/identity` are left to the probe round's own report.
     public func send(_ request: PlexRequest) async throws -> PlexHTTPResponse {
+        let clock = ContinuousClock()
+        let start = clock.now
+        let logged = request.url.path != "/identity"
+        do {
+            let response = try await perform(request)
+            if logged { Self.report(request, status: response.status, bytes: response.body.count, error: nil, elapsed: clock.now - start) }
+            return response
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError {
+            // Reported before it becomes a `NetworkFailure`, which keeps only the kind of failure.
+            if logged { Self.report(request, status: nil, bytes: 0, error: error, elapsed: clock.now - start) }
+            throw NetworkFailure(error.code)
+        } catch {
+            if logged { Self.report(request, status: nil, bytes: 0, error: error, elapsed: clock.now - start) }
+            throw error
+        }
+    }
+
+    private static func report(_ request: PlexRequest, status: Int?, bytes: Int, error: (any Error)?, elapsed: Duration) {
+        let level: DiagLevel = switch status {
+        case .none: .notice
+        case .some(500...): .warning
+        case .some(400...): .notice
+        default: .debug
+        }
+        let ms = Int(elapsed.components.seconds * 1000) + Int(elapsed.components.attoseconds / 1_000_000_000_000_000)
+        DiagHub.emit(.net, status == nil ? "http.fail" : "http", [
+            "method": request.method.rawValue, "url": request.url.removingPlexToken, "status": status,
+            "ms": ms, "bytes": bytes, "error": error,
+        ], level: level)
+    }
+
+    private func perform(_ request: PlexRequest) async throws -> PlexHTTPResponse {
         var urlRequest = URLRequest(url: request.url, timeoutInterval: request.timeout)
         urlRequest.httpMethod = request.method.rawValue
         urlRequest.httpBody = request.body
@@ -65,9 +101,8 @@ public struct URLSessionTransport: PlexTransport {
                 headers[name] = value
             }
             return PlexHTTPResponse(status: http.statusCode, body: data, headers: headers)
-        } catch let error as URLError {
-            if error.code == .cancelled { throw CancellationError() }
-            throw NetworkFailure(error.code)
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
         }
     }
 }
