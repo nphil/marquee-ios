@@ -12,7 +12,7 @@ enum LiveLog {
     static func line(_ tag: String, _ fields: KeyValuePairs<String, String> = [:]) {
         let text = fields.map { "\($0.key)=\($0.value)" }.joined(separator: " ")
         logger.info("live-\(tag, privacy: .public) \(text, privacy: .public)")
-        if let handler = LiveDiagnostics.sink.withLock({ $0 }) {
+        if let handler = LiveLogSink.sink.withLock({ $0 }) {
             handler(tag, fields.map { ($0.key, $0.value) })
         }
     }
@@ -22,8 +22,9 @@ enum LiveLog {
     }
 }
 
-/// Hands every `live-*` line to the app's diagnostic log as well as the unified log.
-public enum LiveDiagnostics {
+/// Hands every `live-*` line to the app's diagnostic log as well as the unified log. Not named
+/// `LiveDiagnostics`: LiveEngine's tuner counters already have that name.
+public enum LiveLogSink {
     public typealias Sink = @Sendable (_ tag: String, _ fields: [(String, String)]) -> Void
 
     static let sink = Mutex<Sink?>(nil)

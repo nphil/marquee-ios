@@ -176,7 +176,7 @@ final class DiagLog: @unchecked Sendable {
         DiagHub.install { [self] level, category, name, fields in
             record(level, category, name, fields)
         }
-        LiveDiagnostics.install { tag, fields in
+        LiveLogSink.install { tag, fields in
             DiagHub.emit(.live, "live." + tag, pairs: fields, level: Self.level(live: tag))
         }
         queue.async { [self] in
