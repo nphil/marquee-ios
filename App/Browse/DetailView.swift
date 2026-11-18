@@ -207,6 +207,7 @@ private struct DetailPage: View {
         }
         .navigationTitle(showsBarTitle ? item.title : "")
         .navigationBarTitleDisplayMode(.inline)
+        .diagPresentation("detail.tracks", isPresented: showsTracks)
         .sheet(isPresented: $showsTracks) {
             if let tracks {
                 TracksSheet(tracks: tracks)

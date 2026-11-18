@@ -106,6 +106,7 @@ struct PlayerView: View {
         .persistentSystemOverlays(model.chromeVisible ? .automatic : .hidden)
         .accessibilityAction(.escape) { close() }
         .accessibilityAction(.magicTap) { model.togglePlay() }
+        .diagPresentation("player.episodes", isPresented: model.showsEpisodes && !sideLayout)
         .sheet(isPresented: Binding(get: { model.showsEpisodes && !sideLayout }, set: { if !$0 { model.showsEpisodes = false } })) {
             EpisodeSheet(model: model) { model.showsEpisodes = false }
                 .panel(model, theme: outerTheme, scheme: outerScheme, detents: [.medium, .large])
@@ -114,6 +115,7 @@ struct PlayerView: View {
                 // The picture above the sheet keeps playing and answers taps.
                 .presentationBackgroundInteraction(.enabled(upThrough: .medium))
         }
+        .diagPresentation("player.info", isPresented: model.showsInfo)
         .sheet(isPresented: $model.showsInfo) {
             NavigationStack {
                 PlaybackInfoView(model: model)

@@ -112,6 +112,7 @@ private struct ScheduledList: View {
             }
         }
         .task { await store.loadRecordings() }
+        .diagPresentation("recordings.edit", isPresented: editing != nil)
         .sheet(item: $editing) { rule in
             RuleSheet(store: store, rule: rule, scheduled: scheduledCount(rule)) { delete($0) }
         }

@@ -97,6 +97,7 @@ struct LivePlayerView: View {
             if model.showsGuide { model.setGuide(false) } else { close() }
         }
         .accessibilityAction(.magicTap) { model.togglePlay() }
+        .diagPresentation("live.details", isPresented: details != nil)
         .sheet(item: $details) { selection in
             ProgrammeSheet(store: model.store, selection: selection) { channel in
                 details = nil

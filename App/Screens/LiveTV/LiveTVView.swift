@@ -83,12 +83,14 @@ private struct LiveGuideScreen: View {
             .navigationDestination(isPresented: $showsRecordings) { RecordingsView(store: store) }
             // Recordings is pushed outside the stack's path, so it brings the tab bar back itself.
             .onChange(of: showsRecordings) { tabBar?.show(reduceMotion: reduceMotion) }
+            .diagPresentation("livetv.details", isPresented: details != nil)
             .sheet(item: $details, onDismiss: { playAfterSheet() }) { selection in
                 ProgrammeSheet(store: store, selection: selection) { channel in
                     watchAfterSheet = channel
                     details = nil
                 }
             }
+            .diagPresentation("livetv.player", isPresented: playing != nil)
             .fullScreenCover(item: $playing) { model in
                 LivePlayerView(model: model, outerTheme: theme, outerScheme: colorScheme) {
                     model.close()

@@ -75,6 +75,7 @@ struct LinkSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { name = link.customName }
         .onDisappear { link.setName(name) }
+        .diagPresentation("link.sheet", isPresented: sheet != nil)
         .sheet(item: $sheet) { sheet in
             switch sheet {
             case .code: LinkCodeView()

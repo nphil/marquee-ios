@@ -45,6 +45,7 @@ struct SeerrTitleView: View {
             await load()
         }
         .onChange(of: clientID) { _, _ in showingRequest = false }
+        .diagPresentation("seerr.request", isPresented: showingRequest)
         .sheet(isPresented: $showingRequest) {
             if let content = remote.value, content.clientID == clientID {
                 SeerrRequestSheet(details: content.details, user: content.user, settings: content.settings,

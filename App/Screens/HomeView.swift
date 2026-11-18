@@ -78,6 +78,7 @@ struct HomeView: View {
         )) {
             await loadWatchlist()
         }
+        .diagPresentation("home.edit", isPresented: editing)
         .sheet(isPresented: $editing) {
             EditHomeSheet()
                 .preferredColorScheme(store.presentationScheme(for: theme))

@@ -895,12 +895,22 @@ struct MoreMenu: View {
         var sections: [UIMenuElement] = [UIMenu.section("player.more.picture", picture)]
         let sound = playback
         if !sound.isEmpty { sections.append(UIMenu.section("player.more.playback", sound)) }
-        sections.append(UIMenu.section("player.more.panels", [
+        var panels: [UIMenuElement] = [
             UIAction.row("Playback Info", systemImage: "info.circle") { [model] in model.showsInfo = true },
             UIAction.choice("Stats for Nerds", systemImage: "chart.bar.xaxis", isOn: model.showsStats) { [model] in
                 model.showsStats.toggle()
             },
-        ]))
+        ]
+        if ReportCenter.shared.isAvailable {
+            panels.append(UIAction.row("Report a Problem", systemImage: "exclamationmark.bubble", identifier: "player.report") {
+                // The action runs while the menu is still closing; the screenshot waits until it has gone.
+                Task { @MainActor in
+                    try? await Task.sleep(for: .milliseconds(350))
+                    ReportCenter.shared.open(from: .player, screenshot: ReportCenter.capture())
+                }
+            })
+        }
+        sections.append(UIMenu.section("player.more.panels", panels))
         return UIMenu(identifier: UIMenu.Identifier(rawValue: "player.more"), children: sections)
     }
 
