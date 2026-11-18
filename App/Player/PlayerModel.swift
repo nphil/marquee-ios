@@ -235,6 +235,14 @@ final class PlayerModel: Identifiable {
         }
     }
 
+    /// The skip past the intro being confirmed (`SkipCheck`), and the movie time it last looked at.
+    @ObservationIgnored private var skipCheck: SkipCheck?
+    @ObservationIgnored private var skipCheckAt: TimeInterval?
+    /// Tallies for the diagnostic log's close summary, and the movie time of its last playhead sample.
+    @ObservationIgnored private var diagSeeks = 0
+    @ObservationIgnored private var diagStalls = 0
+    @ObservationIgnored private var diagSampleAt: TimeInterval = -.infinity
+    @ObservationIgnored private var diagOpenedAt = ContinuousClock.now
     @ObservationIgnored private var request: PlaybackRequest
     @ObservationIgnored private var isFirstItem = true
     @ObservationIgnored private var mediaIndex = 0
@@ -470,6 +478,13 @@ final class PlayerModel: Identifiable {
     // MARK: Lifecycle
 
     func start() {
+        Diag.beginPlayback()
+        diagOpenedAt = .now
+        Diag.event(.player, "open", [
+            "item": request.item.ratingKey, "type": request.item.type.rawValue, "download": request.download != nil,
+            "fromStart": request.fromStart, "startAt": request.startAt, "paused": request.startsPaused, "media": request.mediaIndex,
+            "quality": "\(session.settings.quality)", "directPlay": "\(session.settings.directPlay)", "glasses": session.player.onGlasses,
+        ], .notice)
         session.downloads.setPlaybackActive(true)
         backend.onEvent = { [weak self] event in self?.handle(event) }
         pictureInPicture?.onPossibleChange = { [weak self] possible in self?.canPictureInPicture = possible }
@@ -506,6 +521,11 @@ final class PlayerModel: Identifiable {
     func close() {
         guard !closed else { return }
         closed = true
+        Diag.event(.player, "close", [
+            "at": time, "duration": duration, "phase": Self.diagPhase(phase), "route": route?.kind.rawValue, "seeks": diagSeeks,
+            "stalls": diagStalls, "recoveries": recoveries?.count ?? 0, "watched": markedWatched, "start": startTiming.summary,
+            "seconds": Diag.ms(since: diagOpenedAt) / 1000,
+        ], .notice)
         report(.stopped)
         session.downloads.setPlaybackActive(false)
         generation += 1
@@ -530,9 +550,11 @@ final class PlayerModel: Identifiable {
             session.cast.disconnect()
             session.cast.endSearch()
         }
+        Diag.endPlayback()
     }
 
     func retry() {
+        Diag.event(.player, "retry", ["at": time, "route": route?.kind.rawValue], .notice)
         recovery.reset()
         if route == nil {
             loadItem(loadingKey ?? item.ratingKey)
@@ -545,6 +567,7 @@ final class PlayerModel: Identifiable {
     // MARK: Transport
 
     func play() {
+        Diag.event(.player, "play", ["at": time, "phase": Self.diagPhase(phase)])
         wantsPlay = true
         resumesAfterInterruption = false
         if phase == .finished {
@@ -555,6 +578,7 @@ final class PlayerModel: Identifiable {
     }
 
     func pause() {
+        Diag.event(.player, "pause", ["at": time])
         wantsPlay = false
         resumesAfterInterruption = false
         abandonMove()
@@ -597,40 +621,85 @@ final class PlayerModel: Identifiable {
         seek(to: target)
     }
 
-    func seek(to requested: TimeInterval) {
-        guard phase == .playing || phase == .finished else { return }
+    /// A seek of the viewer's own, which ends any check on an intro skip. False when nothing plays to move.
+    @discardableResult
+    func seek(to requested: TimeInterval) -> Bool {
+        if let check = skipCheck {
+            Diag.event(.offers, "skip.check.end", ["reason": "seek", "end": check.target])
+            skipCheck = nil
+        }
+        return move(to: requested, cause: "seek")
+    }
+
+    /// Moves playback to a movie time: within the stream when it holds that time, else by a new run or stream.
+    private func move(to requested: TimeInterval, cause: String) -> Bool {
+        guard phase == .playing || phase == .finished else {
+            Diag.event(.player, "seek.refused", ["cause": cause, "to": requested, "phase": Self.diagPhase(phase)], .notice)
+            return false
+        }
         if phase == .finished { phase = .playing }
         abandonMove()
         let target = clamp(requested)
+        let from = time
         time = target
+        diagSeeks += 1
+        func logged(_ path: String, written: TimeInterval? = nil) {
+            Diag.event(.player, "seek", ["cause": cause, "from": from, "to": target, "path": path, "written": written])
+        }
         if castDevice != nil {
             // A receiver that has finished holds nothing to seek in.
             if castProgress == nil || castProgress?.state == .stopped {
+                logged("cast-restart")
                 restart(at: target)
             } else {
+                logged("cast")
                 castSeekTarget = target
                 session.cast.seek(to: target)
             }
             publishPosition()
             report()
-            return
+            return true
         }
         if landing != nil {
-            if farSeeking, case .remux(let remux) = stream { farSeek(remux, to: target) } else { landing = target }
-            return
+            if farSeeking, case .remux(let remux) = stream {
+                logged("far-again")
+                farSeek(remux, to: target)
+            } else {
+                logged("landing")
+                landing = target
+            }
+            return true
         }
-        guard let origin else { return }
+        guard let origin else {
+            Diag.event(.player, "seek.refused", ["cause": cause, "to": target, "reason": "no-origin"], .notice)
+            return false
+        }
         let local = target - origin
         switch stream {
         case .remux(let remux):
-            if local >= 0, local <= remux.progress.mediaSeconds - 1 { seekItem(local) } else { farSeek(remux, to: target) }
+            let written = remux.progress.mediaSeconds
+            if local >= 0, local <= written - 1 {
+                logged("item", written: written)
+                seekItem(local)
+            } else {
+                logged("far", written: written)
+                farSeek(remux, to: target)
+            }
         case .transcode:
-            if local >= 0, let length = backend.itemDuration, local <= length - 1 { seekItem(local) } else { restart(at: target) }
+            if local >= 0, let length = backend.itemDuration, local <= length - 1 {
+                logged("item", written: length)
+                seekItem(local)
+            } else {
+                logged("restart")
+                restart(at: target)
+            }
         case .direct, nil:
+            logged("item")
             seekItem(max(0, local))
         }
         publishPosition()
         report()
+        return true
     }
 
     func previous() {
@@ -706,6 +775,7 @@ final class PlayerModel: Identifiable {
     }
 
     func setAspect(_ aspect: VideoAspect) {
+        Diag.event(.player, "aspect", ["aspect": "\(aspect)"])
         self.aspect = aspect
         scheduleHide()
     }
@@ -713,6 +783,7 @@ final class PlayerModel: Identifiable {
     func setQuality(_ setting: QualitySetting) {
         scheduleHide()
         let playing = quality
+        Diag.event(.player, "quality.set", ["setting": "\(setting)", "playing": "\(playing)"])
         qualityCap = nil
         if setting != session.settings.quality { session.settings.quality = setting }
         abandonMove()
@@ -721,6 +792,7 @@ final class PlayerModel: Identifiable {
     }
 
     func setSpeed(_ speed: Float) {
+        Diag.event(.player, "speed", ["speed": speed])
         self.speed = speed
         backend.rate = speed
         scheduleHide()
@@ -728,12 +800,14 @@ final class PlayerModel: Identifiable {
 
     func toggleEnhancement(_ enhancement: AudioEnhancements) {
         session.settings.audioEnhancements.formSymmetricDifference(enhancement)
+        Diag.event(.audio, "enhancement", ["toggled": "\(enhancement)", "now": "\(session.settings.audioEnhancements)"])
         scheduleHide()
         reroute(handPick: false)
     }
 
     func togglePictureInPicture() {
         guard let pictureInPicture else { return }
+        Diag.event(.player, "pip.toggle", ["wasActive": pictureInPicture.isActive])
         if pictureInPicture.isActive { pictureInPicture.stop() } else { pictureInPicture.start() }
     }
 
@@ -746,28 +820,44 @@ final class PlayerModel: Identifiable {
 
     // MARK: Offers
 
-    func skipIntro() {
-        guard case .skipIntro(let end)? = offer else { return }
-        cancelCountdown()
+    /// `auto`: the countdown ran out, rather than a tap. The skip is confirmed once playback runs on (`checkSkip`).
+    func skipIntro(auto: Bool = false) {
+        guard case .skipIntro(let end)? = offer else {
+            Diag.event(.offers, "skip.ignored", ["auto": auto, "offer": Self.diagOffer(offer)], .notice)
+            return
+        }
+        Diag.event(.offers, "skip", [
+            "auto": auto, "at": time, "end": end, "stream": diagStream, "playing": isPlaying, "buffering": isBuffering,
+        ], .notice)
+        cancelCountdown("skip")
+        guard move(to: end, cause: auto ? "skip-intro-auto" : "skip-intro") else {
+            // Nothing moved, so the offer stays to be taken again.
+            Diag.event(.offers, "skip.refused", ["end": end, "phase": Self.diagPhase(phase)], .warning)
+            return
+        }
         withAnimation(.easeOut(duration: 0.18)) { offer = nil }
         skippedIntroEnd = end
-        seek(to: end)
+        skipCheck = SkipCheck(target: end)
+        skipCheckAt = nil
     }
 
     func watchIntro() {
+        Diag.event(.offers, "watch-intro", ["at": time])
         introCancelled = true
-        cancelCountdown()
+        cancelCountdown("watch-intro")
     }
 
     func watchCredits() {
+        Diag.event(.offers, "watch-credits", ["at": time])
         creditsDismissed = true
-        cancelCountdown()
+        cancelCountdown("watch-credits")
         withAnimation(.easeOut(duration: 0.18)) { offer = nil }
     }
 
     /// Takes a long network wait's offer: this playback goes on at the lower quality.
     func playAtLowerQuality() {
         guard case .lowerQuality(let lower)? = offer else { return }
+        Diag.event(.offers, "lower-quality.taken", ["quality": "\(lower)"], .notice)
         qualityCap = lower
         // Before the route is decided again, or the next look would offer a lower quality still.
         forgetWait()
@@ -778,6 +868,7 @@ final class PlayerModel: Identifiable {
 
     func pickAudio(_ track: AudioTrack) {
         guard track.id != audio?.id else { return }
+        Diag.event(.audio, "pick", ["track": Self.diagAudio(track), "was": audio.map(Self.diagAudio)])
         handAudio = track.id
         remember()
         reroute(handPick: true)
@@ -785,6 +876,7 @@ final class PlayerModel: Identifiable {
 
     func pickSubtitle(_ choice: SubtitleChoice) {
         guard choice != subtitleChoice else { return }
+        Diag.event(.subtitles, "pick", ["choice": "\(choice)", "was": "\(subtitleChoice)"])
         handSubtitle = choice
         remember()
         reroute(handPick: true)
@@ -798,6 +890,7 @@ final class PlayerModel: Identifiable {
         let generation = generation
         loadingKey = ratingKey
         enterLoading()
+        Diag.event(.player, "load", ["item": ratingKey])
         #if DEBUG
         if let held = Self.heldStage {
             stageTask?.cancel()
@@ -912,6 +1005,8 @@ final class PlayerModel: Identifiable {
         }
         isFirstItem = false
         time = start
+        Diag.event(.player, "item", list: diagItem(full, media: media, part: part, tracks: tracks, start: start))
+        Diag.event(.offers, "markers", ["intro": Self.diagMarkers(full.markers(.intro)), "credits": Self.diagMarkers(full.markers(.credits))])
         publishItem()
         nextFromStart = false
         // Where the phone is sets Auto's start and whether the remux may read the file over the link.
@@ -1041,11 +1136,16 @@ final class PlayerModel: Identifiable {
                 ? "\(track.label) needs the server to burn it in; pick it again to allow that."
                 : "\(track.label) needs the server to burn it in, so it can't be shown offline."
         }
+        var fields = diagRoute(choice)
+        if qualitySetting == .auto { fields.append(("autoRung", "\(autoRung)")) }
+        Diag.event(.player, "route", list: fields, .notice)
+        if let subtitleProblem { Diag.event(.subtitles, "not-shown", ["problem": subtitleProblem], .notice) }
     }
 
     private func loadSidecar(_ track: SubtitleTrack) async {
         guard sidecarID != track.id else { return }
         let owner = generation
+        let started = ContinuousClock.now
         sidecar = nil
         sidecarID = nil
         let key = part?.streams.first(where: { $0.id == track.id })?.key ?? "/library/streams/\(track.id)"
@@ -1060,9 +1160,16 @@ final class PlayerModel: Identifiable {
             guard owner == generation, !Task.isCancelled else { return }
             sidecar = loaded
             sidecarID = track.id
+            Diag.event(.subtitles, "sidecar.loaded", [
+                "track": Self.diagSubtitle(track), "cues": loaded.cues.count, "images": loaded.bitmaps != nil,
+                "offline": request.download != nil, "ms": Diag.ms(since: started),
+            ])
         } catch {
             guard owner == generation, !Task.isCancelled else { return }
             subtitleProblem = "\(track.label): \(Self.message(error))"
+            Diag.event(.subtitles, "sidecar.failed", [
+                "track": Self.diagSubtitle(track), "error": DiagFormat.describe(error), "ms": Diag.ms(since: started),
+            ], .warning)
         }
     }
 
@@ -1070,6 +1177,8 @@ final class PlayerModel: Identifiable {
 
     private func startStream(at target: TimeInterval, generation: Int) async {
         guard let route, let part else { return }
+        let started = ContinuousClock.now
+        Diag.event(.player, "stream.start", ["at": target, "route": route.kind.rawValue, "cast": castDevice != nil])
         if castDevice != nil {
             await startCast(at: target, generation: generation)
             return
@@ -1139,6 +1248,7 @@ final class PlayerModel: Identifiable {
             guard generation == self.generation, !Task.isCancelled else { return }
             applySubtitleSources()
             startTiming.mark(.stream)
+            Diag.event(.player, "stream.open", ["stream": diagStream, "local": streamConnection?.isLocal, "ms": Diag.ms(since: started)])
             load(url)
             if case .transcode = stream { armStartDeadline(generation: generation) }
         } catch {
@@ -1255,14 +1365,23 @@ final class PlayerModel: Identifiable {
                 switch event {
                 case .opened(let info):
                     mediaInfo = info
+                    Diag.event(.player, "remux.opened", [
+                        "container": info.container, "duration": info.duration, "video": info.video.count, "audio": info.audio.count,
+                        "subtitles": info.subtitles.count,
+                    ])
+                case .headerWritten(_, let entry):
+                    Diag.event(.player, "remux.header", ["sampleEntry": entry], .debug)
                 case .timeline(let origin):
+                    Diag.event(.player, "remux.timeline", ["origin": origin, "first": self.origin == nil])
                     if self.origin == nil {
                         self.origin = origin
                         land()
                     }
-                case .finished:
+                case .finished(let progress):
                     remuxFinished = true
-                case .failed(let error, _):
+                    Diag.event(.player, "remux.finished", ["written": progress.mediaSeconds])
+                case .failed(let error, let progress):
+                    Diag.event(.player, "remux.failed", ["error": DiagFormat.describe(error), "written": progress.mediaSeconds], .warning)
                     streamFailed(PlaybackFailure(text: error.localizedDescription))
                 default:
                     break
@@ -1333,13 +1452,19 @@ final class PlayerModel: Identifiable {
         session.player.linkKbps[PlayerCenter.Link(address: address, place: place)] = Int(bitsPerSecond / 1000)
     }
 
-    /// A new stream at `target` on the same route, keeping the screen as it is.
+    /// A new stream at `target` on the same route, keeping the screen as it is. The target is the landing from
+    /// now on: the old stream's ticks would otherwise move the playhead back, and a seek meanwhile moves it.
     private func restart(at target: TimeInterval) {
         generation += 1
         let generation = generation
         loadTask?.cancel()
+        landing = target
         isBuffering = true
-        loadTask = Task { [weak self] in await self?.startStream(at: target, generation: generation) }
+        Diag.event(.player, "stream.restart", ["at": target, "stream": diagStream])
+        loadTask = Task { [weak self] in
+            guard let self else { return }
+            await startStream(at: landing ?? target, generation: generation)
+        }
     }
 
     /// A track change: decides again, then switches inside the stream or starts a new one.
@@ -1348,7 +1473,7 @@ final class PlayerModel: Identifiable {
         generation += 1
         let generation = generation
         loadTask?.cancel()
-        let at = time
+        Diag.event(.player, "reroute", ["handPick": handPick, "reconnect": reconnect, "at": time])
         loadTask = Task { [weak self] in
             guard let self else { return }
             let previous = streamKey
@@ -1356,7 +1481,8 @@ final class PlayerModel: Identifiable {
             guard generation == self.generation, let route else { return }
             if reconnect || StreamKey(route) != previous || stream == nil {
                 isBuffering = true
-                await startStream(at: at, generation: generation)
+                // Where playback is now: a seek while the route was decided went to the old stream.
+                await startStream(at: landing ?? time, generation: generation)
             } else {
                 applySubtitleSources()
                 // Paused, no time update comes to draw the new subtitle's line.
@@ -1410,6 +1536,10 @@ final class PlayerModel: Identifiable {
     /// same place; otherwise the item starts again on the new link.
     func networkChanged(to connection: PlexConnection?) {
         guard request.download == nil, castDevice == nil, phase == .loading || phase == .playing else { return }
+        Diag.event(.player, "network.changed", [
+            "reachable": connection != nil, "local": connection?.isLocal, "sameAddress": connection?.uri == linkAddress,
+            "phase": Self.diagPhase(phase),
+        ], .notice)
         guard let connection else {
             // A playing stream stalls or fails by itself; a load would only wait out its requests.
             guard phase == .loading else { return }
@@ -1519,6 +1649,7 @@ final class PlayerModel: Identifiable {
     /// Moves Auto to `rung`: beside the playing stream when it can, else by a new stream at the playhead.
     private func adapt(to rung: VideoQuality) {
         guard let tracks, let media, let part else { return settleMove(at: autoRung) }
+        Diag.event(.player, "auto.move", ["from": "\(autoRung)", "to": "\(rung)", "estimateKbps": adaptive?.estimateKbps, "at": time], .notice)
         movePending = true
         moveTask = Task { [weak self] in
             guard let self else { return }
@@ -1599,6 +1730,7 @@ final class PlayerModel: Identifiable {
         standby = next
         layerView.prepareStandby(player)
         backend.armSwitch(at: at - playingOrigin)
+        Diag.event(.player, "auto.standby", ["rung": "\(rung)", "switchAt": at])
         return true
     }
 
@@ -1633,6 +1765,7 @@ final class PlayerModel: Identifiable {
         take(next.choice)
         if let item = backend.player?.currentItem { streamText.attach(to: item) }
         settleMove(at: next.rung)
+        Diag.event(.player, "auto.switched", ["rung": "\(next.rung)", "at": time, "stream": diagStream], .notice)
     }
 
     /// Moves Auto by a new stream at the playhead, keeping the screen as it is.
@@ -1642,18 +1775,20 @@ final class PlayerModel: Identifiable {
         generation += 1
         let generation = generation
         loadTask?.cancel()
-        let at = time
+        Diag.event(.player, "auto.restart", ["rung": "\(rung)", "at": time], .notice)
         isBuffering = true
         loadTask = Task { [weak self] in
             guard let self else { return }
             if case .sidecar(let track) = choice.route.subtitle { await loadSidecar(track) }
             guard generation == self.generation else { return }
-            await startStream(at: at, generation: generation)
+            // Where playback is now: the old stream plays on while the subtitles load, and a seek may move it.
+            await startStream(at: landing ?? time, generation: generation)
         }
     }
 
     /// Gives up the move under way, if any: playback stays at the rung it had.
     private func abandonMove() {
+        if movePending || standby != nil { Diag.event(.player, "auto.abandoned", ["standby": standby != nil], .debug) }
         moveTask?.cancel()
         moveTask = nil
         dropStandby()
@@ -1686,6 +1821,9 @@ final class PlayerModel: Identifiable {
     }
 
     private func streamFailed(_ failure: PlaybackFailure) {
+        Diag.event(.player, "stream.failed", [
+            "error": failure.text, "detail": failure.detail, "route": route?.kind.rawValue, "stream": diagStream, "at": time,
+        ], .warning)
         if request.download != nil { fail(failure); return }
         guard !closed, phase != .finished, let route else {
             fail(failure)
@@ -1702,6 +1840,7 @@ final class PlayerModel: Identifiable {
                 return
             }
             onDeviceFailed = true
+            Diag.event(.player, "recover", ["how": "server"], .notice)
             if let part { session.player.phoneFailures.insert(part.id) }
             fallback = failure.detail
             stopStream()
@@ -1715,6 +1854,7 @@ final class PlayerModel: Identifiable {
         case .serverTranscode where !route.audioEnhancements.isEmpty && !enhancementRefused:
             // Refused with the sound reworked: the same video plays without it.
             enhancementRefused = true
+            Diag.event(.player, "recover", ["how": "without-enhancements"], .notice)
             stopStream()
             enterLoading()
             loadTask = Task { [weak self] in
@@ -1728,6 +1868,7 @@ final class PlayerModel: Identifiable {
                 fail(PlaybackFailure(text: "\(library.server.name) couldn't start the video.", detail: failure.detail))
                 return
             }
+            Diag.event(.player, "recover", ["how": "retry", "delay": delay], .notice)
             // The next try is a new session, on whichever address answers by then.
             let address = streamConnection
             stopStream()
@@ -1747,6 +1888,7 @@ final class PlayerModel: Identifiable {
     }
 
     private func fail(_ failure: PlaybackFailure) {
+        Diag.event(.player, "failed", ["error": failure.text, "detail": failure.detail, "at": time, "route": route?.kind.rawValue], .error)
         failureDetail = failure.detail
         let message = failure.text
         // Work still under way for the failed stream, a landing among it, ends here.
@@ -1755,8 +1897,9 @@ final class PlayerModel: Identifiable {
         report(.stopped)
         stageTask?.cancel()
         showsStage = false
-        cancelCountdown()
+        cancelCountdown("failed")
         offer = nil
+        skipCheck = nil
         landing = nil
         isBuffering = false
         phase = .failed(message)
@@ -1778,6 +1921,7 @@ final class PlayerModel: Identifiable {
     }
 
     private func go(to target: PlexMetadata) {
+        Diag.event(.player, "go", ["item": target.ratingKey, "from": item.ratingKey, "at": time], .notice)
         lastPreviousPress = nil
         report(.stopped)
         stopStream()
@@ -1790,10 +1934,11 @@ final class PlayerModel: Identifiable {
         recovery.reset()
         introCancelled = false
         skippedIntroEnd = nil
+        skipCheck = nil
         creditsDismissed = false
         countdownStopped = false
         markedWatched = false
-        cancelCountdown()
+        cancelCountdown("next-item")
         offer = nil
         sidecar = nil
         sidecarID = nil
@@ -1856,7 +2001,13 @@ final class PlayerModel: Identifiable {
         seekTask = Task { [weak self] in
             guard let self else { return }
             // AVPlayer can join a growing playlist part-way rather than at its start.
-            if abs(backend.itemTime - local) > 0.5 { _ = await backend.seek(to: local, precise: true) }
+            if abs(backend.itemTime - local) > 0.5 {
+                let started = ContinuousClock.now
+                let done = await backend.seek(to: local, precise: true)
+                Diag.event(.player, "land.seek", [
+                    "to": target, "now": backend.itemTime + origin, "ok": done, "ms": Diag.ms(since: started),
+                ], done ? .debug : .notice)
+            }
             guard generation == self.generation, serial == seekSerial, !Task.isCancelled else { return }
             await applySelection()
             guard generation == self.generation, serial == seekSerial, !Task.isCancelled else { return }
@@ -1885,8 +2036,14 @@ final class PlayerModel: Identifiable {
             writeBack()
         }
         if wantsPlay { backend.play() }
+        let first = startTiming.milliseconds(.playing) == nil
         startTiming.mark(.playing)
         if let origin { time = backend.itemTime + origin }
+        if first {
+            Diag.event(.player, "started", ["timing": startTiming.summary, "at": time, "stream": diagStream, "paused": !wantsPlay], .notice)
+        } else {
+            Diag.event(.player, "landed", ["at": time, "stream": diagStream])
+        }
         publishPosition()
         report()
         // A picture left paused, by a call during the load say, keeps its controls.
@@ -1899,9 +2056,13 @@ final class PlayerModel: Identifiable {
         isSeeking = true
         streamText.reset()
         seekTask?.cancel()
+        let started = ContinuousClock.now
         seekTask = Task { [weak self] in
             guard let self else { return }
-            _ = await backend.seek(to: local, precise: true)
+            let done = await backend.seek(to: local, precise: true)
+            let now = backend.itemTime
+            let short = !done || abs(now - local) > 1
+            Diag.event(.player, "seek.result", ["to": local, "now": now, "ok": done, "ms": Diag.ms(since: started)], short ? .notice : .debug)
             guard serial == seekSerial else { return }
             isSeeking = false
             publishPosition()
@@ -1921,6 +2082,7 @@ final class PlayerModel: Identifiable {
         seekTask = Task { [weak self] in
             try? await Task.sleep(for: .milliseconds(350))
             guard let self, serial == seekSerial, !Task.isCancelled, case .remux(let current) = stream, current === remux else { return }
+            Diag.event(.player, "far.seek", ["to": target, "written": remux.progress.mediaSeconds])
             // The old item is let go first, so its end does not count as a failure.
             backend.load(nil)
             itemReady = false
@@ -1957,16 +2119,21 @@ final class PlayerModel: Identifiable {
         updateOffers(at: movie)
         if !markedWatched, duration > 0, movie >= duration * 0.9 { markWatched() }
         if Date.now.timeIntervalSince(lastReport) >= 1 { report() }
+        checkSkip(at: movie, pending: isBuffering || !isPlaying)
+        sample(at: movie)
     }
 
     private func stateChanged(playing: Bool, buffering: Bool) {
         let wasPlaying = isPlaying
+        if playing != wasPlaying || buffering != isBuffering {
+            Diag.event(.player, "state", ["playing": playing, "buffering": buffering, "at": time], .debug)
+        }
         isPlaying = playing
         isBuffering = buffering || landing != nil
         if case .remux(let remux) = stream { remux.setPlayerWaiting(buffering) }
         if playing, buffering { watchStall() } else { endStall() }
         if !playing || buffering {
-            if case .upNext? = offer { interruptCountdown() } else { cancelCountdown() }
+            if case .upNext? = offer { interruptCountdown() } else { cancelCountdown(playing ? "buffering" : "paused") }
         } else {
             startCountdownIfDue()
         }
@@ -2035,17 +2202,18 @@ final class PlayerModel: Identifiable {
             guard seconds >= 2 else { return }
             // The standby cannot take over from a stalled stream; Auto's next look moves by a new stream instead.
             if standby != nil { abandonMove() }
-            if !waitsForNetwork { withAnimation(.easeOut(duration: 0.18)) { waitsForNetwork = true } }
+            if !waitsForNetwork {
+                diagStalls += 1
+                Diag.event(.player, "stall", ["at": time, "seconds": seconds, "stream": diagStream, "ahead": backend.bufferedAhead], .notice)
+                withAnimation(.easeOut(duration: 0.18)) { waitsForNetwork = true }
+            }
             hideTask?.cancel()
             if !chromeVisible { setChrome(true) }
             if seconds >= 10 { offerLowerQuality() }
         case .stuck(let ahead, let cause):
             let at = time
             recoveries = Recoveries(count: (recoveries?.count ?? 0) + 1, at: at, ahead: ahead, cause: cause)
-            EngineLog.logger.event("stall.recovered", [
-                ("at", String(format: "%.1f", at)), ("ahead", String(format: "%.1f", ahead)), ("paced", String(paced)),
-                ("cause", cause.rawValue),
-            ])
+            Diag.event(.player, "stall.recovered", ["at": at, "ahead": ahead, "paced": paced, "cause": cause.rawValue], .warning)
             waitsForNetwork = false
             restart(at: at)
         case .giveUp:
@@ -2059,11 +2227,13 @@ final class PlayerModel: Identifiable {
         if case .lowerQuality? = offer { return }
         guard case .fixed = qualitySetting, !forcesDirectPlay,
               let lower = quality.lower(mediaKbps: media?.bitrate) else { return }
-        cancelCountdown()
+        cancelCountdown("lower-quality")
         withAnimation(.easeOut(duration: 0.22)) { offer = .lowerQuality(lower) }
+        Diag.event(.offers, "lower-quality.shown", ["quality": "\(lower)", "at": time], .notice)
     }
 
     private func ended() {
+        Diag.event(.player, "ended", ["at": time, "hasNext": queue?.item(after: item) != nil, "countdown": countdown != nil], .notice)
         if case .upNext? = offer, countdown != nil {
             next()
             return
@@ -2074,7 +2244,7 @@ final class PlayerModel: Identifiable {
         }
         if !markedWatched { markWatched() }
         report(.stopped)
-        cancelCountdown()
+        cancelCountdown("ended")
         offer = nil
         isPlaying = false
         phase = .finished
@@ -2083,6 +2253,7 @@ final class PlayerModel: Identifiable {
     }
 
     private func externalPlaybackChanged(_ active: Bool) {
+        Diag.event(.player, "external", ["active": active, "stream": diagStream], .notice)
         isExternalPlayback = active
         PlaybackCapabilities.externalPlaybackActive = active
         textRendererChanged()
@@ -2390,13 +2561,18 @@ final class PlayerModel: Identifiable {
                 // Binge mode: no card. The flag keeps later ticks from repeating the jump; `go` clears it for the next episode.
                 guard offer == nil, phase == .playing, isPlaying, !isBuffering, !isScrubbing, menusOpen == 0 else { return }
                 creditsDismissed = true
+                Diag.event(.offers, "autoplay.now", ["next": upcoming.ratingKey, "at": movie], .notice)
                 go(to: upcoming)
                 return
             }
             next = .upNext(upcoming)
         }
         guard next != offer else { return }
-        cancelCountdown()
+        Diag.event(.offers, "offer", [
+            "from": Self.diagOffer(offer), "to": Self.diagOffer(next), "at": movie, "skipped": skippedIntroEnd,
+            "introCancelled": introCancelled,
+        ])
+        cancelCountdown("offer-changed")
         withAnimation(.easeOut(duration: 0.22)) { offer = next }
         startCountdownIfDue()
     }
@@ -2407,7 +2583,7 @@ final class PlayerModel: Identifiable {
         switch offer {
         case .skipIntro?:
             guard settings.introSkipDelay > 0, !introCancelled else { return }
-            runCountdown(TimeInterval(settings.introSkipDelay)) { [weak self] in self?.skipIntro() }
+            runCountdown(TimeInterval(settings.introSkipDelay)) { [weak self] in self?.skipIntro(auto: true) }
         case .upNext?:
             guard case .countdown(let seconds) = settings.autoplay.atCredits, !countdownStopped, menusOpen == 0, !isScrubbing else { return }
             runCountdown(TimeInterval(seconds)) { [weak self] in self?.next() }
@@ -2417,16 +2593,19 @@ final class PlayerModel: Identifiable {
     }
 
     private func runCountdown(_ length: TimeInterval, then action: @escaping @MainActor () -> Void) {
+        Diag.event(.offers, "countdown.start", ["offer": Self.diagOffer(offer), "seconds": length, "at": time])
         countdown = Countdown(start: .now, length: length)
         countdownTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(length))
             guard let self, !Task.isCancelled, countdown != nil else { return }
             countdown = nil
+            Diag.event(.offers, "countdown.fire", ["offer": Self.diagOffer(offer), "at": time], .notice)
             action()
         }
     }
 
-    private func cancelCountdown() {
+    private func cancelCountdown(_ reason: String) {
+        if countdown != nil { Diag.event(.offers, "countdown.cancel", ["reason": reason, "offer": Self.diagOffer(offer), "at": time]) }
         countdownTask?.cancel()
         countdownTask = nil
         countdown = nil
@@ -2435,8 +2614,39 @@ final class PlayerModel: Identifiable {
     /// Pause, buffering, menus and any input stop the Up Next countdown until the next episode.
     private func interruptCountdown() {
         guard case .upNext? = offer, countdown != nil else { return }
-        cancelCountdown()
+        cancelCountdown("interrupted")
         countdownStopped = true
+    }
+
+    /// Confirms an intro skip once playback has run on (`SkipCheck`). A miss is tried once more; a second miss
+    /// brings the Skip Intro offer back without its countdown, so a lost skip never leaves the intro playing
+    /// with nothing to press.
+    private func checkSkip(at movie: TimeInterval, pending: Bool) {
+        guard var check = skipCheck else { return }
+        let step = skipCheckAt.map { movie - $0 } ?? 0
+        skipCheckAt = movie
+        // Only steady playback counts: a jump is a seek or a new stream.
+        let advanced = step > 0 && step <= 2 ? step : 0
+        let verdict = check.check(playhead: movie, advanced: advanced, pending: pending)
+        skipCheck = check
+        switch verdict {
+        case .waiting:
+            break
+        case .landed:
+            skipCheck = nil
+            Diag.event(.offers, "skip.landed", ["at": movie, "end": check.target, "retried": check.retried])
+        case .retry:
+            Diag.event(.offers, "skip.missed", list: diagSkipState(check, at: movie), .warning)
+            skipCheckAt = nil
+            if !move(to: check.target, cause: "skip-retry") {
+                Diag.event(.offers, "skip.retry.refused", ["phase": Self.diagPhase(phase)], .warning)
+            }
+        case .missed:
+            skipCheck = nil
+            skippedIntroEnd = nil
+            introCancelled = true
+            Diag.event(.offers, "skip.gave-up", list: diagSkipState(check, at: movie), .error)
+        }
     }
 
     // MARK: Server
@@ -2456,6 +2666,7 @@ final class PlayerModel: Identifiable {
     }
 
     private func markWatched() {
+        Diag.event(.player, "watched", ["at": time])
         markedWatched = true
         if request.download != nil { report(); return }
         let library = library, key = item.ratingKey
@@ -2573,6 +2784,7 @@ final class PlayerModel: Identifiable {
     private var assistiveTechnologyRuns: Bool { UIAccessibility.isVoiceOverRunning || UIAccessibility.isSwitchControlRunning }
 
     private func interrupted(began: Bool, shouldResume: Bool) {
+        Diag.event(.audio, "interruption", ["began": began, "resume": shouldResume, "wantsPlay": wantsPlay], .notice)
         if began {
             // The wish to play is kept, not the player's state: a stream still loading, or one AVPlayer
             // paused before the news arrived, plays on all the same.
@@ -2589,6 +2801,7 @@ final class PlayerModel: Identifiable {
     /// Without Picture in Picture or AirPlay the sound plays on alone: a layer showing video would
     /// make the system pause it.
     private func enteredBackground() {
+        Diag.event(.player, "background", ["pip": pictureInPicture?.isActive ?? false, "external": isExternalPlayback])
         abandonMove()
         guard !(pictureInPicture?.isActive ?? false), !isExternalPlayback else { return }
         layerView.playerLayer.player = nil
@@ -2666,10 +2879,12 @@ final class PlayerCenter {
         let model = PlayerModel(request: request, session: session, library: library, capabilities: capabilities)
         if let pictureInPicture = model.pictureInPicture {
             pictureInPicture.onStart = { [weak self, weak model] in
+                Diag.event(.player, "pip", ["state": "started"])
                 guard let self, let model, presented === model else { return }
                 presented = nil
             }
             pictureInPicture.onRestore = { [weak self, weak model] completion in
+                Diag.event(.player, "pip", ["state": "restore"])
                 guard let self, let model, active === model else {
                     completion(false)
                     return
@@ -2682,6 +2897,7 @@ final class PlayerCenter {
                 }
             }
             pictureInPicture.onClose = { [weak self, weak model] in
+                Diag.event(.player, "pip", ["state": "closed"])
                 guard let self, let model, active === model, presented == nil else { return }
                 model.close()
                 active = nil
@@ -2719,6 +2935,7 @@ final class PlayerCenter {
 extension PlayerModel: CastPlayer {
     func castConnected(_ device: CastDevice) {
         guard !closed else { return }
+        Diag.event(.player, "cast.connected", ["model": device.model, "at": time], .notice)
         castDevice = device
         castReceiverFailed = false
         // An item still loading decides for the receiver once it has its tracks.
@@ -2734,6 +2951,7 @@ extension PlayerModel: CastPlayer {
     /// Back on the phone, paused where the receiver was.
     func castDisconnected() {
         guard castDevice != nil, !closed else { return }
+        Diag.event(.player, "cast.disconnected", ["at": time], .notice)
         if let castProgress, castProgress.state != .stopped { time = clamp(castProgress.position(at: Self.uptime)) }
         report(.stopped)
         stopStream()
@@ -2755,9 +2973,11 @@ extension PlayerModel: CastPlayer {
         castSeekTarget = nil
         switch end {
         case .finished:
+            Diag.event(.player, "cast.finished")
             castTask?.cancel()
             ended()
         case .failed:
+            Diag.event(.player, "cast.failed", ["route": route?.kind.rawValue, "retried": castReceiverFailed], .warning)
             if route?.kind == .directPlay, !castReceiverFailed {
                 castReceiverFailed = true
                 reroute(handPick: false)
@@ -2765,6 +2985,7 @@ extension PlayerModel: CastPlayer {
                 fail("The Chromecast couldn't play this video.")
             }
         case .stopped:
+            Diag.event(.player, "cast.stopped", ["at": time], .notice)
             // Stopped on the TV, or another sender cast to it.
             session.cast.disconnect(stopping: false)
         case nil:
@@ -2808,6 +3029,7 @@ extension PlayerModel: CastPlayer {
     /// in place of the account's; it starts at `target` itself.
     private func startCast(at target: TimeInterval, generation: Int) async {
         guard let route, let part else { return }
+        Diag.event(.player, "cast.load", ["at": target, "route": route.kind.rawValue], .notice)
         stopStream()
         loadStage = .opening
         landing = nil
@@ -2867,6 +3089,8 @@ extension PlayerModel: CastPlayer {
         updateOffers(at: movie)
         if !markedWatched, duration > 0, movie >= duration * 0.9 { markWatched() }
         if Date.now.timeIntervalSince(lastReport) >= 1 { report() }
+        // A seek's target stands in for the position until the receiver reports one.
+        if castSeekTarget == nil { checkSkip(at: movie, pending: isBuffering || !isPlaying) }
     }
 
     private func stopCast() {
@@ -2879,5 +3103,140 @@ extension PlayerModel: CastPlayer {
             Task { try? await library.stopTranscode(session: castSession) }
             self.castSession = nil
         }
+    }
+}
+
+// MARK: Diagnostics
+
+extension PlayerModel {
+    /// The stream playing, for the log.
+    private var diagStream: String {
+        switch stream {
+        case .direct: "direct"
+        case .remux: "remux"
+        case .transcode: "transcode"
+        case nil: "none"
+        }
+    }
+
+    private static func diagPhase(_ phase: Phase) -> String {
+        switch phase {
+        case .loading: "loading"
+        case .playing: "playing"
+        case .finished: "finished"
+        case .failed: "failed"
+        }
+    }
+
+    private static func diagOffer(_ offer: Offer?) -> String {
+        switch offer {
+        case .skipIntro(let end)?: "skip-intro to " + DiagFormat.seconds(end, digits: 1)
+        case .upNext(let next)?: "up-next " + next.ratingKey
+        case .lowerQuality(let quality)?: "lower-quality \(quality)"
+        case nil: "none"
+        }
+    }
+
+    private static func diagAudio(_ track: AudioTrack) -> String {
+        "\(track.id) \(track.codec)\(track.channels.map { " \($0)ch" } ?? "") \(track.language.code ?? "und")"
+    }
+
+    private static func diagSubtitle(_ track: SubtitleTrack) -> String {
+        "\(track.id) \(track.codec) \(track.language.code ?? "und")\(track.isExternal ? " external" : "")\(track.isImageBased ? " image" : "")"
+    }
+
+    private static func diagDelivery(_ delivery: SubtitleDelivery) -> String {
+        switch delivery {
+        case .none: "none"
+        case .sidecar(let track): "sidecar " + diagSubtitle(track)
+        case .inStream(let track): "in-stream " + diagSubtitle(track)
+        case .burnedIn(let track): "burned-in " + diagSubtitle(track)
+        case .notShown(let track): "not-shown " + diagSubtitle(track)
+        }
+    }
+
+    /// "73.5-163.2, 1290-1420 final", in seconds.
+    private static func diagMarkers(_ markers: [PlexMarker]) -> String {
+        guard !markers.isEmpty else { return "none" }
+        return markers.map { marker in
+            let span = DiagFormat.seconds(Double(marker.start) / 1000, digits: 1) + "-" + DiagFormat.seconds(Double(marker.end) / 1000, digits: 1)
+            return marker.isFinal ? span + " final" : span
+        }.joined(separator: ", ")
+    }
+
+    private func diagItem(_ full: PlexMetadata, media: PlexMedia, part: PlexPart, tracks: MediaTracks, start: TimeInterval) -> [(String, Any?)] {
+        var fields: [(String, Any?)] = [("item", full.ratingKey), ("type", full.type.rawValue)]
+        if full.type == .episode {
+            fields.append(("show", full.grandparentTitle))
+            fields.append(("episode", full.episodeCode))
+        }
+        let size = media.width.flatMap { width in media.height.map { "\(width)x\($0)" } }
+        fields += [
+            ("title", full.title), ("duration", duration), ("start", start), ("container", media.container),
+            ("video", [media.videoCodec, media.videoResolution, media.videoProfile, media.videoFrameRate].compactMap { $0 }.joined(separator: " ")),
+            ("size", size), ("kbps", media.bitrate), ("audioTracks", tracks.audio.count), ("subtitleTracks", tracks.subtitles.count),
+            ("serverAudio", serverAudio), ("serverSubtitle", serverSubtitle), ("part", part.id),
+        ]
+        if let vision = part.videoStream?.dolbyVision { fields.append(("dolbyVision", vision.profile)) }
+        return fields
+    }
+
+    /// The route as decided: how it plays and why, and what it does to the sound and the subtitles.
+    private func diagRoute(_ choice: RouteChoice) -> [(String, Any?)] {
+        let route = choice.route
+        var fields: [(String, Any?)] = [
+            ("kind", route.kind.rawValue),
+            ("why", route.reasons.isEmpty ? "plays as it is" : route.reasons.map(\.description).joined(separator: "; ")),
+            ("audio", route.audio.map(Self.diagAudio) ?? "none"),
+            ("audioAction", route.kind == .directPlay ? "file" : route.convertsAudio ? "convert" : "copy"),
+            ("subtitle", Self.diagDelivery(route.subtitle)),
+            ("subtitleWhy", "\(choice.subtitle.source)"),
+        ]
+        if route.audioIsStandIn { fields.append(("audioStandIn", true)) }
+        if choice.subtitle.followedAudio { fields.append(("followedAudio", true)) }
+        if choice.subtitle.isOnScreenTextOnly { fields.append(("onScreenTextOnly", true)) }
+        if route.reencodesVideo { fields.append(("reencodes", true)) }
+        if let kbps = route.maxVideoBitrateKbps { fields.append(("kbps", kbps)) }
+        if let resolution = route.videoResolution { fields.append(("resolution", resolution)) }
+        if !route.audioEnhancements.isEmpty { fields.append(("enhancements", "\(route.audioEnhancements)")) }
+        if let blocked = choice.enhancements.unavailable { fields.append(("enhancementsBlocked", blocked)) }
+        return fields
+    }
+
+    /// The state a missed intro skip is judged in.
+    private func diagSkipState(_ check: SkipCheck, at movie: TimeInterval) -> [(String, Any?)] {
+        var fields: [(String, Any?)] = [
+            ("at", movie), ("end", check.target), ("retried", check.retried), ("stream", diagStream),
+            ("route", route?.kind.rawValue), ("origin", origin), ("itemTime", backend.itemTime), ("playing", isPlaying),
+            ("buffering", isBuffering), ("rate", backend.rate), ("standby", standby != nil),
+        ]
+        if case .remux(let remux) = stream {
+            fields.append(("written", remux.progress.mediaSeconds))
+            fields.append(("paced", remux.progress.isPaced))
+        }
+        if let item = backend.player?.currentItem {
+            fields.append(("seekable", item.seekableTimeRanges.last.map { range in
+                let span = range.timeRangeValue
+                return DiagFormat.seconds(span.start.seconds, digits: 1) + "-" + DiagFormat.seconds(span.end.seconds, digits: 1)
+            }))
+        }
+        return fields
+    }
+
+    /// A playhead sample every 10 s of movie time, in Detailed logs only.
+    private func sample(at movie: TimeInterval) {
+        guard Diag.detailed, abs(movie - diagSampleAt) >= 10 else { return }
+        diagSampleAt = movie
+        var fields: [(String, Any?)] = [
+            ("at", movie), ("ahead", backend.bufferedAhead), ("rate", backend.rate), ("stream", diagStream),
+            ("estimateKbps", linkEstimateKbps),
+        ]
+        if case .remux(let remux) = stream { fields.append(("written", remux.progress.mediaSeconds)) }
+        if let event = backend.player?.currentItem?.accessLog()?.events.last {
+            fields.append(("dropped", event.numberOfDroppedVideoFrames))
+            let observed = event.observedBitrate
+            if observed.isFinite, observed > 0 { fields.append(("observedKbps", Int(observed / 1000))) }
+        }
+        Diag.event(.player, "playhead", list: fields, .debug)
     }
 }
