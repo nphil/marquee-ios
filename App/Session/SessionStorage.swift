@@ -41,6 +41,13 @@ final class SessionStorage {
         static let glassesLeftRemote = "marquee.glasses.leftRemote"
         static let glassesKind = "marquee.glasses.kind"
         static let glassesDisplays = "marquee.glasses.displays"
+        static let diagServer = "marquee.diag.server"
+        static let diagTopic = "marquee.diag.topic"
+        static let diagToken = "marquee.diag.token"
+        static let diagName = "marquee.diag.name"
+        static let diagLive = "marquee.diag.live"
+        static let diagDetailed = "marquee.diag.detail"
+        static let diagButton = "marquee.diag.button"
         static let tracksPrefix = "marquee."
     }
 
@@ -228,6 +235,41 @@ final class SessionStorage {
         set { defaults.set(newValue, forKey: Key.glassesLeftRemote) }
     }
 
+    /// Diagnostic Logs: the ntfy server and topic, and the access token as a secret like Bazarr's key. Kept
+    /// per iPhone through sign-out, with the name its messages carry, whether the log is sent live, how much
+    /// it keeps and whether the floating report button shows.
+    var ntfy: NtfyConfig? {
+        get {
+            guard let server = defaults.url(forKey: Key.diagServer), let topic = defaults.string(forKey: Key.diagTopic) else { return nil }
+            return NtfyConfig(server: server, topic: topic, token: secret(Key.diagToken).map { String(decoding: $0, as: UTF8.self) })
+        }
+        set {
+            defaults.set(newValue?.server, forKey: Key.diagServer)
+            defaults.set(newValue?.topic, forKey: Key.diagTopic)
+            setSecret(newValue?.token.map { Data($0.utf8) }, for: Key.diagToken)
+        }
+    }
+
+    var diagName: String {
+        get { defaults.string(forKey: Key.diagName) ?? "" }
+        set { defaults.set(newValue, forKey: Key.diagName) }
+    }
+
+    var diagLive: Bool {
+        get { defaults.object(forKey: Key.diagLive) as? Bool ?? true }
+        set { defaults.set(newValue, forKey: Key.diagLive) }
+    }
+
+    var diagDetailed: Bool {
+        get { defaults.bool(forKey: Key.diagDetailed) }
+        set { defaults.set(newValue, forKey: Key.diagDetailed) }
+    }
+
+    var diagButton: Bool {
+        get { defaults.bool(forKey: Key.diagButton) }
+        set { defaults.set(newValue, forKey: Key.diagButton) }
+    }
+
     /// Sign-out: the token, the servers and the Seerr session made with the token leave the Keychain;
     /// settings and themes stay.
     func clearSignIn() {
@@ -247,6 +289,7 @@ final class SessionStorage {
         clearSignIn()
         seerr = nil
         homelabber = nil
+        ntfy = nil
         defaults.removePersistentDomain(forName: domain)
     }
 

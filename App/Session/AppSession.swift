@@ -54,6 +54,7 @@ final class AppSession {
     var settings: ProfileSettings {
         get { profileSettings }
         set {
+            Diag.changes("profile", from: profileSettings, to: newValue)
             profileSettings = newValue
             storage.profileSettings.save(newValue, profile: settingsProfile)
         }
@@ -79,6 +80,8 @@ final class AppSession {
     let glasses: GlassesCenter
     /// Linked phones (DESIGN §8.10), kept per iPhone.
     let link: PhoneLink
+    /// Diagnostic Logs (DESIGN §8.12), kept per iPhone.
+    let diagnostics: DiagnosticsSettings
 
     /// Made again by Delete All Local Data, which removes the stored client identifier.
     private(set) var identity: PlexClientIdentity
@@ -115,11 +118,13 @@ final class AppSession {
         remote = TVRemote(storage: storage, inMemory: FakePlex.isActive)
         glasses = GlassesCenter(storage: storage)
         link = PhoneLink(storage: storage, inMemory: FakePlex.isActive)
+        diagnostics = DiagnosticsSettings(storage: storage)
         restore()
         watchNetwork()
         watchForeground()
         // The fake server is plain HTTP on the test host; no prompt should cover the UI tests' screens.
         if !FakePlex.isActive { localNetwork.request() }
+        ReportCenter.shared.session = self
     }
 
     // MARK: Sign-in
@@ -282,6 +287,7 @@ final class AppSession {
     func deleteAllLocalData() async {
         signOut()
         storage.eraseAll()
+        diagnostics.eraseAll()
         remote.eraseAll()
         glasses.reset()
         link.eraseAll()
@@ -374,7 +380,8 @@ final class AppSession {
     /// `-marquee.uitest.seerr` saves a Seerr signing in with an API key, answered by the `seerr`
     /// fixtures; `-marquee.uitest.speechDock` does the same for SpeechDock and its `speechdock`
     /// fixtures, `-marquee.uitest.homelabber` for HomeLabber and its `homelabber` fixtures, and
-    /// `-marquee.uitest.remote YES` turns the LumaTV remote on.
+    /// `-marquee.uitest.remote YES` turns the LumaTV remote on. `-marquee.uitest.ntfy` with a server saves
+    /// Diagnostic Logs sending to its `marquee-test` topic, answered by the `ntfy` fixtures.
     private func restoreUITest() {
         let arguments = UserDefaults.standard
         if let address = arguments.string(forKey: "marquee.uitest.bazarr").flatMap(URL.init(string:)) {
@@ -390,6 +397,9 @@ final class AppSession {
         }
         if let origin = arguments.string(forKey: "marquee.uitest.speechDock").flatMap({ try? SpeechDock.origin($0).get() }) {
             speechDock.save(origin)
+        }
+        if let server = arguments.string(forKey: "marquee.uitest.ntfy").flatMap(URL.init(string:)) {
+            diagnostics.save(NtfyConfig(server: server, topic: "marquee-test", token: "fake-token-fake"))
         }
         if arguments.bool(forKey: "marquee.uitest.remote") {
             remote.setEnabled(true)
@@ -584,6 +594,8 @@ final class AppSession {
         let key = profile?.uuid ?? ""
         let previous = settingsProfile
         user = profile
+        diagnostics.profileName = profile?.title
+        Diag.event(.app, "profile", ["profile": profile?.title, "admin": profile?.isAdmin, "restricted": profile?.isRestricted, "sameAccount": sameAccount])
         storage.profile = profile
         if let library, let server { downloads.connect(library: library, scope: DownloadScope(server: server.id, profile: key)) }
         guard key != previous || !settingsLoaded else { return }
@@ -652,6 +664,7 @@ final class AppSession {
 
     private func setPlace(_ value: HomePresence.Verdict) {
         guard place != value else { return }
+        Diag.event(.net, "place", ["from": "\(place)", "to": "\(value)"])
         place = value
         networkChanges += 1
     }
@@ -664,6 +677,7 @@ final class AppSession {
         networkChanges += 1
         downloads.syncWatch()
         guard let connection = library?.connection else { return }
+        Diag.event(.plex, "network.changed", ["revision": presenceNetworkRevision, "playing": player.active != nil])
         let revision = presenceNetworkRevision
         let playback = player.active
         addressTask?.cancel()
@@ -672,6 +686,7 @@ final class AppSession {
             await keepAddress(of: connection, reprobe: true)
             let current = await connection.currentConnection
             guard !Task.isCancelled, revision == presenceNetworkRevision, player.active === playback else { return }
+            Diag.event(.plex, "address.after-network", ["class": current?.kindWord, "address": current?.displayAddress, "playing": playback != nil])
             playback?.networkChanged(to: current)
         }
     }
@@ -690,6 +705,7 @@ final class AppSession {
         guard let connection = library?.connection else { return }
         Task {
             guard let found = await connection.preferLocal() else { return }
+            Diag.event(.plex, "address.local", ["address": found.displayAddress])
             storage.setAddress(found.uri, for: connection.server.id)
         }
     }

@@ -13,6 +13,8 @@ settings:
     # Defaults for local builds; CI passes the release version as overrides.
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "0.1.0"
+    # The commit a build came from, in the diagnostic log; CI sets it for releases.
+    MARQUEE_COMMIT: "local"
 
 packages:
   MarqueeCore:
@@ -69,6 +71,7 @@ targets:
         CFBundleDisplayName: Marquee
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        MarqueeCommit: $(MARQUEE_COMMIT)
         LSRequiresIPhoneOS: true
         # Lifts the iPhone's 60 fps cap on Core Animation so animations reach 120 Hz.
         CADisableMinimumFrameDurationOnPhone: true

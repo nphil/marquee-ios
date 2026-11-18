@@ -34,6 +34,8 @@ enum Size {
     static let menuGlyph: CGFloat = 28
     /// The link code Linked Phones shows (DESIGN §8.10): big enough for a phone held at arm's length.
     static let linkCode: CGFloat = 240
+    /// The screenshot preview in Report a Problem: tall enough to recognise the screen.
+    static let reportShot: CGFloat = 240
 }
 
 enum Radius {

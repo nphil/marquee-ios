@@ -121,6 +121,7 @@ struct RootView: View {
         } message: {
             Text("Marquee shows its own screen on the display, and this iPhone becomes a remote that works without looking at it. The answer is kept for this display; Settings › Big Screen changes it.")
         }
+        .modifier(RootDiagnostics(theme: theme, scheme: scheme))
     }
 
     /// The player's cover hangs from the root and again inside Settings, and the player goes to whichever
@@ -170,7 +171,7 @@ private struct MainTabs: View {
         TabView(selection: Binding(get: { selection }, set: { picked = $0 })) {
             ForEach(tabs) { destination in
                 Tab(destination.title, systemImage: destination.systemImage, value: destination, role: destination == .search ? .search : nil) {
-                    BrowseStack { destination.page() }
+                    BrowseStack(tab: destination.rawValue) { destination.page() }
                 }
                 .badge(destination.badge(in: session))
             }
@@ -186,6 +187,10 @@ private struct MainTabs: View {
         .environment(toasts)
         .environment(changes)
         .onChange(of: session.server?.id) { changes.forgetDeletions() }
+        .onChange(of: selection, initial: true) { _, tab in
+            DiagScreen.tab = tab.rawValue
+            Diag.event(.nav, "tab", ["tab": tab.rawValue])
+        }
         .onChange(of: session.glasses.leaveHint) { _, hint in
             guard let hint else { return }
             toasts.show(hint)
@@ -200,5 +205,77 @@ private struct MainTabs: View {
             signInAgain: { session.signOut() },
             canDeleteMedia: session.canDeleteMedia
         ))
+    }
+}
+
+/// What the log needs from the root: the scene's phase, the session's state, the display settings and the
+/// window's size as they change, the sheets and covers hung here, and the theme the report sheet and the
+/// floating button draw in.
+private struct RootDiagnostics: ViewModifier {
+    @Environment(AppSession.self) private var session
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.legibilityWeight) private var legibilityWeight
+    @Environment(\.colorSchemeContrast) private var contrast
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    let theme: Theme
+    let scheme: ColorScheme?
+
+    private struct Display: Equatable {
+        var theme: Theme
+        var scheme: ColorScheme?
+        var typeSize: DynamicTypeSize
+        var bold: Bool
+        var contrast: Bool
+        var reduceMotion: Bool
+        var reduceTransparency: Bool
+    }
+
+    func body(content: Content) -> some View {
+        let display = Display(
+            theme: theme, scheme: scheme, typeSize: typeSize, bold: legibilityWeight == .bold, contrast: contrast == .increased,
+            reduceMotion: reduceMotion, reduceTransparency: reduceTransparency
+        )
+        content
+            .onChange(of: scenePhase, initial: true) { _, phase in
+                Diag.event(.ui, "scene", ["phase": "\(phase)"])
+                if phase == .active { ReportButton.shared.sceneReady() }
+            }
+            .onChange(of: session.state, initial: true) { _, state in
+                switch state {
+                case .signedOut: Diag.event(.app, "state", ["state": "signed-out"])
+                case .signingIn: Diag.event(.app, "state", ["state": "signing-in"])
+                case .choosingServer(let servers): Diag.event(.app, "state", ["state": "choosing-server", "servers": servers.count])
+                case .ready: Diag.event(.app, "state", ["state": "ready", "server": session.server?.name])
+                case .failed(let error): Diag.event(.app, "state", ["state": "failed", "error": error], .warning)
+                }
+            }
+            .onChange(of: display, initial: true) { _, display in
+                ReportCenter.shared.theme = display.theme
+                ReportCenter.shared.scheme = display.scheme
+                Diag.event(.ui, "display", [
+                    "theme": display.theme.name, "scheme": display.scheme.map { "\($0)" } ?? "system", "textSize": "\(display.typeSize)",
+                    "bold": display.bold, "contrast": display.contrast, "reduceMotion": display.reduceMotion,
+                    "reduceTransparency": display.reduceTransparency,
+                ])
+            }
+            // With the safe area, so the keyboard coming and going is not a new size.
+            .onGeometryChange(for: CGSize.self) { proxy in
+                let insets = proxy.safeAreaInsets
+                return CGSize(width: proxy.size.width + insets.leading + insets.trailing, height: proxy.size.height + insets.top + insets.bottom)
+            } action: { size in
+                Diag.event(.ui, "layout", [
+                    "w": Int(size.width), "h": Int(size.height), "orientation": size.width > size.height ? "landscape" : "portrait",
+                    "hClass": horizontalSizeClass.map { "\($0)" }, "vClass": verticalSizeClass.map { "\($0)" },
+                ])
+            }
+            .diagPresentation("settings", isPresented: session.showsSettings)
+            .diagPresentation("profiles", isPresented: session.showsProfileSwitcher)
+            .diagPresentation("remote", isPresented: session.remote.isPresented)
+            .diagPresentation("player", isPresented: session.player.presented != nil)
+            .diagPresentation("glasses.ask", isPresented: session.glasses.asksToUse)
     }
 }

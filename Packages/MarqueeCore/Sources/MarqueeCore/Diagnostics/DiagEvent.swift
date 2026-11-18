@@ -24,7 +24,7 @@ public enum DiagCategory: String, Sendable, CaseIterable, Codable {
     case app, ui, nav, net, plex, player, audio, subtitles, offers, download, live, link, bigscreen, integration
 
     /// The categories whose events belong to the playback in progress.
-    var followsPlayback: Bool {
+    public var followsPlayback: Bool {
         switch self {
         case .player, .audio, .subtitles, .offers: true
         default: false
