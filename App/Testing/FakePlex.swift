@@ -51,6 +51,14 @@ enum FakePlex {
     /// against a server as slow as a real one.
     static let latency: TimeInterval = isActive ? UserDefaults.standard.double(forKey: "marquee.uitest.latency") / 1000 : 0
 
+    /// Seconds only the server's and the watchlist's answers wait (`-marquee.uitest.serverLatency`, in
+    /// milliseconds), plex.tv answering at once, so Home opens on a server that is slow to reply.
+    static let serverLatency: TimeInterval = isActive ? UserDefaults.standard.double(forKey: "marquee.uitest.serverLatency") / 1000 : 0
+
+    static func latency(for url: URL?) -> TimeInterval {
+        url?.host?.hasPrefix("plex.tv") == true ? latency : latency + serverLatency
+    }
+
     /// The phone counts as up on cellular only (`-marquee.uitest.cellular`), for downloads kept to Wi-Fi.
     static let cellularOnly = isActive && UserDefaults.standard.bool(forKey: "marquee.uitest.cellular")
 
@@ -85,9 +93,10 @@ final class FakePlexProtocol: URLProtocol {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        guard FakePlex.latency > 0 else { return answer() }
+        let latency = FakePlex.latency(for: request.url)
+        guard latency > 0 else { return answer() }
         // A timer on this thread's run loop rather than a sleep, so requests made together wait together.
-        let timer = Timer(timeInterval: FakePlex.latency, target: self, selector: #selector(answer), userInfo: nil, repeats: false)
+        let timer = Timer(timeInterval: latency, target: self, selector: #selector(answer), userInfo: nil, repeats: false)
         RunLoop.current.add(timer, forMode: .common)
         delay = timer
     }

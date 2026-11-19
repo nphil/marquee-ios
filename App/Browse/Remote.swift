@@ -17,13 +17,35 @@ final class Remote<Value: Sendable> {
 
     /// Loads afresh. A load that a newer one overtook, or whose task was cancelled, changes nothing.
     /// `file` names the screen in the diagnostic log.
-    func load(_ fetch: @MainActor () async throws -> Value, file: String = #fileID) async {
+    ///
+    /// With `cached`, a screen that has nothing yet shows what the last run saved, while `fetch` is already
+    /// on its way: the saved content is shown as loaded when it was saved, with no banner until a refresh
+    /// fails, and the answer replaces it in one step. A saved copy that is still being read when the answer
+    /// arrives is dropped.
+    func load(
+        cached: (@Sendable () async -> (value: Value, savedAt: Date)?)? = nil,
+        file: String = #fileID,
+        _ fetch: @MainActor () async throws -> Value
+    ) async {
         generation &+= 1
         let current = generation
         isLoading = true
         let screen = file.split(separator: "/").last.map { String($0.prefix { $0 != "." }) } ?? file
         let started = ContinuousClock.now
         Diag.event(.net, "load.start", ["screen": screen, "attempt": attempt, "kept": value != nil], .debug)
+        var seeding: Task<Void, Never>?
+        if let cached, value == nil {
+            seeding = Task { [weak self] in
+                guard let saved = await cached() else { return }
+                guard let self, !Task.isCancelled, generation == current, value == nil else { return }
+                value = saved.value
+                loadedAt = saved.savedAt
+                Diag.event(.net, "load.cached", [
+                    "screen": screen, "ms": Diag.ms(since: started), "ageS": Int(Date.now.timeIntervalSince(saved.savedAt)),
+                ], .debug)
+            }
+        }
+        defer { seeding?.cancel() }
         let outcome: Result<Value, any Error>
         do {
             outcome = .success(try await fetch())

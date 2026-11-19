@@ -6,6 +6,7 @@ public struct PlexWatchlist: Sendable {
     public static let base = URL(string: "https://discover.provider.plex.tv")!
     /// Carries the account token of the current profile.
     public let http: PlexHTTPClient
+    private var snapshot: ResponseSnapshot?
 
     public init(http: PlexHTTPClient) {
         self.http = http
@@ -16,8 +17,22 @@ public struct PlexWatchlist: Sendable {
         var request = request(.get, "/library/sections/watchlist/all", ["includeCollections": "1", "includeExternalMedia": "1"])
         request.headers[PlexHeader.containerStart] = String(start)
         request.headers[PlexHeader.containerSize] = String(size)
-        let result = try await http.decode(PlexEnvelope.self, from: request).container
+        let decode: (Data) throws -> PlexMediaContainer = { try PlexJSON.decode(PlexEnvelope.self, from: $0).container }
+        let result: PlexMediaContainer
+        if let snapshot {
+            let key = ResponseSnapshot.requestKey(path: request.url.path, query: URLComponents(url: request.url, resolvingAgainstBaseURL: false)?.queryItems ?? [], headers: request.headers)
+            result = try await snapshot.decoded(key, fetch: { try await http.send(request).body }, decode: decode)
+        } else {
+            result = try decode(await http.send(request).body)
+        }
         return PlexPage(items: result.metadata, totalSize: result.totalSize ?? start + result.metadata.count)
+    }
+
+    /// This watchlist with its reads going through `snapshot`, as `PlexLibrary.snapshotting` does.
+    public func snapshotting(_ snapshot: ResponseSnapshot?) -> PlexWatchlist {
+        var copy = self
+        copy.snapshot = snapshot
+        return copy
     }
 
     /// Whether the title with this guid is on the watchlist.

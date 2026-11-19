@@ -586,6 +586,8 @@ Little copy: a title and one short line, one action (`L:380`). Icons are SF Symb
 | Undoable change | toast above the tab bar, one at a time | "Marked watched" | Undo (5 s or more) |
 | Destructive | confirmation dialog in the system's destructive style, or the danger button | names what is removed | Cancel is the safe choice |
 
+Home opens on its last content. The raw answers of Home's requests (the rows' hubs and libraries, and the Watchlist shelf's first page) are kept in Caches, one snapshot per server and profile, never keyed by token or address, bounded in size and age, and written off the main thread. A launch decodes them with the same code as a live answer while the refresh is already on its way; the answer then replaces the rows in one step, so a title deleted or watched meanwhile leaves and the scroll position stays. A snapshot shows no banner until a refresh fails, when the offline banner reports its age. Sign-out, Delete All Local Data and leaving a profile remove it, and a profile never reads another's.
+
 ## 12. Component map and icons
 
 | Lucent (`L:259-300`) | iPhone |

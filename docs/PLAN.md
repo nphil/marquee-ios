@@ -13,6 +13,7 @@ Scope: the Marquee iPhone, XR glasses, wired-TV, remote and HomeLabber quality-m
 - [ ] **N5 — Current CI baseline.** Separate the simulator boot failure from product failures in run [43566194650](https://github.com/nphil/marquee-ios/actions/runs/43566194650). App, Core, Live engine and Release passed; four UI jobs failed, including one at simulator boot. Done: every genuine failure is fixed in one combined push and any remaining infrastructure failure is named, not hidden by retries.
 - [ ] **N6 — Diagnostic logs acceptance (R46).** DEVICE-TEST check 29 on the iPhone, then read the first `offers skip.missed` from the live log. Done: live batches and both report paths arrive on the real server, and the skip-intro miss is explained or ruled out from its log line.
 - [ ] **N7 — Chapter markers acceptance (R47).** Play The Apothecary Diaries S2 E10 and E11 on the iPhone. Done: Up Next appears as each Ending chapter starts (22:15), Skip Intro runs to 1:30, and the log's `offers markers` line shows them tagged `chapter`.
+- [ ] **N8 — Home at launch acceptance (R48).** DEVICE-TEST check 30 on the iPhone. Done: Home shows the last titles and artwork on the first frame of a relaunch, online and offline, refreshes without a jump, and a second profile never sees the first's Home; the `load.cached` and `load.ok` times are recorded.
 
 The first build batches N1–N5. Inspect recordings before editing, exercise the touched behavior once after the batch, then publish one point release. No unrelated refactor or engine replacement.
 
@@ -126,6 +127,7 @@ Each request is retained separately below; repeated reports share one entry inst
 | R45 | iPhone USB-C/HDMI CEC control | Platform question answered; no supported public path identified. R26 supplies software volume instead. |
 | R46 | Diagnostic logs to ntfy with Report a Problem, and the skip-intro miss explained | Built: DESIGN §8.12; N6 open. |
 | R47 | Skip Credits on time for shows Plex marks late or not at all | Built: markers from named chapters, DESIGN §8 Up Next; N7 open. |
+| R48 | Home appears instantly at launch | Built: last Home from disk, then a quiet refresh, DESIGN §11; N8 open. |
 
 ## 6. Evidence and release boundaries
 

@@ -25,6 +25,8 @@ The UI tests launch the app with `MARQUEE_FAKE_PLEX` set to this folder. `App/Te
 - `"__anchor": T` at the top of a fixture moves every `beginsAt` and `endsAt` in it by 9 PM today minus T. The app draws the Live TV guide at 9:41 PM today while the fake Plex is active, so the guide fixtures, written around T = 1800000000, always air at the same times.
 - `live.json` holds the Live TV favourites and recent channels each profile starts with.
 
+`-marquee.uitest.latency` delays every answer, `-marquee.uitest.serverLatency` (milliseconds) only the server's and the watchlist's, so Home can be opened on a slow server while plex.tv answers at once.
+
 The fake server is "Living Room", `fake-server`, at `http://192.0.2.10:32400`.
 
 plex.tv lists four servers of the account and its Home: Living Room (reached locally), Cabin (remote only), Office (relay only) and Studio (Alex's, offline), then Sam's server shared with the account. The browser sign-in code is approved at once; the plex.tv/link code never is. The Home has three profiles: Jordan (the account), Alex (PIN 1234) and Kids (restricted). Their photos, `users/<uuid>/avatar.png`, are generated silhouettes.

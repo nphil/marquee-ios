@@ -18,6 +18,7 @@ struct HomeView: View {
     @State private var editing = false
     @State private var watchlistTitles = Remote<PlexPage<PlexMetadata>>()
     @State private var watchlistClient: ObjectIdentifier?
+    @State private var rowsScope: SnapshotScope?
     @Environment(\.plexWatchlist) private var watchlist
     @Environment(\.sheetZoomNamespace) private var sheetNamespace
 
@@ -139,11 +140,27 @@ struct HomeView: View {
         return (shown * (shown < 600 ? 0.82 : 0.33)).rounded()
     }
 
+    /// Shows the last Home saved for this server and profile while the server is asked again; the answer
+    /// replaces it in one step and is saved for the next launch.
     private func load() async {
         guard let library else { return }
+        let scope = session.snapshotScope
+        // Another profile or server never sees the last one's rows, not even until its own answer.
+        if let rowsScope, rowsScope != scope { rows = Remote() }
+        rowsScope = scope
         let libraries = session.settings.homeRows.shownLibraries
         let hidden = session.settings.hiddenLibraries
-        await rows.load { try await HomeRows.load(from: library, libraries: libraries, hidden: hidden) }
+        let live = session.homeSnapshot(.record)
+        let saved = session.homeSnapshot(.replay)
+        await rows.load(
+            cached: saved.map { saved in
+                { @Sendable () async -> (value: [HomeRow], savedAt: Date)? in
+                    guard let rows = try? await HomeRows.load(from: library.snapshotting(saved), libraries: libraries, hidden: hidden),
+                          let at = saved.savedAt else { return nil }
+                    return (rows, at)
+                }
+            }
+        ) { try await HomeRows.load(from: library.snapshotting(live), libraries: libraries, hidden: hidden) }
     }
 
     private struct WatchlistLoad: Hashable {
@@ -164,7 +181,17 @@ struct HomeView: View {
             watchlistClient = client
             watchlistTitles = Remote()
         }
-        await watchlistTitles.load { try await watchlist.items(start: 0, size: 20) }
+        let live = session.homeSnapshot(.record)
+        let saved = session.homeSnapshot(.replay)
+        await watchlistTitles.load(
+            cached: saved.map { saved in
+                { @Sendable () async -> (value: PlexPage<PlexMetadata>, savedAt: Date)? in
+                    guard let page = try? await watchlist.snapshotting(saved).items(start: 0, size: 20),
+                          let at = saved.savedAt else { return nil }
+                    return (page, at)
+                }
+            }
+        ) { try await watchlist.snapshotting(live).items(start: 0, size: 20) }
     }
 
     /// `rows` without the titles deleted this session; a row left empty is not shown.

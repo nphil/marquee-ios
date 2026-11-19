@@ -89,6 +89,8 @@ final class AppSession {
     /// What the app's requests showed of the path to each host, for `NetworkPlace`.
     let pathMetrics: PathMetrics
     private let storage: SessionStorage
+    /// Home's last content, kept in Caches per server and profile (DESIGN §11); nil in UI tests that do not ask for it.
+    let homeSnapshots: SnapshotStore?
     @ObservationIgnored private var signInTask: Task<Void, Never>?
     @ObservationIgnored private let signInBrowser = PlexSignInBrowser()
     /// plex.tv's approval page while a browser sign-in waits, so it can be opened again.
@@ -119,6 +121,7 @@ final class AppSession {
         glasses = GlassesCenter(storage: storage)
         link = PhoneLink(storage: storage, inMemory: FakePlex.isActive)
         diagnostics = DiagnosticsSettings(storage: storage)
+        homeSnapshots = Self.snapshotStore()
         restore()
         watchNetwork()
         watchForeground()
@@ -217,6 +220,31 @@ final class AppSession {
         PlexServerConnection(server: server, identity: identity, transport: transport)
     }
 
+    // MARK: Home snapshot
+
+    /// Whose Home snapshot this is: the chosen server as the active profile sees it. Nothing before a server is chosen.
+    var snapshotScope: SnapshotScope? {
+        server.map { SnapshotScope(server: $0.id, profile: user?.uuid ?? "") }
+    }
+
+    /// Home's snapshot for the current scope in `mode`; nil without a store or a server.
+    func homeSnapshot(_ mode: ResponseSnapshot.Mode) -> ResponseSnapshot? {
+        guard let homeSnapshots, let snapshotScope else { return nil }
+        return ResponseSnapshot(store: homeSnapshots, scope: snapshotScope, mode: mode)
+    }
+
+    /// UI tests share one app container, so a snapshot exists only for a test that launches with
+    /// `-marquee.uitest.homeSnapshot YES`; `-marquee.uitest.homeSnapshotReset YES` starts it empty.
+    private static func snapshotStore() -> SnapshotStore? {
+        let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+        let store = SnapshotStore(directory: caches.appending(path: "HomeSnapshots", directoryHint: .isDirectory))
+        guard FakePlex.isActive else { return store }
+        let defaults = UserDefaults.standard
+        guard defaults.bool(forKey: "marquee.uitest.homeSnapshot") else { return nil }
+        if defaults.bool(forKey: "marquee.uitest.homeSnapshotReset") { store.removeAll() }
+        return store
+    }
+
     // MARK: Profiles
 
     /// Switches to a Home profile. Throws `PlexError.profilePINRejected` for a wrong PIN. The chosen
@@ -231,6 +259,7 @@ final class AppSession {
         storage.servers = found
         plexTV = profileTV
         servers = found
+        homeSnapshots?.remove(profile: user?.uuid ?? "")
         setUser(profile)
         if let id = server?.id, let same = found.first(where: { $0.id == id }) {
             connect(to: same)
@@ -259,6 +288,7 @@ final class AppSession {
         homeUsers = []
         linkCode = nil
         setUser(nil)
+        homeSnapshots?.removeAll()
         downloads.connect(library: nil, scope: nil)
         state = .signedOut
     }

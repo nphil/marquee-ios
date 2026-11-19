@@ -4,6 +4,7 @@ import Foundation
 public struct PlexLibrary: Sendable {
     public let connection: PlexServerConnection
     let http: PlexHTTPClient
+    private var snapshot: ResponseSnapshot?
 
     public var server: PlexServer { connection.server }
 
@@ -15,6 +16,14 @@ public struct PlexLibrary: Sendable {
     ) {
         connection = PlexServerConnection(server: server, identity: identity, transport: transport, remembered: rememberedURI)
         http = PlexHTTPClient(identity: identity, token: server.accessToken, transport: transport)
+    }
+
+    /// This library with its reads going through `snapshot`: Home records them, or replays the last
+    /// recording without any network. Nil is a plain library.
+    public func snapshotting(_ snapshot: ResponseSnapshot?) -> PlexLibrary {
+        var copy = self
+        copy.snapshot = snapshot
+        return copy
     }
 
     // MARK: Browsing
@@ -342,8 +351,15 @@ public struct PlexLibrary: Sendable {
         headers: [String: String] = [:],
         method: HTTPMethod = .get
     ) async throws -> PlexMediaContainer {
-        let response = try await send(method, path, query, headers: headers)
-        return try PlexJSON.decode(PlexEnvelope.self, from: response.body).container
+        guard let snapshot, method == .get else {
+            let response = try await send(method, path, query, headers: headers)
+            return try PlexJSON.decode(PlexEnvelope.self, from: response.body).container
+        }
+        return try await snapshot.decoded(
+            ResponseSnapshot.requestKey(path: path, query: query, headers: headers),
+            fetch: { try await send(method, path, query, headers: headers).body },
+            decode: { try PlexJSON.decode(PlexEnvelope.self, from: $0).container }
+        )
     }
 
     private func perform(

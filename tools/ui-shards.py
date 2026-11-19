@@ -90,6 +90,7 @@ SECONDS = {
     "HomeRowsAccessibilityScreenshots/testHomeRows": 123,
     "HomeRowsScreenshotTests/testHomeRowsDawn": 101,
     "HomeRowsScreenshotTests/testHomeRowsRosePine": 140,
+    "HomeSnapshotTests/testRelaunchShowsLastHomeBeforeTheServerAnswers": 40,
     "LiveDirectScreenshotTests/testDirectPlayerRosePine": 54,
     "LiveTVAccessibilityScreenshots/testGuide": 96,
     "LiveTVAccessibilityScreenshots/testPlayer": 98,
