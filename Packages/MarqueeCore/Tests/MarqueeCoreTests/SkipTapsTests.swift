@@ -43,11 +43,11 @@ struct SkipTapsTests {
         #expect(taps.tap(.back, at: 0.5) == .single)
     }
 
-    @Test func aDoubleTapInTheMiddleTogglesTheAspectAndNeverChains() {
+    @Test func theMiddleOnlyEverTogglesTheControls() {
         var taps = SkipTaps(mode: .chained)
-        _ = taps.tap(.centre, at: 0)
-        #expect(taps.tap(.centre, at: 0.2) == .toggleAspect)
-        #expect(taps.tap(.centre, at: 0.6) == .single)
+        #expect(taps.tap(.centre, at: 0) == .controls)
+        #expect(taps.tap(.centre, at: 0.2) == .controls)
+        #expect(taps.tap(.forward, at: 0.3) == .single)
     }
 
     @Test func tapsTooFarApartAreSingles() {

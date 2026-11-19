@@ -28,10 +28,11 @@ public struct SkipTaps: Sendable {
     public enum Action: Sendable, Equatable {
         /// Skip back or forward by the interval.
         case skip(TapSide)
-        /// A double-tap in the middle: fit or fill.
-        case toggleAspect
-        /// A first tap: show or hide the controls unless a second tap follows within `doubleTapWindow`.
+        /// A first tap at a side: show or hide the controls unless a second tap follows within `doubleTapWindow`.
         case single
+        /// A tap in the middle: show or hide the controls at once. Zoom is pinch only, so a double-tap aimed
+        /// at a side that lands in the middle never changes the picture.
+        case controls
     }
 
     /// A second tap within this many seconds of the first, on the same side, is a double-tap.
@@ -49,14 +50,17 @@ public struct SkipTaps: Sendable {
 
     /// `now` is any steady clock in seconds.
     public mutating func tap(_ side: TapSide, at now: TimeInterval) -> Action {
-        if mode == .chained, let chain, now < chain.until, chain.side == side, side != .centre {
+        if side == .centre {
+            lastTap = nil
+            return .controls
+        }
+        if mode == .chained, let chain, now < chain.until, chain.side == side {
             lastTap = nil
             self.chain = (side, now + Self.chainWindow)
             return .skip(side)
         }
         if let last = lastTap, now - last.at < Self.doubleTapWindow, last.side == side {
             lastTap = nil
-            if side == .centre { return .toggleAspect }
             chain = mode == .chained ? (side, now + Self.chainWindow) : nil
             return .skip(side)
         }

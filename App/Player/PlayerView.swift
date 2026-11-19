@@ -309,10 +309,9 @@ struct PlayerView: View {
             tapTask?.cancel()
             Haptics.impact(.light)
             model.skip(by: side == .back ? -model.skipInterval : model.skipInterval)
-        case .toggleAspect:
+        case .controls:
             tapTask?.cancel()
-            Haptics.impact(.light)
-            model.setAspect(model.aspect == .fit ? .fill : .fit)
+            model.tapped()
         case .single:
             tapTask?.cancel()
             tapTask = Task {
