@@ -488,7 +488,10 @@ final class PlayerModel: Identifiable {
         session.downloads.setPlaybackActive(true)
         backend.onEvent = { [weak self] event in self?.handle(event) }
         pictureInPicture?.onPossibleChange = { [weak self] possible in self?.canPictureInPicture = possible }
-        pictureInPicture?.onActiveChange = { [weak self] _ in self?.textRendererChanged() }
+        pictureInPicture?.onActiveChange = { [weak self] _ in
+            self?.textRendererChanged()
+            self?.updateNowPlayingSight()
+        }
         audioSession.onInterruption = { [weak self] began, shouldResume in self?.interrupted(began: began, shouldResume: shouldResume) }
         audioSession.onRouteLost = { [weak self] in self?.pause() }
         audioSession.activate()
@@ -509,7 +512,15 @@ final class PlayerModel: Identifiable {
             center.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated { self?.enteringForeground() }
             },
+            // Leaving sight covers the Lock Screen, Control Center and the app switcher too.
+            center.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.updateNowPlayingSight(active: false) }
+            },
+            center.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+                MainActor.assumeIsolated { self?.updateNowPlayingSight(active: true) }
+            },
         ]
+        updateNowPlayingSight()
         if request.download == nil {
             session.cast.player = self
             session.cast.beginSearch()
@@ -2260,6 +2271,7 @@ final class PlayerModel: Identifiable {
         isExternalPlayback = active
         PlaybackCapabilities.externalPlaybackActive = active
         textRendererChanged()
+        updateNowPlayingSight()
         // An AirPlay receiver cannot reach the remux's address on the phone.
         guard active, case .remux = stream, session.settings.directPlay != .force else { return }
         reroute(handPick: false)
@@ -2724,6 +2736,13 @@ final class PlayerModel: Identifiable {
 
     private func publishPosition() {
         nowPlaying?.update(time: time, rate: isPlaying && !isBuffering ? 1 : 0)
+    }
+
+    /// The Now Playing entry, and with it the Dynamic Island's waveform, only while the picture is out of
+    /// sight: the app behind something, Picture in Picture or AirPlay.
+    private func updateNowPlayingSight(active: Bool = UIApplication.shared.applicationState == .active) {
+        let inSight = active && !(pictureInPicture?.isActive ?? false) && !isExternalPlayback
+        nowPlaying?.setInSight(inSight, time: time, rate: isPlaying && !isBuffering ? 1 : 0)
     }
 
     /// Scene thumbnails wait for the picture, then ten seconds more for the stream's buffer, so they never

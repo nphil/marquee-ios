@@ -4,6 +4,10 @@ import UIKit
 /// The Lock Screen and Control Center entry: title, poster and position, with play, pause, skip and
 /// seek. Published by hand because a remux restarted by a long seek begins its item timeline at the
 /// seek point, so the player's own clock is not the movie's.
+///
+/// The entry is published only while the picture is out of sight (`setInSight`): iOS put the playing
+/// waveform in the Dynamic Island over a full-screen picture (0.1.47). The remote commands stay
+/// registered throughout, so headphone and AirPods controls keep working in front.
 @MainActor
 final class NowPlaying {
     struct Actions {
@@ -20,6 +24,7 @@ final class NowPlaying {
 
     private var targets: [(MPRemoteCommand, Any)] = []
     private var info: [String: Any] = [:]
+    private var inSight = true
 
     init(skipInterval: Int, actions: Actions) {
         let commands = MPRemoteCommandCenter.shared()
@@ -74,6 +79,18 @@ final class NowPlaying {
         publish()
     }
 
+    /// Whether the picture is on the phone's screen in front of the viewer. Leaving sight publishes the
+    /// entry at the playhead now, since the last `update` may be minutes old.
+    func setInSight(_ visible: Bool, time: TimeInterval, rate: Double) {
+        guard visible != inSight else { return }
+        inSight = visible
+        if visible {
+            MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
+        } else {
+            update(time: time, rate: rate)
+        }
+    }
+
     func end() {
         for (command, target) in targets { command.removeTarget(target) }
         targets = []
@@ -81,6 +98,7 @@ final class NowPlaying {
     }
 
     private func publish() {
+        guard !inSight else { return }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
