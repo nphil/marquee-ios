@@ -37,6 +37,8 @@ struct ProfileSettings: Equatable, Sendable {
     /// Libraries switched off under Favorite Libraries, by `HomeLayout.libraryID`. Empty shows every library,
     /// and one the server adds later shows until switched off.
     var hiddenLibraries: Set<String> = []
+    /// Next-episode cards taken off Continue Watching, which stay off until their show is viewed again.
+    var rewatchDismissed = RewatchDismissals()
     /// Plays a title's trailer in its page's hero after a moment (behaviour spec: Play trailers
     /// automatically, on by default).
     var playsTrailers = true
@@ -57,7 +59,7 @@ extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
         case skipInterval, skipTaps, introSkipDelay, nextEpisodeDelay, autoplaysNext, creditsAutoplay, directPlay, aspect, videoOrientation, readsTunerDirectly
         case audioLanguage, subtitles, remembersTracks, subtitleStyle, homeRows
-        case posterLabels, audioEnhancements, hiddenLibraries, playsTrailers, playsThemeMusic, themeMusicVolume
+        case posterLabels, audioEnhancements, hiddenLibraries, rewatchDismissed, playsTrailers, playsThemeMusic, themeMusicVolume
         /// "quality" held a fixed quality before Auto existed (`LegacyKeys`).
         case quality = "qualitySetting"
     }
@@ -93,6 +95,7 @@ extension ProfileSettings: Codable {
         quality = value(.quality) ?? QualitySetting.saved(legacy: legacy)
         audioEnhancements = value(.audioEnhancements) ?? audioEnhancements
         hiddenLibraries = value(.hiddenLibraries) ?? hiddenLibraries
+        rewatchDismissed = value(.rewatchDismissed) ?? rewatchDismissed
         playsTrailers = value(.playsTrailers) ?? playsTrailers
         playsThemeMusic = value(.playsThemeMusic) ?? playsThemeMusic
         themeMusicVolume = value(.themeMusicVolume) ?? themeMusicVolume

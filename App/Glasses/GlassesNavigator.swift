@@ -564,7 +564,7 @@ final class GlassesNavigator {
         case .show: push(showPage(item))
         case .season: push(seasonPage(item))
         case .collection: push(collectionPage(item))
-        default: play(item)
+        default: play(item, fromStart: item.rewatchedAt != nil)
         }
     }
 
@@ -597,7 +597,11 @@ final class GlassesNavigator {
             page.setRows([menu], loading: true)
             do {
                 let layout = session.settings.homeRows
-                let loaded = try await HomeRows.load(from: library, libraries: layout.shownLibraries, hidden: session.settings.hiddenLibraries)
+                let hidden = session.settings.hiddenLibraries
+                let rewatch = RewatchRun(library: library, hidden: hidden)
+                defer { rewatch.cancel() }
+                let plex = try await HomeRows.load(from: library, libraries: layout.shownLibraries, hidden: hidden)
+                let loaded = await HomeRows.following(plex, through: rewatch, dismissed: session.settings.rewatchDismissed, within: .seconds(2)) ?? plex
                 let shown = layout.arrange(loaded).filter { $0.shown && !$0.hub.items.isEmpty }
                 page.setRows([menu] + shown.map(row))
                 // Continue Watching is what most visits are for.
@@ -692,7 +696,7 @@ final class GlassesNavigator {
             })
         } else {
             tiles.append(GlassesTile(id: "play", title: "Play", subtitle: label, art: .symbol("play.fill"), item: item) { [weak self] in
-                self?.play(item)
+                self?.play(item, fromStart: item.rewatchedAt != nil)
             })
         }
         return GlassesRow(id: "actions", title: nil, shape: .card, tiles: tiles)
@@ -722,7 +726,8 @@ final class GlassesNavigator {
             do {
                 async let full = library.metadata(item.ratingKey)
                 let seasons = try await library.children(of: item.ratingKey).filter { $0.type == .season }
-                let show = (try? await full) ?? item
+                var show = item
+                if let loaded = try? await full { show = await library.offeringRewatch(of: loaded) }
                 page.hero = hero(show)
                 var rows: [GlassesRow] = []
                 if let next = show.onDeck {

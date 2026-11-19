@@ -40,6 +40,22 @@ enum HomeRows {
             + zip(sections, hubs).flatMap { section, hubs in rows(hubs, library: section) }
     }
 
+    /// `rows` with Continue Watching following the shows watched again (`RewatchQueue`): its cards come
+    /// from `run`, and the row is made when Plex lists none. Nil when `run` takes longer than `limit`.
+    static func following(_ rows: [HomeRow], through run: RewatchRun, dismissed: RewatchDismissals, within limit: Duration? = nil) async -> [HomeRow]? {
+        let at = rows.firstIndex { $0.isContinueWatching }
+        let plex = at.map { rows[$0].hub.items } ?? []
+        guard let cards = await run.continuing(plex, dismissed: dismissed, within: limit) else { return nil }
+        guard cards != plex else { return rows }
+        var rows = rows
+        if let at {
+            rows[at].hub.items = cards
+        } else {
+            rows.insert(HomeRow(hub: PlexHub(identifier: "home.continue", title: "Continue Watching", style: "hero", items: cards)), at: 0)
+        }
+        return rows
+    }
+
     static func isContinueWatching(_ hub: PlexHub) -> Bool {
         hub.style == "hero" || hub.identifier == "home.continue"
     }

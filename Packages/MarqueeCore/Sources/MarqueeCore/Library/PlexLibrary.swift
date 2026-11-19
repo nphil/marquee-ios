@@ -166,6 +166,28 @@ public struct PlexLibrary: Sendable {
         try await container("/library/metadata/\(ratingKey)/children").metadata
     }
 
+    /// Episodes with a view, newest first, as this user's token sees them: those of one library
+    /// (`sectionKey`), or the server's, and of one show (`show`) if given, without the shows in `skipping`.
+    /// Episodes with the same `lastViewedAt`, which a bulk "mark watched" makes, come later episode first.
+    /// `since` leaves out older views; it moves with the clock, so a snapshot keeps that request under a
+    /// key of its own.
+    func viewedEpisodes(
+        in sectionKey: String?, ofShow show: String? = nil, skipping skipped: [String] = [], since: Date? = nil, size: Int = 50
+    ) async throws -> PlexPage<PlexMetadata> {
+        var query = [
+            URLQueryItem(name: "type", value: PlexMediaType.episode.code.map { String($0) }),
+            URLQueryItem(name: "sort", value: "lastViewedAt:desc,season.index:desc,episode.index:desc"),
+        ]
+        if let show { query.append(URLQueryItem(name: "show.id", value: show)) }
+        if !skipped.isEmpty { query.append(URLQueryItem(name: "show.id!", value: skipped.joined(separator: ","))) }
+        if let since { query.append(URLQueryItem(name: "lastViewedAt>>", value: String(Int(since.timeIntervalSince1970)))) }
+        let paging = [PlexHeader.containerStart: "0", PlexHeader.containerSize: String(size)]
+        let path = sectionKey.map { "/library/sections/\($0)/all" } ?? "/library/all"
+        let key = since == nil ? nil : "viewed \(path) \(show ?? "-") !\(skipped.joined(separator: ",")) \(size)"
+        let result = try await container(path, query, headers: paging, snapshotKey: key)
+        return PlexPage(items: result.metadata, totalSize: result.totalSize ?? result.metadata.count)
+    }
+
     /// Search results grouped by kind: movies, shows, episodes, people.
     public func search(_ text: String, limit: Int = 10) async throws -> [PlexHub] {
         try await container("/hubs/search", ["query": text, "limit": String(limit)]).hubs
@@ -345,18 +367,20 @@ public struct PlexLibrary: Sendable {
         try await container(path, Self.items(query), headers: headers, method: method)
     }
 
+    /// `snapshotKey` names the request in a snapshot where its query would never repeat.
     private func container(
         _ path: String,
         _ query: [URLQueryItem],
         headers: [String: String] = [:],
-        method: HTTPMethod = .get
+        method: HTTPMethod = .get,
+        snapshotKey: String? = nil
     ) async throws -> PlexMediaContainer {
         guard let snapshot, method == .get else {
             let response = try await send(method, path, query, headers: headers)
             return try PlexJSON.decode(PlexEnvelope.self, from: response.body).container
         }
         return try await snapshot.decoded(
-            ResponseSnapshot.requestKey(path: path, query: query, headers: headers),
+            snapshotKey ?? ResponseSnapshot.requestKey(path: path, query: query, headers: headers),
             fetch: { try await send(method, path, query, headers: headers).body },
             decode: { try PlexJSON.decode(PlexEnvelope.self, from: $0).container }
         )

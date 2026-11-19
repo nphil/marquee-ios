@@ -27,7 +27,11 @@ struct DetailView: View {
         .task(id: LoadKey(library: library?.instance, attempt: remote.attempt, extra: changes.revision)) {
             guard let library else { return }
             let key = ratingKey
-            await remote.load { try await library.metadata(key) }
+            await remote.load {
+                // A show watched through offers the episode after the last one viewed, as Continue Watching does.
+                let item = try await library.metadata(key)
+                return await library.offeringRewatch(of: item)
+            }
         }
     }
 }
@@ -323,7 +327,7 @@ private struct DetailPage: View {
         VStack(alignment: .leading, spacing: Space.s4) {
             if let target = playTarget {
                 Button {
-                    session.play(target, mediaIndex: mediaIndex(for: target))
+                    session.play(target, mediaIndex: mediaIndex(for: target), fromStart: target.rewatchedAt != nil)
                 } label: {
                     Label(playTitle(target), systemImage: "play.fill")
                         .frame(maxWidth: .infinity)

@@ -151,6 +151,17 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
     /// An array, because a struct cannot hold an optional of itself.
     private var onDeckItems: [PlexMetadata]
 
+    /// Set on a Continue Watching card that `RewatchQueue` made rather than Plex listed: when its show was
+    /// last viewed, the view that puts this episode next.
+    public var rewatchedAt: Date?
+
+    /// This show with `episode` as the one to play next.
+    public func settingOnDeck(_ episode: PlexMetadata?) -> PlexMetadata {
+        var copy = self
+        copy.onDeckItems = episode.map { [$0] } ?? []
+        return copy
+    }
+
     enum CodingKeys: String, CodingKey {
         case ratingKey, key, guid, type, subtype, extraType, primaryExtraKey, title, titleSort, originalTitle, summary, tagline, year
         case index, parentIndex
@@ -652,6 +663,19 @@ public struct PlexHub: Sendable, Hashable, Identifiable, Decodable {
     enum CodingKeys: String, CodingKey {
         case hubIdentifier, key, title, type, style, size, more
         case items = "Metadata", directories = "Directory"
+    }
+
+    /// A hub the app makes itself, such as Continue Watching when Plex lists nothing for it.
+    public init(identifier: String, title: String, type: String? = nil, style: String? = nil, items: [PlexMetadata]) {
+        self.identifier = identifier
+        key = nil
+        self.title = title
+        self.type = type
+        self.style = style
+        size = items.count
+        more = false
+        self.items = items
+        directories = []
     }
 
     public init(from decoder: any Decoder) throws {

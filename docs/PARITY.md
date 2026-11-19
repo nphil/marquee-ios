@@ -33,7 +33,8 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Play from Beginning | Done | Starts again from zero. | `viewOffset=0` [code] |
 | Mark Watched / Unwatched | Done | Toggles watched state on title or episode. | `/:/scrobble`, `/:/unscrobble` [code] |
 | Mark show watched | Done | Mark Show Watched / Unwatched on a show's page (the check button), in the long-press menu of a show's poster in the library grid and shelves, and on an episode in Continue Watching; Mark Season Watched / Unwatched in the menu beside the season name. Plex marks every episode; badges, episode checks and Continue Watching change at once, and Undo is offered. | `/:/scrobble`, `/:/unscrobble` with the show's or season's `ratingKey` [code] |
-| Remove from Continue Watching | Done | Removes a title from the continue row. | `/:/unscrobble` / on-deck [code] |
+| Remove from Continue Watching | Done | Removes a title from the continue row. A next-episode card added for a rewatch is hidden on this profile, with the older Plex card it replaced, until the show has a newer view; Plex is not written to. | `/:/unscrobble` / on-deck [code] |
+| Continue Watching after a rewatch | Done | A show watched through again keeps its next episode in the row, as a card without progress that plays from the start; the show's page offers it as Play. The rule is shared with the LG TV app (DESIGN §8.1). | `/library/sections/{id}/all?type=4&sort=lastViewedAt:desc,season.index:desc,episode.index:desc&lastViewedAt>>=`, `show.id=`, `show.id!=` [code] |
 | Cast shelf | Done | Circular photos with names. | `roles` in metadata [code] |
 | Related titles | Done | Related shelves on the detail page. | `/library/metadata/{key}/related` [code] |
 | Extras (bonus videos) | Done | Movie and show pages: a shelf of 16:9 cards (kind and length); tapping one plays it. | `/library/metadata/{key}/extras` |

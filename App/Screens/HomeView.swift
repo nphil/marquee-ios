@@ -114,7 +114,10 @@ struct HomeView: View {
                         let menu = ShelfMenu(hide: { hide(row, in: arranged) }, edit: { editing = true })
                         if row.isContinueWatching {
                             if width > 0 {
-                                ContinueShelf(hub: row.hub, title: row.title, cardWidth: Self.cardWidth(for: width), header: menu, setShown: setShown)
+                                ContinueShelf(
+                                    hub: row.hub, title: row.title, cardWidth: Self.cardWidth(for: width), header: menu,
+                                    setShown: setShown, dismissRewatch: dismissRewatch
+                                )
                             }
                             if watchlistShelf {
                                 WatchlistShelf(page: watchlistTitles.value)
@@ -141,7 +144,9 @@ struct HomeView: View {
     }
 
     /// Shows the last Home saved for this server and profile while the server is asked again; the answer
-    /// replaces it in one step and is saved for the next launch.
+    /// replaces it in one step and is saved for the next launch. Continue Watching follows the shows
+    /// watched again (`RewatchQueue`): their cards are read beside Plex's own answer and put into it when
+    /// they are ready within a moment, or into the row after it has shown, so the row is not held up.
     private func load() async {
         guard let library else { return }
         let scope = session.snapshotScope
@@ -150,18 +155,38 @@ struct HomeView: View {
         rowsScope = scope
         let libraries = session.settings.homeRows.shownLibraries
         let hidden = session.settings.hiddenLibraries
+        let dismissed = session.settings.rewatchDismissed
         let live = session.homeSnapshot(.record)
         let saved = session.homeSnapshot(.replay)
+        let rewatch = RewatchRun(library: library.snapshotting(live), hidden: hidden)
+        defer { rewatch.cancel() }
+        var late = false
         await rows.load(
             cached: saved.map { saved in
                 { @Sendable () async -> (value: [HomeRow], savedAt: Date)? in
-                    guard let rows = try? await HomeRows.load(from: library.snapshotting(saved), libraries: libraries, hidden: hidden),
+                    let replay = library.snapshotting(saved)
+                    guard let plex = try? await HomeRows.load(from: replay, libraries: libraries, hidden: hidden),
                           let at = saved.savedAt else { return nil }
-                    return (rows, at)
+                    let followed = await HomeRows.following(plex, through: RewatchRun(library: replay, hidden: hidden), dismissed: dismissed)
+                    return (followed ?? plex, at)
                 }
             }
-        ) { try await HomeRows.load(from: library.snapshotting(live), libraries: libraries, hidden: hidden) }
+        ) {
+            let plex = try await HomeRows.load(from: library.snapshotting(live), libraries: libraries, hidden: hidden)
+            // Rows already on show (the saved copy, or the last load) can wait longer than a skeleton.
+            let wait = rows.value == nil ? Self.rewatchWait : Self.rewatchWaitShown
+            let followed = await HomeRows.following(plex, through: rewatch, dismissed: session.settings.rewatchDismissed, within: wait)
+            late = followed == nil
+            return followed ?? plex
+        }
+        guard late, let plex = rows.value,
+              let followed = await HomeRows.following(plex, through: rewatch, dismissed: session.settings.rewatchDismissed) else { return }
+        withAnimation(Motion.spring(reduceMotion: reduceMotion)) { rows.update { $0 = followed } }
     }
+
+    /// How long Home waits for the shows watched again before it shows Plex's row without them.
+    private static let rewatchWait = Duration.milliseconds(400)
+    private static let rewatchWaitShown = Duration.seconds(2)
 
     private struct WatchlistLoad: Hashable {
         let client: ObjectIdentifier?
@@ -229,6 +254,21 @@ struct HomeView: View {
         }
     }
 
+    /// Takes a next-episode card off Continue Watching, and with it the older entry of Plex's it replaced,
+    /// until its show is viewed again; Undo in the toast brings it back.
+    private func dismissRewatch(_ item: PlexMetadata, at index: Int) {
+        guard let show = item.grandparentRatingKey, item.rewatchedAt != nil, let server = library?.server.clientIdentifier else { return }
+        let session = session
+        session.settings.rewatchDismissed.dismiss(item, on: server)
+        setShown(false, item, at: index)
+        Diag.event(.plex, "rewatch.dismiss", ["show": show])
+        toasts.show("Removed from Continue Watching", undo: {
+            session.settings.rewatchDismissed.restore(item, on: server)
+            setShown(true, item, at: index)
+            Diag.event(.plex, "rewatch.restore", ["show": show])
+        })
+    }
+
     private struct Reload: Hashable {
         let revision: Int
         let libraries: Set<String>
@@ -255,13 +295,15 @@ private struct PlacesMenu: ViewModifier {
 }
 
 /// The Continue Watching row: snapping 16:9 cards. A tap resumes; a long press offers Details, Mark
-/// Watched, Mark Show Watched (on an episode) and Remove from Continue Watching.
+/// Watched, Mark Show Watched (on an episode) and Remove from Continue Watching. A card made for a show
+/// watched again plays from its start, and removing it hides it until the show is viewed again.
 private struct ContinueShelf: View {
     let hub: PlexHub
     let title: String
     let cardWidth: CGFloat
     let header: ShelfMenu
     let setShown: @MainActor (Bool, PlexMetadata, Int) -> Void
+    let dismissRewatch: @MainActor (PlexMetadata, Int) -> Void
 
     @Environment(\.sessionActions) private var session
     @Environment(\.openRoute) private var openRoute
@@ -275,7 +317,7 @@ private struct ContinueShelf: View {
                     ForEach(Array(hub.items.enumerated()), id: \.element.id) { index, item in
                         let zoomID = "continue/\(item.ratingKey)"
                         Button {
-                            session.play(item)
+                            session.play(item, fromStart: item.rewatchedAt != nil)
                         } label: {
                             ContinueCard(item: item, width: cardWidth, zoomID: zoomID)
                         }
@@ -312,7 +354,11 @@ private struct ContinueShelf: View {
             }
         }
         Button("Remove from Continue Watching", systemImage: "minus.circle") {
-            actions.removeFromContinueWatching(item) { hidden in setShown(!hidden, item, index) }
+            if item.rewatchedAt != nil {
+                dismissRewatch(item, index)
+            } else {
+                actions.removeFromContinueWatching(item) { hidden in setShown(!hidden, item, index) }
+            }
         }
     }
 }
