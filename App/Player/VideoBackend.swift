@@ -53,6 +53,10 @@ protocol VideoBackend: AnyObject {
     var itemDuration: TimeInterval? { get }
     /// Replaces the stream; nil unloads it.
     func load(_ item: AVPlayerItem?)
+    /// Pauses the stream and stops reporting on it but leaves it in the player until the next `load`.
+    /// Picture in Picture closes the moment its player has no item, which ended playback whenever
+    /// autoplay moved to the next episode in the window.
+    func hold()
     /// Playback speed, 1 for normal. Kept across loads, pauses and seeks.
     var rate: Float { get set }
     func play()
@@ -140,6 +144,11 @@ final class AVPlayerBackend: VideoBackend, GainSink {
         item?.audioTimePitchAlgorithm = .spectral
         avPlayer.replaceCurrentItem(with: item)
         if let item { observe(item) }
+    }
+
+    func hold() {
+        avPlayer.pause()
+        clearItem()
     }
 
     func play() {

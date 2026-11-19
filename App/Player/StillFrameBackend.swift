@@ -49,6 +49,10 @@ final class StillFrameBackend: VideoBackend {
         }
     }
 
+    func hold() {
+        stopClock()
+    }
+
     func play() {
         guard clock == nil else { return }
         if stalls || (linkTest && linkKbps == 0) {

@@ -1418,7 +1418,7 @@ final class PlayerModel: Identifiable {
         if measured { measureLink() }
         lastTransfer = nil
         longestWait = 0
-        backend.load(nil)
+        if pictureInPicture?.isActive ?? false { backend.hold() } else { backend.load(nil) }
         itemReady = false
         farSeeking = false
         switch stream {
