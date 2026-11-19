@@ -15,6 +15,8 @@ enum BackendEvent {
     case presentationSize(CGSize)
     /// The playing item reached the time `armSwitch` set: the standby stream is due.
     case switchDue
+    /// A segment of the stream answered 404 (AVPlayer's error log): the server no longer has what makes it.
+    case segmentNotFound
 }
 
 /// Why a stream stopped: plain words for the screen, and the error's domain, code and AVPlayer's comment
@@ -22,10 +24,13 @@ enum BackendEvent {
 struct PlaybackFailure: Equatable {
     let text: String
     let detail: String
+    /// The error, or the one beneath it, is a 404: the server no longer has the stream's files.
+    let isNotFound: Bool
 
-    init(text: String, detail: String? = nil) {
+    init(text: String, detail: String? = nil, isNotFound: Bool = false) {
         self.text = text
         self.detail = detail ?? text
+        self.isNotFound = isNotFound
     }
 
     init(_ error: NSError?, comment: String? = nil) {
@@ -36,7 +41,9 @@ struct PlaybackFailure: Equatable {
         let cause = (error.userInfo[NSUnderlyingErrorKey] as? NSError) ?? error
         var detail = "\(error.localizedDescription) (\(cause.domain) \(cause.code))"
         if let comment, !comment.isEmpty { detail += " " + comment }
-        self.init(text: error.localizedDescription, detail: detail)
+        let notFound = [error, cause].contains { ConversionWatch.isNotFound(domain: $0.domain, code: $0.code) }
+            || ConversionWatch.isNotFound(domain: nil, code: 0, comment: comment)
+        self.init(text: error.localizedDescription, detail: detail, isNotFound: notFound)
     }
 }
 
@@ -308,12 +315,15 @@ final class AVPlayerBackend: VideoBackend, GainSink {
             center.addObserver(forName: AVPlayerItem.playbackStalledNotification, object: item, queue: .main) { _ in
                 Diag.event(.player, "item.stalled", [:], .notice)
             },
-            center.addObserver(forName: AVPlayerItem.newErrorLogEntryNotification, object: item, queue: .main) { note in
+            center.addObserver(forName: AVPlayerItem.newErrorLogEntryNotification, object: item, queue: .main) { [weak self] note in
                 // The entry's address is a stream's, token and all, so it stays out of the log.
                 guard let event = (note.object as? AVPlayerItem)?.errorLog()?.events.last else { return }
                 Diag.event(.player, "item.error-log", [
                     "status": event.errorStatusCode, "domain": event.errorDomain, "comment": event.errorComment,
                 ], .notice)
+                // AVPlayer retries a missing segment for about 30 s before it fails the item; the model hears the 404 now.
+                guard ConversionWatch.isNotFound(domain: event.errorDomain, code: event.errorStatusCode, comment: event.errorComment) else { return }
+                MainActor.assumeIsolated { self?.onEvent?(.segmentNotFound) }
             },
             center.addObserver(forName: AVPlayerItem.newAccessLogEntryNotification, object: item, queue: .main) { note in
                 guard let event = (note.object as? AVPlayerItem)?.accessLog()?.events.last else { return }

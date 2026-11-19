@@ -304,6 +304,8 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var stageTask: Task<Void, Never>?
     @ObservationIgnored private var stallTask: Task<Void, Never>?
     @ObservationIgnored private var stallWatch = StallWatch()
+    /// Notices the server losing the conversion the stream plays from.
+    @ObservationIgnored private var conversion = ConversionWatch()
     @ObservationIgnored private var sideTasks: [Task<Void, Never>] = []
     @ObservationIgnored private var trickplayLoad: (part: Int, task: Task<Void, Never>, waits: Bool)?
     @ObservationIgnored private var castProgress: CastProgress?
@@ -320,6 +322,8 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var moveTask: Task<Void, Never>?
     /// Auto asked for a rung and the move has not settled (`settleMove`).
     @ObservationIgnored private var movePending = false
+    /// The move under way replaces a stream the server lost (`ConversionWatch`), not one Auto picked.
+    @ObservationIgnored private var replacingLost = false
     @ObservationIgnored private var standby: Standby?
     /// The playing item's transfer totals at Auto's last look.
     @ObservationIgnored private var lastTransfer: (bytes: Int64, seconds: TimeInterval)?
@@ -331,6 +335,14 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var loadingKey: String?
     /// The server address `place` was read for.
     @ObservationIgnored private var linkAddress: URL?
+    /// How near the server is for the item, decided as it starts or the network changes: a track change halfway
+    /// through must not move the route as the reading ages.
+    @ObservationIgnored private var reach = RouteReach.near
+    /// The server was asked what it would make of the file's own stream (`ServerLimit`) since `reach` was decided.
+    @ObservationIgnored private var serverLimitAsked = false
+    /// The playing stream's reading of the link is taken (`noteLink`); `readingBase` is where its counting began.
+    @ObservationIgnored private var linkNoted = false
+    @ObservationIgnored private var readingBase: (bytes: Int64, seconds: TimeInterval)?
 
     init(request: PlaybackRequest, session: AppSession, library: PlexLibrary, capabilities: PlaybackCapabilities) {
         self.request = request
@@ -980,6 +992,7 @@ final class PlayerModel: Identifiable {
         item = full
         loadingKey = nil
         stallWatch = StallWatch()
+        conversion = ConversionWatch()
         recoveries = nil
         subtitleFinder.itemChanged(to: full.ratingKey)
         mediaIndex = isFirstItem && (request.download == nil || request.download?.quality == .original) ? request.mediaIndex : 0
@@ -1048,8 +1061,8 @@ final class PlayerModel: Identifiable {
             return RouteLimits(
                 serverReason: onDeviceFailed || failedBefore ? .onDeviceFailed : nil,
                 quality: quality,
-                // Plex calls a LAN address reached through a VPN local; the place knows better.
-                remoteConnection: place.map { !$0.isHome } ?? connection.map { !$0.isLocal } ?? false,
+                // Decided as the item started, from the measured link (`startAdapting`).
+                reach: reach,
                 // Auto's rung already fits the link.
                 linkKbps: adaptive == nil ? connection.flatMap { measuredKbps(over: $0) } : nil
             )
@@ -1105,6 +1118,16 @@ final class PlayerModel: Identifiable {
             return (decision, route)
         }
         var (decision, route) = decide(drawsImages: true)
+        // The server's own limits win over the measured link. For a link only the measurement calls near, it is asked
+        // what it would make of the file's video; a stream it holds below the file's rate comes from it.
+        if request.download == nil, case .nearByLink = limits.reach, route.kind == .remux, !serverLimitAsked {
+            serverLimitAsked = true
+            if await serverHoldsBack(route, media: media) {
+                reach = .remoteByServer
+                limits.reach = reach
+                (decision, route) = decide(drawsImages: true)
+            }
+        }
         if request.download == nil, route.kind == .remux, isExternalPlayback, settings.directPlay != .force {
             limits.serverReason = .airPlay
             (decision, route) = decide(drawsImages: true)
@@ -1137,6 +1160,20 @@ final class PlayerModel: Identifiable {
             note: !route.audioEnhancements.isEmpty && decision.track != nil ? "Subtitles won't change." : nil
         )
         return RouteChoice(subtitle: decision, route: route, enhancements: enhancements)
+    }
+
+    /// Whether the server holds the file's stream below its own rate. Asked for the video as it is, its decision says
+    /// what it would make (`ServerLimit`); one that fails or comes late holds nothing back.
+    private func serverHoldsBack(_ route: PlaybackRoute, media: PlexMedia) async -> Bool {
+        let asked = TranscodeRequest(item: item, mediaIndex: mediaIndex, route: route)
+        let library = library
+        guard let decision = await TimeLimit.answer(within: Self.decisionWait, { try? await library.transcodeDecision(asked) }),
+              let output = decision.item.media.first else { return false }
+        let held = ServerLimit.holdsBack(output: output, source: media)
+        Diag.event(.player, "route.server-limit", [
+            "held": held, "madeKbps": output.parts.first?.videoStream?.bitrate, "fileKbps": media.parts.first?.videoStream?.bitrate,
+        ], held ? .notice : .debug)
+        return held
     }
 
     private func take(_ choice: RouteChoice) {
@@ -1202,6 +1239,9 @@ final class PlayerModel: Identifiable {
         landing = target
         // A landing can finish between two looks at a wait, which would then count on into the new stream.
         forgetWait()
+        conversion.streamStarted()
+        linkNoted = false
+        readingBase = nil
         origin = nil
         streamKey = StreamKey(route)
         do {
@@ -1463,7 +1503,10 @@ final class PlayerModel: Identifiable {
         // Auto's estimate spans every stream of the item, not only this one's last reads.
         if let estimate = adaptive?.estimateKbps { bitsPerSecond = Double(estimate) * 1000 }
         guard let bitsPerSecond, bitsPerSecond > 0 else { return }
-        session.player.linkKbps[PlayerCenter.Link(address: address, place: place)] = Int(bitsPerSecond / 1000)
+        session.player.links.record(
+            Int(bitsPerSecond / 1000), over: LinkMemory.Link(address: address, place: place),
+            at: ProcessInfo.processInfo.systemUptime, network: session.presenceNetworkRevision
+        )
     }
 
     /// A new stream at `target` on the same route, keeping the screen as it is. The target is the landing from
@@ -1512,6 +1555,15 @@ final class PlayerModel: Identifiable {
     /// How far past the playhead the standby takes over, and the buffer the playing stream needs to get there.
     private static let switchLead: TimeInterval = 8
     private static let switchBuffer: TimeInterval = 9
+    /// A conversion the server lost is replaced beside the playing stream when this much is buffered ahead, taking
+    /// over short of that buffer by the margin; with less it is replaced at once (`replaceLostConversion`).
+    private static let recoveryBuffer: TimeInterval = 7
+    private static let recoveryMargin: TimeInterval = 2
+    /// How long the phone waits for the server's decision on the original before it plays the file itself.
+    private static let decisionWait = Duration.seconds(4)
+    /// What a reading of the link from the playing stream rests on: the bytes and the time they took.
+    private static let readingBytes: Int64 = 1_000_000
+    private static let readingSeconds: TimeInterval = 0.25
 
     private var sourcePicture: AdaptiveQuality.Picture? {
         guard let width = media?.width, let height = media?.height, width > 0, height > 0 else { return nil }
@@ -1586,6 +1638,10 @@ final class PlayerModel: Identifiable {
             place = networkPlace(of: connection)
             linkAddress = connection.uri
         }
+        serverLimitAsked = false
+        reach = RouteReach.decide(
+            place: place, connection: connection, mediaKbps: media?.bitrate, linkKbps: connection.flatMap { recentKbps(over: $0) }
+        )
         guard qualitySetting == .auto, !forcesDirectPlay, let connection, let place else { return }
         let adaptive = AdaptiveQuality(
             place: place, mediaKbps: media?.bitrate, linkKbps: measuredKbps(over: connection),
@@ -1602,10 +1658,27 @@ final class PlayerModel: Identifiable {
         return .of(connection, localAddress: local)
     }
 
-    /// The link to `connection` from where the phone is, as the last stream over it measured.
+    /// The link to `connection` from where the phone is, as the last stream over it measured, however long ago.
     private func measuredKbps(over connection: PlexConnection) -> Int? {
         guard let place, connection.uri == linkAddress else { return nil }
-        return session.player.linkKbps[PlayerCenter.Link(address: connection.uri, place: place)]
+        return session.player.links.latest(over: LinkMemory.Link(address: connection.uri, place: place))
+    }
+
+    /// The reading of that link the route may go by: recent, from this network, and not given up on (`LinkMemory`).
+    private func recentKbps(over connection: PlexConnection) -> Int? {
+        guard let place, connection.uri == linkAddress else { return nil }
+        return session.player.links.recent(
+            over: LinkMemory.Link(address: connection.uri, place: place),
+            at: ProcessInfo.processInfo.systemUptime, network: session.presenceNetworkRevision
+        )
+    }
+
+    /// The phone failed to read the file over a link only the measurement called near: on this network the route goes
+    /// by the place there from now on.
+    private func distrustLink() {
+        guard case .nearByLink = reach, let place, let address = linkAddress else { return }
+        session.player.links.distrust(LinkMemory.Link(address: address, place: place), network: session.presenceNetworkRevision)
+        Diag.event(.player, "link.distrusted", ["place": place.description], .notice)
     }
 
     private func watchQuality() {
@@ -1614,6 +1687,7 @@ final class PlayerModel: Identifiable {
                 try? await Task.sleep(for: .seconds(2))
                 guard let self, !Task.isCancelled else { return }
                 lookAtStream()
+                noteLink()
             }
         }
     }
@@ -1660,6 +1734,32 @@ final class PlayerModel: Identifiable {
         if let move { adapt(to: move) }
     }
 
+    /// One reading of the link from the playing stream, for the next start to go by. The route went by the place when
+    /// the link had no recent reading, and a stream that ends early or never ends leaves none. A server stream that
+    /// re-encodes is held back by its encoder rather than the link, and says nothing of it.
+    private func noteLink() {
+        guard !linkNoted, request.download == nil, castDevice == nil, phase == .playing, isPlaying, landing == nil, !isSeeking,
+              route?.reencodesVideo == false, let place, let address = streamConnection?.uri, address == linkAddress else { return }
+        switch stream {
+        case .transcode, .direct: break
+        case .remux, nil: return
+        }
+        let link = LinkMemory.Link(address: address, place: place)
+        let now = ProcessInfo.processInfo.systemUptime
+        let network = session.presenceNetworkRevision
+        guard session.player.links.recent(over: link, at: now, network: network) == nil, let transfer = backend.transfer else { return }
+        guard let base = readingBase, transfer.bytes >= base.bytes, transfer.seconds >= base.seconds else {
+            readingBase = transfer
+            return
+        }
+        let bytes = transfer.bytes - base.bytes, seconds = transfer.seconds - base.seconds
+        guard bytes >= Self.readingBytes, seconds >= Self.readingSeconds else { return }
+        let kbps = Int(Double(bytes) * 8 / 1000 / seconds)
+        linkNoted = true
+        session.player.links.record(kbps, over: link, at: now, network: network)
+        Diag.event(.player, "link.measured", ["kbps": kbps, "place": place.description, "stream": diagStream], .debug)
+    }
+
     /// Moves Auto to `rung`: beside the playing stream when it can, else by a new stream at the playhead.
     private func adapt(to rung: VideoQuality) {
         guard let tracks, let media, let part else { return settleMove(at: autoRung) }
@@ -1674,32 +1774,33 @@ final class PlayerModel: Identifiable {
                 take(choice)
                 return settleMove(at: rung)
             }
-            if canSwitchBeside(to: choice), await prepareSwitch(to: choice, rung: rung) { return }
+            if canSwitchBeside(to: choice, buffer: Self.switchBuffer), await prepareSwitch(to: choice, rung: rung) { return }
             guard !Task.isCancelled else { return }
             restartForMove(choice, rung: rung)
         }
     }
 
-    /// The standby takes over only on the phone's own screen, from a stream with enough in hand, to a server
+    /// The standby takes over only on the phone's own screen, from a stream with `buffer` seconds in hand, to a server
     /// stream or the file with the same sound and subtitle.
-    private func canSwitchBeside(to choice: RouteChoice) -> Bool {
+    private func canSwitchBeside(to choice: RouteChoice, buffer minimum: TimeInterval) -> Bool {
         guard let route, choice.route.kind != .remux, choice.route.audio?.id == route.audio?.id,
               choice.route.subtitle == route.subtitle, !(pictureInPicture?.isActive ?? false), !isExternalPlayback,
               UIApplication.shared.applicationState == .active
         else { return false }
-        return (backend.bufferedAhead ?? 0) >= Self.switchBuffer
+        return (backend.bufferedAhead ?? 0) >= minimum
     }
 
-    /// Opens the stream at `rung` on the standby player, primed at a movie time a few seconds ahead, and arms the
-    /// switch for when the playhead gets there. False, with nothing of it left, when that failed or came too late.
-    private func prepareSwitch(to choice: RouteChoice, rung: VideoQuality) async -> Bool {
+    /// Opens the stream at `rung` on the standby player, primed at a movie time `lead` seconds ahead (the usual lead
+    /// when nil), and arms the switch for when the playhead gets there. False, with nothing of it left, when that
+    /// failed or came too late.
+    private func prepareSwitch(to choice: RouteChoice, rung: VideoQuality, lead: TimeInterval? = nil) async -> Bool {
         guard let part, let playingOrigin = origin else { return false }
         // A move given up meanwhile has dropped its standby; a later one may hold the next.
         func failed() -> Bool {
             if !Task.isCancelled { dropStandby() }
             return false
         }
-        let at = time + Self.switchLead
+        let at = time + (lead ?? Self.switchLead)
         let url: URL
         do {
             if choice.route.kind == .serverTranscode {
@@ -1778,18 +1879,22 @@ final class PlayerModel: Identifiable {
         lastTransfer = nil
         take(next.choice)
         if let item = backend.player?.currentItem { streamText.attach(to: item) }
+        let lost = replacingLost
         settleMove(at: next.rung)
-        Diag.event(.player, "auto.switched", ["rung": "\(next.rung)", "at": time, "stream": diagStream], .notice)
+        Diag.event(.player, lost ? "conversion.switched" : "auto.switched", ["rung": "\(next.rung)", "at": time, "stream": diagStream], .notice)
     }
 
     /// Moves Auto by a new stream at the playhead, keeping the screen as it is.
     private func restartForMove(_ choice: RouteChoice, rung: VideoQuality) {
+        // The lost stream's last reads say nothing of the link.
+        let lost = replacingLost
+        if lost { stopStream(measured: false) }
         take(choice)
         settleMove(at: rung)
         generation += 1
         let generation = generation
         loadTask?.cancel()
-        Diag.event(.player, "auto.restart", ["rung": "\(rung)", "at": time], .notice)
+        Diag.event(.player, lost ? "conversion.restart" : "auto.restart", ["rung": "\(rung)", "at": time], .notice)
         isBuffering = true
         loadTask = Task { [weak self] in
             guard let self else { return }
@@ -1797,6 +1902,74 @@ final class PlayerModel: Identifiable {
             guard generation == self.generation else { return }
             // Where playback is now: the old stream plays on while the subtitles load, and a seek may move it.
             await startStream(at: landing ?? time, generation: generation)
+        }
+    }
+
+    // MARK: Lost conversion
+
+    /// The stream is a server conversion that plays: the one the server can lose.
+    private var watchesConversion: Bool {
+        guard !closed, phase == .playing, castDevice == nil, landing == nil, request.download == nil,
+              case .transcode = stream else { return false }
+        return true
+    }
+
+    /// A segment of the stream answered 404 (an entry in AVPlayer's error log). A move under way replaces the stream
+    /// anyway, so what the old one answers meanwhile does not count.
+    private func segmentNotFound() {
+        guard watchesConversion, !movePending, standby == nil else { return }
+        act(on: conversion.notFound(at: ProcessInfo.processInfo.systemUptime, bufferAhead: backend.bufferedAhead))
+    }
+
+    /// AVPlayer gave up on the missing segments and failed the item. True when the conversion is replaced.
+    private func conversionFailed() -> Bool {
+        guard watchesConversion else { return false }
+        let verdict = conversion.failed(at: ProcessInfo.processInfo.systemUptime)
+        guard case .recover = verdict else { return false }
+        act(on: verdict, itemFailed: true)
+        return true
+    }
+
+    private func act(on verdict: ConversionWatch.Verdict, itemFailed: Bool = false) {
+        switch verdict {
+        case .wait:
+            break
+        case .recover(let cause, let missed):
+            Diag.event(.player, "conversion.lost", [
+                "cause": cause.rawValue, "missed": missed, "ahead": backend.bufferedAhead, "at": time, "stream": diagStream,
+            ], .warning)
+            conversion.recovered(at: ProcessInfo.processInfo.systemUptime)
+            replaceLostConversion(itemFailed: itemFailed)
+        case .giveUp:
+            Diag.event(.player, "conversion.lost", [
+                "cause": "again", "ahead": backend.bufferedAhead, "at": time, "stream": diagStream,
+            ], .warning)
+            streamFailed(PlaybackFailure(
+                text: "\(library.server.name) stopped sending the video.", detail: "The server lost the conversion again and again"
+            ))
+        }
+    }
+
+    /// Starts the conversion again where the playhead is. With enough of the old stream buffered, the new one is
+    /// prepared beside it and takes over before it runs dry, so the picture does not stop; otherwise at once.
+    private func replaceLostConversion(itemFailed: Bool) {
+        let buffer = backend.bufferedAhead ?? 0
+        guard !itemFailed, let route, let subtitle, buffer >= Self.recoveryBuffer else {
+            // The lost stream's last reads say nothing of the link.
+            Diag.event(.player, "conversion.restart", ["at": time], .notice)
+            stopStream(measured: false)
+            return restart(at: time)
+        }
+        let choice = RouteChoice(subtitle: subtitle, route: route, enhancements: enhancements)
+        let rung = autoRung
+        let lead = min(Self.switchLead, buffer - Self.recoveryMargin)
+        movePending = true
+        replacingLost = true
+        moveTask = Task { [weak self] in
+            guard let self else { return }
+            if canSwitchBeside(to: choice, buffer: Self.recoveryBuffer), await prepareSwitch(to: choice, rung: rung, lead: lead) { return }
+            guard !Task.isCancelled else { return }
+            restartForMove(choice, rung: rung)
         }
     }
 
@@ -1823,6 +1996,7 @@ final class PlayerModel: Identifiable {
 
     private func settleMove(at rung: VideoQuality) {
         movePending = false
+        replacingLost = false
         autoRung = rung
         adaptive?.moved(to: rung, at: ProcessInfo.processInfo.systemUptime)
     }
@@ -1854,6 +2028,7 @@ final class PlayerModel: Identifiable {
                 return
             }
             onDeviceFailed = true
+            if route.kind == .remux { distrustLink() }
             Diag.event(.player, "recover", ["how": "server"], .notice)
             if let part { session.player.phoneFailures.insert(part.id) }
             fallback = failure.detail
@@ -1988,6 +2163,7 @@ final class PlayerModel: Identifiable {
             }
             land()
         case .failed(let failure):
+            if failure.isNotFound, conversionFailed() { return }
             streamFailed(failure)
         case .ended:
             ended()
@@ -1997,6 +2173,8 @@ final class PlayerModel: Identifiable {
             presentationSize = size
         case .switchDue:
             completeSwitch()
+        case .segmentNotFound:
+            segmentNotFound()
         }
     }
 
@@ -2214,8 +2392,14 @@ final class PlayerModel: Identifiable {
         case .network(let seconds):
             longestWait = max(longestWait, seconds)
             guard seconds >= 2 else { return }
-            // The standby cannot take over from a stalled stream; Auto's next look moves by a new stream instead.
-            if standby != nil { abandonMove() }
+            // The standby cannot take over from a stalled stream. A conversion the server lost is started again at
+            // once; Auto's next look moves by a new stream instead.
+            if replacingLost {
+                stopStream(measured: false)
+                restart(at: time)
+            } else if standby != nil {
+                abandonMove()
+            }
             if !waitsForNetwork {
                 diagStalls += 1
                 Diag.event(.player, "stall", ["at": time, "seconds": seconds, "stream": diagStream, "ahead": backend.bufferedAhead], .notice)
@@ -2869,13 +3053,8 @@ final class PlayerCenter {
     let capabilities = PlaybackCapabilities()
     /// Parts that failed to play on the phone in this run; reopening one goes straight to the server.
     @ObservationIgnored var phoneFailures: Set<Int> = []
-    /// A link's key: a tunnel that routes the home network reaches the same LAN address at another speed.
-    struct Link: Hashable {
-        let address: URL
-        let place: NetworkPlace
-    }
-    /// Each link as the last stream over it measured, in kbit/s.
-    @ObservationIgnored var linkKbps: [Link: Int] = [:]
+    /// What this run's streams measured of each link to a server (`LinkMemory`).
+    @ObservationIgnored var links = LinkMemory()
     /// The XR glasses show the player in place of the phone (DESIGN §8.9). When they go, what played
     /// carries on on the phone, paused.
     var onGlasses = false {
@@ -3220,9 +3399,20 @@ extension PlayerModel {
         if route.reencodesVideo { fields.append(("reencodes", true)) }
         if let kbps = route.maxVideoBitrateKbps { fields.append(("kbps", kbps)) }
         if let resolution = route.videoResolution { fields.append(("resolution", resolution)) }
+        if request.download == nil { fields.append(("reach", Self.diagReach(reach))) }
         if !route.audioEnhancements.isEmpty { fields.append(("enhancements", "\(route.audioEnhancements)")) }
         if let blocked = choice.enhancements.unavailable { fields.append(("enhancementsBlocked", blocked)) }
         return fields
+    }
+
+    private static func diagReach(_ reach: RouteReach) -> String {
+        switch reach {
+        case .near: "near"
+        case .nearByLink(let kbps): "near by link, \(kbps) kbps"
+        case .remote: "remote"
+        case .remoteByLink(let kbps, let needs): "remote by link, \(kbps) of \(needs) kbps"
+        case .remoteByServer: "remote by server"
+        }
     }
 
     /// The state a missed intro skip is judged in.

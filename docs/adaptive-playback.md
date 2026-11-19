@@ -8,7 +8,11 @@ Auto quality is the default and adapts to the measured link. Plex converts on th
 
 `HomePresence` is independent proof for the optional TV remote, not proof of the Plex playback route. The remote's open session directly over Wi-Fi establishes home. Without one, a probe completes the paired TV's encrypted handshake and closes without opening a remote session. Failed probes retain home for at most 30 seconds from the last success. A network change invalidates proof immediately. Probes run only while the plugin is enabled and the app is foregrounded.
 
-Away or unknown turns a file that needs the remux into a server stream (`RouteLimits.remoteConnection`).
+## How near the server is (`RouteReach`)
+
+The measured link decides whether the phone reads a file that needs the remux itself, for any address but a relay, which always converts. A reading of at least 3 times the file's bitrate and 20 Mbps keeps the home rules, the phone's own remux; less sends the file to the server. A reading counts for 30 minutes and only on the network it was taken on (`LinkMemory`). Without one the place decides as before (away or unknown converts), and the stream that plays takes a reading for the next start, so the first start after launch can still be converted for a file the next start reads itself. Playback info says why: "Server at 131 Mbps, fast enough for the original".
+
+The server's own limits win. Before the phone reads the original over a link only the measurement calls near, Marquee asks Plex what it would make of the file's video; a picture under nine tenths of the file's rate is a limit (remote streaming quality, the user's own), and the server streams it (`ServerLimit`). A quality cap or Direct Play off converts whatever the link measures. A phone that fails to read the file over a link only the measurement called near ignores that link's readings until the network changes. Direct play does not depend on the link.
 
 ## Choosing a rung (`AdaptiveQuality`)
 

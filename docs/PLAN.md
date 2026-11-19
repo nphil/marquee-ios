@@ -15,6 +15,8 @@ Scope: the Marquee iPhone, XR glasses, wired-TV, remote and HomeLabber quality-m
 - [ ] **N7 — Chapter markers acceptance (R47).** Play The Apothecary Diaries S2 E10 and E11 on the iPhone. Done: Up Next appears as each Ending chapter starts (22:15), Skip Intro runs to 1:30, and the log's `offers markers` line shows them tagged `chapter`.
 - [ ] **N8 — Home at launch acceptance (R48).** DEVICE-TEST check 30 on the iPhone. Done: Home shows the last titles and artwork on the first frame of a relaunch, online and offline, refreshes without a jump, and a second profile never sees the first's Home; the `load.cached` and `load.ok` times are recorded.
 - [ ] **N9 — Rewatch acceptance (R49).** On the iPhone, with a show watched through whose latest view is a finished episode, not one part-way (Plex lists those itself): Community between episodes, or My Hero Academia S4 E14. Done: Home shows the next episode as an ordinary card, without a progress bar, that plays from the start; Remove from Continue Watching hides it with Undo until the show is viewed again; the show's page offers the same episode as Play; the cached first paint and the Glasses Home show the same card. The `rewatch` log line's `ms` is recorded.
+- [ ] **N10 — Lost conversion acceptance (R50).** DEVICE-TEST check 31 on the iPhone. Done: a converted title paused for four minutes plays again within about 5 s of Play, not 30 s; the log shows `conversion.lost` (`cause`, `missed`, `ahead`), then `conversion.restart` or `conversion.switched`; no error shows. A 404 cannot be forced on demand, so which of the two lines appeared is recorded.
+- [ ] **N11 — Measured link acceptance (R51).** DEVICE-TEST check 32 on the iPhone, with Isabel's server (DMZ VLAN through Tailscale) and an MKV that needs the remux. Done: the second start reads Route "Repackaged on the phone", Why "MKV file, Server at N Mbps, fast enough for the original", the `route` log line's `reach` says "near by link", and a remote quality limit set on the server keeps the stream there (`route.server-limit held`). Cellular, the relay and a direct public address stay untested.
 
 The first build batches N1–N5. Inspect recordings before editing, exercise the touched behavior once after the batch, then publish one point release. No unrelated refactor or engine replacement.
 
@@ -130,6 +132,8 @@ Each request is retained separately below; repeated reports share one entry inst
 | R47 | Skip Credits on time for shows Plex marks late or not at all | Built: markers from named chapters, DESIGN §8 Up Next; N7 open. |
 | R48 | Home appears instantly at launch | Built: last Home from disk, then a quiet refresh, DESIGN §11; N8 open. |
 | R49 | Continue Watching follows rewatches | Built: the rule shared with the LG TV app, DESIGN §8.1 item 2 (`RewatchQueue`, `RewatchRun`); N9 open. |
+| R50 | A lost server conversion is replaced within seconds, not after 30 s of retries | Built: DESIGN §8.6 (`ConversionWatch`); N10 open. |
+| R51 | The measured link, not the place, decides whether the phone reads a file itself | Built: DESIGN §8.6, docs/adaptive-playback.md (`RouteReach`, `LinkMemory`, `ServerLimit`); N11 open. |
 
 ## 6. Evidence and release boundaries
 

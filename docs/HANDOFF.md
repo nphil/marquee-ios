@@ -22,6 +22,8 @@ Replace the profile Settings screen's Done button with an X matching the profile
 
 A server conversion asks Plex's decision first, as PMS 1.43.5 refused the start of a player's later sessions without one; the player gives the stream 30 s to be ready, tries twice more on a new session with the addresses probed again, then shows the error with Retry. Ending a conversion also reports its playback stopped. Downloads report an address that stops answering, so the next transfer probes again; on cellular only with cellular downloads off a row says Waiting for Wi-Fi and offers Download on Cellular; after two failed tries a row says the server can't be reached while it keeps trying.
 
+A conversion the server loses mid-play (Plex ends idle sessions, so a long pause leaves 404s) is started again at the playhead within seconds, not after AVPlayer's 30 s of retries. For a file that needs the remux, the measured link to the server, not the place, decides whether the phone reads it itself (DESIGN §8.6, `RouteReach`). DEVICE-TEST checks 31 and 32 are open.
+
 Released in the fix batch. DEVICE-TEST check 20 remains open; this handoff does not establish the latest result of `DownloadFlowTests.testWaitingForWiFi`.
 
 ## Quality downloads: released in 0.1.41

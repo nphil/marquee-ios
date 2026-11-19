@@ -132,7 +132,7 @@ struct PlaybackRouteTests {
     @Test func dolbyVisionFiveIsNeverCopiedByTheServer() throws {
         let p5mkv = try Self.file("mkv", video: Fixture.video("hevc", bitDepth: 10, dolbyVision: (5, 0)))
 
-        let remote = Self.route(p5mkv, limits: RouteLimits(remoteConnection: true))
+        let remote = Self.route(p5mkv, limits: RouteLimits(reach: .remote))
 
         #expect(remote.kind == .serverTranscode && remote.reencodesVideo && remote.reasons.contains(.dolbyVision(profile: 5)))
     }
@@ -276,15 +276,69 @@ struct PlaybackRouteTests {
         }
     }
 
-    @Test func remoteConnectionStreamsRemuxFilesFromTheServer() throws {
+    @Test func aRemoteServerStreamsRemuxFilesFromTheServer() throws {
         let mkv = try Self.file("mkv")
         let mp4 = try Self.file("mp4")
 
-        let remote = Self.route(mkv, limits: RouteLimits(remoteConnection: true))
+        let remote = Self.route(mkv, limits: RouteLimits(reach: .remote))
 
         #expect(remote.kind == .serverTranscode && !remote.reencodesVideo)
         #expect(remote.reasons == [.remoteConnection, .container("mkv")])
-        #expect(Self.route(mp4, limits: RouteLimits(remoteConnection: true)).kind == .directPlay)
+        #expect(Self.route(mp4, limits: RouteLimits(reach: .remote)).kind == .directPlay)
+    }
+
+    @Test func aFastLinkLetsThePhoneRemuxAwayFromHome() throws {
+        let mkv = try Self.file("mkv", bitrate: 1_800)
+
+        let route = Self.route(mkv, limits: RouteLimits(reach: .nearByLink(kbps: 130_800)))
+
+        #expect(route.kind == .remux && !route.reencodesVideo)
+        #expect(route.reasons == [.container("mkv"), .fastLink(kbps: 130_800)])
+        #expect(route.reasons.map(\.description) == ["MKV file", "Server at 131 Mbps, fast enough for the original"])
+    }
+
+    @Test func aShortLinkHasTheServerRepackageTheFile() throws {
+        let mkv = try Self.file("mkv", bitrate: 1_800)
+
+        let route = Self.route(mkv, limits: RouteLimits(reach: .remoteByLink(kbps: 12_000, needs: 20_000)))
+
+        #expect(route.kind == .serverTranscode && !route.reencodesVideo)
+        #expect(route.reasons == [.shortLink(kbps: 12_000, needs: 20_000), .container("mkv")])
+        #expect(route.reasons[0].description == "Server at 12 Mbps, short of the 20 Mbps the phone needs to read the file")
+    }
+
+    @Test func theServersLimitStreamsFromTheServerWhateverTheLinkCarries() throws {
+        let route = Self.route(try Self.file("mkv"), limits: RouteLimits(reach: .remoteByServer))
+
+        #expect(route.kind == .serverTranscode && !route.reencodesVideo)
+        #expect(route.reasons == [.serverLimit, .container("mkv")])
+    }
+
+    @Test func reachDoesNotMoveDirectPlay() throws {
+        let mp4 = try Self.file("mp4")
+
+        for reach in [RouteReach.nearByLink(kbps: 130_800), .remoteByLink(kbps: 5_000, needs: 30_000), .remoteByServer] {
+            let route = Self.route(mp4, limits: RouteLimits(reach: reach))
+            #expect(route.kind == .directPlay && route.reasons.isEmpty)
+        }
+    }
+
+    @Test func aQualityCapStillConvertsOverAFastLink() throws {
+        let mkv = try Self.file("mkv", bitrate: 8_000)
+
+        let route = Self.route(mkv, limits: RouteLimits(quality: .mbps4, reach: .nearByLink(kbps: 130_800)))
+
+        #expect(route.kind == .serverTranscode && route.reencodesVideo && route.maxVideoBitrateKbps == 4_000)
+        #expect(route.reasons == [.bitrateLimit(kbps: 4_000), .container("mkv")])
+    }
+
+    @Test func theFastLinkNoteIsLeftOffWhenTheServerEncodesForAnotherReason() throws {
+        let highLevel = try Self.file("mkv", video: Fixture.video("hevc", level: 156))
+
+        let route = Self.route(highLevel, limits: RouteLimits(reach: .nearByLink(kbps: 130_800)))
+
+        #expect(route.kind == .serverTranscode)
+        #expect(!route.reasons.contains(.fastLink(kbps: 130_800)))
     }
 
     @Test func aSlowLinkHasTheServerEncodeUnderIt() throws {

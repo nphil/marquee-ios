@@ -223,7 +223,7 @@ public final class RewatchRun: Sendable {
         guard !history.isCancelled else { return nil }
         return await withTaskCancellationHandler {
             guard let limit else { return await resolve(plex, dismissed) }
-            return await Self.race(limit) { await self.resolve(plex, dismissed) }
+            return await TimeLimit.answer(within: limit) { await self.resolve(plex, dismissed) }
         } onCancel: {
             self.cancel()
         }
@@ -257,37 +257,6 @@ public final class RewatchRun: Sendable {
             let task = Task { try? await library.episode(after: viewed) }
             tasks[viewed.ratingKey] = task
             return task
-        }
-    }
-
-    /// `work`'s answer, or nil if it takes longer than `limit`. `work` is not stopped.
-    private static func race<T: Sendable>(_ limit: Duration, _ work: @escaping @Sendable () async -> T?) async -> T? {
-        await withCheckedContinuation { (continuation: CheckedContinuation<T?, Never>) in
-            let once = Once(continuation)
-            let timer = Task {
-                try? await Task.sleep(for: limit)
-                once.resume(nil)
-            }
-            Task {
-                once.resume(await work())
-                timer.cancel()
-            }
-        }
-    }
-}
-
-/// Resumes a continuation the first time it is asked to, and ignores the rest.
-private final class Once<T: Sendable>: Sendable {
-    private let continuation: Mutex<CheckedContinuation<T?, Never>?>
-
-    init(_ continuation: CheckedContinuation<T?, Never>) {
-        self.continuation = Mutex(continuation)
-    }
-
-    func resume(_ value: T?) {
-        continuation.withLock { continuation in
-            continuation?.resume(returning: value)
-            continuation = nil
         }
     }
 }
