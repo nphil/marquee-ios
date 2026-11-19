@@ -259,9 +259,25 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
         }
     }
 
-    /// Markers of one kind in playback order; Plex sends them unsorted.
+    /// Markers of one kind in playback order; Plex sends them unsorted. On an episode, a chapter the file itself
+    /// names as its opening or ending (`PlexChapter.markerKind`) widens the Plex marker it overlaps, or stands
+    /// in where Plex has none. Plex finds credits from the picture and misses animated endings: on The
+    /// Apothecary Diaries season 2, 9 of 24 episodes had no credits marker and the rest started up to 16 s
+    /// after the file's Ending chapter.
     public func markers(_ kind: PlexMarker.Kind) -> [PlexMarker] {
-        markers.filter { $0.kind == kind }.sorted { $0.start < $1.start }
+        var result = markers.filter { $0.kind == kind }
+        if type == .episode, duration > 0 {
+            for chapter in chapters where chapter.markerKind == kind && chapter.isPlausible(kind, in: duration) {
+                if let index = result.firstIndex(where: { $0.start < chapter.end && chapter.start < ($0.isFinal ? .max : $0.end) }) {
+                    result[index].start = min(result[index].start, chapter.start)
+                    result[index].end = max(result[index].end, chapter.end)
+                    result[index].fromChapter = true
+                } else {
+                    result.append(PlexMarker(kind: kind, start: chapter.start, end: chapter.end, fromChapter: true))
+                }
+            }
+        }
+        return result.sorted { $0.start < $1.start }
     }
 }
 
@@ -498,16 +514,19 @@ public struct PlexMarker: Sendable, Hashable, Decodable {
     public var end: Int
     /// The last credits of the item. Its end is the container length, so it runs to the end of playback.
     public var isFinal: Bool
+    /// Placed or widened by one of the file's named chapters rather than by Plex alone.
+    public var fromChapter: Bool
 
     enum CodingKeys: String, CodingKey {
         case type, startTimeOffset, endTimeOffset, final
     }
 
-    public init(kind: Kind, start: Int, end: Int, isFinal: Bool = false) {
+    public init(kind: Kind, start: Int, end: Int, isFinal: Bool = false, fromChapter: Bool = false) {
         self.kind = kind
         self.start = start
         self.end = end
         self.isFinal = isFinal
+        self.fromChapter = fromChapter
     }
 
     public init(from decoder: any Decoder) throws {
@@ -521,6 +540,7 @@ public struct PlexMarker: Sendable, Hashable, Decodable {
         start = c.int(.startTimeOffset) ?? 0
         end = c.int(.endTimeOffset) ?? 0
         isFinal = c.bool(.final) ?? false
+        fromChapter = false
     }
 
     /// Whether `time` (milliseconds) falls inside the marker; final credits are open-ended.
@@ -548,6 +568,29 @@ public struct PlexChapter: Sendable, Hashable, Decodable {
         start = c.int(.startTimeOffset) ?? 0
         end = c.int(.endTimeOffset) ?? 0
         thumb = c.string(.thumb)
+    }
+
+    private static let openings: Set<String> = ["opening", "op", "opening credits", "opening theme", "opening song", "title sequence"]
+    private static let endings: Set<String> = [
+        "ending", "ed", "credits", "end credits", "ending credits", "closing credits", "ending theme", "ending song",
+    ]
+
+    /// The marker an episode's chapter stands for, by its name with any number dropped ("OP2", "Ending 1").
+    /// "Intro" and "Outro" are left out: releases use them for story scenes as often as for the theme.
+    public var markerKind: PlexMarker.Kind? {
+        guard let title else { return nil }
+        let name = title.lowercased().trimmingCharacters(in: .whitespaces)
+            .trimmingCharacters(in: CharacterSet.decimalDigits.union(.whitespaces).union(.punctuationCharacters))
+        if Self.openings.contains(name) { return .intro }
+        if Self.endings.contains(name) { return .credits }
+        return nil
+    }
+
+    /// A theme song's length, in the half of the episode it belongs to. Keeps a long scene that happens to be
+    /// called "Ending", or opening credits called "Credits", from becoming a skip.
+    func isPlausible(_ kind: PlexMarker.Kind, in duration: Int) -> Bool {
+        guard (10_000...240_000).contains(end - start) else { return false }
+        return kind == .intro ? start < duration / 2 : start >= duration / 2
     }
 }
 

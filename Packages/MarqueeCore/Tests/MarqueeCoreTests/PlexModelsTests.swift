@@ -66,4 +66,38 @@ struct PlexModelsTests {
         #expect(try !show(leaves: 10, viewed: 9).isWatched)
         #expect(try show(leaves: 10, viewed: 9).unwatchedLeafCount == 1)
     }
+
+    /// The Apothecary Diaries S2 E10's real times: Plex's credits start 13 s into the file's Ending chapter, and
+    /// E11 has an Ending chapter but no Plex credits marker.
+    @Test func namedChaptersCorrectAndFillIntroAndCreditsMarkers() throws {
+        func episode(markers: [[String: Any]], extra: [[String: Any]] = []) throws -> PlexMetadata {
+            let chapters: [[String: Any]] = [
+                ["tag": "Opening", "startTimeOffset": 0, "endTimeOffset": 90007],
+                ["tag": "Part A", "startTimeOffset": 90007, "endTimeOffset": 859_067],
+                ["tag": "Part B", "startTimeOffset": 859_067, "endTimeOffset": 1_335_084],
+                ["tag": "Ending", "startTimeOffset": 1_335_084, "endTimeOffset": 1_425_132],
+                ["tag": "Preview", "startTimeOffset": 1_425_132, "endTimeOffset": 1_441_065],
+            ] + extra
+            return try decode(PlexMetadata.self, [
+                "ratingKey": "18731", "type": "episode", "duration": 1_441_065, "Marker": markers, "Chapter": chapters,
+            ])
+        }
+
+        let marked = try episode(markers: [
+            ["type": "intro", "startTimeOffset": 1600, "endTimeOffset": 87400],
+            ["type": "credits", "startTimeOffset": 1_348_000, "endTimeOffset": 1_441_065, "final": true],
+        ])
+        let intro = try #require(marked.markers(.intro).first)
+        #expect((intro.start, intro.end, intro.fromChapter) == (0, 90007, true))
+        let credits = try #require(marked.markers(.credits).first)
+        #expect((credits.start, credits.end, credits.isFinal) == (1_335_084, 1_441_065, true))
+
+        let unmarked = try episode(markers: [], extra: [
+            // Opening credits named "Credits", and a story scene too long for a theme song: neither is a marker.
+            ["tag": "Credits", "startTimeOffset": 95000, "endTimeOffset": 150_000],
+            ["tag": "Ending", "startTimeOffset": 900_000, "endTimeOffset": 1_300_000],
+        ])
+        #expect(unmarked.markers(.credits).map { [$0.start, $0.end] } == [[1_335_084, 1_425_132]])
+        #expect(unmarked.markers(.intro).map(\.start) == [0])
+    }
 }

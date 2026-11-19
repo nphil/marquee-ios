@@ -1006,7 +1006,10 @@ final class PlayerModel: Identifiable {
         isFirstItem = false
         time = start
         Diag.event(.player, "item", list: diagItem(full, media: media, part: part, tracks: tracks, start: start))
-        Diag.event(.offers, "markers", ["intro": Self.diagMarkers(full.markers(.intro)), "credits": Self.diagMarkers(full.markers(.credits))])
+        Diag.event(.offers, "markers", [
+            "intro": Self.diagMarkers(full.markers(.intro)), "credits": Self.diagMarkers(full.markers(.credits)),
+            "chapters": full.chapters.compactMap(\.title).joined(separator: "|"),
+        ])
         publishItem()
         nextFromStart = false
         // Where the phone is sets Auto's start and whether the remux may read the file over the link.
@@ -3155,12 +3158,12 @@ extension PlayerModel {
         }
     }
 
-    /// "73.5-163.2, 1290-1420 final", in seconds.
+    /// "73.5-163.2 chapter, 1290-1420 final", in seconds.
     private static func diagMarkers(_ markers: [PlexMarker]) -> String {
         guard !markers.isEmpty else { return "none" }
         return markers.map { marker in
             let span = DiagFormat.seconds(Double(marker.start) / 1000, digits: 1) + "-" + DiagFormat.seconds(Double(marker.end) / 1000, digits: 1)
-            return marker.isFinal ? span + " final" : span
+            return span + (marker.isFinal ? " final" : "") + (marker.fromChapter ? " chapter" : "")
         }.joined(separator: ", ")
     }
 
