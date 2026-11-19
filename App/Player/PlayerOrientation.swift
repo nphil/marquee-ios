@@ -27,7 +27,10 @@ enum PlayerOrientation {
         ) { _ in
             MainActor.assumeIsolated { turned() }
         }
-        if hold.holdsLandscape { allow(.landscape, turning: .landscape) }
+        Diag.event(.ui, "orientation.open", [
+            "setting": setting.rawValue, "sideways": sideways, "held": "\(device.orientation.rawValue)", "holds": hold.holdsLandscape,
+        ])
+        if hold.holdsLandscape { allow(.landscape, turning: .landscape, afterPresentation: true) }
     }
 
     /// The player closed, or left for Picture in Picture: the screen is the app's again.
@@ -48,17 +51,41 @@ enum PlayerOrientation {
         if before.holdsLandscape, !after.holdsLandscape { allow(.allButUpsideDown, turning: nil) }
     }
 
-    /// Has iOS ask again which ways the screen may turn, and turns it to `turn` now.
-    private static func allow(_ orientations: UIInterfaceOrientationMask, turning turn: UIInterfaceOrientationMask?) {
+    /// Has iOS ask again which ways the screen may turn, and turns it to `turn`.
+    private static func allow(
+        _ orientations: UIInterfaceOrientationMask, turning turn: UIInterfaceOrientationMask?, afterPresentation: Bool = false
+    ) {
         allowed = orientations
         guard let scene else { return }
         var controller = scene.keyWindow?.rootViewController
+        var top: UIViewController?
         while let current = controller {
             current.setNeedsUpdateOfSupportedInterfaceOrientations()
+            top = current
             controller = current.presentedViewController
         }
-        if let turn {
-            scene.requestGeometryUpdate(UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: turn))
+        guard let turn else { return }
+        // A turn asked for while the player's cover slides in was dropped, and the screen turned only when
+        // something else had iOS ask again: 1.2 s later, after the picture had started upright (0.1.47).
+        if afterPresentation, let transition = top?.transitionCoordinator {
+            transition.animate(alongsideTransition: nil) { _ in request(turn, in: scene, retry: true) }
+        } else {
+            request(turn, in: scene, retry: true)
+        }
+    }
+
+    private static func request(_ turn: UIInterfaceOrientationMask, in scene: UIWindowScene, retry: Bool) {
+        let name = turn == .portrait ? "portrait" : "landscape"
+        Diag.event(.ui, "orientation.request", ["turn": name, "now": "\(scene.effectiveGeometry.interfaceOrientation.rawValue)"])
+        scene.requestGeometryUpdate(UIWindowScene.GeometryPreferences.iOS(interfaceOrientations: turn)) { @Sendable error in
+            Diag.event(.ui, "orientation.refused", ["turn": name, "error": error.localizedDescription, "retry": retry], .warning)
+            guard retry else { return }
+            Task { @MainActor in
+                try? await Task.sleep(for: .milliseconds(300))
+                // Only while the reason for the turn still stands.
+                guard allowed == (turn == .portrait ? .allButUpsideDown : .landscape) else { return }
+                request(turn, in: scene, retry: false)
+            }
         }
     }
 

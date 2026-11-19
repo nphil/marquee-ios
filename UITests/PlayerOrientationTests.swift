@@ -24,7 +24,9 @@ final class PlayerOrientationTests: XCTestCase {
     @MainActor
     func testStartInLandscapeFollowsThePhoneAfterItsFirstTurn() {
         let app = openPlayer(under: "startInLandscape")
-        XCTAssertTrue(screenTurns(sideways: true, in: app), "The player did not open on its side")
+        // Not long after the controls appear: a turn that waited for something else to ask iOS again
+        // showed the picture upright first.
+        XCTAssertTrue(screenTurns(sideways: true, in: app, within: 1.5), "The player did not open on its side")
         XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertTrue(screenTurns(sideways: true, in: app), "The screen left its side as the phone turned to it")
         XCUIDevice.shared.orientation = .portrait
@@ -34,7 +36,7 @@ final class PlayerOrientationTests: XCTestCase {
     @MainActor
     func testLockToLandscapeHoldsUntilThePlayerCloses() {
         let app = openPlayer(under: "lockToLandscape")
-        XCTAssertTrue(screenTurns(sideways: true, in: app), "The player did not open on its side")
+        XCTAssertTrue(screenTurns(sideways: true, in: app, within: 1.5), "The player did not open on its side")
         XCUIDevice.shared.orientation = .landscapeLeft
         XCUIDevice.shared.orientation = .portrait
         XCTAssertFalse(screenTurns(sideways: false, in: app, within: 2), "The screen turned upright with the phone")
