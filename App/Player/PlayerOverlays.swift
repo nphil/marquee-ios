@@ -5,19 +5,24 @@ import SwiftUI
 /// Skip intro, Up Next and, after a long wait on the network, a lower quality (DESIGN §8.6, Offers),
 /// bottom trailing and one at a time. They are not part of the auto-hiding chrome: they stay while their
 /// marker or wait lasts and take touch while they show.
+///
+/// The offer stays in the hierarchy and fades, rather than leaving through a removal transition: a Skip
+/// Intro pill removed that way just after autoplay replaced the Up Next card stayed on screen and took
+/// taps after the skip (0.1.49, twice in one evening). Once faded it is dropped without animation.
 struct OfferView: View {
     let model: PlayerModel
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The offer drawn while the last one fades out.
+    @State private var fading: PlayerModel.Offer?
 
     var body: some View {
+        let visible = model.offer != nil
         ZStack(alignment: .bottomTrailing) {
-            switch model.offer {
+            switch model.offer ?? fading {
             case .skipIntro?:
                 SkipIntroOffer(model: model)
-                    .transition(transition)
             case .upNext(let next)?:
                 UpNextCard(model: model, next: next)
-                    .transition(transition)
             case .lowerQuality(let quality)?:
                 Button {
                     Haptics.impact(.light)
@@ -32,20 +37,26 @@ struct OfferView: View {
                 .accessibilityLabel("Play at lower quality")
                 .accessibilityHint("Plays on at \(quality.title) until the player closes.")
                 .accessibilityIdentifier("player.lowerQuality")
-                .transition(transition)
             case nil:
                 EmptyView()
             }
         }
-    }
-
-    /// In over 220 ms travelling 16 pt, out over 180 ms; opacity alone under Reduce Motion (DESIGN §9).
-    private var transition: AnyTransition {
-        let insertion: AnyTransition = reduceMotion ? .opacity : .opacity.combined(with: .offset(y: 16))
-        return .asymmetric(
-            insertion: insertion.animation(.easeOut(duration: reduceMotion ? 0.12 : 0.22)),
-            removal: .opacity.animation(.easeOut(duration: 0.18))
-        )
+        // In over 220 ms travelling 16 pt, out over 180 ms; opacity alone under Reduce Motion (DESIGN §9).
+        .opacity(visible ? 1 : 0)
+        .offset(y: visible || reduceMotion ? 0 : 16)
+        .animation(.easeOut(duration: visible ? (reduceMotion ? 0.12 : 0.22) : 0.18), value: visible)
+        .allowsHitTesting(visible)
+        .accessibilityHidden(!visible)
+        .onChange(of: model.offer, initial: true) { _, offer in
+            if let offer {
+                fading = offer
+            } else {
+                Task {
+                    try? await Task.sleep(for: .milliseconds(250))
+                    if model.offer == nil { fading = nil }
+                }
+            }
+        }
     }
 }
 
