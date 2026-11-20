@@ -1,4 +1,5 @@
 import notify
+import UIKit
 import XCTest
 
 /// The player on the fake server's Caminandes episode 2 (intro 0:05–0:35, final credits from 2:10).
@@ -37,6 +38,28 @@ final class PlayerScreenshotTests: XCTestCase {
     @MainActor
     func testSkipIntroCountsDownThenSkips() throws {
         try skipIntroFlow(suffix: "rose-pine")
+    }
+
+    /// The skip lands as the controls fade, both 3 s into playback as on an iPhone, and leaves nothing on screen.
+    /// The pill is looked for in the screen's pixels: a leftover stayed on the phone after the skip (0.1.49 to
+    /// 0.1.51) while the accessibility tree, which the other skip tests read, no longer listed it.
+    @MainActor
+    func testSkipIntroLeavesNothingOnScreen() throws {
+        let app = launchPlayer(at: 8, paused: false, mode: "dark", introSkipDelay: 3)
+        let skip = element("player.skipIntro", in: app)
+        XCTAssertTrue(skip.waitForExistence(timeout: 10), "No Skip Intro offer")
+        let shown = accentPixels()
+        // Only while it still shows: a loaded runner may get here after the skip.
+        if skip.exists { XCTAssertGreaterThan(shown, 2000, "The pixel check does not find the Skip Intro pill") }
+        XCTAssertTrue(skip.waitForNonExistence(timeout: 8), "The intro was not skipped after the countdown")
+        Thread.sleep(forTimeInterval: 1.5)
+        XCTAssertLessThan(accentPixels(), 200, "The Skip Intro pill is still drawn after the skip")
+        // The leftover showed with the controls on the phone: bring them back and look again.
+        let controls = element("player.playPause", in: app)
+        if !controls.exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
+        XCTAssertTrue(controls.waitForExistence(timeout: 3), "The controls did not come back")
+        XCTAssertLessThan(accentPixels(), 200, "The Skip Intro pill is drawn with the controls after the skip")
+        XCTAssertFalse(skip.exists, "Skip Intro came back after the skip")
     }
 
     @MainActor
@@ -365,6 +388,29 @@ private extension XCTestCase {
         XCTAssertTrue(element("player.watchIntro", in: app).exists, "No countdown: Watch Intro is missing")
         try snap("player-09-skip-intro-\(suffix)")
         XCTAssertTrue(skip.waitForNonExistence(timeout: 8), "The intro was not skipped after the countdown")
+    }
+
+    /// Screen pixels in the dark theme's accent (Rosé Pine, #A79BF5). In the player only an offer is drawn in
+    /// it: the Skip Intro pill and the play button of Up Next.
+    @MainActor
+    func accentPixels() -> Int {
+        guard let image = XCUIScreen.main.screenshot().image.cgImage,
+              let space = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                  data: nil, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                  space: space, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ) else { return 0 }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        guard let data = context.data else { return 0 }
+        let bytes = image.width * image.height * 4
+        let pixels = data.bindMemory(to: UInt8.self, capacity: bytes)
+        var count = 0
+        for index in stride(from: 0, to: bytes, by: 4)
+        where abs(Int(pixels[index]) - 0xA7) <= 20 && abs(Int(pixels[index + 1]) - 0x9B) <= 20
+            && abs(Int(pixels[index + 2]) - 0xF5) <= 20 {
+            count += 1
+        }
+        return count
     }
 
     /// Playback that waits on data for good at a fixed quality (Auto steps down by itself): "Waiting for the

@@ -120,6 +120,7 @@ SECONDS = {
     "PlayerScreenshotTests/testPausedControlsAndPanels": 176,
     "PlayerScreenshotTests/testScrubPreviewFollowsTheThumb": 52,
     "PlayerScreenshotTests/testSkipIntroCountsDownThenSkips": 19,
+    "PlayerScreenshotTests/testSkipIntroLeavesNothingOnScreen": 25,
     "PlayerScreenshotTests/testUpNextCountsDownThenPlaysNext": 28,
     "PlayerScreenshotTests/testWatchIntroStopsTheCountdown": 37,
     "PlayerStartTimingTests/testDirectPlayStart": 64,

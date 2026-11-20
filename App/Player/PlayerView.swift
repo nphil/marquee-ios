@@ -71,7 +71,7 @@ struct PlayerView: View {
                 PlayerChrome(model: model, frames: frames, close: close) { bottomControls = $0 }
                     .transition(.opacity)
             }
-            OfferView(model: model)
+            OfferView(model: model, offer: model.offer)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 .padding(.trailing, Space.inset)
                 .padding(.bottom, model.chromeVisible ? bottomControls.height + Space.s2 : Space.s6)

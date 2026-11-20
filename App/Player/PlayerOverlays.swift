@@ -1,61 +1,54 @@
 import AVFoundation
 import MarqueeCore
 import SwiftUI
+import UIKit
 
 /// Skip intro, Up Next and, after a long wait on the network, a lower quality (DESIGN §8.6, Offers),
 /// bottom trailing and one at a time. They are not part of the auto-hiding chrome: they stay while their
 /// marker or wait lasts and take touch while they show.
 ///
-/// The offer stays in the hierarchy and fades, rather than leaving through a removal transition: a Skip
-/// Intro pill removed that way just after autoplay replaced the Up Next card stayed on screen and took
-/// taps after the skip (0.1.49, twice in one evening). Once faded it is dropped without animation.
+/// The player screen hands down `offer` and this view draws exactly that: no transition, no fade, no state
+/// of its own. On an iPhone (iOS 27.2) a Skip Intro pill that left with an animation stayed on screen, and
+/// took taps, after the skip had happened, while the player held no offer (0.1.49 with a removal
+/// transition, 0.1.51 with a fade). The skip lands about 3 s into an episode, in the same moment as the
+/// controls fade and the countdown ring goes; the simulator never showed it.
 struct OfferView: View {
     let model: PlayerModel
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// The offer drawn while the last one fades out.
-    @State private var fading: PlayerModel.Offer?
+    let offer: PlayerModel.Offer?
 
     var body: some View {
-        let visible = model.offer != nil
-        ZStack(alignment: .bottomTrailing) {
-            switch model.offer ?? fading {
-            case .skipIntro?:
-                SkipIntroOffer(model: model)
-            case .upNext(let next)?:
-                UpNextCard(model: model, next: next)
-            case .lowerQuality(let quality)?:
-                Button {
-                    Haptics.impact(.light)
-                    model.playAtLowerQuality()
-                } label: {
-                    HStack(spacing: Space.s2) {
-                        Image(systemName: "dial.low")
-                        Text("Play at Lower Quality")
-                    }
-                }
-                .buttonStyle(PlayerPillStyle(prominent: true))
-                .accessibilityLabel("Play at lower quality")
-                .accessibilityHint("Plays on at \(quality.title) until the player closes.")
-                .accessibilityIdentifier("player.lowerQuality")
-            case nil:
-                EmptyView()
+        content
+            .id(PlayerModel.diagOffer(offer))
+            // Whatever animation the change arrives with, the offer comes and goes at once.
+            .transaction { $0.animation = nil }
+            .onChange(of: offer, initial: true) { _, offer in
+                Diag.event(.ui, "offer.view", ["offer": PlayerModel.diagOffer(offer)])
             }
-        }
-        // In over 220 ms travelling 16 pt, out over 180 ms; opacity alone under Reduce Motion (DESIGN §9).
-        .opacity(visible ? 1 : 0)
-        .offset(y: visible || reduceMotion ? 0 : 16)
-        .animation(.easeOut(duration: visible ? (reduceMotion ? 0.12 : 0.22) : 0.18), value: visible)
-        .allowsHitTesting(visible)
-        .accessibilityHidden(!visible)
-        .onChange(of: model.offer, initial: true) { _, offer in
-            if let offer {
-                fading = offer
-            } else {
-                Task {
-                    try? await Task.sleep(for: .milliseconds(250))
-                    if model.offer == nil { fading = nil }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch offer {
+        case .skipIntro?:
+            SkipIntroOffer(model: model)
+        case .upNext(let next)?:
+            UpNextCard(model: model, next: next)
+        case .lowerQuality(let quality)?:
+            Button {
+                Haptics.impact(.light)
+                model.playAtLowerQuality()
+            } label: {
+                HStack(spacing: Space.s2) {
+                    Image(systemName: "dial.low")
+                    Text("Play at Lower Quality")
                 }
             }
+            .buttonStyle(PlayerPillStyle(prominent: true))
+            .accessibilityLabel("Play at lower quality")
+            .accessibilityHint("Plays on at \(quality.title) until the player closes.")
+            .accessibilityIdentifier("player.lowerQuality")
+        case nil:
+            EmptyView()
         }
     }
 }
@@ -162,27 +155,117 @@ private struct UpNextCard: View {
     }
 }
 
-/// A ring that fills over the countdown.
-struct CountdownRing: View {
+/// A ring that fills over the countdown, from the top and clockwise. Core Animation runs it from the countdown's
+/// start and length, so its end, at the moment of the skip, touches no SwiftUI animation: a SwiftUI timeline
+/// drove it when the Skip Intro pill stayed on screen after the skip (`OfferView`).
+struct CountdownRing: UIViewRepresentable {
     let countdown: PlayerModel.Countdown
     let tint: Color
     var lineWidth: CGFloat = 3
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    var body: some View {
-        TimelineView(.animation(minimumInterval: reduceMotion ? 1 : nil)) { context in
-            let elapsed = context.date.timeIntervalSince(countdown.start)
-            let fraction = countdown.length > 0 ? min(1, max(0, elapsed / countdown.length)) : 1
-            ZStack {
-                Circle()
-                    .stroke(tint.opacity(0.35), lineWidth: lineWidth)
-                Circle()
-                    .trim(from: 0, to: fraction)
-                    .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                    .rotationEffect(.degrees(-90))
-            }
+    func makeUIView(context: Context) -> CountdownRingView {
+        CountdownRingView()
+    }
+
+    func updateUIView(_ view: CountdownRingView, context: Context) {
+        view.show(countdown, tint: UIColor(tint), lineWidth: lineWidth, stepped: reduceMotion)
+    }
+}
+
+final class CountdownRingView: UIView {
+    private let track = CAShapeLayer()
+    private let fill = CAShapeLayer()
+    private var countdown: PlayerModel.Countdown?
+    /// Reduce Motion: the ring moves once a second rather than continuously.
+    private var stepped = false
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isUserInteractionEnabled = false
+        isAccessibilityElement = false
+        backgroundColor = .clear
+        for ring in [track, fill] {
+            ring.fillColor = nil
+            ring.lineCap = .round
+            layer.addSublayer(ring)
         }
-        .accessibilityHidden(true)
+        // Core Animation drops a layer's animations while the app is in the background.
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(restart), name: UIApplication.willEnterForegroundNotification, object: nil
+        )
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    func show(_ countdown: PlayerModel.Countdown, tint: UIColor, lineWidth: CGFloat, stepped: Bool) {
+        track.strokeColor = tint.withAlphaComponent(0.35).cgColor
+        fill.strokeColor = tint.cgColor
+        if track.lineWidth != lineWidth {
+            track.lineWidth = lineWidth
+            fill.lineWidth = lineWidth
+            setNeedsLayout()
+        }
+        guard countdown != self.countdown || stepped != self.stepped else { return }
+        self.countdown = countdown
+        self.stepped = stepped
+        restart()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        let radius = max(0, min(bounds.width, bounds.height) / 2 - fill.lineWidth / 2)
+        let path = UIBezierPath(
+            arcCenter: CGPoint(x: bounds.midX, y: bounds.midY), radius: radius,
+            startAngle: -.pi / 2, endAngle: .pi * 1.5, clockwise: true
+        ).cgPath
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for ring in [track, fill] {
+            ring.frame = bounds
+            ring.path = path
+        }
+        CATransaction.commit()
+    }
+
+    /// Fills from where the countdown is now to the end over the time it has left; full once that is over.
+    @objc private func restart() {
+        fill.removeAnimation(forKey: "countdown")
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        fill.strokeEnd = 1
+        CATransaction.commit()
+        guard let countdown, countdown.length > 0 else { return }
+        let elapsed = max(0, Date.now.timeIntervalSince(countdown.start))
+        let remaining = countdown.length - elapsed
+        guard remaining > 0 else { return }
+        let from = elapsed / countdown.length
+        let animation: CAAnimation
+        if stepped {
+            // Discrete steps on each whole second of the count; the key times run one past the values.
+            let steps = CAKeyframeAnimation(keyPath: "strokeEnd")
+            steps.calculationMode = .discrete
+            var values = [from]
+            var times = [NSNumber(value: 0)]
+            var second = elapsed.rounded(.down) + 1
+            while second < countdown.length {
+                values.append(second / countdown.length)
+                times.append(NSNumber(value: (second - elapsed) / remaining))
+                second += 1
+            }
+            times.append(1)
+            steps.values = values
+            steps.keyTimes = times
+            animation = steps
+        } else {
+            let sweep = CABasicAnimation(keyPath: "strokeEnd")
+            sweep.fromValue = from
+            sweep.toValue = 1
+            sweep.timingFunction = CAMediaTimingFunction(name: .linear)
+            animation = sweep
+        }
+        animation.duration = remaining
+        fill.add(animation, forKey: "countdown")
     }
 }
 
