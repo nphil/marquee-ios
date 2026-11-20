@@ -668,8 +668,10 @@ final class PlayerModel: Identifiable {
         let from = time
         time = target
         diagSeeks += 1
-        func logged(_ path: String, written: TimeInterval? = nil) {
-            Diag.event(.player, "seek", ["cause": cause, "from": from, "to": target, "path": path, "written": written])
+        func logged(_ path: String, written: TimeInterval? = nil, seekable: TimeInterval? = nil) {
+            Diag.event(.player, "seek", [
+                "cause": cause, "from": from, "to": target, "path": path, "written": written, "seekable": seekable,
+            ])
         }
         if castDevice != nil {
             // A receiver that has finished holds nothing to seek in.
@@ -703,11 +705,16 @@ final class PlayerModel: Identifiable {
         switch stream {
         case .remux(let remux):
             let written = remux.progress.mediaSeconds
-            if local >= 0, local <= written - 1 {
-                logged("item", written: written)
+            // AVPlayer seeks only inside the item's seekable range. The remux's playlist is live until the whole
+            // file is written, and a live range stops three target durations short of the playlist's end: with
+            // 89.5 s written and 59.1 s seekable, a skip to 88.2 s was refused in 12 ms (0.1.51). The UI tests'
+            // still frame has no item and follows what is written.
+            let seekable = itemSeekableEnd
+            if local >= 0, local <= min(written, seekable ?? written) - 1 {
+                logged("item", written: written, seekable: seekable)
                 seekItem(local)
             } else {
-                logged("far", written: written)
+                logged("far", written: written, seekable: seekable)
                 farSeek(remux, to: target)
             }
         case .transcode:
@@ -2242,6 +2249,13 @@ final class PlayerModel: Identifiable {
         report()
         // A picture left paused, by a call during the load say, keeps its controls.
         if wantsPlay { scheduleHide() } else { showChrome() }
+    }
+
+    /// The end of the playing item's seekable range, in item time: 0 while it has none, nil without an AVPlayer.
+    private var itemSeekableEnd: TimeInterval? {
+        guard let item = backend.player?.currentItem else { return nil }
+        guard let end = item.seekableTimeRanges.last?.timeRangeValue.end.seconds, end.isFinite else { return 0 }
+        return end
     }
 
     private func seekItem(_ local: TimeInterval) {
