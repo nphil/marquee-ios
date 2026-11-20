@@ -34,6 +34,16 @@ public enum TransportStream {
         return latest
     }
 
+    /// The presentation time, in seconds, of the first video frame in `data`; nil when it holds none.
+    public static func firstVideoTime(in data: Data) -> Double? {
+        var first: Int64?
+        forEachPacket(in: data) { packet in
+            guard first == nil, let pes = packet.pes, pes.kind == .video, let pts = pes.pts else { return }
+            first = pts
+        }
+        return first.map { Double($0) / 90_000 }
+    }
+
     /// `data` without the frames at or before `saved`. `resumed` is true once every kind saved before
     /// has come back; until then the next segment is trimmed too. Data that is not whole packets, or
     /// whose times are not on the saved ones' timeline (more than a minute before them), stays as it

@@ -201,6 +201,8 @@ final class PlayerModel: Identifiable {
         /// The server stream's offset; 0 for the file.
         var offset: TimeInterval
         var origin: TimeInterval
+        /// The server stream's `start.m3u8`.
+        var master: URL?
         var preparationDeadline: TimeInterval?
     }
 
@@ -279,6 +281,8 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var farSeeking = false
     @ObservationIgnored private var remuxFinished = false
     @ObservationIgnored private var transcodeOffset: TimeInterval = 0
+    /// The playing server stream's `start.m3u8`, for measuring its clock (`ServerStreamClock`).
+    @ObservationIgnored private var transcodeMaster: URL?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var seekSerial = 0
     @ObservationIgnored private var isSeeking = false
@@ -1298,6 +1302,7 @@ final class PlayerModel: Identifiable {
                 url = try await library.transcodeURL(
                     TranscodeRequest(item: item, mediaIndex: mediaIndex, route: route, offset: target, session: session)
                 )
+                transcodeMaster = url
                 let connection = await library.connection.currentConnection
                 guard generation == self.generation, !Task.isCancelled else {
                     try? await library.stopTranscode(session: session)
@@ -1838,9 +1843,12 @@ final class PlayerModel: Identifiable {
         guard !Task.isCancelled, await backend.openStandby(playerItem), !Task.isCancelled, var next = standby else {
             return failed()
         }
-        if case .transcode = next.stream {
+        if case .transcode(let id) = next.stream {
             let length = playerItem.duration.seconds
-            next.origin = transcodeOrigin(itemDuration: length.isFinite && length > 0 ? length : nil, offset: next.offset)
+            next.master = url
+            next.origin = await serverStreamOrigin(
+                master: url, session: id, itemDuration: length.isFinite && length > 0 ? length : nil, offset: next.offset
+            )
         }
         next.connection = await library.connection.currentConnection
         await applySelection(choice.route, to: playerItem)
@@ -1881,6 +1889,7 @@ final class PlayerModel: Identifiable {
         streamConnection = next.connection
         reporter = next.reporter
         transcodeOffset = next.offset
+        transcodeMaster = next.master
         origin = next.origin
         mediaInfo = nil
         lastTransfer = nil
@@ -2013,6 +2022,32 @@ final class PlayerModel: Identifiable {
     private func transcodeOrigin(itemDuration: TimeInterval?, offset: TimeInterval) -> TimeInterval {
         if let length = itemDuration, duration > 0, length >= duration - 30 { return 0 }
         return offset
+    }
+
+    /// The same, measured from the segment the player starts in (`ServerStreamClock`): the playlist alone was
+    /// 1.8 s off for a copied picture begun part-way, and subtitles showed that early. A stream from the start
+    /// begins with the title, so it is not measured; a measure that fails, or lands further from the listed
+    /// origin than the 10 s a segment spans, leaves the listed one.
+    private func serverStreamOrigin(master: URL?, session: String, itemDuration: TimeInterval?, offset: TimeInterval) async -> TimeInterval {
+        let listed = transcodeOrigin(itemDuration: itemDuration, offset: offset)
+        guard offset > 0, let master else { return listed }
+        let start = offset - listed
+        let measured = (try? await library.serverStreamOrigin(master: master, session: session, startingAt: start)) ?? nil
+        let kept = measured.flatMap { abs($0 - listed) <= 10 ? $0 : nil }
+        Diag.event(.player, "stream.origin", ["listed": listed, "measured": measured, "start": start, "used": kept ?? listed])
+        return kept ?? listed
+    }
+
+    /// Sets the playing server stream's origin once measured, then lands it.
+    private func measureOrigin(of session: String) {
+        let generation = generation, master = transcodeMaster, length = backend.itemDuration, offset = transcodeOffset
+        Task { [weak self] in
+            guard let self else { return }
+            let measured = await serverStreamOrigin(master: master, session: session, itemDuration: length, offset: offset)
+            guard generation == self.generation, case .transcode(let playing) = stream, playing == session, origin == nil else { return }
+            origin = measured
+            land()
+        }
     }
 
     private func streamFailed(_ failure: PlaybackFailure) {
@@ -2165,10 +2200,11 @@ final class PlayerModel: Identifiable {
             itemReady = true
             startTiming.mark(.ready)
             loadStage = .starting
-            if case .transcode = stream, origin == nil {
-                origin = transcodeOrigin(itemDuration: backend.itemDuration, offset: transcodeOffset)
+            if case .transcode(let session) = stream, origin == nil {
+                measureOrigin(of: session)
+            } else {
+                land()
             }
-            land()
         case .failed(let failure):
             if failure.isNotFound, conversionFailed() { return }
             streamFailed(failure)
