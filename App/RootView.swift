@@ -163,7 +163,6 @@ private struct MainTabs: View {
     @State private var picked: Destination?
     @Environment(\.scenePhase) private var scenePhase
     @State private var toasts = ToastCenter()
-    @State private var changes = LibraryChanges()
 
     var body: some View {
         let tabs = store.tabLayout.tabs(available: Destination.available(in: session))
@@ -185,8 +184,8 @@ private struct MainTabs: View {
         .tabBarMinimizeBehavior(store.tabBar == .minimise && selection != .search ? .onScrollDown : .never)
         .environment(\.tabSelection, TabSelection(tabs: tabs, select: { picked = $0 }))
         .environment(toasts)
-        .environment(changes)
-        .onChange(of: session.server?.id) { changes.forgetDeletions() }
+        .environment(session.changes)
+        .onChange(of: session.server?.id) { session.changes.forgetDeletions() }
         .onChange(of: selection, initial: true) { _, tab in
             DiagScreen.tab = tab.rawValue
             Diag.event(.nav, "tab", ["tab": tab.rawValue])

@@ -389,6 +389,19 @@ struct PlexLibraryTests {
         #expect(reports.map { $0.url.query("playQueueItemID") } == [nil, "502"])
     }
 
+    /// The player has screens refetch only once the server has the stopped report.
+    @Test func reporterSaysWhetherTheServerTookTheReport() async throws {
+        let item = try decode(PlexMetadata.self, ["ratingKey": "12", "key": "/library/metadata/12"])
+        let (taking, _) = Self.library { _ in container([:]) }
+        let accepted = TimelineReporter(library: taking, item: item)
+        #expect(await accepted.update(.stopped, time: 1_000, duration: 1_450_000))
+        #expect(await accepted.update(.stopped, time: 1_000, duration: 1_450_000) == false)
+
+        let (refusing, _) = Self.library { _ in PlexHTTPResponse(status: 503, body: Data()) }
+        let refused = TimelineReporter(library: refusing, item: item)
+        #expect(await refused.update(.stopped, time: 1_000, duration: 1_450_000) == false)
+    }
+
     @Test func timelineIsReportedOnStateChangesAndEveryInterval() {
         var cadence = TimelineCadence(interval: .seconds(10))
         let start = ContinuousClock.now

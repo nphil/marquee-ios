@@ -2877,7 +2877,12 @@ final class PlayerModel: Identifiable {
         lastReport = .now
         let state = state ?? (isBuffering ? .buffering : isPlaying ? .playing : .paused)
         let time = Int(self.time * 1000), length = Int(duration * 1000)
-        Task { await reporter.update(state, time: time, duration: length) }
+        guard state == .stopped else {
+            Task { await reporter.update(state, time: time, duration: length) }
+            return
+        }
+        // Where the viewer stopped is what Plex's Continue Watching goes by.
+        settle("stopped", touching: watchKeys) { await reporter.update(.stopped, time: time, duration: length) }
     }
 
     private func markWatched() {
@@ -2885,7 +2890,28 @@ final class PlayerModel: Identifiable {
         markedWatched = true
         if request.download != nil { report(); return }
         let library = library, key = item.ratingKey
-        Task { try? await library.markWatched(key) }
+        settle("watched", touching: watchKeys) { (try? await library.markWatched(key)) != nil }
+    }
+
+    /// The item, its season and its show: what a change to its watch state touches.
+    private var watchKeys: Set<String> {
+        Set([item.ratingKey, item.parentRatingKey, item.grandparentRatingKey].compactMap(\.self))
+    }
+
+    /// Sends a change to the item's watch state and, once the server has it, has the screens showing the
+    /// item refetch (`LibraryChanges`). Home loaded only at launch, so its Continue Watching stayed on the
+    /// episode watched before the app opened, however many followed (2026-11-20). The send is held open
+    /// with the app in the background: closing Picture in Picture there let iOS suspend the app before the
+    /// stopped report went, and Plex kept the episode's old place in the row.
+    private func settle(_ what: String, touching keys: Set<String>, send: @escaping @MainActor () async -> Bool) {
+        let assertion = UIApplication.shared.beginBackgroundTask(withName: "marquee-\(what)")
+        let changes = session.changes, key = item.ratingKey
+        Task {
+            defer { if assertion != .invalid { UIApplication.shared.endBackgroundTask(assertion) } }
+            let sent = await send()
+            Diag.event(.player, "server.\(what)", ["item": key, "ok": sent])
+            if sent { changes.record(keys) }
+        }
     }
 
     /// Saves the playing tracks as the part's selection, once per fresh playback on the phone and per

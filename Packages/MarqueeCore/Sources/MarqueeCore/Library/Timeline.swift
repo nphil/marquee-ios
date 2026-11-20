@@ -84,12 +84,19 @@ public actor TimelineReporter {
         item.playQueueItemID = playQueueItemID
     }
 
+    /// Whether the server took a report: false when none was due or the request failed.
     /// - Parameters:
     ///   - time: Playback position in milliseconds.
     ///   - duration: Item length in milliseconds.
-    public func update(_ state: PlaybackState, time: Int, duration: Int) async {
-        guard cadence.shouldReport(state, at: .now) else { return }
+    @discardableResult
+    public func update(_ state: PlaybackState, time: Int, duration: Int) async -> Bool {
+        guard cadence.shouldReport(state, at: .now) else { return false }
         let update = TimelineUpdate(item: item, state: state, time: time, duration: duration, sessionIdentifier: sessionIdentifier)
-        try? await library.reportTimeline(update)
+        do {
+            try await library.reportTimeline(update)
+            return true
+        } catch {
+            return false
+        }
     }
 }

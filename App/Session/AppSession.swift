@@ -45,6 +45,8 @@ final class AppSession {
     var showsSettings = false
     /// The full-screen player and whatever keeps playing in Picture in Picture.
     let player = PlayerCenter()
+    /// Watch-state changes this app made on the server, the player's included, so the screens showing them refetch.
+    let changes = LibraryChanges()
     /// The theme tune of the show page on screen.
     let themeMusic = ThemeMusicPlayer()
     let downloads: DownloadCenter

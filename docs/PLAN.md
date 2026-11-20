@@ -18,6 +18,7 @@ Scope: the Marquee iPhone, XR glasses, wired-TV, remote and HomeLabber quality-m
 - [ ] **N10 — Lost conversion acceptance (R50).** DEVICE-TEST check 31 on the iPhone. Done: a converted title paused for four minutes plays again within about 5 s of Play, not 30 s; the log shows `conversion.lost` (`cause`, `missed`, `ahead`), then `conversion.restart` or `conversion.switched`; no error shows. A 404 cannot be forced on demand, so which of the two lines appeared is recorded.
 - [ ] **N11 — Measured link acceptance (R51).** DEVICE-TEST check 32 on the iPhone, with Isabel's server (DMZ VLAN through Tailscale) and an MKV that needs the remux. Done: the second start reads Route "Repackaged on the phone", Why "MKV file, Server at N Mbps, fast enough for the original", the `route` log line's `reach` says "near by link", and a remote quality limit set on the server keeps the stream there (`route.server-limit held`). Cellular, the relay and a direct public address stay untested.
 - [ ] **N12 — Offers keep up, skips land first time (R52).** On the iPhone, with auto-skip on, let the countdown skip intros on three episodes in a row, the later ones started by Up Next, one of them repackaged on the phone; tap the picture after each skip. Done: the Skip Intro pill fades out once the skip lands and the controls draw when brought back; the log's `ui offer.view offer=none` follows each `offers skip`, and `skip.landed` reads `retried=no`.
+- [ ] **N13 — Continue Watching follows playback (R53).** On the iPhone, play two episodes of a show in a row, then go back to Home, once closing the player and once closing Picture in Picture from the Home Screen. Done: the row shows the episode and place last played within a few seconds, without pulling to refresh; the log has `player server.stopped ok=yes` for each close.
 
 The first build batches N1–N5. Inspect recordings before editing, exercise the touched behavior once after the batch, then publish one point release. No unrelated refactor or engine replacement.
 
@@ -136,6 +137,7 @@ Each request is retained separately below; repeated reports share one entry inst
 | R50 | A lost server conversion is replaced within seconds, not after 30 s of retries | Built: DESIGN §8.6 (`ConversionWatch`); N10 open. |
 | R51 | The measured link, not the place, decides whether the phone reads a file itself | Built: DESIGN §8.6, docs/adaptive-playback.md (`RouteReach`, `LinkMemory`, `ServerLimit`); N11 open. |
 | R52 | Skip Intro leaves after the skip and lands on the first seek | Built: DESIGN §8.6 Who decides an overlay and Seeking in the remux (AVPlayer's seekable range); `testSkipIntroLeavesNothingOnScreen` checks the screen's pixels; N12 open. |
+| R53 | Continue Watching follows what was just played | Built: DESIGN §8.1 item 6 (`LibraryChanges` from the player, stopped report held open in the background); N13 open. |
 
 ## 6. Evidence and release boundaries
 
