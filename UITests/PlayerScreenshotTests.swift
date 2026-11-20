@@ -40,9 +40,10 @@ final class PlayerScreenshotTests: XCTestCase {
         try skipIntroFlow(suffix: "rose-pine")
     }
 
-    /// The skip lands as the controls fade, both 3 s into playback as on an iPhone, and leaves nothing on screen.
-    /// The pill is looked for in the screen's pixels: a leftover stayed on the phone after the skip (0.1.49 to
-    /// 0.1.51) while the accessibility tree, which the other skip tests read, no longer listed it.
+    /// The skip lands as the controls fade, both 3 s into playback, and the screen keeps up with both. On an
+    /// iPhone, and in about one run in four on the simulator, 0.1.49 to 0.1.51 left the Skip Intro pill drawn
+    /// after the skip, and the controls brought back afterwards never drew. Both are judged by the screen's
+    /// pixels: the accessibility tree, which the other skip tests read, may list what is not drawn.
     @MainActor
     func testSkipIntroLeavesNothingOnScreen() throws {
         let app = launchPlayer(at: 8, paused: false, mode: "dark", introSkipDelay: 3)
@@ -51,13 +52,18 @@ final class PlayerScreenshotTests: XCTestCase {
         let shown = accentPixels()
         // Only while it still shows: a loaded runner may get here after the skip.
         if skip.exists { XCTAssertGreaterThan(shown, 2000, "The pixel check does not find the Skip Intro pill") }
-        XCTAssertTrue(skip.waitForNonExistence(timeout: 8), "The intro was not skipped after the countdown")
+        let left = skip.waitForNonExistence(timeout: 8)
         Thread.sleep(forTimeInterval: 1.5)
         XCTAssertLessThan(accentPixels(), 200, "The Skip Intro pill is still drawn after the skip")
-        // The leftover showed with the controls on the phone: bring them back and look again.
+        XCTAssertTrue(left, "Skip Intro is still listed after the countdown")
+        // The leftover showed with the controls on the phone: bring them back, and see that they draw.
         let controls = element("player.playPause", in: app)
-        if !controls.exists { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
+        let band = edgeBrightness()
+        let hidden = !controls.exists
+        if hidden { app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap() }
         XCTAssertTrue(controls.waitForExistence(timeout: 3), "The controls did not come back")
+        Thread.sleep(forTimeInterval: 0.5)
+        if hidden { XCTAssertLessThan(edgeBrightness(), band - 15, "The controls came back without drawing their scrims") }
         XCTAssertLessThan(accentPixels(), 200, "The Skip Intro pill is drawn with the controls after the skip")
         XCTAssertFalse(skip.exists, "Skip Intro came back after the skip")
     }
@@ -394,6 +400,42 @@ private extension XCTestCase {
     /// it: the Skip Intro pill and the play button of Up Next.
     @MainActor
     func accentPixels() -> Int {
+        screenPixels { pixels, width, height in
+            var count = 0
+            for index in stride(from: 0, to: width * height * 4, by: 4)
+            where abs(Int(pixels[index]) - 0xA7) <= 20 && abs(Int(pixels[index + 1]) - 0x9B) <= 20
+                && abs(Int(pixels[index + 2]) - 0xF5) <= 20 {
+                count += 1
+            }
+            return count
+        }
+    }
+
+    /// Mean brightness, 0–255, of the screen's two long edges, which the controls' top and bottom scrims darken.
+    /// The screenshot's pixels stay upright while the player is on its side, so the long edges are its columns
+    /// there, past the picture's side bars.
+    @MainActor
+    func edgeBrightness() -> Int {
+        screenPixels { pixels, width, height in
+            let sideways = height > width
+            let band = max(1, (sideways ? width : height) * 6 / 100)
+            var total = 0, count = 0
+            for y in 0..<height {
+                for x in 0..<width {
+                    let edge = sideways ? x < band || x >= width - band : y < band || y >= height - band
+                    guard edge else { continue }
+                    let index = (y * width + x) * 4
+                    total += Int(pixels[index]) + Int(pixels[index + 1]) + Int(pixels[index + 2])
+                    count += 3
+                }
+            }
+            return total / max(1, count)
+        }
+    }
+
+    /// The screen as sRGB bytes, four to a pixel and the top row first, handed to `measure`.
+    @MainActor
+    func screenPixels(_ measure: (UnsafePointer<UInt8>, Int, Int) -> Int) -> Int {
         guard let image = XCUIScreen.main.screenshot().image.cgImage,
               let space = CGColorSpace(name: CGColorSpace.sRGB),
               let context = CGContext(
@@ -402,15 +444,7 @@ private extension XCTestCase {
               ) else { return 0 }
         context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         guard let data = context.data else { return 0 }
-        let bytes = image.width * image.height * 4
-        let pixels = data.bindMemory(to: UInt8.self, capacity: bytes)
-        var count = 0
-        for index in stride(from: 0, to: bytes, by: 4)
-        where abs(Int(pixels[index]) - 0xA7) <= 20 && abs(Int(pixels[index + 1]) - 0x9B) <= 20
-            && abs(Int(pixels[index + 2]) - 0xF5) <= 20 {
-            count += 1
-        }
-        return count
+        return measure(UnsafePointer(data.bindMemory(to: UInt8.self, capacity: image.width * image.height * 4)), image.width, image.height)
     }
 
     /// Playback that waits on data for good at a fixed quality (Auto steps down by itself): "Waiting for the

@@ -67,8 +67,12 @@ struct PlayerView: View {
                     .padding(.top, model.chromeVisible ? 76 : Space.s3)
                     .padding(.horizontal, Space.inset)
             }
+            // The screen reads what decides each overlay and hands it down (`OfferView`): a long-lived view
+            // that read it itself could miss an update and keep showing it.
             if model.chromeVisible || model.phase != .playing {
-                PlayerChrome(model: model, frames: frames, close: close) { bottomControls = $0 }
+                PlayerChrome(
+                    model: model, offer: model.offer, waitsForNetwork: model.waitsForNetwork, frames: frames, close: close
+                ) { bottomControls = $0 }
                     .transition(.opacity)
             }
             OfferView(model: model, offer: model.offer)
@@ -91,9 +95,9 @@ struct PlayerView: View {
             }
             VStack(spacing: Space.s2) {
                 if model.fallback != nil {
-                    FallbackBanner(model: model)
+                    FallbackBanner(fallback: model.fallback, chromeVisible: model.chromeVisible)
                 }
-                SubtitleSearchBanner(finder: model.subtitleFinder)
+                SubtitleSearchBanner(status: model.subtitleFinder.status)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .padding(.top, model.chromeVisible ? 76 : Space.s3)

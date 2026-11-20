@@ -59,7 +59,7 @@ struct LivePlayerView: View {
             Color.black.ignoresSafeArea()
             picture
             if showsChrome && !model.showsGuide {
-                LiveChrome(model: model, lean: lean, close: close)
+                LiveChrome(model: model, showsCard: model.surfing != nil || model.state == .opening, lean: lean, close: close)
                     .transition(.opacity)
             } else if !model.showsGuide, let status = model.status {
                 LiveStatusLabel(text: status)
@@ -222,6 +222,9 @@ struct LivePlayerView: View {
 /// programme's progress, Last and Guide at the bottom.
 private struct LiveChrome: View {
     let model: LivePlaybackModel
+    /// The card stands in for the transport while surfing, and while a channel tunes, which on the Plex path
+    /// takes about 3 s. The screen decides and hands it down (`OfferView`).
+    let showsCard: Bool
     let lean: CGFloat
     let close: () -> Void
 
@@ -306,12 +309,6 @@ private struct LiveChrome: View {
                 surfButton(by: 1)
             }
         }
-    }
-
-    /// The card stands in for the transport while surfing, and while a channel tunes, which on the Plex
-    /// path takes about 3 s.
-    private var showsCard: Bool {
-        model.surfing != nil || model.state == .opening
     }
 
     /// Back, pause and forward within the buffer (docs/LIVE-TV.md §6.7); forward only behind live.

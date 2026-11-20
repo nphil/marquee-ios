@@ -115,8 +115,6 @@ final class PlayerModel: Identifiable {
     /// The Chromecast playing this item, while one does.
     private(set) var castDevice: CastDevice?
     private(set) var trickplay: Trickplay?
-    /// Set without animation: an offer comes and goes at once (`OfferView`), and so does the transport the Up
-    /// Next card replaces.
     private(set) var offer: Offer?
     private(set) var countdown: Countdown?
     private(set) var cueText: AttributedString?
@@ -867,7 +865,7 @@ final class PlayerModel: Identifiable {
             Diag.event(.offers, "skip.refused", ["end": end, "phase": Self.diagPhase(phase)], .warning)
             return
         }
-        offer = nil
+        withAnimation(.easeOut(duration: 0.18)) { offer = nil }
         skippedIntroEnd = end
         skipCheck = SkipCheck(target: end)
         skipCheckAt = nil
@@ -883,7 +881,7 @@ final class PlayerModel: Identifiable {
         Diag.event(.offers, "watch-credits", ["at": time])
         creditsDismissed = true
         cancelCountdown("watch-credits")
-        offer = nil
+        withAnimation(.easeOut(duration: 0.18)) { offer = nil }
     }
 
     /// Takes a long network wait's offer: this playback goes on at the lower quality.
@@ -2377,7 +2375,7 @@ final class PlayerModel: Identifiable {
     private func forgetWait() {
         stallWatch.resume()
         waitsForNetwork = false
-        if case .lowerQuality? = offer { offer = nil }
+        if case .lowerQuality? = offer { withAnimation(.easeOut(duration: 0.18)) { offer = nil } }
     }
 
     private func checkStall() {
@@ -2442,7 +2440,7 @@ final class PlayerModel: Identifiable {
         guard case .fixed = qualitySetting, !forcesDirectPlay,
               let lower = quality.lower(mediaKbps: media?.bitrate) else { return }
         cancelCountdown("lower-quality")
-        offer = .lowerQuality(lower)
+        withAnimation(.easeOut(duration: 0.22)) { offer = .lowerQuality(lower) }
         Diag.event(.offers, "lower-quality.shown", ["quality": "\(lower)", "at": time], .notice)
     }
 
@@ -2788,7 +2786,7 @@ final class PlayerModel: Identifiable {
             "introCancelled": introCancelled,
         ])
         cancelCountdown("offer-changed")
-        offer = next
+        withAnimation(.easeOut(duration: 0.22)) { offer = next }
         startCountdownIfDue()
     }
 

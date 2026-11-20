@@ -9,6 +9,10 @@ import SwiftUI
 /// itself.
 struct PlayerChrome: View {
     let model: PlayerModel
+    /// Handed down by the player screen, as for `OfferView`: the transport steps aside for Up Next by it, and
+    /// the network caption shows by both.
+    let offer: PlayerModel.Offer?
+    let waitsForNetwork: Bool
     let frames: TrickplayFrames
     let close: () -> Void
     /// The bottom controls' frame on screen.
@@ -143,7 +147,7 @@ struct PlayerChrome: View {
     }
 
     private var upNextShowing: Bool {
-        guard case .upNext? = model.offer else { return false }
+        guard case .upNext? = offer else { return false }
         return true
     }
 
@@ -151,7 +155,7 @@ struct PlayerChrome: View {
     /// text sizes or on a small phone.
     @ViewBuilder
     private var networkWait: some View {
-        if model.waitsForNetwork, model.offer == nil {
+        if waitsForNetwork, offer == nil {
             Text(model.belowQualityFloor ? "Keeping picture quality; buffering may be needed." : "Waiting for the network")
                 .textRole(.label)
                 .foregroundStyle(theme.ink)

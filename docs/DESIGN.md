@@ -419,7 +419,9 @@ On the smallest iPhones (375 × 667 pt), upright, the top row leaves the title 2
 - **Style** is a submenu of the same menu: Look (the presets), Size, Colour, Position and Reveal as Spoken, each a submenu whose choices apply at once and keep the menu up, so the subtitles behind it show the change. The rest of the look is in Settings › Audio & Subtitles. Image subtitles (PGS, VOBSUB, DVB) take only Colour and Soften Brightness (`L:367`). Custom controls must offer subtitle choice (`W26-256`); this menu does.
 - Track labels are "English", "English (dub)", "English (on-screen text)", "(commentary)"; "Track N" tells identical rows apart; no codec names or file titles in the subtitle rows (`B:§3`).
 
-**Offers** (bottom trailing, one at a time; not part of the auto-hiding chrome, they stay while their marker or wait lasts and take touch while visible). An offer appears and leaves at once, without a fade: an exit animation left the Skip Intro pill on an iPhone's screen after the skip, where it lands about 3 s into an episode together with the controls' fade (0.1.49–0.1.51). The countdown ring is drawn by Core Animation.
+**Offers** (bottom trailing, one at a time, 220 ms in travelling 16 pt, 180 ms out; not part of the auto-hiding chrome, they stay while their marker or wait lasts and take touch while visible). The countdown ring is drawn by Core Animation.
+
+**Who decides an overlay:** the screen that holds an overlay reads what decides whether it shows and hands that down: the offer, the banners, and the transport's and the network caption's rules (the Live TV card's too). A long-lived view that watched the model itself stopped updating when its screen redrew in the same frame: Skip Intro stayed on screen after the skip, and the controls brought back after it did not draw (0.1.49–0.1.51; on the simulator, about one skip in four landing as the controls faded).
 
 - **Skip intro:** a solid accent pill, 56 pt tall (the one control size), accentInk label, with a thin countdown ring when auto-skip is on. Manual by default; "Watch intro" cancels auto-skip for that episode (`B:§4`).
 - **Up Next:** at a credits marker with a queued next episode, an opaque-sheet card (poster, "S2 · E6 · Name", a countdown ring around a play glyph, a text button "Watch credits"). Pause, buffering, menus and input stop the countdown (`B:§4`). With Autoplay Next Episode off the card only waits for a tap; with Skip Credits Instantly there is no card and the next episode starts at the marker. An episode with no credits marker plays the next one when it ends, if autoplay is on (not after "Watch credits"). On a phone on its side the card covers the middle of the screen, so while it shows the transport steps aside: the card carries play, and "Watch credits" brings the transport back.
@@ -542,7 +544,7 @@ Motion tokens come from Lucent (`T:motion`, `L:214-227`); native adapters use th
 | Press on poster, card or button | press | scale .97 over 90 ms; commits on release inside, cancels if the finger leaves (`L:72`) |
 | Text or glyph swap (Play to Resume, bookmark fill) | label | 120 ms crossfade |
 | Focus ring appears | focus | 150 ms |
-| Custom overlay arrives (track panel, toast) | layer | 220 ms, travels 16 pt (toast 8 pt); offers (Skip intro, Up Next) come and go at once |
+| Custom overlay arrives (track panel, toast, Skip intro) | layer | 220 ms, travels 16 pt (toast 8 pt) |
 | Overlay leaves; chrome fades out | exit | 180 ms |
 | Chrome fades in | label | 120 ms |
 | Programmatic scroll (A–Z jump, "go to current episode") | scroll | 300 ms at most; a drag follows the finger without easing (`L:222`) |

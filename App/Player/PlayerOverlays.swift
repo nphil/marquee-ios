@@ -7,28 +7,42 @@ import UIKit
 /// bottom trailing and one at a time. They are not part of the auto-hiding chrome: they stay while their
 /// marker or wait lasts and take touch while they show.
 ///
-/// The player screen hands down `offer` and this view draws exactly that: no transition, no fade, no state
-/// of its own. On an iPhone (iOS 27.2) a Skip Intro pill that left with an animation stayed on screen, and
-/// took taps, after the skip had happened, while the player held no offer (0.1.49 with a removal
-/// transition, 0.1.51 with a fade). The skip lands about 3 s into an episode, in the same moment as the
-/// controls fade and the countdown ring goes; the simulator never showed it.
+/// The player screen reads the offer and hands it down; this view never reads it from the model. A view
+/// that read it itself kept drawing a Skip Intro pill after the skip, while the model held no offer and
+/// its own fade-out had never begun (0.1.49, 0.1.51, iOS 27.2). A screen that redraws for any reason now
+/// brings the offer up to date. The offer stays in the hierarchy while it fades; once faded it is dropped.
 struct OfferView: View {
     let model: PlayerModel
     let offer: PlayerModel.Offer?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    /// The offer drawn while the last one fades out.
+    @State private var fading: PlayerModel.Offer?
 
     var body: some View {
-        content
-            .id(PlayerModel.diagOffer(offer))
-            // Whatever animation the change arrives with, the offer comes and goes at once.
-            .transaction { $0.animation = nil }
+        let visible = offer != nil
+        ZStack(alignment: .bottomTrailing) { content }
+            // In over 220 ms travelling 16 pt, out over 180 ms; opacity alone under Reduce Motion (DESIGN §9).
+            .opacity(visible ? 1 : 0)
+            .offset(y: visible || reduceMotion ? 0 : 16)
+            .animation(.easeOut(duration: visible ? (reduceMotion ? 0.12 : 0.22) : 0.18), value: visible)
+            .allowsHitTesting(visible)
+            .accessibilityHidden(!visible)
             .onChange(of: offer, initial: true) { _, offer in
                 Diag.event(.ui, "offer.view", ["offer": PlayerModel.diagOffer(offer)])
+                if let offer {
+                    fading = offer
+                } else {
+                    Task {
+                        try? await Task.sleep(for: .milliseconds(250))
+                        if model.offer == nil { fading = nil }
+                    }
+                }
             }
     }
 
     @ViewBuilder
     private var content: some View {
-        switch offer {
+        switch offer ?? fading {
         case .skipIntro?:
             SkipIntroOffer(model: model)
         case .upNext(let next)?:
@@ -390,15 +404,16 @@ struct FailureCard: View {
 }
 
 /// Playback moved from the phone to the server; shown for six seconds, then with the chrome. The error
-/// behind it stays in Playback info.
+/// behind it stays in Playback info. The player screen hands down what decides it, as for `OfferView`.
 struct FallbackBanner: View {
-    let model: PlayerModel
+    let fallback: String?
+    let chromeVisible: Bool
     @Environment(\.theme) private var theme
     @State private var fresh = true
 
     var body: some View {
         ZStack {
-            if model.fallback != nil, fresh || model.chromeVisible {
+            if fallback != nil, fresh || chromeVisible {
                 HStack(spacing: Space.s3) {
                     Image(systemName: "server.rack")
                         .font(.system(size: 20, weight: .semibold))
@@ -422,8 +437,8 @@ struct FallbackBanner: View {
                 .accessibilityElement(children: .combine)
             }
         }
-        .animation(.easeOut(duration: 0.18), value: fresh || model.chromeVisible)
-        .task(id: model.fallback) {
+        .animation(.easeOut(duration: 0.18), value: fresh || chromeVisible)
+        .task(id: fallback) {
             fresh = true
             try? await Task.sleep(for: .seconds(6))
             fresh = false
@@ -431,15 +446,16 @@ struct FallbackBanner: View {
     }
 }
 
-/// Find Subtitles' progress and outcome: up while the search runs, then for six seconds.
+/// Find Subtitles' progress and outcome: up while the search runs, then for six seconds. The player screen
+/// hands down the status, as for `OfferView`.
 struct SubtitleSearchBanner: View {
-    let finder: SubtitleFinder
+    let status: SubtitleFinder.Status?
     @Environment(\.theme) private var theme
     @State private var fresh = true
 
     var body: some View {
         ZStack {
-            if let status = finder.status, status.tone == .busy || fresh {
+            if let status, status.tone == .busy || fresh {
                 HStack(spacing: Space.s3) {
                     icon(status.tone)
                         .accessibilityHidden(true)
@@ -463,11 +479,11 @@ struct SubtitleSearchBanner: View {
                 .accessibilityIdentifier("player.subtitleSearch")
             }
         }
-        .animation(.easeOut(duration: 0.18), value: finder.status)
+        .animation(.easeOut(duration: 0.18), value: status)
         .animation(.easeOut(duration: 0.18), value: fresh)
-        .task(id: finder.status) {
+        .task(id: status) {
             fresh = true
-            guard let status = finder.status, status.tone != .busy else { return }
+            guard let status, status.tone != .busy else { return }
             try? await Task.sleep(for: .seconds(6))
             fresh = false
         }
