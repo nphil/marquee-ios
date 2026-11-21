@@ -287,6 +287,29 @@ struct PlaybackRouteTests {
         #expect(Self.route(mp4, limits: RouteLimits(reach: .remote)).kind == .directPlay)
     }
 
+    /// Isabel at home with Tailscale on (2026-11-20): the tunnel made the place away, and with no reading yet
+    /// the server converted an MKV. The link is probed only where that alone sent the file to the server.
+    @Test func theLinkIsProbedOnlyWhenThePlaceAloneSentTheFileToTheServer() throws {
+        let mkv = try Self.file("mkv")
+        let remote = Self.route(mkv, limits: RouteLimits(reach: .remote))
+        let tunnel = PlexConnection(uri: URL(string: "https://192-168-5-10.abc.plex.direct:32400")!, isLocal: true)
+        let relay = PlexConnection(uri: URL(string: "https://relay.plex.direct:8443")!, isLocal: false, isRelay: true)
+
+        #expect(LinkProbe.isNeeded(route: remote, place: .away(.tunnel), connection: tunnel, distrusted: false))
+        #expect(!LinkProbe.isNeeded(route: remote, place: .away(.tunnel), connection: tunnel, distrusted: true))
+        #expect(!LinkProbe.isNeeded(route: remote, place: .away(.relay), connection: relay, distrusted: false))
+        #expect(!LinkProbe.isNeeded(route: Self.route(mkv), place: .home, connection: tunnel, distrusted: false))
+        let short = Self.route(mkv, limits: RouteLimits(reach: .remoteByLink(kbps: 4_000, needs: 20_000)))
+        #expect(!LinkProbe.isNeeded(route: short, place: .away(.tunnel), connection: tunnel, distrusted: false))
+    }
+
+    /// A read cut short by its window still measures a slow link; a fast one ending early on too little does not.
+    @Test func aProbeReadNeedsEnoughDataOrItsWholeWindow() {
+        #expect(LinkProbe.kbps(bytes: 4 << 20, seconds: 0.2) == 167_772)
+        #expect(LinkProbe.kbps(bytes: 125_000, seconds: 0.5) == 2_000)
+        #expect(LinkProbe.kbps(bytes: 64 << 10, seconds: 0.01) == nil)
+    }
+
     @Test func aFastLinkLetsThePhoneRemuxAwayFromHome() throws {
         let mkv = try Self.file("mkv", bitrate: 1_800)
 

@@ -20,6 +20,7 @@ Scope: the Marquee iPhone, XR glasses, wired-TV, remote and HomeLabber quality-m
 - [ ] **N12 — Offers keep up, skips land first time (R52).** On the iPhone, with auto-skip on, let the countdown skip intros on three episodes in a row, the later ones started by Up Next, one of them repackaged on the phone; tap the picture after each skip. Done: the Skip Intro pill fades out once the skip lands and the controls draw when brought back; the log's `ui offer.view offer=none` follows each `offers skip`, and `skip.landed` reads `retried=no`.
 - [ ] **N13 — Continue Watching follows playback (R53).** On the iPhone, play two episodes of a show in a row, then go back to Home, once closing the player and once closing Picture in Picture from the Home Screen. Done: the row shows the episode and place last played within a few seconds, without pulling to refresh; the log has `player server.stopped ok=yes` for each close.
 - [ ] **N14 — Subtitles on time in a server stream begun part-way (R54).** On the iPhone, resume an episode the server converts with its picture copied (Playback info reads "Repackaged by the server") from Continue Watching, mid-episode, with a sidecar subtitle on. Done: lines appear with the speech, as they do when the same episode plays from its start; the log's `player stream.origin` shows `used` equal to `measured`.
+- [ ] **N15 — The first episode after launch plays on the phone at home (R55).** On Isabel's iPhone at home with Tailscale on, quit Marquee, open it and play an MKV episode. Done: Playback info reads "Repackaged on the phone", not "by the server"; the log has `player link.probe` with its kbps and `ms` under 1000. Away on cellular, the same start still converts when the probe reads under 3 times the file's bitrate.
 
 The first build batches N1–N5. Inspect recordings before editing, exercise the touched behavior once after the batch, then publish one point release. No unrelated refactor or engine replacement.
 
@@ -140,6 +141,7 @@ Each request is retained separately below; repeated reports share one entry inst
 | R52 | Skip Intro leaves after the skip and lands on the first seek | Built: DESIGN §8.6 Who decides an overlay and Seeking in the remux (AVPlayer's seekable range); `testSkipIntroLeavesNothingOnScreen` checks the screen's pixels; N12 open. |
 | R53 | Continue Watching follows what was just played | Built: DESIGN §8.1 item 6 (`LibraryChanges` from the player, stopped report held open in the background); N13 open. |
 | R54 | Subtitles keep time in a server stream started part-way | Built: ARCHITECTURE Timeline mapping (`ServerStreamClock`, the origin measured from the first frame of the starting segment); N14 open. |
+| R55 | A file plays on the phone whenever the link carries it, the first start after launch included | Built: DESIGN §8.6 Which way a file plays (`LinkProbe`); N15 open. |
 
 ## 6. Evidence and release boundaries
 

@@ -55,4 +55,9 @@ public struct LinkMemory: Sendable {
     public mutating func distrust(_ link: Link, network: Int) {
         distrusted[link] = network
     }
+
+    /// Whether the phone failed to read a file over this link on this network.
+    public func isDistrusted(_ link: Link, network: Int) -> Bool {
+        distrusted[link] == network
+    }
 }

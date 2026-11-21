@@ -344,6 +344,8 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var reach = RouteReach.near
     /// The server was asked what it would make of the file's own stream (`ServerLimit`) since `reach` was decided.
     @ObservationIgnored private var serverLimitAsked = false
+    /// The link was probed (`LinkProbe`) since `reach` was decided.
+    @ObservationIgnored private var linkProbed = false
     /// The playing stream's reading of the link is taken (`noteLink`); `readingBase` is where its counting began.
     @ObservationIgnored private var linkNoted = false
     @ObservationIgnored private var readingBase: (bytes: Int64, seconds: TimeInterval)?
@@ -1129,6 +1131,11 @@ final class PlayerModel: Identifiable {
             return (decision, route)
         }
         var (decision, route) = decide(drawsImages: true)
+        // With no recent reading the place sent the file to the server: the link is measured now, and decides.
+        if request.download == nil, !linkProbed, let connection, await probeLink(for: route, over: connection, media: media, part: part) {
+            limits.reach = reach
+            (decision, route) = decide(drawsImages: true)
+        }
         // The server's own limits win over the measured link. For a link only the measurement calls near, it is asked
         // what it would make of the file's video; a stream it holds below the file's rate comes from it.
         if request.download == nil, case .nearByLink = limits.reach, route.kind == .remux, !serverLimitAsked {
@@ -1651,6 +1658,7 @@ final class PlayerModel: Identifiable {
             linkAddress = connection.uri
         }
         serverLimitAsked = false
+        linkProbed = false
         reach = RouteReach.decide(
             place: place, connection: connection, mediaKbps: media?.bitrate, linkKbps: connection.flatMap { recentKbps(over: $0) }
         )
@@ -1691,6 +1699,28 @@ final class PlayerModel: Identifiable {
         guard case .nearByLink = reach, let place, let address = linkAddress else { return }
         session.player.links.distrust(LinkMemory.Link(address: address, place: place), network: session.presenceNetworkRevision)
         Diag.event(.player, "link.distrusted", ["place": place.description], .notice)
+    }
+
+    /// Measures the link by reading the start of the file (`LinkProbe`) when the place alone sent `route` to the
+    /// server, records the reading and decides `reach` again by it. True when the reading changed `reach`.
+    private func probeLink(for route: PlaybackRoute, over connection: PlexConnection, media: PlexMedia, part: PlexPart) async -> Bool {
+        guard let place, connection.uri == linkAddress else { return false }
+        let link = LinkMemory.Link(address: connection.uri, place: place)
+        let network = session.presenceNetworkRevision
+        guard LinkProbe.isNeeded(
+            route: route, place: place, connection: connection, distrusted: session.player.links.isDistrusted(link, network: network)
+        ) else { return false }
+        linkProbed = true
+        let started = ContinuousClock.now
+        guard let url = try? await library.playbackURL(path: part.key) else { return false }
+        let kbps = await LinkProbeRead.kbps(of: url, headers: library.authorizationHeaders())
+        Diag.event(.player, "link.probe", ["kbps": kbps, "place": place.description, "ms": Diag.ms(since: started)], .notice)
+        guard let kbps, !Task.isCancelled else { return false }
+        session.player.links.record(kbps, over: link, at: ProcessInfo.processInfo.systemUptime, network: network)
+        let probed = RouteReach.decide(place: place, connection: connection, mediaKbps: media.bitrate, linkKbps: kbps)
+        guard probed != reach else { return false }
+        reach = probed
+        return true
     }
 
     private func watchQuality() {
