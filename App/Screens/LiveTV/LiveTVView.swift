@@ -238,11 +238,19 @@ private struct LiveGuideScreen: View {
             GuideNotice(symbol: "exclamationmark.triangle.fill", tint: theme.warning, text: problem + age)
         }
         if let dvr = store.dvr, !dvr.devices.isEmpty, dvr.devices.allSatisfy({ !$0.isAlive }) {
-            GuideNotice(symbol: "antenna.radiowaves.left.and.right.slash", tint: theme.warning, text: "The tuner isn't responding.")
+            GuideNotice(symbol: "antenna.radiowaves.left.and.right.slash", tint: theme.warning, text: deadTunerText)
         }
         if store.guide.airings.values.allSatisfy(\.isEmpty), !store.guide.channels.isEmpty {
             GuideNotice(symbol: "calendar.badge.exclamationmark", tint: theme.ink2, text: "No guide data yet." + age)
         }
+    }
+
+    /// Plex reports the tuner dead. When this phone still reaches it, only Plex's side is cut off.
+    private var deadTunerText: String {
+        guard store.phoneReachesDeadTuner else { return "The tuner isn't responding." }
+        return session.settings.readsTunerDirectly
+            ? "Plex can't reach the tuner, so recordings won't work. Live TV still plays straight from the tuner."
+            : "Plex can't reach the tuner, so Live TV and recordings won't work. Turn on Direct from Tuner to watch."
     }
 
     private var age: String {

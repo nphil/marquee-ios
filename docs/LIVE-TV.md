@@ -446,7 +446,7 @@ Recordings (header button) has Scheduled | Recorded. Scheduled lists upcoming ai
 Per M DESIGN.md:444-458:
 
 - No DVR on the server: "Live TV isn't set up on <server>. Set it up in Plex on a computer." No setup on the phone.
-- Tuner offline (device `status` dead): channels dimmed, banner "The tuner isn't responding".
+- Tuner offline (device `status` dead): channels dimmed, banner "The tuner isn't responding". When the phone still reaches the tuner's `discover.json` (0.5 s), only Plex is cut off: "Plex can't reach the tuner, so recordings won't work. Live TV still plays straight from the tuner" (or, with Direct from Tuner off, that Live TV won't play either). Plex on its isolated network lost the tuner this way until the router allowed Plex to the tuner's port 5004 (2026-11-21).
 - TV busy (805): the tuner's sentence and Try Again.
 - No or old guide data: "No guide data yet" with the last refresh time.
 - Away from home: plays through Plex; the status label says so once.

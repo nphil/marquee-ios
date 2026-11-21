@@ -63,6 +63,9 @@ final class LiveTVStore {
     private(set) var refreshedAt: Date?
     /// Why the last refresh failed while an older guide stays on screen.
     private(set) var refreshProblem: String?
+    /// Whether this phone reaches a tuner Plex reports dead. Plex on an isolated network lost the tuner while the
+    /// phone still played from it, and "The tuner isn't responding" told the wrong story (2026-11-21).
+    private(set) var phoneReachesDeadTuner = false
     private(set) var category: Category = .all
     /// The channel keys of the chosen genre; nil while they load.
     private(set) var genreKeys: Set<String>?
@@ -208,6 +211,7 @@ final class LiveTVStore {
             }
             self.dvr = dvr
             lists.dvr = dvr
+            phoneReachesDeadTuner = await Self.phoneReachesTuner(of: dvr)
             async let channelList = live.channels(dvr)
             async let filterList = try? live.channelFilters(dvr)
             async let recordingList: Void = loadRecordings()
@@ -234,6 +238,17 @@ final class LiveTVStore {
                 phase = .ready
             }
         }
+    }
+
+    /// Whether every device Plex lists is dead to Plex while one answers this phone directly (`discover.json`,
+    /// 0.5 s), on a network the phone is attached to, as the direct route requires.
+    private static func phoneReachesTuner(of dvr: LiveDVR) async -> Bool {
+        guard !dvr.devices.isEmpty, dvr.devices.allSatisfy({ !$0.isAlive }) else { return false }
+        let client = HDHomeRunClient()
+        for device in dvr.devices where device.speaksHDHomeRun && NetworkPath.isOnAttachedNetwork(device.uri.host()) != false {
+            if (try? await client.discover(device.uri)) != nil { return true }
+        }
+        return false
     }
 
     // MARK: Recordings
