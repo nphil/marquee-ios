@@ -22,7 +22,9 @@ final class LinkProbeRead: NSObject, URLSessionDataDelegate, Sendable {
         var request = URLRequest(url: url, timeoutInterval: LinkProbe.timeout)
         for (name, value) in headers { request.setValue(value, forHTTPHeaderField: name) }
         request.setValue("bytes=0-\(LinkProbe.maxBytes - 1)", forHTTPHeaderField: "Range")
-        let session = URLSession(configuration: .ephemeral, delegate: probe, delegateQueue: nil)
+        let configuration = URLSessionConfiguration.ephemeral
+        FakePlex.install(into: configuration)
+        let session = URLSession(configuration: configuration, delegate: probe, delegateQueue: nil)
         defer { session.invalidateAndCancel() }
         return await withTaskCancellationHandler {
             await withCheckedContinuation { answer in

@@ -87,6 +87,12 @@ enum FakePlex {
 #if DEBUG
 final class FakePlexProtocol: URLProtocol {
     private var delay: Timer?
+    /// A body still being sent, and how much of it has gone.
+    private var body = Data()
+    private var sent = 0
+    /// Bodies arrive in pieces this large, a few milliseconds apart, as a server's do: the link probe times the
+    /// pieces after the first (`LinkProbeRead`).
+    private static let piece = 256 * 1024
 
     override class func canInit(with request: URLRequest) -> Bool { FakePlex.isActive }
 
@@ -121,9 +127,23 @@ final class FakePlexProtocol: URLProtocol {
                 return
             }
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: reply.body)
-            client?.urlProtocolDidFinishLoading(self)
+            body = reply.body
+            sent = 0
+            sendPiece()
         }
+    }
+
+    @objc private func sendPiece() {
+        let end = min(sent + Self.piece, body.count)
+        client?.urlProtocol(self, didLoad: body.subdata(in: sent..<end))
+        sent = end
+        guard sent < body.count else {
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+        let timer = Timer(timeInterval: 0.005, target: self, selector: #selector(sendPiece), userInfo: nil, repeats: false)
+        RunLoop.current.add(timer, forMode: .common)
+        delay = timer
     }
 }
 
@@ -186,6 +206,11 @@ struct FakePlexRouter {
         let base = prefix(for: host) + (path == "/" ? "/root" : path)
         if method == "GET", prefix(for: host) == "pms", let data = file("\(base).bin") {
             return .success(Self.binary(data, range: request.value(forHTTPHeaderField: "Range")))
+        }
+        // A file without a fixture answers a ranged read with filler: the link probe reads the start of the file.
+        if method == "GET", prefix(for: host) == "pms", path.hasPrefix("/library/parts/"),
+           let range = request.value(forHTTPHeaderField: "Range") {
+            return .success(Self.binary(Self.filler, range: range))
         }
         if let found = fixture(base, query: query) ?? derived(base, query: query) {
             guard var object = found as? [String: Any] else { return .success(json(found)) }
@@ -362,6 +387,9 @@ struct FakePlexRouter {
         let directories = counts.map { ["key": $0.character, "title": $0.character, "size": $0.size] as [String: Any] }
         return ["MediaContainer": ["size": directories.count, "Directory": directories] as [String: Any]]
     }
+
+    /// Stands in for a media file's bytes: more than a link probe reads.
+    private static let filler = Data(count: 8 << 20)
 
     private static func binary(_ data: Data, range: String?) -> Reply {
         guard let range else { return Reply(status: 200, body: data, contentType: "application/octet-stream") }
