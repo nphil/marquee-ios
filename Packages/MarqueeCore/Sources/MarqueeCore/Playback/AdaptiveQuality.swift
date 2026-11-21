@@ -102,8 +102,8 @@ public struct AdaptiveQuality: Sendable {
         public var calm: TimeInterval = 300
         public var fastHalfLife: TimeInterval = 3
         public var slowHalfLife: TimeInterval = 10
-        /// The start away from home with no measured link.
-        public var awayStart = VideoQuality.mbps4
+        /// The start with no reading of the link (`LinkProbe` could not take one).
+        public var unmeasuredStart = VideoQuality.mbps4
 
         public init() {}
     }
@@ -143,7 +143,7 @@ public struct AdaptiveQuality: Sendable {
     public private(set) var belowFloor = false
     public let streamID: UUID
     private let mediaKbps: Int?
-    /// The highest rung a climb or an away start reaches (`QualityScores`).
+    /// The highest rung Auto reaches: the lower of `QualityScores`' and the data-saving cap's.
     private let ceiling: VideoQuality?
     private let tuning: Tuning
     private var fast: MovingAverage
@@ -155,9 +155,11 @@ public struct AdaptiveQuality: Sendable {
     private var climbSince: TimeInterval?
     private var climbHold: TimeInterval
 
-    /// - Parameter linkKbps: the link to the server as an earlier stream measured it.
+    /// - Parameters:
+    ///   - linkKbps: the link to the server as recently measured (`LinkMemory`).
+    ///   - cap: the highest quality to play at while saving data, if saving.
     public init(
-        place: NetworkPlace, mediaKbps: Int?, linkKbps: Int?, scores: QualityScores? = nil, tuning: Tuning = Tuning(),
+        mediaKbps: Int?, linkKbps: Int?, cap: VideoQuality? = nil, scores: QualityScores? = nil, tuning: Tuning = Tuning(),
         source: Picture? = nil, view: Picture? = nil, streamID: UUID = UUID(), now: TimeInterval
     ) {
         let mediaKbps = mediaKbps.flatMap { $0 > 0 ? $0 : nil }
@@ -174,7 +176,11 @@ public struct AdaptiveQuality: Sendable {
         self.streamID = streamID
         self.mediaKbps = mediaKbps
         self.tuning = tuning
-        ceiling = scores?.ceiling(in: ladder)
+        let capped = cap.flatMap { cap in
+            cap.maxBitrateKbps.map { limit in ladder.first { ($0.maxBitrateKbps ?? .max) <= limit } ?? ladder.last! }
+        }
+        let scored = scores?.ceiling(in: ladder)
+        ceiling = [scored, capped].compactMap { $0 }.max { (ladder.firstIndex(of: $0) ?? 0) < (ladder.firstIndex(of: $1) ?? 0) }
         fast = MovingAverage(halfLife: tuning.fastHalfLife)
         slow = MovingAverage(halfLife: tuning.slowHalfLife)
         lastMove = now
@@ -186,9 +192,8 @@ public struct AdaptiveQuality: Sendable {
             belowFloor = rate(of: floor).map { Double($0) > Double(linkKbps) * tuning.fit } ?? false
             return
         }
-        guard !place.isHome else { return }
-        // Away with no measured link, a low rung starts fast and the climb follows.
-        rung = climbable.first { (rate(of: $0) ?? .max) <= tuning.awayStart.rawValue }
+        // With no reading of the link, a low rung starts fast and the climb follows.
+        rung = climbable.first { (rate(of: $0) ?? .max) <= tuning.unmeasuredStart.rawValue }
             ?? climbable.last!
     }
 

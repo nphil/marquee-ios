@@ -75,14 +75,14 @@ public enum RouteReason: Sendable, Hashable, CustomStringConvertible {
     case directPlayOff
     /// AirPlay is showing the video, and the receiver cannot reach a stream made on the phone.
     case airPlay
-    /// The server is away by the place or the relay, with no recent measurement of the link to say the
-    /// phone can read the file itself.
-    case remoteConnection
+    /// No recent reading of the link to the server, and none could be taken (`LinkProbe`).
+    case unmeasuredLink
+    /// The server is reached through Plex's relay, which caps bandwidth.
+    case relay
     /// The link to the server, as last measured, carries less than the file's bitrate with a quarter to
     /// spare; the server re-encodes the video to fit it.
     case slowLink(kbps: Int)
-    /// Away by the place, near by the link: it measured `kbps`, with room over what the phone needs to
-    /// read the file itself.
+    /// The link measured `kbps`, with room over what the phone needs to read the file itself.
     case fastLink(kbps: Int)
     /// The link measured `kbps`, short of the `needs` the phone wants for reading the file itself.
     case shortLink(kbps: Int, needs: Int)
@@ -100,7 +100,7 @@ public enum RouteReason: Sendable, Hashable, CustomStringConvertible {
         switch self {
         case .videoCodec, .videoFormat, .dolbyVision, .hdrOnSDRScreen, .levelOrFrameRate, .bitrateLimit, .burnsSubtitle, .slowLink:
             true
-        case .container, .hevcTag, .dolbyVisionBaseLayer, .audio, .onDeviceFailed, .directPlayOff, .airPlay, .remoteConnection,
+        case .container, .hevcTag, .dolbyVisionBaseLayer, .audio, .onDeviceFailed, .directPlayOff, .airPlay, .unmeasuredLink, .relay,
              .fastLink, .shortLink, .serverLimit, .audioEnhancement, .notFirstAudioTrack, .receiverFailed:
             false
         }
@@ -122,7 +122,8 @@ public enum RouteReason: Sendable, Hashable, CustomStringConvertible {
         case .onDeviceFailed: "Playing on the phone failed"
         case .directPlayOff: "Direct play turned off"
         case .airPlay: "AirPlay needs a server stream"
-        case .remoteConnection: "Server reached over the internet"
+        case .unmeasuredLink: "Connection to the server not measured"
+        case .relay: "Server reached through Plex's relay"
         case .slowLink(let kbps): "Link measured at \(Double(kbps / 100) / 10) Mbps"
         case .fastLink(let kbps): "Server at \(Self.mbps(kbps)), fast enough for the original"
         case .shortLink(let kbps, let needs): "Server at \(Self.mbps(kbps)), short of the \(Self.mbps(needs)) the phone needs to read the file"
@@ -199,17 +200,18 @@ public struct RouteLimits: Sendable, Hashable {
     public var phoneOnly: Bool
     /// The picked quality; a source above its bitrate or picture size is converted down.
     public var quality: VideoQuality
-    /// How near the server is (`RouteReach`). A file that needs the remux streams from the server when it
-    /// is remote: the remux reads the file's header, index and start point one request at a time, which
-    /// took 11 s before the first picture over a 14 Mbit/s remote path. Direct play is unaffected.
-    public var reach: RouteReach
+    /// How near the server is by the measured link (`RouteReach`); nil where the link does not matter (a
+    /// download, a Chromecast). A file that needs the remux streams from the server unless the link carries it:
+    /// the remux reads the file's header, index and start point one request at a time, which took 11 s before
+    /// the first picture over a 14 Mbit/s remote path. Direct play is unaffected.
+    public var reach: RouteReach?
     /// The link to the server as the last stream measured it, in kbit/s.
     public var linkKbps: Int?
     /// Boost dialog or Normalize loudness is on: the server streams, copying the video when it can.
     public var audioEnhancements: AudioEnhancements
 
     public init(
-        serverReason: RouteReason? = nil, phoneOnly: Bool = false, quality: VideoQuality = .original, reach: RouteReach = .near,
+        serverReason: RouteReason? = nil, phoneOnly: Bool = false, quality: VideoQuality = .original, reach: RouteReach? = nil,
         linkKbps: Int? = nil, audioEnhancements: AudioEnhancements = []
     ) {
         self.serverReason = serverReason
@@ -303,10 +305,13 @@ public enum PlaybackRouteDecider {
             kind = .directPlay
         } else if capabilities.canRemux, !audioNeedsConversion || capabilities.remuxConvertsAudio {
             switch limits.reach {
-            case .near, .nearByLink:
+            case nil, .nearByLink:
                 kind = .remux
-            case .remote:
-                serverReasons.append(.remoteConnection)
+            case .unmeasured:
+                serverReasons.append(.unmeasuredLink)
+                kind = .serverTranscode
+            case .relay:
+                serverReasons.append(.relay)
                 kind = .serverTranscode
             case .remoteByLink(let kbps, let needs):
                 serverReasons.append(.shortLink(kbps: kbps, needs: needs))
@@ -359,7 +364,7 @@ public enum PlaybackRouteDecider {
         let frame = limits.quality.frame.map { "\($0.width)x\($0.height)" }
         var reasons = kind == .directPlay ? [] : serverReasons + remuxReasons
         // The note belongs to the route it explains: the phone does the remux the link makes possible.
-        if kind == .remux, !limits.phoneOnly, case .nearByLink(let kbps) = limits.reach { reasons.append(.fastLink(kbps: kbps)) }
+        if kind == .remux, !limits.phoneOnly, case .nearByLink(let kbps)? = limits.reach { reasons.append(.fastLink(kbps: kbps)) }
         return PlaybackRoute(
             kind: kind,
             reasons: reasons,

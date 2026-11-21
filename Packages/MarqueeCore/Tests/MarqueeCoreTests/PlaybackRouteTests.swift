@@ -132,7 +132,7 @@ struct PlaybackRouteTests {
     @Test func dolbyVisionFiveIsNeverCopiedByTheServer() throws {
         let p5mkv = try Self.file("mkv", video: Fixture.video("hevc", bitDepth: 10, dolbyVision: (5, 0)))
 
-        let remote = Self.route(p5mkv, limits: RouteLimits(reach: .remote))
+        let remote = Self.route(p5mkv, limits: RouteLimits(reach: .relay))
 
         #expect(remote.kind == .serverTranscode && remote.reencodesVideo && remote.reasons.contains(.dolbyVision(profile: 5)))
     }
@@ -276,31 +276,29 @@ struct PlaybackRouteTests {
         }
     }
 
-    @Test func aRemoteServerStreamsRemuxFilesFromTheServer() throws {
+    @Test func anUnmeasuredLinkOrTheRelayStreamsRemuxFilesFromTheServer() throws {
         let mkv = try Self.file("mkv")
         let mp4 = try Self.file("mp4")
 
-        let remote = Self.route(mkv, limits: RouteLimits(reach: .remote))
+        let unmeasured = Self.route(mkv, limits: RouteLimits(reach: .unmeasured))
+        let relay = Self.route(mkv, limits: RouteLimits(reach: .relay))
 
-        #expect(remote.kind == .serverTranscode && !remote.reencodesVideo)
-        #expect(remote.reasons == [.remoteConnection, .container("mkv")])
-        #expect(Self.route(mp4, limits: RouteLimits(reach: .remote)).kind == .directPlay)
+        #expect(unmeasured.kind == .serverTranscode && !unmeasured.reencodesVideo)
+        #expect(unmeasured.reasons == [.unmeasuredLink, .container("mkv")])
+        #expect(relay.reasons == [.relay, .container("mkv")])
+        #expect(Self.route(mp4, limits: RouteLimits(reach: .relay)).kind == .directPlay)
     }
 
-    /// Isabel at home with Tailscale on (2026-11-20): the tunnel made the place away, and with no reading yet
-    /// the server converted an MKV. The link is probed only where that alone sent the file to the server.
-    @Test func theLinkIsProbedOnlyWhenThePlaceAloneSentTheFileToTheServer() throws {
+    /// The first start after a launch has no reading: it measures the link unless the file simply plays as it is.
+    @Test func theLinkIsProbedForAnyStartThatIsNotDirectPlayWithoutAReading() throws {
         let mkv = try Self.file("mkv")
-        let remote = Self.route(mkv, limits: RouteLimits(reach: .remote))
-        let tunnel = PlexConnection(uri: URL(string: "https://192-168-5-10.abc.plex.direct:32400")!, isLocal: true)
-        let relay = PlexConnection(uri: URL(string: "https://relay.plex.direct:8443")!, isLocal: false, isRelay: true)
+        let mp4 = try Self.file("mp4")
 
-        #expect(LinkProbe.isNeeded(route: remote, place: .away(.tunnel), connection: tunnel, distrusted: false))
-        #expect(!LinkProbe.isNeeded(route: remote, place: .away(.tunnel), connection: tunnel, distrusted: true))
-        #expect(!LinkProbe.isNeeded(route: remote, place: .away(.relay), connection: relay, distrusted: false))
-        #expect(!LinkProbe.isNeeded(route: Self.route(mkv), place: .home, connection: tunnel, distrusted: false))
-        let short = Self.route(mkv, limits: RouteLimits(reach: .remoteByLink(kbps: 4_000, needs: 20_000)))
-        #expect(!LinkProbe.isNeeded(route: short, place: .away(.tunnel), connection: tunnel, distrusted: false))
+        #expect(LinkProbe.isNeeded(route: Self.route(mkv, limits: RouteLimits(reach: .unmeasured)), reach: .unmeasured))
+        #expect(!LinkProbe.isNeeded(route: Self.route(mp4, limits: RouteLimits(reach: .unmeasured)), reach: .unmeasured))
+        #expect(!LinkProbe.isNeeded(route: Self.route(mkv, limits: RouteLimits(reach: .relay)), reach: .relay))
+        let measured = RouteReach.nearByLink(kbps: 160_000)
+        #expect(!LinkProbe.isNeeded(route: Self.route(mkv, limits: RouteLimits(reach: measured)), reach: measured))
     }
 
     /// A read cut short by its window still measures a slow link; a fast one ending early on too little does not.

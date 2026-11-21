@@ -2,37 +2,6 @@ import Foundation
 import Testing
 @testable import MarqueeCore
 
-struct NetworkPlaceTests {
-    static let lan = PlexConnection(uri: URL(string: "https://192-168-1-5.abc.plex.direct:32400")!, isLocal: true)
-    static let wan = PlexConnection(uri: URL(string: "https://81-2-3-4.abc.plex.direct:32400")!, isLocal: false)
-    static let relay = PlexConnection(uri: URL(string: "https://5-6-7-8.abc.plex.direct:8443")!, isLocal: false, isRelay: true)
-    static let named = PlexConnection(uri: URL(string: "https://plex.example.com")!, isLocal: true)
-
-    @Test func aLocalAddressReachedDirectlyIsHomeAndARemoteOneIsUnknown() {
-        for connection in [Self.lan, Self.named] {
-            #expect(NetworkPlace.of(connection, localAddress: "192.168.1.20") == .home)
-            #expect(NetworkPlace.of(connection, localAddress: nil) == .home)
-        }
-        #expect(NetworkPlace.of(Self.wan, localAddress: "192.168.1.20") == .unknown)
-        #expect(!NetworkPlace.unknown.isHome)
-    }
-
-    @Test func aRelayOrATunnelIsAwayEvenAtALocalAddress() {
-        var localRelay = Self.relay
-        localRelay.isLocal = true
-        #expect(NetworkPlace.of(localRelay, localAddress: "192.168.1.20") == .away(.relay))
-        #expect(NetworkPlace.of(Self.relay, localAddress: "100.101.5.6") == .away(.relay))
-        #expect(NetworkPlace.of(Self.lan, localAddress: "100.101.5.6") == .away(.tunnel))
-        #expect(NetworkPlace.of(Self.lan, localAddress: "fd7a:115c:a1e0::12") == .away(.tunnel))
-        let tailnet = PlexConnection(uri: URL(string: "http://100.88.1.2:32400")!, isLocal: true)
-        #expect(NetworkPlace.of(tailnet, localAddress: nil) == .away(.tunnel))
-        #expect(NetworkPlace.isTunnel("100.64.0.0"))
-        #expect(NetworkPlace.isTunnel("100.127.255.255"))
-        #expect(!NetworkPlace.isTunnel("100.63.0.1"))
-        #expect(!NetworkPlace.isTunnel("100.128.0.1"))
-    }
-}
-
 struct HomePresenceTests {
     let start = Date(timeIntervalSince1970: 1_000)
 

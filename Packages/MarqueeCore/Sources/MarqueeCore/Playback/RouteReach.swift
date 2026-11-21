@@ -3,19 +3,21 @@ import Foundation
 /// How near the server is for the route (docs/adaptive-playback.md): whether the phone may read a file that
 /// needs the remux from the server itself, or the server packages it. Direct play does not depend on it.
 ///
-/// The measured link decides, since a tunnel, a VPN or a public address can carry as much as the LAN and a
-/// weak Wi-Fi as little as the internet. The place (`NetworkPlace`) decides only while the link has not
-/// been measured lately. Plex's relay, which caps bandwidth, always converts.
+/// The measured link alone decides, wherever the phone is. Where it was guessed from the address and the
+/// tunnel, a phone at home that reached its server through Tailscale counted as away, and the server
+/// converted files the link carried at 160 Mbit/s (2026-11-20); a fast 5G link carries a file as well as
+/// the LAN. Plex's relay, which caps bandwidth, always converts.
 public enum RouteReach: Sendable, Hashable {
-    /// Near by the place, or by nothing measured that says otherwise.
-    case near
-    /// Away by the place, near by the link: it carries the file with room to spare.
+    /// The link carries the file with room to spare: it measured `kbps`.
     case nearByLink(kbps: Int)
-    /// Away by the place or the relay, with no recent measurement to say otherwise.
-    case remote
-    /// Away by the link: it measured `kbps`, short of the `needs` the phone wants for reading the file.
+    /// No recent reading of the link: the start measures it (`LinkProbe`), and streams from the server
+    /// while it cannot.
+    case unmeasured
+    /// Plex's relay.
+    case relay
+    /// The link measured `kbps`, short of the `needs` the phone wants for reading the file.
     case remoteByLink(kbps: Int, needs: Int)
-    /// The server holds remote streams below the original (`ServerLimit`); its decision wins over the link.
+    /// The server holds the stream below the original (`ServerLimit`); its decision wins over the link.
     case remoteByServer
 
     /// The link has to carry the file this many times over, and at least `floorKbps`: the phone reads the
@@ -23,32 +25,21 @@ public enum RouteReach: Sendable, Hashable {
     public static let headroom = 3
     public static let floorKbps = 20_000
 
-    /// The link rate, in kbit/s, that counts as fast for a file of `mediaKbps`.
-    public static func needs(forMediaKbps mediaKbps: Int) -> Int {
-        max(floorKbps, mediaKbps * headroom)
-    }
-
-    /// A file that needs the remux streams from the server.
-    public var isRemote: Bool {
-        switch self {
-        case .near, .nearByLink: false
-        case .remote, .remoteByLink, .remoteByServer: true
-        }
+    /// The link rate, in kbit/s, that counts as fast for a file of `mediaKbps`; the floor for a file whose
+    /// rate is unknown.
+    public static func needs(forMediaKbps mediaKbps: Int?) -> Int {
+        max(floorKbps, (mediaKbps ?? 0) * headroom)
     }
 
     /// - Parameters:
-    ///   - place: where the phone is from the server, if known.
     ///   - connection: the address the server is reached at.
     ///   - mediaKbps: the file's bitrate.
     ///   - linkKbps: a recent measurement of the link to the server (`LinkMemory.recent`), if any.
-    public static func decide(place: NetworkPlace?, connection: PlexConnection?, mediaKbps: Int?, linkKbps: Int?) -> RouteReach {
-        // Plex calls a LAN address reached through a VPN local; the place knows better.
-        let awayByPlace = place.map { !$0.isHome } ?? connection.map { !$0.isLocal } ?? false
-        if place == .away(.relay) || connection?.isRelay == true { return .remote }
-        guard let mediaKbps, mediaKbps > 0, let linkKbps, linkKbps > 0 else { return awayByPlace ? .remote : .near }
-        let needs = needs(forMediaKbps: mediaKbps)
-        guard linkKbps >= needs else { return .remoteByLink(kbps: linkKbps, needs: needs) }
-        return awayByPlace ? .nearByLink(kbps: linkKbps) : .near
+    public static func decide(connection: PlexConnection?, mediaKbps: Int?, linkKbps: Int?) -> RouteReach {
+        if connection?.isRelay == true { return .relay }
+        guard let linkKbps, linkKbps > 0 else { return .unmeasured }
+        let needs = needs(forMediaKbps: mediaKbps.flatMap { $0 > 0 ? $0 : nil })
+        return linkKbps >= needs ? .nearByLink(kbps: linkKbps) : .remoteByLink(kbps: linkKbps, needs: needs)
     }
 }
 

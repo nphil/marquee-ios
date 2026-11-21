@@ -3,117 +3,65 @@ import Testing
 @testable import MarqueeCore
 
 struct RouteReachTests {
-    static let lan = NetworkPlaceTests.lan
-    static let wan = NetworkPlaceTests.wan
-    static let relay = NetworkPlaceTests.relay
+    static let lan = PlexConnection(uri: URL(string: "https://192-168-5-10.abc.plex.direct:32400")!, isLocal: true)
+    static let wan = PlexConnection(uri: URL(string: "https://81-2-3-4.abc.plex.direct:32400")!, isLocal: false)
+    static let relay = PlexConnection(uri: URL(string: "https://5-6-7-8.abc.plex.direct:8443")!, isLocal: false, isRelay: true)
 
-    static func reach(_ place: NetworkPlace?, _ connection: PlexConnection?, media: Int? = 1_800, link: Int?) -> RouteReach {
-        RouteReach.decide(place: place, connection: connection, mediaKbps: media, linkKbps: link)
+    static func reach(_ connection: PlexConnection?, media: Int? = 1_800, link: Int?) -> RouteReach {
+        RouteReach.decide(connection: connection, mediaKbps: media, linkKbps: link)
     }
 
-    @Test func aFastLinkIsNearWhereverThePlaceSaysAway() {
-        let away: [(NetworkPlace?, PlexConnection)] = [
-            (.away(.tunnel), Self.lan), (.away(.tunnel), Self.wan), (.unknown, Self.wan), (.unknown, Self.lan), (nil, Self.wan),
-        ]
-        for (place, connection) in away {
-            #expect(Self.reach(place, connection, link: 130_800) == .nearByLink(kbps: 130_800))
+    /// Isabel's phone at home reached the server through Tailscale at 160 Mbit/s: the link decides, whatever
+    /// the address, and a fast 5G link counts the same.
+    @Test func theMeasuredLinkDecidesWhateverTheAddress() {
+        for connection in [Self.lan, Self.wan] {
+            #expect(Self.reach(connection, link: 160_000) == .nearByLink(kbps: 160_000))
+            #expect(Self.reach(connection, link: 15_000) == .remoteByLink(kbps: 15_000, needs: 20_000))
         }
-    }
-
-    @Test func aFastLinkAtHomeStaysNear() {
-        #expect(Self.reach(.home, Self.lan, link: 130_800) == .near)
-        #expect(Self.reach(nil, Self.lan, link: 130_800) == .near)
-    }
-
-    @Test func aShortLinkIsRemoteWhereverThePhoneIs() {
-        let short = RouteReach.remoteByLink(kbps: 15_000, needs: 20_000)
-        for place in [NetworkPlace.home, .unknown, .away(.tunnel)] {
-            #expect(Self.reach(place, Self.lan, link: 15_000) == short)
-        }
-        #expect(Self.reach(nil, Self.wan, link: 15_000) == short)
     }
 
     @Test func theLinkNeedsThreeTimesTheFileAndTwentyMegabits() {
-        func reach(media: Int, link: Int) -> RouteReach {
-            Self.reach(.away(.tunnel), Self.lan, media: media, link: link)
-        }
-        #expect(reach(media: 1_800, link: 20_000) == .nearByLink(kbps: 20_000))
-        #expect(reach(media: 1_800, link: 19_999) == .remoteByLink(kbps: 19_999, needs: 20_000))
-        #expect(reach(media: 25_000, link: 75_000) == .nearByLink(kbps: 75_000))
-        #expect(reach(media: 25_000, link: 74_999) == .remoteByLink(kbps: 74_999, needs: 75_000))
-        #expect(RouteReach.needs(forMediaKbps: 6_000) == 20_000)
-        #expect(RouteReach.needs(forMediaKbps: 8_000) == 24_000)
+        #expect(Self.reach(Self.lan, media: 1_800, link: 20_000) == .nearByLink(kbps: 20_000))
+        #expect(Self.reach(Self.lan, media: 1_800, link: 19_999) == .remoteByLink(kbps: 19_999, needs: 20_000))
+        #expect(Self.reach(Self.lan, media: 25_000, link: 75_000) == .nearByLink(kbps: 75_000))
+        #expect(Self.reach(Self.lan, media: 25_000, link: 74_999) == .remoteByLink(kbps: 74_999, needs: 75_000))
+        // A file of unknown rate needs the floor.
+        #expect(Self.reach(Self.lan, media: nil, link: 20_000) == .nearByLink(kbps: 20_000))
     }
 
-    @Test func thePlaceKeepsDecidingWithoutARecentReading() {
-        #expect(Self.reach(.home, Self.lan, link: nil) == .near)
-        #expect(Self.reach(nil, Self.lan, link: nil) == .near)
-        #expect(Self.reach(.away(.tunnel), Self.lan, link: nil) == .remote)
-        #expect(Self.reach(.unknown, Self.wan, link: nil) == .remote)
-        #expect(Self.reach(nil, Self.wan, link: nil) == .remote)
-        #expect(Self.reach(nil, nil, link: nil) == .near)
-    }
-
-    @Test func aFileOfUnknownRateCannotBeMeasuredAgainst() {
-        #expect(Self.reach(.away(.tunnel), Self.lan, media: nil, link: 130_800) == .remote)
-        #expect(Self.reach(.home, Self.lan, media: nil, link: 130_800) == .near)
-    }
-
-    @Test func thePlexRelayAlwaysConverts() {
-        #expect(Self.reach(.away(.relay), Self.relay, link: 500_000) == .remote)
-        #expect(Self.reach(nil, Self.relay, link: 500_000) == .remote)
-        #expect(Self.reach(.away(.relay), Self.relay, link: nil) == .remote)
-    }
-
-    @Test func onlyTheRemoteKindsAreRemote() {
-        #expect(!RouteReach.near.isRemote && !RouteReach.nearByLink(kbps: 50_000).isRemote)
-        #expect(RouteReach.remote.isRemote && RouteReach.remoteByLink(kbps: 1, needs: 2).isRemote && RouteReach.remoteByServer.isRemote)
+    @Test func withoutAReadingTheLinkIsUnmeasuredAndTheRelayAlwaysConverts() {
+        #expect(Self.reach(Self.lan, link: nil) == .unmeasured)
+        #expect(Self.reach(nil, link: nil) == .unmeasured)
+        #expect(Self.reach(Self.relay, link: 500_000) == .relay)
+        #expect(Self.reach(Self.relay, link: nil) == .relay)
     }
 }
 
 struct LinkMemoryTests {
-    static let link = LinkMemory.Link(address: URL(string: "https://192-168-5-10.abc.plex.direct:32400")!, place: .away(.tunnel))
+    static let address = URL(string: "https://192-168-5-10.abc.plex.direct:32400")!
 
-    @Test func aRecentReadingServesTheRoute() {
+    @Test func aReadingServesOnItsNetworkForHalfAnHour() {
         var memory = LinkMemory()
-        memory.record(130_800, over: Self.link, at: 100, network: 3)
+        memory.record(130_800, to: Self.address, at: 100, network: 3)
 
-        #expect(memory.recent(over: Self.link, at: 100 + LinkMemory.maxAge, network: 3) == 130_800)
-        #expect(memory.recent(over: Self.link, at: 100 + LinkMemory.maxAge + 1, network: 3) == nil)
-        #expect(memory.latest(over: Self.link) == 130_800)
-    }
-
-    @Test func aReadingFromAnotherNetworkOrPlaceDoesNotServe() {
-        var memory = LinkMemory()
-        memory.record(130_800, over: Self.link, at: 0, network: 3)
-        let home = LinkMemory.Link(address: Self.link.address, place: .home)
-
-        #expect(memory.recent(over: Self.link, at: 10, network: 4) == nil)
-        #expect(memory.recent(over: home, at: 10, network: 3) == nil)
-        #expect(memory.latest(over: home) == nil)
+        #expect(memory.recent(to: Self.address, at: 100 + LinkMemory.maxAge, network: 3) == 130_800)
+        #expect(memory.recent(to: Self.address, at: 100 + LinkMemory.maxAge + 1, network: 3) == nil)
+        #expect(memory.recent(to: Self.address, at: 110, network: 4) == nil)
     }
 
     @Test func aLinkTheFileFailedOverIsNotTrustedOnThatNetwork() {
         var memory = LinkMemory()
-        memory.record(130_800, over: Self.link, at: 0, network: 3)
+        memory.record(130_800, to: Self.address, at: 0, network: 3)
 
-        memory.distrust(Self.link, network: 3)
-        #expect(memory.recent(over: Self.link, at: 10, network: 3) == nil)
-        memory.record(140_000, over: Self.link, at: 20, network: 3)
-        #expect(memory.recent(over: Self.link, at: 21, network: 3) == nil)
+        memory.distrust(Self.address, network: 3)
+        #expect(memory.isDistrusted(Self.address, network: 3))
+        #expect(memory.recent(to: Self.address, at: 10, network: 3) == nil)
+        memory.record(140_000, to: Self.address, at: 20, network: 3)
+        #expect(memory.recent(to: Self.address, at: 21, network: 3) == nil)
 
-        memory.record(140_000, over: Self.link, at: 30, network: 4)
-        #expect(memory.recent(over: Self.link, at: 31, network: 4) == 140_000)
-    }
-
-    @Test func aNewReadingReplacesTheOldAndAnEmptyOneIsIgnored() {
-        var memory = LinkMemory()
-        memory.record(50_000, over: Self.link, at: 0, network: 1)
-        memory.record(0, over: Self.link, at: 5, network: 1)
-        #expect(memory.latest(over: Self.link) == 50_000)
-
-        memory.record(80_000, over: Self.link, at: 9, network: 1)
-        #expect(memory.latest(over: Self.link) == 80_000)
+        memory.record(140_000, to: Self.address, at: 30, network: 4)
+        #expect(!memory.isDistrusted(Self.address, network: 4))
+        #expect(memory.recent(to: Self.address, at: 31, network: 4) == 140_000)
     }
 }
 

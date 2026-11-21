@@ -32,6 +32,8 @@ struct ProfileSettings: Equatable, Sendable {
     var posterLabels = PosterLabels()
     /// The default quality: Auto, or a fixed one; picking one in the player's More menu saves it too.
     var quality = QualitySetting.auto
+    /// Caps video at `PlayerModel.savedDataCap` on mobile data, a personal hotspot or Low Data Mode; off by default.
+    var savesData = false
     /// Boost dialog and Normalize loudness, from the player's Audio menu.
     var audioEnhancements: AudioEnhancements = []
     /// Libraries switched off under Favorite Libraries, by `HomeLayout.libraryID`. Empty shows every library,
@@ -59,7 +61,7 @@ extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
         case skipInterval, skipTaps, introSkipDelay, nextEpisodeDelay, autoplaysNext, creditsAutoplay, directPlay, aspect, videoOrientation, readsTunerDirectly
         case audioLanguage, subtitles, remembersTracks, subtitleStyle, homeRows
-        case posterLabels, audioEnhancements, hiddenLibraries, rewatchDismissed, playsTrailers, playsThemeMusic, themeMusicVolume
+        case posterLabels, audioEnhancements, hiddenLibraries, rewatchDismissed, playsTrailers, playsThemeMusic, themeMusicVolume, savesData
         /// "quality" held a fixed quality before Auto existed (`LegacyKeys`).
         case quality = "qualitySetting"
     }
@@ -93,6 +95,7 @@ extension ProfileSettings: Codable {
         posterLabels = value(.posterLabels) ?? posterLabels
         let legacy = try? decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent(VideoQuality.self, forKey: .quality)
         quality = value(.quality) ?? QualitySetting.saved(legacy: legacy)
+        savesData = value(.savesData) ?? savesData
         audioEnhancements = value(.audioEnhancements) ?? audioEnhancements
         hiddenLibraries = value(.hiddenLibraries) ?? hiddenLibraries
         rewatchDismissed = value(.rewatchDismissed) ?? rewatchDismissed

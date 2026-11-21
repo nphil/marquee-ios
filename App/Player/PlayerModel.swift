@@ -155,14 +155,15 @@ final class PlayerModel: Identifiable {
     var qualitySetting: QualitySetting { qualityCap.map(QualitySetting.fixed) ?? session.settings.quality }
     /// The highest quality videos play at: the fixed one, or Auto's rung.
     var quality: VideoQuality {
-        if case .fixed(let fixed) = qualitySetting { return fixed }
-        return autoRung
+        guard case .fixed(let fixed) = qualitySetting else { return autoRung }
+        guard let cap = dataCap, fixed == .original || fixed.rawValue > cap.rawValue else { return fixed }
+        return cap
     }
+    /// Save Data's cap on this item while the phone is on a metered network (`savedDataCap`); Auto keeps under it.
+    private(set) var dataCap: VideoQuality?
     private(set) var qualityCap: VideoQuality?
     /// Auto's rung on this item (docs/adaptive-playback.md); Original while Auto does not adapt.
     private(set) var autoRung = VideoQuality.original
-    /// Where the phone is from the server, for Auto and stats for nerds.
-    private(set) var place: NetworkPlace?
     /// Auto's estimate of the link to the server, for stats for nerds.
     private(set) var linkEstimateKbps: Int?
     /// Auto holds its lowest rung on a link that cannot sustain it; a wait on the network then says why.
@@ -337,11 +338,11 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var viewportScale: CGFloat = 1
     /// The item `loadItem` is fetching, until `begin` takes it: `item` is still the one before it.
     @ObservationIgnored private var loadingKey: String?
-    /// The server address `place` was read for.
+    /// The server address the link reading is for.
     @ObservationIgnored private var linkAddress: URL?
-    /// How near the server is for the item, decided as it starts or the network changes: a track change halfway
-    /// through must not move the route as the reading ages.
-    @ObservationIgnored private var reach = RouteReach.near
+    /// How near the server is for the item by the measured link, decided as it starts or the network changes: a
+    /// track change halfway through must not move the route as the reading ages. Stats for nerds shows it.
+    @ObservationIgnored private(set) var reach = RouteReach.unmeasured
     /// The server was asked what it would make of the file's own stream (`ServerLimit`) since `reach` was decided.
     @ObservationIgnored private var serverLimitAsked = false
     /// The link was probed (`LinkProbe`) since `reach` was decided.
@@ -1049,7 +1050,7 @@ final class PlayerModel: Identifiable {
         ])
         publishItem()
         nextFromStart = false
-        // Where the phone is sets Auto's start and whether the remux may read the file over the link.
+        // The measured link sets Auto's start and whether the phone reads the file itself.
         if request.download == nil {
             let connection = try? await library.connection.connection()
             guard generation == self.generation else { return }
@@ -1077,7 +1078,7 @@ final class PlayerModel: Identifiable {
                 // Decided as the item started, from the measured link (`startAdapting`).
                 reach: reach,
                 // Auto's rung already fits the link.
-                linkKbps: adaptive == nil ? connection.flatMap { measuredKbps(over: $0) } : nil
+                linkKbps: adaptive == nil ? connection.flatMap { recentKbps(over: $0) } : nil
             )
         }
     }
@@ -1105,8 +1106,14 @@ final class PlayerModel: Identifiable {
             decideCastRoute(castDevice, tracks: tracks, media: media, part: part)
             return
         }
-        let choice = await chooseRoute(tracks: tracks, media: media, part: part, quality: quality)
+        var choice = await chooseRoute(tracks: tracks, media: media, part: part, quality: quality)
         guard owner == generation, !Task.isCancelled else { return }
+        // Nothing measured the link lately: it is measured now, and the route and Auto's start go by the reading.
+        if LinkProbe.isNeeded(route: choice.route, reach: reach), await probeLink(part: part) {
+            guard owner == generation, !Task.isCancelled else { return }
+            choice = await chooseRoute(tracks: tracks, media: media, part: part, quality: quality)
+            guard owner == generation, !Task.isCancelled else { return }
+        }
         take(choice)
         if case .sidecar(let track) = choice.route.subtitle { await loadSidecar(track) }
     }
@@ -1131,14 +1138,9 @@ final class PlayerModel: Identifiable {
             return (decision, route)
         }
         var (decision, route) = decide(drawsImages: true)
-        // With no recent reading the place sent the file to the server: the link is measured now, and decides.
-        if request.download == nil, !linkProbed, let connection, await probeLink(for: route, over: connection, media: media, part: part) {
-            limits.reach = reach
-            (decision, route) = decide(drawsImages: true)
-        }
-        // The server's own limits win over the measured link. For a link only the measurement calls near, it is asked
-        // what it would make of the file's video; a stream it holds below the file's rate comes from it.
-        if request.download == nil, case .nearByLink = limits.reach, route.kind == .remux, !serverLimitAsked {
+        // The server's own limits win over the measured link: before the phone reads the original, the server is asked
+        // what it would make of the file's video, and a stream it holds below the file's rate comes from it.
+        if request.download == nil, case .nearByLink? = limits.reach, route.kind == .remux, !serverLimitAsked {
             serverLimitAsked = true
             if await serverHoldsBack(route, media: media) {
                 reach = .remoteByServer
@@ -1506,8 +1508,8 @@ final class PlayerModel: Identifiable {
     /// Keeps what the ending stream measured of the link to its server, for the next route: the remux's
     /// reads from the file, or AVPlayer's segment downloads from the server. Direct play is not measured.
     private func measureLink() {
-        // A stream from another address than the place was read for says nothing of that link.
-        guard let place, let address = streamConnection?.uri, address == linkAddress else { return }
+        // A stream from another address than the reading's says nothing of that link.
+        guard let address = streamConnection?.uri, address == linkAddress else { return }
         var bitsPerSecond: Double?
         switch stream {
         case .remux(let remux):
@@ -1523,8 +1525,7 @@ final class PlayerModel: Identifiable {
         if let estimate = adaptive?.estimateKbps { bitsPerSecond = Double(estimate) * 1000 }
         guard let bitsPerSecond, bitsPerSecond > 0 else { return }
         session.player.links.record(
-            Int(bitsPerSecond / 1000), over: LinkMemory.Link(address: address, place: place),
-            at: ProcessInfo.processInfo.systemUptime, network: session.presenceNetworkRevision
+            Int(bitsPerSecond / 1000), to: address, at: ProcessInfo.processInfo.systemUptime, network: session.presenceNetworkRevision
         )
     }
 
@@ -1602,9 +1603,9 @@ final class PlayerModel: Identifiable {
         guard size.width > 0, size.height > 0, scale > 0 else { return }
         viewport = size
         viewportScale = scale
-        guard phase == .playing, let current = adaptive, let place else { return }
+        guard phase == .playing, let current = adaptive else { return }
         var resized = AdaptiveQuality(
-            place: place, mediaKbps: media?.bitrate, linkKbps: current.estimateKbps,
+            mediaKbps: media?.bitrate, linkKbps: current.estimateKbps, cap: dataCap,
             source: sourcePicture, view: viewPicture, now: ProcessInfo.processInfo.systemUptime
         )
         guard resized.floor != current.floor else { return }
@@ -1617,8 +1618,8 @@ final class PlayerModel: Identifiable {
     }
 
     /// The network changed and the server's addresses were asked again: `connection` is the one that
-    /// answered, if any. Playback and what Auto learned go on while it is the same address reached from the
-    /// same place; otherwise the item starts again on the new link.
+    /// answered, if any. Playback and what Auto learned go on at the same address, under Save Data's cap for the
+    /// new network; at another address the item starts again on the new link.
     func networkChanged(to connection: PlexConnection?) {
         guard request.download == nil, castDevice == nil, phase == .loading || phase == .playing else { return }
         Diag.event(.player, "network.changed", [
@@ -1633,7 +1634,7 @@ final class PlayerModel: Identifiable {
             fail("\(library.server.name) could not be reached after the network changed.")
             return
         }
-        guard connection.uri != linkAddress || networkPlace(of: connection) != place else { return }
+        guard connection.uri != linkAddress else { return dataCapMayHaveChanged() }
         if let loadingKey {
             loadItem(loadingKey)
             return
@@ -1645,7 +1646,7 @@ final class PlayerModel: Identifiable {
         reroute(handPick: false, reconnect: true)
     }
 
-    /// Auto's state for the item: where the phone is and the link as last measured set the start.
+    /// Auto's state for the item: the link as recently measured sets the start and `reach`.
     private func startAdapting(connection: PlexConnection?) {
         adaptive = nil
         lastTransfer = nil
@@ -1653,18 +1654,15 @@ final class PlayerModel: Identifiable {
         linkEstimateKbps = nil
         belowQualityFloor = false
         autoRung = .original
-        if let connection {
-            place = networkPlace(of: connection)
-            linkAddress = connection.uri
-        }
+        if let connection { linkAddress = connection.uri }
         serverLimitAsked = false
         linkProbed = false
-        reach = RouteReach.decide(
-            place: place, connection: connection, mediaKbps: media?.bitrate, linkKbps: connection.flatMap { recentKbps(over: $0) }
-        )
-        guard qualitySetting == .auto, !forcesDirectPlay, let connection, let place else { return }
+        dataCap = session.settings.savesData && session.isMetered ? Self.savedDataCap : nil
+        let linkKbps = connection.flatMap { recentKbps(over: $0) }
+        reach = RouteReach.decide(connection: connection, mediaKbps: media?.bitrate, linkKbps: linkKbps)
+        guard qualitySetting == .auto, !forcesDirectPlay, connection != nil else { return }
         let adaptive = AdaptiveQuality(
-            place: place, mediaKbps: media?.bitrate, linkKbps: measuredKbps(over: connection),
+            mediaKbps: media?.bitrate, linkKbps: linkKbps, cap: dataCap,
             source: sourcePicture, view: viewPicture,
             now: ProcessInfo.processInfo.systemUptime
         )
@@ -1672,54 +1670,52 @@ final class PlayerModel: Identifiable {
         autoRung = adaptive.rung
     }
 
-    /// Where the phone is from the server at `connection`.
-    private func networkPlace(of connection: PlexConnection) -> NetworkPlace {
-        let local = session.pathMetrics.localAddress(to: connection.uri, revision: session.presenceNetworkRevision)
-        return .of(connection, localAddress: local)
+    /// The highest quality Save Data plays at on mobile data, a hotspot or Low Data Mode: 720p at 4 Mbit/s, about
+    /// 1.8 GB an hour where a 1080p original commonly takes 4 to 5.
+    static let savedDataCap = VideoQuality.mbps4
+
+    /// The phone moved on or off a metered network, or Save Data changed: the item goes on under the new cap.
+    func dataCapMayHaveChanged() {
+        guard request.download == nil, phase == .playing,
+              (session.settings.savesData && session.isMetered ? Self.savedDataCap : nil) != dataCap else { return }
+        let playing = quality
+        abandonMove()
+        startAdapting(connection: streamConnection)
+        Diag.event(.player, "data.cap", ["cap": dataCap.map { "\($0)" }, "playing": "\(playing)", "now": "\(quality)"], .notice)
+        if quality != playing { reroute(handPick: false) }
     }
 
-    /// The link to `connection` from where the phone is, as the last stream over it measured, however long ago.
-    private func measuredKbps(over connection: PlexConnection) -> Int? {
-        guard let place, connection.uri == linkAddress else { return nil }
-        return session.player.links.latest(over: LinkMemory.Link(address: connection.uri, place: place))
-    }
-
-    /// The reading of that link the route may go by: recent, from this network, and not given up on (`LinkMemory`).
+    /// The reading of the link to `connection` that serves: recent, from this network, and not given up on (`LinkMemory`).
     private func recentKbps(over connection: PlexConnection) -> Int? {
-        guard let place, connection.uri == linkAddress else { return nil }
+        guard connection.uri == linkAddress else { return nil }
         return session.player.links.recent(
-            over: LinkMemory.Link(address: connection.uri, place: place),
-            at: ProcessInfo.processInfo.systemUptime, network: session.presenceNetworkRevision
+            to: connection.uri, at: ProcessInfo.processInfo.systemUptime, network: session.presenceNetworkRevision
         )
     }
 
-    /// The phone failed to read the file over a link only the measurement called near: on this network the route goes
-    /// by the place there from now on.
+    /// The phone failed to read the file over a link the measurement called fast enough: on this network the server
+    /// streams from now on.
     private func distrustLink() {
-        guard case .nearByLink = reach, let place, let address = linkAddress else { return }
-        session.player.links.distrust(LinkMemory.Link(address: address, place: place), network: session.presenceNetworkRevision)
-        Diag.event(.player, "link.distrusted", ["place": place.description], .notice)
+        guard case .nearByLink = reach, let address = linkAddress else { return }
+        session.player.links.distrust(address, network: session.presenceNetworkRevision)
+        Diag.event(.player, "link.distrusted", [:], .notice)
     }
 
-    /// Measures the link by reading the start of the file (`LinkProbe`) when the place alone sent `route` to the
-    /// server, records the reading and decides `reach` again by it. True when the reading changed `reach`.
-    private func probeLink(for route: PlaybackRoute, over connection: PlexConnection, media: PlexMedia, part: PlexPart) async -> Bool {
-        guard let place, connection.uri == linkAddress else { return false }
-        let link = LinkMemory.Link(address: connection.uri, place: place)
+    /// Measures the link by reading the start of the file (`LinkProbe`), records the reading and starts Auto and
+    /// `reach` again from it. True when the link was measured.
+    private func probeLink(part: PlexPart) async -> Bool {
+        guard request.download == nil, !forcesDirectPlay, !linkProbed, let address = linkAddress else { return false }
         let network = session.presenceNetworkRevision
-        guard LinkProbe.isNeeded(
-            route: route, place: place, connection: connection, distrusted: session.player.links.isDistrusted(link, network: network)
-        ) else { return false }
+        guard !session.player.links.isDistrusted(address, network: network) else { return false }
         linkProbed = true
         let started = ContinuousClock.now
-        guard let url = try? await library.playbackURL(path: part.key) else { return false }
+        guard let connection = try? await library.connection.connection(), connection.uri == address,
+              let url = try? await library.playbackURL(path: part.key) else { return false }
         let kbps = await LinkProbeRead.kbps(of: url, headers: library.authorizationHeaders())
-        Diag.event(.player, "link.probe", ["kbps": kbps, "place": place.description, "ms": Diag.ms(since: started)], .notice)
-        guard let kbps, !Task.isCancelled else { return false }
-        session.player.links.record(kbps, over: link, at: ProcessInfo.processInfo.systemUptime, network: network)
-        let probed = RouteReach.decide(place: place, connection: connection, mediaKbps: media.bitrate, linkKbps: kbps)
-        guard probed != reach else { return false }
-        reach = probed
+        Diag.event(.player, "link.probe", ["kbps": kbps, "ms": Diag.ms(since: started)], .notice)
+        guard let kbps, !Task.isCancelled, address == linkAddress, network == session.presenceNetworkRevision else { return false }
+        session.player.links.record(kbps, to: address, at: ProcessInfo.processInfo.systemUptime, network: network)
+        startAdapting(connection: connection)
         return true
     }
 
@@ -1781,15 +1777,14 @@ final class PlayerModel: Identifiable {
     /// re-encodes is held back by its encoder rather than the link, and says nothing of it.
     private func noteLink() {
         guard !linkNoted, request.download == nil, castDevice == nil, phase == .playing, isPlaying, landing == nil, !isSeeking,
-              route?.reencodesVideo == false, let place, let address = streamConnection?.uri, address == linkAddress else { return }
+              route?.reencodesVideo == false, let address = streamConnection?.uri, address == linkAddress else { return }
         switch stream {
         case .transcode, .direct: break
         case .remux, nil: return
         }
-        let link = LinkMemory.Link(address: address, place: place)
         let now = ProcessInfo.processInfo.systemUptime
         let network = session.presenceNetworkRevision
-        guard session.player.links.recent(over: link, at: now, network: network) == nil, let transfer = backend.transfer else { return }
+        guard session.player.links.recent(to: address, at: now, network: network) == nil, let transfer = backend.transfer else { return }
         guard let base = readingBase, transfer.bytes >= base.bytes, transfer.seconds >= base.seconds else {
             readingBase = transfer
             return
@@ -1798,8 +1793,8 @@ final class PlayerModel: Identifiable {
         guard bytes >= Self.readingBytes, seconds >= Self.readingSeconds else { return }
         let kbps = Int(Double(bytes) * 8 / 1000 / seconds)
         linkNoted = true
-        session.player.links.record(kbps, over: link, at: now, network: network)
-        Diag.event(.player, "link.measured", ["kbps": kbps, "place": place.description, "stream": diagStream], .debug)
+        session.player.links.record(kbps, to: address, at: now, network: network)
+        Diag.event(.player, "link.measured", ["kbps": kbps, "stream": diagStream], .debug)
     }
 
     /// Moves Auto to `rung`: beside the playing stream when it can, else by a new stream at the playhead.
@@ -3507,19 +3502,21 @@ extension PlayerModel {
         if route.reencodesVideo { fields.append(("reencodes", true)) }
         if let kbps = route.maxVideoBitrateKbps { fields.append(("kbps", kbps)) }
         if let resolution = route.videoResolution { fields.append(("resolution", resolution)) }
-        if request.download == nil { fields.append(("reach", Self.diagReach(reach))) }
+        if request.download == nil { fields.append(("reach", Self.describe(reach))) }
+        if let dataCap { fields.append(("dataCap", "\(dataCap)")) }
         if !route.audioEnhancements.isEmpty { fields.append(("enhancements", "\(route.audioEnhancements)")) }
         if let blocked = choice.enhancements.unavailable { fields.append(("enhancementsBlocked", blocked)) }
         return fields
     }
 
-    private static func diagReach(_ reach: RouteReach) -> String {
+    /// How the measured link decided the route, for logs and stats for nerds.
+    static func describe(_ reach: RouteReach) -> String {
         switch reach {
-        case .near: "near"
-        case .nearByLink(let kbps): "near by link, \(kbps) kbps"
-        case .remote: "remote"
-        case .remoteByLink(let kbps, let needs): "remote by link, \(kbps) of \(needs) kbps"
-        case .remoteByServer: "remote by server"
+        case .nearByLink(let kbps): "fast enough, \(kbps) kbps"
+        case .unmeasured: "not measured"
+        case .relay: "Plex relay"
+        case .remoteByLink(let kbps, let needs): "too slow, \(kbps) of \(needs) kbps"
+        case .remoteByServer: "held back by the server"
         }
     }
 

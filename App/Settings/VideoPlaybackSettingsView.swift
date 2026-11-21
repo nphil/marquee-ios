@@ -109,11 +109,14 @@ struct VideoPlaybackSettingsView: View {
                         }
                     }
                     .accessibilityIdentifier("video.quality")
+                    Toggle("Save Data", isOn: $session.settings.savesData)
+                        .accessibilityIdentifier("video.savesData")
+                        .onChange(of: session.settings.savesData) { session.player.active?.dataCapMayHaveChanged() }
                 }
             } footer: {
                 Text(session.settings.directPlay == .force
                     ? "Forced Direct Play: original quality."
-                    : "Auto plays the original at home and adjusts to the connection away from home. A fixed quality is the highest a video plays at: your Plex server converts larger files to fit. Also in the player's More menu.")
+                    : "Auto plays the original when the connection to your Plex server is fast enough, on Wi-Fi or mobile data, and lowers the quality when it is not. A fixed quality is the highest a video plays at: your Plex server converts larger files to fit. Also in the player's More menu. Save Data keeps video to 720p (4 Mbps, about 1.8 GB an hour) on mobile data, a personal hotspot or Low Data Mode.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)

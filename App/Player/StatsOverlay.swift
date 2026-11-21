@@ -151,8 +151,11 @@ enum PlayerStats {
         if let connection = model.streamConnection ?? server?.connection {
             lines.append(Line("Server", "\(connection.kindWord) · \(connection.displayAddress)"))
         }
-        if let place = model.place {
-            lines.append(Line("Place", place.description))
+        if model.streamConnection != nil {
+            lines.append(Line("Link", PlayerModel.describe(model.reach)))
+        }
+        if let cap = model.dataCap {
+            lines.append(Line("Save Data", cap.title))
         }
         if model.qualitySetting == .auto, !model.forcesDirectPlay {
             let link = model.linkEstimateKbps.map { " · link \(mbps(Double($0) * 1000))" } ?? ""

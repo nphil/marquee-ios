@@ -10,6 +10,8 @@ struct NetworkPath: Equatable, @unchecked Sendable {
     let wifiInterface: NWInterface?
     /// Up only over cellular, also through a VPN on it: a download kept to Wi-Fi waits.
     let isCellularOnly: Bool
+    /// Cellular, a personal hotspot or Low Data Mode. Not part of the comparison: the addresses that work stay.
+    let isMetered: Bool
 
     static func == (lhs: NetworkPath, rhs: NetworkPath) -> Bool {
         lhs.isConnected == rhs.isConnected && lhs.interfaces == rhs.interfaces && lhs.gateways == rhs.gateways && lhs.wifiInterface?.name == rhs.wifiInterface?.name
@@ -46,6 +48,7 @@ struct NetworkPath: Equatable, @unchecked Sendable {
         wifiInterface = path.availableInterfaces.first { $0.type == .wifi }
         let types = path.availableInterfaces.map(\.type)
         isCellularOnly = isConnected && types.contains(.cellular) && !types.contains(.wifi) && !types.contains(.wiredEthernet)
+        isMetered = path.isExpensive || path.isConstrained
     }
 
     /// The current path, then every change to it.

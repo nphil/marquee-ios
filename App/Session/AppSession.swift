@@ -38,6 +38,8 @@ final class AppSession {
     private(set) var networkChanges = 0
     private(set) var presenceNetworkRevision = 0
     private(set) var presencePath: NetworkPath?
+    /// On mobile data, a personal hotspot or Low Data Mode, where Save Data caps video quality.
+    private(set) var isMetered = false
     private(set) var place: HomePresence.Verdict = .unknown
     @ObservationIgnored private var presenceGeneration = 0
     @ObservationIgnored private var presence = HomePresence(gracePeriod: 30)
@@ -88,8 +90,6 @@ final class AppSession {
     /// Made again by Delete All Local Data, which removes the stored client identifier.
     private(set) var identity: PlexClientIdentity
     let transport: URLSessionTransport
-    /// What the app's requests showed of the path to each host, for `NetworkPlace`.
-    let pathMetrics: PathMetrics
     private let storage: SessionStorage
     /// Home's last content, kept in Caches per server and profile (DESIGN §11); nil in UI tests that do not ask for it.
     let homeSnapshots: SnapshotStore?
@@ -109,9 +109,7 @@ final class AppSession {
         identity = Self.identity(defaults: storage.defaults)
         let configuration = URLSessionConfiguration.default
         FakePlex.install(into: configuration)
-        let pathMetrics = PathMetrics()
-        self.pathMetrics = pathMetrics
-        transport = URLSessionTransport(session: URLSession(configuration: configuration, delegate: pathMetrics, delegateQueue: nil))
+        transport = URLSessionTransport(session: URLSession(configuration: configuration))
         let downloads = DownloadCenter()
         self.downloads = downloads
         bazarr = BazarrSettings(storage: storage, transport: transport)
@@ -643,16 +641,17 @@ final class AppSession {
                 guard let self else { return }
                 let initial = last == nil
                 let changed = last.map { $0 != path } ?? false
+                // Low Data Mode turns on and off on the same network: only Save Data's cap follows it.
+                if isMetered != path.isMetered {
+                    isMetered = path.isMetered
+                    if !initial && !changed { player.active?.dataCapMayHaveChanged() }
+                }
                 guard initial || changed else { continue }
                 last = path
                 presencePath = path
-                if initial {
-                    pathMetrics.networkChanged(to: presenceNetworkRevision)
-                    continue
-                }
+                if initial { continue }
                 invalidatePresence()
                 presenceNetworkRevision += 1
-                pathMetrics.networkChanged(to: presenceNetworkRevision)
                 if path.isConnected { networkChanged() }
             }
         }
