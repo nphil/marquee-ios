@@ -14,7 +14,7 @@ let package = Package(
     ],
     dependencies: [
         // The same pin as the app's VideoEngine, so both resolve to one checkout.
-        .package(url: "https://github.com/nphil/videoengine.git", exact: "2.0.4"),
+        .package(url: "https://github.com/nphil/videoengine.git", exact: "2.0.5"),
     ],
     targets: [
         // Platform-neutral: no AVFoundation, so a scratch package can test it on Linux.
