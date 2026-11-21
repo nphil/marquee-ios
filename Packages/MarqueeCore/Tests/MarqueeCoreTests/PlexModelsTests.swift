@@ -100,4 +100,24 @@ struct PlexModelsTests {
         #expect(unmarked.markers(.credits).map { [$0.start, $0.end] } == [[1_335_084, 1_425_132]])
         #expect(unmarked.markers(.intro).map(\.start) == [0])
     }
+
+    /// The Apothecary Diaries S1 E14's real times: Plex split the file's Credits chapter into credits and final
+    /// credits, and Up Next waited 75 s for the final ones.
+    @Test func aCreditsChapterJoinsEveryPlexCreditsMarkerItSpans() throws {
+        let item = try decode(PlexMetadata.self, [
+            "ratingKey": "22534", "type": "episode", "duration": 1_372_073,
+            "Marker": [
+                ["type": "credits", "startTimeOffset": 1_270_867, "endTimeOffset": 1_290_867],
+                ["type": "credits", "startTimeOffset": 1_340_867, "endTimeOffset": 1_372_075, "final": true],
+            ],
+            "Chapter": [
+                ["tag": "Part 01", "startTimeOffset": 0, "endTimeOffset": 1_266_450],
+                ["tag": "Credits", "startTimeOffset": 1_266_450, "endTimeOffset": 1_372_080],
+            ],
+        ])
+
+        let credits = item.markers(.credits)
+        #expect(credits.map { [$0.start, $0.end] } == [[1_266_450, 1_372_080]])
+        #expect(credits.first?.isFinal == true)
+    }
 }

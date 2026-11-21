@@ -271,21 +271,24 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
     }
 
     /// Markers of one kind in playback order; Plex sends them unsorted. On an episode, a chapter the file itself
-    /// names as its opening or ending (`PlexChapter.markerKind`) widens the Plex marker it overlaps, or stands
-    /// in where Plex has none. Plex finds credits from the picture and misses animated endings: on The
-    /// Apothecary Diaries season 2, 9 of 24 episodes had no credits marker and the rest started up to 16 s
-    /// after the file's Ending chapter.
+    /// names as its opening or ending (`PlexChapter.markerKind`) joins the Plex markers it overlaps into one, final
+    /// if any of them is, or stands in where Plex has none. Plex finds credits from the picture and misses animated
+    /// endings: on The Apothecary Diaries season 2, 9 of 24 episodes had no credits marker and the rest started up
+    /// to 16 s after the file's Ending chapter. On season 1 E14 Plex split the Credits chapter's span into credits
+    /// at 1270.9 s and final credits at 1340.9 s, and Up Next, which waits for the final ones, came 74 s late.
     public func markers(_ kind: PlexMarker.Kind) -> [PlexMarker] {
         var result = markers.filter { $0.kind == kind }
         if type == .episode, duration > 0 {
             for chapter in chapters where chapter.markerKind == kind && chapter.isPlausible(kind, in: duration) {
-                if let index = result.firstIndex(where: { $0.start < chapter.end && chapter.start < ($0.isFinal ? .max : $0.end) }) {
-                    result[index].start = min(result[index].start, chapter.start)
-                    result[index].end = max(result[index].end, chapter.end)
-                    result[index].fromChapter = true
-                } else {
-                    result.append(PlexMarker(kind: kind, start: chapter.start, end: chapter.end, fromChapter: true))
+                var joined = PlexMarker(kind: kind, start: chapter.start, end: chapter.end, fromChapter: true)
+                result.removeAll { marker in
+                    guard marker.start < chapter.end && chapter.start < (marker.isFinal ? .max : marker.end) else { return false }
+                    joined.start = min(joined.start, marker.start)
+                    joined.end = max(joined.end, marker.end)
+                    joined.isFinal = joined.isFinal || marker.isFinal
+                    return true
                 }
+                result.append(joined)
             }
         }
         return result.sorted { $0.start < $1.start }

@@ -135,7 +135,7 @@ Each request is retained separately below; repeated reports share one entry inst
 | R44 | Eyes-free touch remote for the LG TV app | Later: L3; not the linked-iPhone remote. |
 | R45 | iPhone USB-C/HDMI CEC control | Platform question answered; no supported public path identified. R26 supplies software volume instead. |
 | R46 | Diagnostic logs to ntfy with Report a Problem, and the skip-intro miss explained | Built: DESIGN §8.12; N6 open. |
-| R47 | Skip Credits on time for shows Plex marks late or not at all | Built: markers from named chapters, DESIGN §8 Up Next; N7 open. |
+| R47 | Skip Credits on time for shows Plex marks late or not at all | Built: markers from named chapters, joining every Plex marker a chapter spans (DESIGN §8 Up Next); N7 open. 0.1.60 on Isabel's iPhone: S1 E14 waited for Plex's split-off final credits, fixed in 0.1.61. |
 | R48 | Home appears instantly at launch | Built: last Home from disk, then a quiet refresh, DESIGN §11; N8 open. |
 | R49 | Continue Watching follows rewatches | Built: the rule shared with the LG TV app, DESIGN §8.1 item 2 (`RewatchQueue`, `RewatchRun`); N9 open. |
 | R50 | A lost server conversion is replaced within seconds, not after 30 s of retries | Built: DESIGN §8.6 (`ConversionWatch`); N10 open. |
