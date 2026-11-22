@@ -59,7 +59,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Stats for Nerds | Done | Route, stream and bitrate overlay. | local [code] |
 | Playback Info sheet | Done | Route, subtitle track, bitrate, frame rate. | local [code] |
 | AirPlay / Picture in Picture | Done | AirPlay and the PiP button in the top row; leaving the app while a film or a live channel plays starts PiP; AirPlay stream handling. | AVKit [code] |
-| Chromecast | Done | Settings › Chromecast turns it on; the route popover lists receivers. The receiver plays the file or the server's HLS with subtitles burned in; controls, Skip Intro, Up Next and watched state follow it. Untested on hardware. | Google Cast SDK; `/security/token`, `/video/:/transcode/universal/start.m3u8` [code] |
+| Chromecast | Done | Settings › Chromecast turns it on; the route popover lists receivers. The receiver plays the file or the server's HLS; it draws no text subtitle, and a picture subtitle the viewer picked is burned in. Controls, Skip Intro, Up Next and watched state follow it. Untested on hardware. | Google Cast SDK; `/security/token`, `/video/:/transcode/universal/start.m3u8` [code] |
 | Resume position | Done | Starts at saved offset. | `viewOffset` [code] |
 | Watched threshold | Done | Marks watched near the end. | timeline [code] |
 | Remote-control focus | Done | On the big screen only (XR glasses or TV, DESIGN §8.9): one focus on the screen, moved by swipes on the phone, which is the remote. | — |
@@ -67,15 +67,16 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 ## 4. Audio
 | Feature | Status | Behaviour | API |
 |---|---|---|---|
-| Audio track selector | Done | Pick track; wanted-language first; check on playing track. | streams [code] |
-| Preferred audio language | Done | Per-profile preference. | local [code] |
-| Follow-dub rule | Done | Subtitles follow the audio: English audio takes the dub transcript (SDH or CC flag, `.cc`/`.sdh`, a Dub or Dubtitle title), other audio the full translation; a downloaded track beats a built-in one. Switching audio picks again unless the viewer chose the subtitle or the show remembers one; Off and on-screen text are left alone. Audio & Subtitles › Follow the Audio turns it off. | local [code] |
+| Audio track selector | Done | The Audio menu shows the playing track, ticked, and one Advanced row with every track. | streams [code] |
+| Audio rules | Done | Movies and non-anime TV play the original audio, never a dub; anime plays the English dub when the file has one. A pick is kept for the show or film. No language setting. | local [code] |
+| Anime subtitle pairing | Done | Anime with the dub takes the dub-matched English subtitle (`.en.cc.srt`), the original audio the original-matched one (`.en.srt`); switching audio switches the subtitle unless the viewer chose it. Anime is Plex's tags on the title or its show; Subtitles › Advanced › Anime overrides it per show. | local [code] |
 | Normalize loudness / Boost | Done | See Playback. | `boostDialog`, `normalizeLoudness` |
 
 ## 5. Subtitles
 | Feature | Status | Behaviour | API |
 |---|---|---|---|
-| Off / the viewer's language | Done | The Tracks menu offers Off and one language row, which puts the usual track on screen: full ahead of SDH, text ahead of pictures. On-screen-text and other-language tracks are not offered; a track the file turned on stands ticked under the two rows. | streams [code] |
+| On / Off | Done | English subtitles are on by default, in the remembered style. The Tracks menu offers On, Off, Subtitle Style and one Advanced row with every track, Find Subtitles, Timing and the Anime setting. The pick is one English subtitle: the `.en.srt` beside the file, else its `.en.cc.srt`, else the file's own English text; a picture subtitle is never picked automatically. Off is kept per show or film. | streams [code] |
+| Placed cues | Done | A cue starting `{\an8}` (signs and songs) draws at the top with the tag never shown; Picture in Picture and AirPlay keep it at the bottom. | local [code] |
 | Sidecar (external) subtitle download | Done | Downloads an external subtitle file and reads it. | `/library/streams/{id}` [code] |
 | Image subtitles (PGS, DVB, VOBSUB) | Done | Drawn as bitmaps. | streams [code] |
 | Image-subtitle badges and no-restyle rule | Done | Image subtitles keep their own size and position; Subtitle Style offers them only Colour and Soften Brightness and says why. | local |
@@ -105,7 +106,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Feature | Status | Behaviour | API |
 |---|---|---|---|
 | Video & playback page | Done | Direct Play mode, default aspect, Video Orientation (Follow Device, Start in Landscape, Lock to Landscape). | local [code] |
-| Audio & subtitles page | Done | Preferred audio, subtitle mode, remember choices, style. | local [code] |
+| Audio & subtitles page | Done | Subtitle style. The tracks follow one set of rules for every profile, so there is no language, mode or remember setting. | local [code] |
 | Downloads | Partial | Download a movie or episode as Original or at High, Medium or Low from its page or the … menu, or a season or show's episodes at the default quality. Each choice shows its picture size and download size; the tiers aim at VMAF 95, 90 and 85, from HomeLabber's measured map when its plugin is set up and the title is measured, otherwise estimated from the file's resolution, bitrate, codec, frame rate and genre. A tier is converted by the server while its segments download, in the background too; the download queue makes it when the server will not stream it. The Downloads screen groups them by show and movies, each row with a still, size, resolution, quality, duration, watched progress and state, and ends in a storage bar of Marquee, other and free space; Play, Pause, Resume and Remove work by tap, swipe, context menu or Select, and Settings › Downloads sets transfers, playback, cellular, background and watched-deletion preferences. On cellular only with cellular downloads off, a row says Waiting for Wi-Fi and offers Download on Cellular, which turns the setting on; after two failed tries in a row it says the server can't be reached while it keeps trying. A transfer that gets no answer from its address makes the next one probe for an address that answers. Device and server behavior remains unverified. | Plex transcode decision and HLS segments, download queue, file byte ranges; HomeLabber `/api/media-quality/v1` [code] |
 | Intro skip (manual/3/5/10/15/30s) | Done | Intro skip delay. | local [code] |
 | Credits countdown | Done | Up Next delay. | local [code] |

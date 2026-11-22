@@ -22,11 +22,6 @@ struct ProfileSettings: Equatable, Sendable {
     var videoOrientation = VideoOrientation.followDevice
     /// Live TV reads an HDHomeRun tuner on the home network itself; off, every channel plays through Plex.
     var readsTunerDirectly = true
-    /// Nil plays the file's default audio track.
-    var audioLanguage: TrackLanguage?
-    var subtitles = SubtitleSettings()
-    /// Remembers the audio and subtitles picked for each show or movie, per profile and server.
-    var remembersTracks = true
     var subtitleStyle = SubtitleLook()
     var homeRows = HomeLayout()
     var posterLabels = PosterLabels()
@@ -60,7 +55,7 @@ struct ProfileSettings: Equatable, Sendable {
 extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
         case skipInterval, skipTaps, introSkipDelay, nextEpisodeDelay, autoplaysNext, creditsAutoplay, directPlay, aspect, videoOrientation, readsTunerDirectly
-        case audioLanguage, subtitles, remembersTracks, subtitleStyle, homeRows
+        case subtitleStyle, homeRows
         case posterLabels, audioEnhancements, hiddenLibraries, rewatchDismissed, playsTrailers, playsThemeMusic, themeMusicVolume, savesData
         /// "quality" held a fixed quality before Auto existed (`LegacyKeys`).
         case quality = "qualitySetting"
@@ -87,9 +82,6 @@ extension ProfileSettings: Codable {
         aspect = value(.aspect) ?? aspect
         videoOrientation = value(.videoOrientation) ?? videoOrientation
         readsTunerDirectly = value(.readsTunerDirectly) ?? readsTunerDirectly
-        audioLanguage = value(.audioLanguage)
-        subtitles = value(.subtitles) ?? subtitles
-        remembersTracks = value(.remembersTracks) ?? remembersTracks
         subtitleStyle = value(.subtitleStyle) ?? subtitleStyle
         homeRows = value(.homeRows) ?? homeRows
         posterLabels = value(.posterLabels) ?? posterLabels

@@ -40,9 +40,10 @@ public enum SubtitleDelivery: Sendable, Hashable {
     /// Inside the played stream: MP4 text, closed captions in the video, or a track the remux carries
     /// (text as WebVTT, pictures for the app to draw).
     case inStream(SubtitleTrack)
-    /// Burned into the picture by the server.
+    /// Burned into the picture by the server. Only a picture subtitle is.
     case burnedIn(SubtitleTrack)
-    /// Chosen but not shown: only a server re-encode could show it, and only a hand pick may cause one.
+    /// Chosen but not shown: text inside the file while the server streams it, or a picture only a server
+    /// re-encode could show, and only a hand pick may cause one.
     case notShown(SubtitleTrack)
 }
 
@@ -67,7 +68,7 @@ public enum RouteReason: Sendable, Hashable, CustomStringConvertible {
     case levelOrFrameRate
     /// Above the quality picked in the player.
     case bitrateLimit(kbps: Int)
-    /// A hand-picked subtitle that only the server can show, by burning it in.
+    /// A hand-picked picture subtitle that only the server can show, by burning it in.
     case burnsSubtitle
     /// Playing on the phone failed, so the server takes over.
     case onDeviceFailed
@@ -230,11 +231,13 @@ public enum PlaybackRouteDecider {
     /// 2. Remux on the phone: other containers, hev1 HEVC, Dolby Vision 7 (base layer), audio the remux
     ///    converts, embedded subtitles it carries. Without a remux the server copies the video instead.
     /// 3. Server re-encode: video the phone cannot decode, Dolby Vision it cannot show, HDR on an SDR
-    ///    screen or HLS limits for copied video, a quality limit, or a hand-picked subtitle to burn in.
+    ///    screen or HLS limits for copied video, a quality limit, or a hand-picked picture subtitle to burn in.
     ///
     /// Audio the phone cannot play is first swapped for a playable track in the same language (not
-    /// commentary, same dub-ness and audio description). Subtitle defaults never burn; a remembered pick
-    /// burns only when the video is re-encoded anyway.
+    /// commentary, same dub-ness and audio description). Only a picture subtitle (PGS, VobSub) is ever
+    /// burned in: when hand-picked, or when remembered and the video is re-encoded anyway. A text subtitle
+    /// is drawn by the app, from its file or from the stream the phone plays, and is not shown when it is
+    /// inside the file and the server does the streaming.
     ///
     /// With `limits.phoneOnly` the server is never used: the file plays directly, or through the remux when
     /// it needs one, and a subtitle only the server could show is not shown.
@@ -338,7 +341,7 @@ public enum PlaybackRouteDecider {
         if let track = subtitle.track {
             if let onPhone = onDevice(track, kind: kind, reencodes: reencodes, capabilities) {
                 delivery = onPhone
-            } else if limits.phoneOnly {
+            } else if limits.phoneOnly || !track.isImageBased {
                 delivery = .notShown(track)
             } else {
                 switch subtitle.source {
@@ -349,7 +352,7 @@ public enum PlaybackRouteDecider {
                     delivery = .burnedIn(track)
                 case .remembered:
                     delivery = reencodes ? .burnedIn(track) : .notShown(track)
-                case .server, .fileDefault, .setting:
+                case .rules:
                     delivery = .notShown(track)
                 }
             }

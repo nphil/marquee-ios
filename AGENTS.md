@@ -31,9 +31,9 @@ Read first: `docs/HANDOFF.md` (unfinished work, how it lands, decisions already 
 | `Connection/` | `PlexServerConnection`: probe all addresses, `ConnectionRanking` (local > remote > relay, https > http), `HomeNetwork` (hosts allowed plain http) |
 | `Library/` | `PlexLibrary` (browse, search, metadata, timeline, mark watched, delete), `PagedLoader`, `SectionQuery`, `HomeLayout`, play queues, transcode sessions, `Deletion` |
 | `Playback/` | `PlaybackRouteDecider` (direct, remux, transcode and why), `DeviceCapabilities`, `TranscodeRequest`, `TrailerAutoplay`, `ThemeMusic` and `ThemeFade` |
-| `Tracks/` | `AudioPicker`, `SubtitlePicker`, `TrackMemory`, language and track-label rules |
+| `Tracks/` | `TrackRules` (the audio and subtitle decision), `Anime` (classifier and `AnimeLookup`), `TrackMemory`, language and track-label rules |
 | `Live/` | Plex Live TV and DVR (`PlexLiveTV`), guide models and `GuideCache`, recordings, `LiveRouteDecider`, `HDHomeRunClient` for the direct tuner path |
-| `Subtitles/` | `Bazarr` client (search, download), `SpeechDock` (word timing: the file as the service reads it, request windows, client), `SubtitleLook` (presets, fonts, edges, boxes, position), `SubtitleTiming` (offset), `SubtitleReveal` (Reveal as Spoken modes) |
+| `Subtitles/` | `Bazarr` client (search, download), `SpeechDock` (word timing: the file as the service reads it, request windows, client), `SubtitleLook` (presets, fonts, edges, boxes, position), `SubtitleTiming` (offset), `SubtitleReveal` (Reveal as Spoken modes), `CueMarkup` (`{\anN}` placement of SRT cues) |
 | `Downloads/` | `DownloadRecord` and `DownloadStore`, `PlexDownloadQueue`, `DownloadQualityPlan` (tiers sized per title, measured or estimated), `HomeLabber` (quality map client), `TranscodeLadder`, `HLSPlaylist` and `StreamedFile` (a conversion's segments joined into one `.ts`) |
 | `Navigation/` | `Destination` and `TabLayout`: the person's tabs and their rules |
 | `Link/` | Linked phones: `LinkInvite` (the QR code's link, ids, names), `LinkKeys` (HKDF keys), `LinkMessage` (preamble, messages, status, `LinkDialing`, `LinkStatusPacer`) |

@@ -33,7 +33,7 @@ struct PlaybackRouteTests {
     static func route(
         _ file: File,
         audio: Int? = nil,
-        subtitle: SubtitleDecision = SubtitleDecision(track: nil, source: .setting),
+        subtitle: SubtitleDecision = SubtitleDecision(track: nil, source: .rules),
         capabilities: DeviceCapabilities = PlaybackRouteTests.remuxer,
         limits: RouteLimits = RouteLimits(),
         sampleEntry: String? = nil
@@ -189,7 +189,7 @@ struct PlaybackRouteTests {
 
     // MARK: Subtitles
 
-    @Test func subtitlesThatNeedABurnBurnOnlyForAHandPick() throws {
+    @Test func onlyAPictureSubtitleIsBurnedAndOnlyForAHandPick() throws {
         let mkv = try Self.file("mkv", streams: [
             Fixture.audio(2, "eng"),
             Fixture.subtitle(3, "eng", codec: "pgs"),
@@ -204,10 +204,10 @@ struct PlaybackRouteTests {
 
         let remembered = Self.route(mkv, subtitle: Self.subtitle(3, in: mkv, .remembered))
         #expect(remembered.kind == .remux && remembered.subtitle == .notShown(mkv.tracks.subtitles[0]))
-        #expect(Self.route(mkv, subtitle: Self.subtitle(3, in: mkv, .fileDefault)).subtitle == .notShown(mkv.tracks.subtitles[0]))
+        #expect(Self.route(mkv, subtitle: Self.subtitle(3, in: mkv, .rules)).subtitle == .notShown(mkv.tracks.subtitles[0]))
 
-        #expect(Self.route(mkv, subtitle: Self.subtitle(4, in: mkv, .setting)).subtitle == .inStream(mkv.tracks.subtitles[1]))
-        #expect(Self.route(mkv, subtitle: Self.subtitle(5, in: mkv, .server)).subtitle == .sidecar(mkv.tracks.subtitles[2]))
+        #expect(Self.route(mkv, subtitle: Self.subtitle(4, in: mkv, .rules)).subtitle == .inStream(mkv.tracks.subtitles[1]))
+        #expect(Self.route(mkv, subtitle: Self.subtitle(5, in: mkv, .rules)).subtitle == .sidecar(mkv.tracks.subtitles[2]))
         #expect(Self.route(mkv, subtitle: Self.subtitle(6, in: mkv, .handPick)).subtitle == .burnedIn(mkv.tracks.subtitles[3]))
         var draws = Self.remuxer
         draws.drawsImageSubtitles = true
@@ -222,7 +222,7 @@ struct PlaybackRouteTests {
         ])
 
         let remembered = Self.route(vc1, subtitle: Self.subtitle(3, in: vc1, .remembered))
-        let automatic = Self.route(vc1, subtitle: Self.subtitle(3, in: vc1, .server))
+        let automatic = Self.route(vc1, subtitle: Self.subtitle(3, in: vc1, .rules))
 
         #expect(remembered.subtitle == .burnedIn(vc1.tracks.subtitles[0]))
         #expect(!remembered.reasons.contains(.burnsSubtitle))
@@ -236,9 +236,40 @@ struct PlaybackRouteTests {
         let copied = try file(Fixture.video())
         let reencoded = try file(Fixture.video(bitDepth: 10))
 
-        #expect(Self.route(copied, subtitle: Self.subtitle(3, in: copied, .setting)).subtitle == .inStream(copied.tracks.subtitles[0]))
-        #expect(Self.route(reencoded, subtitle: Self.subtitle(3, in: reencoded, .setting)).subtitle
+        #expect(Self.route(copied, subtitle: Self.subtitle(3, in: copied, .rules)).subtitle == .inStream(copied.tracks.subtitles[0]))
+        #expect(Self.route(reencoded, subtitle: Self.subtitle(3, in: reencoded, .rules)).subtitle
             == .notShown(reencoded.tracks.subtitles[0]))
+    }
+
+    @Test func textInsideTheFileIsNeverBurnedIn() throws {
+        // VC-1 sends the file through the server, which has no way to put embedded text on the screen.
+        let vc1 = try Self.file("mkv", video: Fixture.video("vc1"), streams: [
+            Fixture.audio(2, "eng"),
+            Fixture.subtitle(3, "eng"),
+            Fixture.subtitle(4, "eng", codec: "ass", external: true),
+        ])
+
+        for source in [SubtitleDecision.Source.handPick, .remembered, .rules] {
+            let route = Self.route(vc1, subtitle: Self.subtitle(3, in: vc1, source))
+            #expect(route.kind == .serverTranscode && !route.reasons.contains(.burnsSubtitle))
+            #expect(route.subtitle == .notShown(vc1.tracks.subtitles[0]))
+        }
+        // A separate file is drawn by the app on any route.
+        #expect(Self.route(vc1, subtitle: Self.subtitle(4, in: vc1, .handPick)).subtitle == .sidecar(vc1.tracks.subtitles[1]))
+    }
+
+    @Test func aConvertedDownloadBurnsOnlyAPictureSubtitleTheServerSelected() throws {
+        func request(_ subtitle: [String: Any]) throws -> TranscodeRequest {
+            let item = try decode(PlexMetadata.self, [
+                "ratingKey": "12",
+                "Media": [["id": 1, "Part": [["id": 7, "Stream": [Fixture.video(), Fixture.audio(2, "eng"), subtitle]]]]],
+            ])
+            return TranscodeRequest(download: item, mediaIndex: 0, target: DownloadTarget(videoKbps: 3400, height: 720), session: "s-1")
+        }
+
+        #expect(try request(Fixture.subtitle(3, "eng", codec: "pgs", selected: true)).burnsSubtitles)
+        #expect(try !request(Fixture.subtitle(3, "eng", selected: true)).burnsSubtitles)
+        #expect(try !request(Fixture.subtitle(3, "eng", codec: "pgs")).burnsSubtitles)
     }
 
     // MARK: Limits

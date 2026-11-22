@@ -45,7 +45,7 @@ struct PlaybackInfoView: View {
             }
 
             Section("Subtitles") {
-                row("Track", model.subtitle?.track?.label ?? (model.subtitleChoice == .onScreenTextOnly ? "On-screen text only" : "Off"))
+                row("Track", model.subtitle?.track?.label ?? "Off")
                 if let route = model.route, let delivery = route.subtitle.words {
                     row("Delivery", delivery)
                 }

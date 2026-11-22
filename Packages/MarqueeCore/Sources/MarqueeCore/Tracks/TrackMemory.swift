@@ -1,14 +1,25 @@
 import Foundation
 
-/// The audio and subtitle choice remembered for a show or movie. It describes the tracks rather than
-/// naming them, because stream ids differ in every episode.
+/// The audio and subtitle choice remembered for a show or movie, with the viewer's word on whether it is
+/// anime. It describes the tracks rather than naming them, because stream ids differ in every episode.
 public struct TrackMemory: Sendable, Hashable, Codable {
     public var audio: RememberedAudio?
     public var subtitle: RememberedSubtitle?
+    public var anime: AnimeOverride
 
-    public init(audio: RememberedAudio? = nil, subtitle: RememberedSubtitle? = nil) {
+    public init(audio: RememberedAudio? = nil, subtitle: RememberedSubtitle? = nil, anime: AnimeOverride = .automatic) {
         self.audio = audio
         self.subtitle = subtitle
+        self.anime = anime
+    }
+
+    /// Each part is read on its own: a subtitle remembered in a form that no longer exists (signs only) is
+    /// dropped without taking the audio or the anime override with it.
+    public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        audio = try? c.decodeIfPresent(RememberedAudio.self, forKey: .audio)
+        subtitle = try? c.decodeIfPresent(RememberedSubtitle.self, forKey: .subtitle)
+        anime = (try? c.decodeIfPresent(AnimeOverride.self, forKey: .anime)) ?? .automatic
     }
 
     /// Where the memory of one show or movie is kept: per server and Plex Home profile.
@@ -47,7 +58,6 @@ public struct RememberedAudio: Sendable, Hashable, Codable {
 
 public enum RememberedSubtitle: Sendable, Hashable, Codable {
     case off
-    case onScreenTextOnly
     case track(Description)
 
     public struct Description: Sendable, Hashable, Codable {
@@ -77,11 +87,11 @@ public enum RememberedSubtitle: Sendable, Hashable, Codable {
         }
     }
 
-    /// What to remember after a hand pick.
+    /// What to remember after a hand pick; On forgets the subtitle, so the rules apply again.
     public init?(_ choice: SubtitleChoice, in tracks: MediaTracks) {
         switch choice {
         case .off: self = .off
-        case .onScreenTextOnly: self = .onScreenTextOnly
+        case .automatic: return nil
         case .track(let id):
             guard let track = tracks.subtitle(id: id) else { return nil }
             self = .track(Description(tracks.visible(track)))

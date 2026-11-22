@@ -72,7 +72,7 @@ public struct TranscodeRequest: Sendable, Hashable {
 
     /// A download the server converts while the phone saves its segments: H.264 (HEVC for 4K) at the
     /// target's cap and frame, with AAC audio, in MPEG-TS. Without the profile the server sends MP3.
-    /// A subtitle inside the file is burned in when picked; separate ones are saved beside the video.
+    /// A picture subtitle inside the file is burned in when picked; separate ones are saved beside the video.
     public init(download item: PlexMetadata, mediaIndex: Int, target: DownloadTarget, offset: Double = 0, session: String) {
         let part = item.media.indices.contains(mediaIndex) ? item.media[mediaIndex].parts.first : nil
         path = "/library/metadata/\(item.ratingKey)"
@@ -81,7 +81,7 @@ public struct TranscodeRequest: Sendable, Hashable {
         self.session = session
         self.offset = offset
         copiesVideo = false
-        burnsSubtitles = part?.streams.contains { $0.kind == .subtitle && $0.isSelected && $0.key == nil } ?? false
+        burnsSubtitles = part?.streams.contains { $0.kind == .subtitle && $0.isSelected && $0.key == nil && SubtitleTrack($0).isImageBased } ?? false
         maxVideoBitrateKbps = target.maxVideoBitrateKbps
         videoResolution = target.videoResolution
         audioEnhancements = []

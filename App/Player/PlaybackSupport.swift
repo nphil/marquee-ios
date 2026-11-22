@@ -41,6 +41,14 @@ struct TextCue: Sendable, Equatable {
     var start: TimeInterval
     var end: TimeInterval
     var text: AttributedString
+    /// Where the file puts the cue (`{\anN}`); nil leaves it to the viewer's subtitle look.
+    var alignment: CueAlignment?
+}
+
+/// The cues showing in one place the file chose, as one block of text.
+struct PlacedCue: Sendable, Hashable {
+    var alignment: CueAlignment
+    var text: AttributedString
 }
 
 /// A downloaded subtitle file, ready to draw or to hand to the remux.
@@ -70,18 +78,39 @@ enum SidecarLoader {
     }
 
     static func load(_ track: SubtitleTrack, fileURL: URL) async throws -> SidecarContents {
-        let contents = try await SubtitleFile.read(fileURL: fileURL)
+        let marked = try markedCopy(of: fileURL, track)
+        defer { if let marked { try? FileManager.default.removeItem(at: marked) } }
+        let contents = try await SubtitleFile.read(fileURL: marked ?? fileURL)
+        var cues = contents.cues
+        var drawn: [TextCue] = []
+        for index in cues.indices {
+            let placed = CueMarkup.placing(cues[index].text)
+            cues[index].text = placed.text
+            drawn.append(TextCue(start: cues[index].start, end: cues[index].end, text: CueText.attributed(placed.text), alignment: placed.alignment))
+        }
         return SidecarContents(
-            cues: contents.cues.map { TextCue(start: $0.start, end: $0.end, text: CueText.attributed($0.text)) },
+            cues: drawn,
             bitmaps: contents.bitmaps.isEmpty ? nil : SubtitleOverlayTrack(contents.bitmaps),
             sidecar: SidecarSubtitles(
                 name: name(track),
                 language: track.language.code ?? "und",
                 isForced: track.kind == .onScreenText,
                 isHearingImpaired: track.kind == .captions,
-                cues: contents.cues
+                cues: cues
             )
         )
+    }
+
+    /// A copy of a `.srt` whose `{\anN}` tags are marked for `CueMarkup.placing`, since the reader drops
+    /// them; nil when the file has none or is another format. The copy is the caller's to delete.
+    private static func markedCopy(of file: URL, _ track: SubtitleTrack) throws -> URL? {
+        guard ["srt", "subrip"].contains(track.codec.lowercased()) else { return nil }
+        let data = try Data(contentsOf: file)
+        let marked = CueMarkup.marking(data)
+        guard marked != data else { return nil }
+        let copy = FileManager.default.temporaryDirectory.appending(path: "marquee-subtitle-\(UUID().uuidString).srt")
+        try marked.write(to: copy)
+        return copy
     }
 
     /// The rendition name the remux lists a downloaded track under; unique per stream id.

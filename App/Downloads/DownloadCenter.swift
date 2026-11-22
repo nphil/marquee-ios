@@ -57,6 +57,7 @@ final class DownloadCenter {
     private var library: PlexLibrary?
     private let meter = TransferMeter()
     private let keepAlive = DownloadKeepAlive()
+    private let anime = AnimeLookup()
     @ObservationIgnored private var worker: Task<Void, Never>?
     @ObservationIgnored private var transferOwner = UUID()
     @ObservationIgnored private var enqueueOwner = UUID()
@@ -267,6 +268,7 @@ final class DownloadCenter {
                 item: snapshot.item, scope: scope, quality: chosen, target: option?.target, mediaIndex: mediaIndex, addedAt: .now,
                 expectedLength: option?.bytes
             )
+            record.isAnime = await anime.isAnime(snapshot.item, in: library)
             let poster: Data?
             if let thumb = record.thumb { poster = try? await PlexFetch.data(thumb, library: library, session: metadataSession) }
             else { poster = nil }

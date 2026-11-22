@@ -12,13 +12,14 @@ struct CastTests {
         _ file: File,
         audio: Int? = nil,
         subtitle: Int? = nil,
+        source: SubtitleDecision.Source = .rules,
         receiver: CastReceiver = hd,
         limits: RouteLimits = RouteLimits()
     ) -> PlaybackRoute {
         CastRouteDecider.decide(
             media: file.media, part: file.part, tracks: file.tracks,
             audio: audio.flatMap(file.tracks.audioTrack(id:)) ?? file.tracks.audio.first,
-            subtitle: SubtitleDecision(track: subtitle.flatMap(file.tracks.subtitle(id:)), source: .setting),
+            subtitle: SubtitleDecision(track: subtitle.flatMap(file.tracks.subtitle(id:)), source: source),
             receiver: receiver, limits: limits
         )
     }
@@ -58,11 +59,21 @@ struct CastTests {
         #expect(level.reasons == [.videoFormat("H.264 level 4.2")] && level.reencodesVideo)
     }
 
-    @Test func subtitleIsBurnedIn() throws {
-        let file = try PlaybackRouteTests.file("mp4", streams: [Fixture.audio(2, "eng"), Fixture.subtitle(4, "eng", external: true)])
-        let route = Self.route(file, subtitle: 4)
-        #expect(route.kind == .serverTranscode && route.reencodesVideo && route.reasons == [.burnsSubtitle])
-        #expect(route.subtitle == .burnedIn(try #require(file.tracks.subtitle(id: 4))))
+    @Test func onlyAPictureSubtitleTheViewerPickedIsBurnedIn() throws {
+        let file = try PlaybackRouteTests.file("mp4", streams: [
+            Fixture.audio(2, "eng"), Fixture.subtitle(4, "eng", external: true), Fixture.subtitle(5, "eng", codec: "pgs"),
+        ])
+
+        let text = Self.route(file, subtitle: 4, source: .handPick)
+        let picture = Self.route(file, subtitle: 5, source: .handPick)
+        let automatic = Self.route(file, subtitle: 5, source: .rules)
+        let textTrack = try #require(file.tracks.subtitle(id: 4))
+        let pictureTrack = try #require(file.tracks.subtitle(id: 5))
+
+        #expect(text.kind == .directPlay && text.reasons.isEmpty && text.subtitle == .notShown(textTrack))
+        #expect(picture.kind == .serverTranscode && picture.reencodesVideo && picture.reasons == [.burnsSubtitle])
+        #expect(picture.subtitle == .burnedIn(pictureTrack))
+        #expect(automatic.kind == .directPlay && automatic.subtitle == .notShown(pictureTrack))
     }
 
     @Test func qualityAndSettingsSendItThroughTheServer() throws {

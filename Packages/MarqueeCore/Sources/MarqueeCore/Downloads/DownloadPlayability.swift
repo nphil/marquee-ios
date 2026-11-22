@@ -9,7 +9,7 @@ public enum DownloadPlayability {
         let tracks = MediaTracks(part: part)
         let route = PlaybackRouteDecider.decide(
             media: media, part: part, tracks: tracks, audio: tracks.audio.first,
-            subtitle: SubtitleDecision(track: nil, source: .setting), capabilities: capabilities
+            subtitle: SubtitleDecision(track: nil, source: .rules), capabilities: capabilities
         )
         let undecodable = route.reasons.first {
             switch $0 {

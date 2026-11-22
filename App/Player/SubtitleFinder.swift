@@ -39,7 +39,7 @@ final class SubtitleFinder {
     func find(in model: PlayerModel) {
         guard !isSearching, model.tracks != nil else { return }
         itemChanged(to: model.item.ratingKey)
-        let words = Words(language: model.subtitleLanguage)
+        let words = Words(language: .english)
         Diag.event(.subtitles, "find", ["bazarr": model.bazarr != nil, "pending": unlisted != nil])
         status = words.busy(unlisted != nil ? Words.checking : model.bazarr != nil ? Words.askingBazarr : Words.askingPlex)
         task = Task { await self.run(model, words: words) }

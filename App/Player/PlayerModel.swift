@@ -100,6 +100,10 @@ final class PlayerModel: Identifiable {
     private(set) var subtitle: SubtitleDecision?
     /// Why the chosen subtitle is not on screen.
     private(set) var subtitleProblem: String?
+    /// Whether the title plays by the anime rules: Plex's tags, or the viewer's word for the show.
+    private(set) var treatsAsAnime = false
+    /// The viewer's word on the show being anime, kept with its remembered tracks.
+    private(set) var animeOverride = AnimeOverride.automatic
     private(set) var time: TimeInterval = 0
     private(set) var duration: TimeInterval = 0
     private(set) var isPlaying = false
@@ -120,6 +124,8 @@ final class PlayerModel: Identifiable {
     private(set) var cueText: AttributedString?
     /// Reveal as Spoken: how much shows of each word of `cueText` still appearing.
     private(set) var cueWords: [RevealedWord] = []
+    /// Cues the file places itself (`{\an8}`), one block for each place; they draw apart from `cueText`.
+    private(set) var placedCues: [PlacedCue] = []
     private(set) var bitmaps: [SubtitleBitmap] = []
     /// How far the subtitles are moved from their own times, for this item only.
     private(set) var timing = SubtitleTiming()
@@ -212,6 +218,7 @@ final class PlayerModel: Identifiable {
         var subtitle: SubtitleDecision
         var route: PlaybackRoute
         var enhancements: EnhancementState
+        var isAnime: Bool
     }
 
     /// What a track change can switch inside the playing stream; anything else needs a new stream.
@@ -255,6 +262,7 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private(set) var part: PlexPart?
     @ObservationIgnored private var handAudio: Int?
     @ObservationIgnored private var handSubtitle: SubtitleChoice?
+    @ObservationIgnored private var taggedAnime = false
     @ObservationIgnored private var onDeviceFailed = false
     @ObservationIgnored private var wroteBack = false
     @ObservationIgnored private var serverAudio: Int?
@@ -427,21 +435,17 @@ final class PlayerModel: Identifiable {
     }
 
     var subtitleChoice: SubtitleChoice {
-        guard let subtitle else { return .off }
-        if subtitle.isOnScreenTextOnly { return .onScreenTextOnly }
-        return subtitle.track.map { .track($0.id) } ?? .off
+        subtitle?.track.map { .track($0.id) } ?? .off
+    }
+
+    /// The English track the rules would put on screen now: what the menu's On row turns on. Nil when the file
+    /// has none.
+    var automaticSubtitle: SubtitleTrack? {
+        tracks.flatMap { TrackRules.automaticSubtitle(in: $0, audio: audio, isAnime: treatsAsAnime) }
     }
 
     /// Image subtitles keep their own size and position; the look's colour tints them.
     var subtitleIsImage: Bool { subtitle?.track?.isImageBased ?? false }
-
-    /// The language of the subtitle menu's one language row and of Find Subtitles: the subtitle setting.
-    var subtitleLanguage: TrackLanguage {
-        let language = session.settings.subtitles.language
-        return language.isKnown ? language : .english
-    }
-
-    var preferredAudioLanguage: TrackLanguage? { session.settings.audioLanguage }
 
     /// The playing audio track's id, for the tracks menu; setting it is a hand pick.
     var audioPick: Int? {
@@ -919,6 +923,15 @@ final class PlayerModel: Identifiable {
         reroute(handPick: true)
     }
 
+    /// The viewer's word on the show being anime, kept for its other episodes; the tracks are chosen again.
+    func pickAnime(_ choice: AnimeOverride) {
+        guard choice != animeOverride else { return }
+        Diag.event(.subtitles, "anime", ["choice": "\(choice)", "was": "\(animeOverride)"])
+        animeOverride = choice
+        remember()
+        reroute(handPick: true)
+    }
+
     // MARK: Loading
 
     private func loadItem(_ ratingKey: String) {
@@ -1050,12 +1063,17 @@ final class PlayerModel: Identifiable {
         ])
         publishItem()
         nextFromStart = false
+        animeOverride = session.trackMemory(for: full)?.anime ?? .automatic
+        // Plex's anime tags are read beside the link's measure.
+        async let tagged = isTaggedAnime(full)
         // The measured link sets Auto's start and whether the phone reads the file itself.
         if request.download == nil {
             let connection = try? await library.connection.connection()
             guard generation == self.generation else { return }
             startAdapting(connection: connection)
         }
+        taggedAnime = await tagged
+        guard generation == self.generation else { return }
         // Scene thumbnails load after the first picture (`arrived`).
         await decideRoute()
         startTiming.mark(.route)
@@ -1118,26 +1136,30 @@ final class PlayerModel: Identifiable {
         if case .sidecar(let track) = choice.route.subtitle { await loadSidecar(track) }
     }
 
+    /// Whether Plex's tags make the playing title anime: its own, or its show's. A download answers from what was
+    /// read when it was saved, since offline there is no server to ask.
+    private func isTaggedAnime(_ full: PlexMetadata) async -> Bool {
+        if let download = request.download { return download.isAnime ?? full.isAnime }
+        return await session.anime.isAnime(full, in: library)
+    }
+
     /// The route at `quality`, decided without changing the playing one.
     private func chooseRoute(tracks: MediaTracks, media: PlexMedia, part: PlexPart, quality: VideoQuality) async -> RouteChoice {
         let settings = session.settings
-        let memory = settings.remembersTracks ? session.trackMemory(for: item) : nil
-        let picked = AudioPicker.pick(in: tracks, handPick: handAudio, remembered: memory?.audio, preferredLanguage: settings.audioLanguage)
+        let picked = TrackRules.pick(
+            from: tracks, isAnime: taggedAnime,
+            choices: TrackRules.Choices(audio: handAudio, subtitle: handSubtitle, memory: session.trackMemory(for: item))
+        )
         let device = await capabilities.current()
         let connection = request.download == nil ? try? await library.connection.connection() : nil
         // A download plays on the phone or not at all: offline there is no server to convert it.
         var limits = request.download == nil ? routeLimits(connection: connection, quality: quality) : RouteLimits(phoneOnly: true)
-        func decide(drawsImages: Bool) -> (SubtitleDecision, PlaybackRoute) {
-            let decision = SubtitlePicker.decide(
-                tracks: tracks, audio: picked, handPick: handSubtitle, remembered: memory?.subtitle,
-                settings: settings.subtitles, canDrawImageSubtitles: drawsImages
+        func decide() -> PlaybackRoute {
+            PlaybackRouteDecider.decide(
+                media: media, part: part, tracks: tracks, audio: picked.audio, subtitle: picked.subtitle, capabilities: device, limits: limits
             )
-            let route = PlaybackRouteDecider.decide(
-                media: media, part: part, tracks: tracks, audio: picked, subtitle: decision, capabilities: device, limits: limits
-            )
-            return (decision, route)
         }
-        var (decision, route) = decide(drawsImages: true)
+        var route = decide()
         // The server's own limits win over the measured link: before the phone reads the original, the server is asked
         // what it would make of the file's video, and a stream it holds below the file's rate comes from it.
         if request.download == nil, case .nearByLink? = limits.reach, route.kind == .remux, !serverLimitAsked {
@@ -1145,41 +1167,33 @@ final class PlayerModel: Identifiable {
             if await serverHoldsBack(route, media: media) {
                 reach = .remoteByServer
                 limits.reach = reach
-                (decision, route) = decide(drawsImages: true)
+                route = decide()
             }
         }
         if request.download == nil, route.kind == .remux, isExternalPlayback, settings.directPlay != .force {
             limits.serverReason = .airPlay
-            (decision, route) = decide(drawsImages: true)
-        }
-        // A server stream shows embedded image subtitles only burned in, which an automatic pick never
-        // asks for; it moves to a text track instead.
-        var drawsImages = true
-        if route.kind == .serverTranscode, decision.source != .handPick, decision.source != .remembered,
-           let track = decision.track, track.isImageBased, !track.isExternal {
-            drawsImages = false
-            (decision, route) = decide(drawsImages: false)
+            route = decide()
         }
         // Boost dialog and Normalize loudness are the server's: it copies the video and reworks the sound.
         // They never ride on a stream it re-encodes anyway.
         let offered = request.download == nil && session.serverInfo.hasPlexPass
-        var block = enhancementBlock(base: route, audio: picked, quality: quality)
+        var block = enhancementBlock(base: route, audio: picked.audio, quality: quality)
         if offered, !settings.audioEnhancements.isEmpty, block == nil {
             limits.audioEnhancements = settings.audioEnhancements
-            let enhanced = decide(drawsImages: drawsImages)
-            if enhanced.1.reencodesVideo {
+            let enhanced = decide()
+            if enhanced.reencodesVideo {
                 block = "Your Plex server can't add this to this video right now."
             } else {
-                (decision, route) = enhanced
+                route = enhanced
             }
         }
         let enhancements = EnhancementState(
             offered: offered,
             asked: settings.audioEnhancements,
             unavailable: block,
-            note: !route.audioEnhancements.isEmpty && decision.track != nil ? "Subtitles won't change." : nil
+            note: !route.audioEnhancements.isEmpty && picked.subtitle.track != nil ? "Subtitles won't change." : nil
         )
-        return RouteChoice(subtitle: decision, route: route, enhancements: enhancements)
+        return RouteChoice(subtitle: picked.subtitle, route: route, enhancements: enhancements, isAnime: picked.isAnime)
     }
 
     /// Whether the server holds the file's stream below its own rate. Asked for the video as it is, its decision says
@@ -1199,18 +1213,30 @@ final class PlayerModel: Identifiable {
     private func take(_ choice: RouteChoice) {
         enhancements = choice.enhancements
         subtitle = choice.subtitle
+        treatsAsAnime = choice.isAnime
         route = choice.route
         audio = choice.route.audio
         subtitleProblem = nil
         if case .notShown(let track) = choice.route.subtitle {
-            subtitleProblem = request.download == nil
-                ? "\(track.label) needs the server to burn it in; pick it again to allow that."
-                : "\(track.label) needs the server to burn it in, so it can't be shown offline."
+            subtitleProblem = Self.notShown(track, offline: request.download != nil)
         }
         var fields = diagRoute(choice)
         if qualitySetting == .auto { fields.append(("autoRung", "\(autoRung)")) }
         Diag.event(.player, "route", list: fields, .notice)
         if let subtitleProblem { Diag.event(.subtitles, "not-shown", ["problem": subtitleProblem], .notice) }
+    }
+
+    /// Why a subtitle the route can't draw is not on screen. A picture needs the server to burn it in, which only
+    /// a pick allows; text is never burned in, so text inside the file waits for a route that plays the file itself.
+    private static func notShown(_ track: SubtitleTrack, offline: Bool) -> String {
+        if track.isImageBased {
+            return offline
+                ? "\(track.label) needs the server to burn it in, so it can't be shown offline."
+                : "\(track.label) needs the server to burn it in; pick it again to allow that."
+        }
+        return offline
+            ? "\(track.label) is inside the file, so it can't be shown offline."
+            : "\(track.label) is inside the file, so it can't be shown while your Plex server converts the video. Find Subtitles adds one that can."
     }
 
     private func loadSidecar(_ track: SubtitleTrack) async {
@@ -2543,6 +2569,7 @@ final class PlayerModel: Identifiable {
         overlayTrack = nil
         cueText = nil
         cueWords = []
+        placedCues = []
         bitmaps = []
         updateWordTiming()
         timing.fit(canGoEarlier: timingCanGoEarlier)
@@ -2609,16 +2636,26 @@ final class PlayerModel: Identifiable {
             if shown.map(\.start) != bitmaps.map(\.start) || shown.map(\.y) != bitmaps.map(\.y) { bitmaps = shown }
         }
         wordTiming?.ask(due: due, offset: timing.seconds)
-        let line = textCues.isEmpty ? streamLine(at: due) : cueLine(at: due)
-        if line?.text != cueText { cueText = line?.text }
-        let words = line?.words ?? []
+        let lines = textCues.isEmpty ? (line: streamLine(at: due), placed: [PlacedCue]()) : cueLines(at: due)
+        if lines.line?.text != cueText { cueText = lines.line?.text }
+        let words = lines.line?.words ?? []
         if words != cueWords { cueWords = words }
+        if lines.placed != placedCues { placedCues = lines.placed }
     }
 
-    private func cueLine(at movie: TimeInterval) -> ShownLine? {
+    /// What the sidecar shows at `movie`: the line in the viewer's look, and the cues the file places itself, one
+    /// block for each place, so a sign at the top and the dialogue at the bottom show together.
+    private func cueLines(at movie: TimeInterval) -> (line: ShownLine?, placed: [PlacedCue]) {
         let reveal = session.settings.subtitleStyle.reveal
         var line: ShownLine?
+        var places: [CueAlignment] = []
+        var placed: [CueAlignment: ShownLine] = [:]
         for cue in textCues where cue.start <= movie && movie < cue.end {
+            if let alignment = cue.alignment {
+                if placed[alignment] == nil { places.append(alignment) }
+                placed[alignment, default: ShownLine()].add(cue.text, [], at: movie - cue.start)
+                continue
+            }
             let text = String(cue.text.characters)
             // SpeechDock's times once it has timed the cue, the estimate until then.
             let words = wordTiming?.starts(at: cue.start).flatMap { SubtitleReveal.measured(text, starts: $0, by: reveal) }
@@ -2627,7 +2664,7 @@ final class PlayerModel: Identifiable {
             shown.add(cue.text, words, at: movie - cue.start)
             line = shown
         }
-        return line
+        return (line, places.compactMap { place in placed[place].map { PlacedCue(alignment: place, text: $0.text) } })
     }
 
     private func streamLine(at movie: TimeInterval) -> ShownLine? {
@@ -2993,10 +3030,11 @@ final class PlayerModel: Identifiable {
     }
 
     private func remember() {
-        guard session.settings.remembersTracks, let tracks else { return }
+        guard let tracks else { return }
         var memory = session.trackMemory(for: item) ?? TrackMemory()
         if let id = handAudio, let track = tracks.audioTrack(id: id) { memory.audio = RememberedAudio(track) }
         if let choice = handSubtitle { memory.subtitle = RememberedSubtitle(choice, in: tracks) }
+        memory.anime = animeOverride
         session.remember(memory, for: item)
     }
 
@@ -3308,25 +3346,26 @@ extension PlayerModel: CastPlayer {
 
     private static var uptime: TimeInterval { ProcessInfo.processInfo.systemUptime }
 
-    /// The receiver's route: subtitles are burned in, as the Default Media Receiver draws none of Plex's.
+    /// The receiver's route, the audio and subtitle chosen by the same rules. The Default Media Receiver draws none
+    /// of Plex's subtitles, so only a picture track the viewer picked is burned in; text is not shown.
     private func decideCastRoute(_ device: CastDevice, tracks: MediaTracks, media: PlexMedia, part: PlexPart) {
         let settings = session.settings
-        let memory = settings.remembersTracks ? session.trackMemory(for: item) : nil
-        let picked = AudioPicker.pick(in: tracks, handPick: handAudio, remembered: memory?.audio, preferredLanguage: settings.audioLanguage)
-        let decision = SubtitlePicker.decide(
-            tracks: tracks, audio: picked, handPick: handSubtitle, remembered: memory?.subtitle,
-            settings: settings.subtitles, canDrawImageSubtitles: true
+        let picked = TrackRules.pick(
+            from: tracks, isAnime: taggedAnime,
+            choices: TrackRules.Choices(audio: handAudio, subtitle: handSubtitle, memory: session.trackMemory(for: item))
         )
         let reason: RouteReason? = castReceiverFailed ? .receiverFailed : settings.directPlay == .disabled ? .directPlayOff : nil
         let route = CastRouteDecider.decide(
-            media: media, part: part, tracks: tracks, audio: picked, subtitle: decision,
+            media: media, part: part, tracks: tracks, audio: picked.audio, subtitle: picked.subtitle,
             receiver: CastReceiver(modelName: device.model), limits: RouteLimits(serverReason: reason, quality: quality)
         )
         enhancements = EnhancementState()
-        subtitle = decision
+        subtitle = picked.subtitle
+        treatsAsAnime = picked.isAnime
         self.route = route
         audio = route.audio
         subtitleProblem = nil
+        if case .notShown = route.subtitle { subtitleProblem = "Text subtitles aren't shown while casting." }
     }
 
     /// Hands the receiver the file, or the server's stream of it from the start, with a transient token
@@ -3497,8 +3536,7 @@ extension PlayerModel {
             ("subtitleWhy", "\(choice.subtitle.source)"),
         ]
         if route.audioIsStandIn { fields.append(("audioStandIn", true)) }
-        if choice.subtitle.followedAudio { fields.append(("followedAudio", true)) }
-        if choice.subtitle.isOnScreenTextOnly { fields.append(("onScreenTextOnly", true)) }
+        if choice.isAnime { fields.append(("anime", true)) }
         if route.reencodesVideo { fields.append(("reencodes", true)) }
         if let kbps = route.maxVideoBitrateKbps { fields.append(("kbps", kbps)) }
         if let resolution = route.videoResolution { fields.append(("resolution", resolution)) }

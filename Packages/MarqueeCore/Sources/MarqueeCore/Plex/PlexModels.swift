@@ -143,6 +143,8 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
     public var chapters: [PlexChapter]
     public var roles: [PlexRole]
     public var genres: [String]
+    /// Countries of production, on a movie or a show; an episode carries none.
+    public var countries: [String]
     public var directors: [String]
     public var writers: [String]
     public var images: [PlexImage]
@@ -171,7 +173,7 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
         case addedAt, lastViewedAt, originallyAvailableAt, contentRating, studio, rating, audienceRating
         case librarySectionID, librarySectionTitle, playQueueItemID
         case media = "Media", markers = "Marker", chapters = "Chapter", roles = "Role"
-        case genres = "Genre", directors = "Director", writers = "Writer", images = "Image", onDeck = "OnDeck"
+        case genres = "Genre", countries = "Country", directors = "Director", writers = "Writer", images = "Image", onDeck = "OnDeck"
     }
 
     public init(from decoder: any Decoder) throws {
@@ -225,6 +227,7 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
         chapters = c.list(.chapters)
         roles = c.list(.roles)
         genres = c.tags(.genres)
+        countries = c.tags(.countries)
         directors = c.tags(.directors)
         writers = c.tags(.writers)
         images = c.list(.images)

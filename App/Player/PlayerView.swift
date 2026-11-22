@@ -403,7 +403,8 @@ enum VideoFrame {
 // MARK: - Subtitles drawn by Marquee
 
 /// Sidecar text cues and image subtitles. They sit on the picture and rise above the bottom controls
-/// while those show, so the controls never cover them.
+/// while those show, so the controls never cover them. A cue the file places itself (`{\an8}`) draws in its
+/// own band of the picture; the rest stand where the viewer's look puts them.
 struct SubtitleOverlay: View {
     let model: PlayerModel
     let picture: CGRect
@@ -421,12 +422,12 @@ struct SubtitleOverlay: View {
                     // The look's colour tints the picture's white letters; their own outline stays dark.
                     .colorMultiply(PictureColours.subtitle(look))
             }
-            if let text = model.cueText {
+            if model.cueText != nil || !model.placedCues.isEmpty {
                 let distance = CGFloat(look.edgeDistance) * area.height / 1080
-                VStack(spacing: 0) {
-                    if look.anchor == .bottom { Spacer(minLength: 0) }
-                    SubtitleLine(text: text, look: look, pictureHeight: area.height, words: model.cueWords)
-                    if look.anchor == .top { Spacer(minLength: 0) }
+                ZStack {
+                    band(.top, pictureHeight: area.height)
+                    band(.middle, pictureHeight: area.height)
+                    band(.bottom, pictureHeight: area.height)
                 }
                 .padding(.horizontal, area.width * 0.06)
                 .padding(.top, distance)
@@ -439,6 +440,37 @@ struct SubtitleOverlay: View {
         .allowsHitTesting(false)
         .animation(.easeOut(duration: 0.18), value: lift)
         .accessibilityHidden(true)
+    }
+
+    /// One band of the picture: the cues the file places there, and the viewer's line when the look's edge is this one.
+    private func band(_ place: CueAlignment.Vertical, pictureHeight: CGFloat) -> some View {
+        let looksEdge: CueAlignment.Vertical = look.anchor == .top ? .top : .bottom
+        return VStack(spacing: 0) {
+            ForEach(model.placedCues.filter { $0.alignment.vertical == place }, id: \.self) { cue in
+                SubtitleLine(text: cue.text, look: look, pictureHeight: pictureHeight, words: [])
+                    .frame(maxWidth: .infinity, alignment: Self.side(cue.alignment.horizontal))
+            }
+            if let text = model.cueText, place == looksEdge {
+                SubtitleLine(text: text, look: look, pictureHeight: pictureHeight, words: model.cueWords)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: Self.edge(place))
+    }
+
+    private static func edge(_ place: CueAlignment.Vertical) -> Alignment {
+        switch place {
+        case .top: .top
+        case .middle: .center
+        case .bottom: .bottom
+        }
+    }
+
+    private static func side(_ place: CueAlignment.Horizontal) -> Alignment {
+        switch place {
+        case .left: .leading
+        case .centre: .center
+        case .right: .trailing
+        }
     }
 }
 

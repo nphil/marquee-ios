@@ -37,9 +37,10 @@ public enum CastRouteDecider {
 
     /// Picks how `part` reaches the receiver with the chosen audio and subtitle:
     /// 1. Direct play: the receiver opens the file itself. MP4 with video it decodes, AAC or MP3 as the
-    ///    file's first audio track, no subtitle, within the picked quality.
+    ///    file's first audio track, no picture subtitle to burn in, within the picked quality.
     /// 2. Server stream: HLS of H.264 and AAC, copying H.264 the receiver decodes and converting the rest.
-    ///    The Default Media Receiver draws none of Plex's subtitle formats, so a subtitle is burned in.
+    ///    The Default Media Receiver draws none of Plex's subtitle formats, so a picture subtitle the viewer
+    ///    picked is burned in. Text is left out rather than re-encoding the video for it.
     ///
     /// Settings' Force Direct Play applies to the phone only: a file the receiver cannot open streams from
     /// the server. Turning direct play off sends every file through the server.
@@ -74,12 +75,11 @@ public enum CastRouteDecider {
 
         var delivery = SubtitleDelivery.none
         if let track = subtitle.track {
-            // Captions inside the video are not a stream the server can burn.
-            if track.isInVideoStream {
-                delivery = .notShown(track)
-            } else {
+            if track.isImageBased, subtitle.source != .rules {
                 reasons.append(.burnsSubtitle)
                 delivery = .burnedIn(track)
+            } else {
+                delivery = .notShown(track)
             }
         }
 

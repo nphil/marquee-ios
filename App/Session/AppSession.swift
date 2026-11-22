@@ -51,6 +51,8 @@ final class AppSession {
     let changes = LibraryChanges()
     /// The theme tune of the show page on screen.
     let themeMusic = ThemeMusicPlayer()
+    /// Which shows are anime, for the track rules; one read per show.
+    let anime = AnimeLookup()
     let downloads: DownloadCenter
     /// The profile switcher sheet, opened from the Settings Account row.
     var showsProfileSwitcher = false

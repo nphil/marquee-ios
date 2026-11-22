@@ -87,20 +87,14 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 
 ## 3. Audio and subtitle rules
 
-**Subtitle pick, in order** (`docs/marquee/changelog.md`):
-1. The pick for this playback only.
-2. A subtitle the server selected that the app can draw.
-3. The remembered choice for this show: a track, Off, or Forced only.
-4. Plex's embedded default, then the show's setting, then the account setting, then Off.
-- Remembered Off and Forced only never fall through to later steps. A remembered track can fall through when no match exists.
-
-**Automatic subtitle follow:**
-- English audio: prefer the dub transcript (SDH or CC flag, a `.cc` or `.sdh` sidecar, or a name with Dub or Dubtitle).
-- Other audio: prefer the full English translation (not forced, not signs, not dub or commentary).
-- Downloaded tracks beat built-in ones.
-- A base track that is forced, signs, commentary or of unknown language stands as it is.
-- On-screen text and the account-level Forced only rule are never followed.
-- A remembered choice that picked the subtitle is never overridden.
+**Track rules** (confirmed 2026-11-22; every profile, no settings):
+- English subtitles only, on by default everywhere, English audio included, in the remembered style. A track with no language is not picked.
+- Movies and non-anime TV play the original audio, never a dub, with one English subtitle: the `.en.srt` beside the file, else its `.en.cc.srt`, else embedded English text. Full beats captions, and captions beat on-screen text.
+- Anime is Plex genre "Anime", or genres Animation and country Japan, on the title or its show. It plays the English dub when the file has one, with the dub-matched English subtitle (`.en.cc.srt`, Plex `hearingImpaired`); otherwise the original audio with the original-matched one (`.en.srt`). Switching audio switches the subtitle, unless the viewer chose the subtitle.
+- A choice made in the player wins and is remembered. Off is per show or film. The per-show anime override (Automatic, Anime, Not Anime) is hidden in Advanced.
+- A picture subtitle (PGS, VobSub) is never picked automatically.
+- Sidecars are SRT only. Signs and songs are merged into the full track as cues starting `{\an8}`: they draw at the top of the picture and the tag never shows as text.
+- The server's selected streams and the file's default flags do not decide.
 
 **Track kinds:**
 - Full, SDH, Forced, Commentary. Forced words: "forced", "forsed", "форс", "sign", "signs". Commentary: "commentary" or "комментари".
@@ -110,12 +104,7 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 
 **Downloaded-twin rule** (`sub_layout.rs` ~290, 747–758): a built-in track is hidden only when a downloaded track has the same language, region and kind. Commentary, dub and on-screen text are never twins of a full translation.
 
-**Forced only:** shows the forced, non-commentary track in the playing audio's language, or nothing. It never falls back to a full track. Switching audio switches the forced track with it. A track named Forced counts even with no flag. A flagged commentary track is never the forced track.
-
-**Remember audio and subtitle choices:**
-- On by default, per show or movie, per profile and per server.
-- Turning it off stops remembering and recalling, but keeps saved choices.
-- The audio menu can remember the current track or forget the saved one.
+**Remember audio and subtitle choices:** always on, per show or movie, per profile and per server; there is no switch. A hand audio pick is remembered. A hand subtitle pick, a track or Off, is remembered for the show or film, and choosing On forgets a remembered Off. A remembered subtitle never moves with the audio.
 
 **Audio matching** (`track_memory.rs`): language, commentary and audio-description are hard constraints. Codec, channel count, tag, title and default flag are soft, in that order. Commentary never stands in for a plain pick.
 
@@ -128,7 +117,7 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 
 **Server write-back:** on a fresh direct play, the applied tracks are written once, on the first decoded frame. Retries, transcodes and downloaded-subtitle parts write nothing.
 
-**Burn-in rule:** account defaults never burn a subtitle into the picture at transcode start. A remembered pick is burned in only when the video is re-encoded anyway. Otherwise it is drawn, or shown as "not shown (copy remux)".
+**Burn-in rule:** text subtitles are never burned into the picture. A picture subtitle burns only for a hand pick, or for a remembered one when the video is re-encoded anyway. Otherwise it is not shown.
 
 **Labels a viewer sees:**
 - "Subtitles", "Captions" (deaf and hard of hearing), "Audio description".
@@ -137,13 +126,13 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 - "Track N" tells apart identical rows.
 - The audio menu uses plain-words labels in eleven languages.
 
-**Subtitles menu** (`docs/player-submenus.md` 1–203): Off, Forced only ("On-screen text only"), one section per language, "Other languages N", Timing, Style (size, position, colour), and Search subtitles: Plex's own agents always, Bazarr when it is set up. Per-language pages rank Full, SDH, Forced, Commentary. Image-format badges (PGS, VOBSUB, DVB) show only on image subtitles. The iPhone keeps it simpler: Off and the viewer's language, whose row takes the usual track by the same ranking, then Find Subtitles, Subtitle Style and Timing, all in the Tracks menu.
+**Subtitles menu:** On, Off, Style (size, position, colour) and one Advanced row: every track of the file (image-format badges PGS, DVB and VOBSUB show only on image subtitles), Find Subtitles, Timing and the show's Anime setting. There are no per-language pages. Find Subtitles searches Plex's own agents always, and Bazarr when it is set up.
 
 **Find Subtitles:** one action. Bazarr goes first, for at most 20 s; Plex's own agents step in when Bazarr is not set up, cannot be reached, runs out of time or has nothing in the language. The new file is put on screen once Plex lists it. A status over the picture names the source being asked, then the file's source or why nothing came. The TV's "Wrong subtitles?" flow (remove a file, pick from Bazarr's results by score, provider and hearing-impaired flag) is not carried over.
 - A file Plex had not listed when its search ended is looked for first by the next Find, which refreshes metadata only and never downloads twice.
-- Plex's agent search (`pms-api.md` §8) asks in one two-letter language, the subtitle language by default; a result the item already lists is not added again, and an added file replaces an earlier copy with the same release name.
+- Plex's agent search (`pms-api.md` §8) asks in one two-letter language, English; a result the item already lists is not added again, and an added file replaces an earlier copy with the same release name.
 
-**Subtitle look** (per profile): presets, font, size, colour, opacity, bold, edge, background box, position, line spacing, "Blend with video", "Reveal as spoken", and "My look" file styling. Native ASS/SSA keeps its own styles.
+**Subtitle look** (per profile): presets, font, size, colour, opacity, bold, edge, background box, position, line spacing, "Blend with video", "Reveal as spoken", and "My look" file styling.
 
 **SpeechDock** (the owner's own service): optional address under Settings › Integrations, off when empty. Supplies English word timing for "Reveal as spoken". Not verified on a real TV.
 

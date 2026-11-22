@@ -717,9 +717,9 @@ struct LoadingArc: View {
 
 // MARK: - Menus
 
-/// Audio and subtitles (DESIGN §8.6, Tracks menu). The subtitles are Off or the viewer's language, whose
-/// row puts the usual track on screen; Find Subtitles and Subtitle Style sit in the menu too, so nothing
-/// covers the picture. The audio tracks open from one row.
+/// Audio and subtitles (DESIGN §8.6, Tracks menu). The subtitles are On or Off, with Style beside them and one
+/// Advanced row for the rest; the audio is the track that plays and one Advanced row. One set of rules
+/// (`TrackRules`) chooses the tracks, so no language is asked for here, and nothing covers the picture.
 struct TracksMenu: View {
     let model: PlayerModel
     @Environment(AppSession.self) private var session
@@ -739,82 +739,101 @@ struct TracksMenu: View {
         if let tracks = model.tracks {
             sections.append(UIMenu.section("player.tracks.subtitles", title: "Subtitles", subtitleRows(tracks)))
             if tracks.audio.count > 1 {
-                let playing = model.audioPick
-                sections.append(UIMenu.section("player.tracks.audio", [
-                    UIMenu.submenu(
-                        "player.tracks.audio.choices", title: "Audio", systemImage: "speaker.wave.2", value: model.audio?.label ?? "",
-                        orderedAudio(tracks).map { track in
-                            let id = track.id
-                            // Choosing the playing track again keeps it.
-                            return UIAction.choice(track.label, detail: detail(track.badges), isOn: playing == id) { [model] in
-                                if model.audioPick != id { model.audioPick = id }
-                            }
-                        }
-                    ),
-                ]))
+                sections.append(UIMenu.section("player.tracks.audio", title: "Audio", audioRows(tracks)))
             }
-            sections.append(UIMenu.section("player.tracks.tools", tools))
         }
         return UIMenu(identifier: UIMenu.Identifier(rawValue: "player.tracks"), children: sections)
     }
 
-    private var languageName: String { model.subtitleLanguage.name ?? "English" }
-
-    /// Off and the viewer's language. A file without that language finds it from the same row. A track
-    /// showing that neither row means, a forced track the file chose or an earlier pick, stands ticked
-    /// under them.
+    /// On and Off, then Style and one Advanced row. On puts the rules' English track on screen, or finds one when
+    /// the file has none. Style stays but dims, with the reason, while the server draws the subtitle into the picture.
     private func subtitleRows(_ tracks: MediaTracks) -> [UIMenuElement] {
         let showing = model.subtitle?.track
-        let usual = SubtitlePicker.usual(in: model.subtitleLanguage, from: tracks)
+        let drawnByServer = model.subtitleDrawnByServer
         let finder = model.subtitleFinder
+        let waiting = showing == nil && model.automaticSubtitle == nil
         var rows: [UIMenuElement] = [
+            UIAction.choice(
+                "On", detail: waiting ? (finder.isSearching ? finder.status?.detail : "None yet. Choose to find them.") : nil,
+                isOn: showing != nil, isEnabled: !(waiting && finder.isSearching)
+            ) { [model] in
+                guard model.subtitle?.track == nil else { return }
+                if model.automaticSubtitle != nil { model.subtitlePick = .automatic } else { model.findSubtitles() }
+            },
             UIAction.choice("Off", isOn: showing == nil) { [model] in
                 if model.subtitlePick != .off { model.subtitlePick = .off }
             },
+            style(drawnByServer: drawnByServer),
+            advancedSubtitles(tracks, drawnByServer: drawnByServer),
         ]
-        if let usual {
-            let id = usual.id
-            rows.append(UIAction.choice(languageName, isOn: showing?.id == id) { [model] in
-                if model.subtitle?.track?.id != id { model.subtitlePick = .track(id) }
-            })
-        } else {
-            rows.append(UIAction.choice(
-                languageName, detail: finder.isSearching ? finder.status?.detail : "None yet. Choose to find them.", isOn: false,
-                isEnabled: !finder.isSearching
-            ) { [model] in
-                model.findSubtitles()
-            })
-        }
-        if let showing, showing.id != usual?.id {
-            rows.append(UIAction.choice(showing.label, detail: detail(showing.badges, imageFormat: showing.imageFormat), isOn: true) {})
-        }
+        if let drawnByServer { rows.append(UIAction.note(drawnByServer)) }
+        if let problem = model.subtitleProblem { rows.append(UIAction.note(problem)) }
         return rows
     }
 
-    /// Find Subtitles, Subtitle Style and Timing. Style and Timing stay but dim, with the reason, while
-    /// the server draws the subtitle into the picture; Timing shows only while a subtitle is on.
-    private var tools: [UIMenuElement] {
-        let drawnByServer = model.subtitleDrawnByServer
+    /// Every subtitle track of the file, Find Subtitles, Subtitle Timing and the show's anime setting. Timing
+    /// dims, with the reason, while the server draws the subtitle; it shows only while a subtitle is on.
+    private func advancedSubtitles(_ tracks: MediaTracks, drawnByServer: String?) -> UIMenuElement {
+        let showing = model.subtitle?.track
         let finder = model.subtitleFinder
-        var rows: [UIMenuElement] = [
+        var sections: [UIMenuElement] = []
+        let choices = tracks.visibleSubtitles.map { track in
+            let id = track.id
+            return UIAction.choice(track.label, detail: detail(track.badges, imageFormat: track.imageFormat), isOn: showing?.id == id) { [model] in
+                if model.subtitle?.track?.id != id { model.subtitlePick = .track(id) }
+            }
+        }
+        if !choices.isEmpty { sections.append(UIMenu.section("player.tracks.subtitles.choices", choices)) }
+        var tools: [UIMenuElement] = [
             UIAction.row(
-                "Find \(languageName) Subtitles", systemImage: "magnifyingglass", value: finder.isSearching ? finder.status?.detail : nil,
+                "Find English Subtitles", systemImage: "magnifyingglass", value: finder.isSearching ? finder.status?.detail : nil,
                 identifier: "player.tracks.find", isEnabled: !finder.isSearching
             ) { [model] in
                 model.findSubtitles()
             },
-            style(drawnByServer: drawnByServer),
         ]
         if model.canTimeSubtitles || drawnByServer != nil {
-            rows.append(UIAction.row(
+            tools.append(UIAction.row(
                 "Subtitle Timing", systemImage: "clock", value: model.timingText, identifier: "player.tracks.timing",
                 isEnabled: drawnByServer == nil
             ) { [model] in
                 model.openTiming()
             })
         }
-        if let drawnByServer { rows.append(UIAction.note(drawnByServer)) }
-        if let problem = model.subtitleProblem { rows.append(UIAction.note(problem)) }
+        sections.append(UIMenu.section("player.tracks.subtitles.tools", tools))
+        sections.append(UIMenu.section("player.tracks.subtitles.anime", [animeMenu]))
+        return UIMenu.submenu("player.tracks.subtitles.advanced", title: "Advanced", systemImage: "ellipsis.circle", value: "", sections)
+    }
+
+    /// Whether the show plays by the anime rules: the English dub with its own subtitles. Automatic follows Plex's tags.
+    private var animeMenu: UIMenuElement {
+        UIMenu.submenu(
+            "player.tracks.anime", title: "Anime", systemImage: "tv", value: model.animeOverride.title,
+            [AnimeOverride.automatic, .anime, .notAnime].map { option in
+                UIAction.choice(option.title, isOn: model.animeOverride == option) { [model] in
+                    model.pickAnime(option)
+                }
+            }
+        )
+    }
+
+    /// The audio that plays, and every track of the file under Advanced.
+    private func audioRows(_ tracks: MediaTracks) -> [UIMenuElement] {
+        let playing = model.audioPick
+        var rows: [UIMenuElement] = []
+        if let current = model.audio {
+            rows.append(UIAction.choice(current.label, detail: detail(current.badges), isOn: true) {})
+        }
+        rows.append(UIMenu.submenu(
+            "player.tracks.audio.choices", title: "Advanced", systemImage: "ellipsis.circle", value: "",
+            tracks.audio.map { track in
+                let id = track.id
+                // Choosing the playing track again keeps it.
+                return UIAction.choice(track.label, detail: detail(track.badges), isOn: playing == id) { [model] in
+                    if model.audioPick != id { model.audioPick = id }
+                }
+            }
+        ))
         return rows
     }
 
@@ -876,12 +895,15 @@ struct TracksMenu: View {
         let words = badges.map(\.rawValue) + [imageFormat].compactMap { $0 }
         return words.isEmpty ? nil : words.joined(separator: " · ")
     }
+}
 
-    /// Tracks in the wanted language first, then the file's order.
-    private func orderedAudio(_ tracks: MediaTracks) -> [AudioTrack] {
-        guard let code = model.preferredAudioLanguage?.code else { return tracks.audio }
-        let wanted = tracks.audio.filter { $0.language.code == code }
-        return wanted + tracks.audio.filter { $0.language.code != code }
+private extension AnimeOverride {
+    var title: String {
+        switch self {
+        case .automatic: "Automatic"
+        case .anime: "Anime"
+        case .notAnime: "Not Anime"
+        }
     }
 }
 

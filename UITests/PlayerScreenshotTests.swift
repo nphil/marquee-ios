@@ -181,7 +181,7 @@ final class PlayerScreenshotTests: XCTestCase {
     @MainActor
     func testFindSubtitlesFallsBackToPlex() throws {
         let app = launchPlayer(at: 61, paused: true, mode: "dark", bazarr: "http://bazarr-offline.local:6767")
-        tracksMenuRow("Find English Subtitles", in: app).tap()
+        subtitleAdvancedRow("Find English Subtitles", in: app).tap()
         let found = subtitleSearch("English subtitles on", in: app)
         XCTAssertTrue(found.waitForExistence(timeout: 30), "Plex's file did not come on: \(element("player.subtitleSearch", in: app).label)")
         XCTAssertTrue(found.label.contains("From Plex"), "The file did not come from Plex: \(found.label)")
@@ -307,9 +307,8 @@ private extension XCTestCase {
         XCTAssertTrue(labelled("Off", in: app).waitForExistence(timeout: 5), "The tracks menu does not open on the subtitle choices")
         XCTAssertFalse(labelled("Subtitles…", in: app).exists, "The subtitle choices are behind a row of their own")
         try snap("player-02-tracks-menu-\(suffix)")
-        for row in ["English", "Find English Subtitles"] {
-            XCTAssertNotNil(menuRow(row, in: app), "No \(row) row in the tracks menu")
-        }
+        XCTAssertNotNil(menuRow("On", in: app), "No On row in the tracks menu")
+        XCTAssertNotNil(menuRow("Advanced", in: app, hasValue: true), "No Advanced row in the tracks menu")
         XCTAssertNotNil(menuRow("Subtitle Style", in: app, hasValue: true), "No Subtitle Style row in the tracks menu")
         dismissMenu(in: app)
 
@@ -526,9 +525,10 @@ private extension XCTestCase {
         try snap("player-12-next-episode-\(suffix)")
     }
 
-    /// Find English Subtitles with Bazarr set up: only Off and English to choose from, Bazarr's best
-    /// English file downloaded, listed by Plex and put on screen with the outcome in a banner, then
-    /// Reveal as Spoken from Subtitle Style in the same menu, SpeechDock timing the file's lines.
+    /// Find English Subtitles, under the tracks menu's Advanced row, with Bazarr set up: the file's other tracks
+    /// stay out of the menu, Bazarr's best English file is downloaded, listed by Plex and put on screen with the
+    /// outcome in a banner, then Reveal as Spoken from Subtitle Style in the same menu, SpeechDock timing the
+    /// file's lines.
     @MainActor
     func findSubtitlesFlow(mode: String, suffix: String) throws {
         let app = launchPlayer(at: 61, paused: true, mode: mode, bazarr: "http://bazarr.local:6767", speechDock: true)
@@ -537,6 +537,9 @@ private extension XCTestCase {
         XCTAssertTrue(labelled("Off", in: app).waitForExistence(timeout: 5), "The tracks menu did not open")
         let others = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Spanish' OR label BEGINSWITH 'Español' OR label CONTAINS 'SDH'"))
         XCTAssertFalse(others.firstMatch.exists, "The subtitle choices list the file's other tracks")
+        let advanced = menuRow("Advanced", in: app, hasValue: true)
+        XCTAssertNotNil(advanced, "No Advanced row in the tracks menu")
+        advanced?.tap()
         let find = menuRow("Find English Subtitles", in: app)
         XCTAssertNotNil(find, "No Find English Subtitles row")
         find?.tap()
@@ -578,12 +581,15 @@ private extension XCTestCase {
             .matching(NSPredicate(format: "identifier == %@ AND label BEGINSWITH %@", "player.subtitleSearch", title)).firstMatch
     }
 
-    /// Opens the tracks menu and brings the row with `label` into reach.
+    /// Opens the tracks menu and its Advanced row for the subtitles, and brings the row with `label` into reach.
     @MainActor
-    func tracksMenuRow(_ label: String, in app: XCUIApplication) -> XCUIElement {
+    func subtitleAdvancedRow(_ label: String, in app: XCUIApplication) -> XCUIElement {
         tap("player.tracks", in: app)
+        let advanced = menuRow("Advanced", in: app, hasValue: true)
+        XCTAssertNotNil(advanced, "No Advanced row in the tracks menu")
+        advanced?.tap()
         let row = menuRow(label, in: app)
-        XCTAssertNotNil(row, "No \(label) row in the tracks menu")
+        XCTAssertNotNil(row, "No \(label) row under Advanced")
         return row ?? labelled(label, in: app)
     }
 
