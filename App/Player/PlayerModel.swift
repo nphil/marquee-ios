@@ -2027,7 +2027,7 @@ final class PlayerModel: Identifiable {
             stopStream(measured: false)
             return restart(at: time)
         }
-        let choice = RouteChoice(subtitle: subtitle, route: route, enhancements: enhancements)
+        let choice = RouteChoice(subtitle: subtitle, route: route, enhancements: enhancements, isAnime: treatsAsAnime)
         let rung = autoRung
         let lead = min(Self.switchLead, buffer - Self.recoveryMargin)
         movePending = true
