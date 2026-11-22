@@ -26,7 +26,7 @@ struct PosterBadge: View {
     var body: some View {
         if let count = item.unwatchedBadge {
             pill { Text(count, format: .number).monospacedDigit() }
-        } else if item.isWatched, item.type != .collection, item.type != .clip {
+        } else if item.showsWatchedCheck {
             pill { Image(systemName: "checkmark").fontWeight(.semibold) }
         }
     }

@@ -255,6 +255,17 @@ public struct PlexMetadata: Sendable, Hashable, Identifiable, Decodable {
         return viewCount > 0
     }
 
+    /// Whether a poster shows the watched check. Plex keeps a title's view count while it is watched again, so a
+    /// part-watched movie or episode with one is in progress, not watched; a show or season counts only when Plex sends
+    /// its episode counts. Rewatched shows in On Deck all carried a wrong check (2026-11-21).
+    public var showsWatchedCheck: Bool {
+        switch type {
+        case .collection, .clip: false
+        case .show, .season: (leafCount ?? 0) > 0 && isWatched
+        default: isWatched && viewOffset <= 0
+        }
+    }
+
     /// Episodes left to watch in a show or season.
     public var unwatchedLeafCount: Int? {
         leafCount.map { max(0, $0 - (viewedLeafCount ?? 0)) }

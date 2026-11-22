@@ -67,6 +67,18 @@ struct PlexModelsTests {
         #expect(try show(leaves: 10, viewed: 9).unwatchedLeafCount == 1)
     }
 
+    /// A rewatch keeps the view count, so part-watched titles in On Deck carried a check (2026-11-21).
+    @Test func aPartWatchedRewatchShowsNoCheck() throws {
+        func item(_ fields: [String: Any]) throws -> PlexMetadata {
+            try decode(PlexMetadata.self, ["ratingKey": "1"].merging(fields) { $1 })
+        }
+        #expect(try !item(["type": "episode", "viewCount": 2, "viewOffset": 120_000]).showsWatchedCheck)
+        #expect(try item(["type": "episode", "viewCount": 2]).showsWatchedCheck)
+        #expect(try !item(["type": "show", "viewCount": 3]).showsWatchedCheck)
+        #expect(try item(["type": "show", "leafCount": 10, "viewedLeafCount": 10]).showsWatchedCheck)
+        #expect(try !item(["type": "collection", "viewCount": 1]).showsWatchedCheck)
+    }
+
     /// The Apothecary Diaries S2 E10's real times: Plex's credits start 13 s into the file's Ending chapter, and
     /// E11 has an Ending chapter but no Plex credits marker.
     @Test func namedChaptersCorrectAndFillIntroAndCreditsMarkers() throws {
