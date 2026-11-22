@@ -80,6 +80,18 @@ struct PlaybackRouteTests {
         #expect(server.kind == .serverTranscode && !server.reencodesVideo && server.reasons == [.container("mkv")])
     }
 
+    @Test func aPlayerThatOpensMatroskaPlaysItDirectly() throws {
+        let opens = DeviceCapabilities(directContainers: DeviceCapabilities.playerContainers.union(["mkv"]))
+        let mkv = try Self.file("mkv", video: Fixture.video("hevc", bitDepth: 10, colorTrc: "smpte2084"))
+
+        let route = Self.route(mkv, capabilities: opens)
+
+        // The MP4 sample-entry tag does not apply to Matroska, and a container outside the set still needs a route.
+        #expect(route.kind == .directPlay && route.reasons.isEmpty)
+        #expect(Self.route(try Self.file("avi"), capabilities: opens).reasons == [.container("avi")])
+        #expect(Self.route(try Self.file("mp4", video: Fixture.video("hevc")), capabilities: opens).reasons == [.hevcTag])
+    }
+
     struct Undecodable: Sendable, CustomTestStringConvertible {
         var codec: String
         var bitDepth = 8

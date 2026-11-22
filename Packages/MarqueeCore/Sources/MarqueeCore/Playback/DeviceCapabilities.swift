@@ -16,6 +16,9 @@ public struct DeviceCapabilities: Sendable, Hashable {
     public var dolbyVisionProfiles: Set<Int>
     /// Audio codecs the player plays as they are (Plex codec names).
     public var nativeAudioCodecs: Set<String>
+    /// Containers the player opens as they are (lower case), which play directly. AVPlayer opens the MP4
+    /// family; a player that also reads Matroska lists it.
+    public var directContainers: Set<String>
     /// The on-device remux is available: it repackages a file the player cannot open (MKV, hev1 HEVC)
     /// without re-encoding the video.
     public var canRemux: Bool
@@ -36,6 +39,7 @@ public struct DeviceCapabilities: Sendable, Hashable {
         hdrDisplay: Bool = true,
         dolbyVisionProfiles: Set<Int> = [],
         nativeAudioCodecs: Set<String> = DeviceCapabilities.playerAudioCodecs,
+        directContainers: Set<String> = DeviceCapabilities.playerContainers,
         canRemux: Bool = false,
         remuxConvertsAudio: Bool = false,
         remuxKeepsDolbyVision: Bool = false,
@@ -48,6 +52,7 @@ public struct DeviceCapabilities: Sendable, Hashable {
         self.hdrDisplay = hdrDisplay
         self.dolbyVisionProfiles = dolbyVisionProfiles
         self.nativeAudioCodecs = nativeAudioCodecs
+        self.directContainers = directContainers
         self.canRemux = canRemux
         self.remuxConvertsAudio = remuxConvertsAudio
         self.remuxKeepsDolbyVision = remuxKeepsDolbyVision
@@ -57,4 +62,7 @@ public struct DeviceCapabilities: Sendable, Hashable {
 
     /// Audio AVPlayer plays from MP4 and HLS.
     public static let playerAudioCodecs: Set<String> = ["aac", "ac3", "eac3", "alac", "mp3", "flac"]
+
+    /// Containers AVPlayer opens.
+    public static let playerContainers: Set<String> = ["mp4", "m4v", "mov"]
 }

@@ -227,7 +227,8 @@ public struct RouteLimits: Sendable, Hashable {
 public enum PlaybackRouteDecider {
     /// Picks the lightest route that plays `part` with the chosen audio and subtitle, from Plex's stream
     /// facts alone:
-    /// 1. Direct play: MP4/MOV with H.264 or hvc1 HEVC and audio the player takes.
+    /// 1. Direct play: a container the player opens (`DeviceCapabilities.directContainers`, MP4/MOV for AVPlayer)
+    ///    with H.264 or hvc1 HEVC and audio the player takes.
     /// 2. Remux on the phone: other containers, hev1 HEVC, Dolby Vision 7 (base layer), audio the remux
     ///    converts, embedded subtitles it carries. Without a remux the server copies the video instead.
     /// 3. Server re-encode: video the phone cannot decode, Dolby Vision it cannot show, HDR on an SDR
@@ -267,9 +268,9 @@ public enum PlaybackRouteDecider {
         if let cap = limits.quality.maxBitrateKbps, shrinks || (media.bitrate ?? 0) > cap { serverReasons.append(.bitrateLimit(kbps: cap)) }
         if let link = limits.linkKbps, let bitrate = media.bitrate, link * 4 < bitrate * 5 { serverReasons.append(.slowLink(kbps: link)) }
 
-        if !directContainers.contains(container) {
+        if !capabilities.directContainers.contains(container) {
             remuxReasons.append(.container(container.isEmpty ? "unknown" : container))
-        } else if isHEVC(codec), container != "mov", !["hvc1", "dvh1"].contains(hevcSampleEntry?.lowercased() ?? "") {
+        } else if isHEVC(codec), ["mp4", "m4v"].contains(container), !["hvc1", "dvh1"].contains(hevcSampleEntry?.lowercased() ?? "") {
             remuxReasons.append(.hevcTag)
         }
         let dolbyVisionProfile = isHEVC(codec) ? video?.dolbyVision?.profile : nil
@@ -387,8 +388,6 @@ public enum PlaybackRouteDecider {
         guard let frame, let width = video?.width ?? media.width, let height = video?.height ?? media.height else { return false }
         return width > frame.width || height > frame.height
     }
-
-    private static let directContainers: Set<String> = ["mp4", "m4v", "mov"]
 
     static func isHEVC(_ codec: String) -> Bool {
         ["hevc", "h265", "hvc1", "hev1"].contains(codec)
