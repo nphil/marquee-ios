@@ -262,7 +262,7 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private(set) var part: PlexPart?
     @ObservationIgnored private var handAudio: Int?
     @ObservationIgnored private var handSubtitle: SubtitleChoice?
-    @ObservationIgnored private var taggedAnime = false
+    @ObservationIgnored private var titleTags = TitleTags(isAnime: false, countries: [])
     @ObservationIgnored private var onDeviceFailed = false
     @ObservationIgnored private var wroteBack = false
     @ObservationIgnored private var serverAudio: Int?
@@ -1064,15 +1064,15 @@ final class PlayerModel: Identifiable {
         publishItem()
         nextFromStart = false
         animeOverride = session.trackMemory(for: full)?.anime ?? .automatic
-        // Plex's anime tags are read beside the link's measure.
-        async let tagged = isTaggedAnime(full)
+        // Plex's anime and country tags are read beside the link's measure.
+        async let tagged = tags(of: full)
         // The measured link sets Auto's start and whether the phone reads the file itself.
         if request.download == nil {
             let connection = try? await library.connection.connection()
             guard generation == self.generation else { return }
             startAdapting(connection: connection)
         }
-        taggedAnime = await tagged
+        titleTags = await tagged
         guard generation == self.generation else { return }
         // Scene thumbnails load after the first picture (`arrived`).
         await decideRoute()
@@ -1136,18 +1136,20 @@ final class PlayerModel: Identifiable {
         if case .sidecar(let track) = choice.route.subtitle { await loadSidecar(track) }
     }
 
-    /// Whether Plex's tags make the playing title anime: its own, or its show's. A download answers from what was
-    /// read when it was saved, since offline there is no server to ask.
-    private func isTaggedAnime(_ full: PlexMetadata) async -> Bool {
-        if let download = request.download { return download.isAnime ?? full.isAnime }
-        return await session.anime.isAnime(full, in: library)
+    /// Whether Plex's tags make the playing title anime, and where it was made: its own, or its show's. A download
+    /// answers from what was read when it was saved, since offline there is no server to ask.
+    private func tags(of full: PlexMetadata) async -> TitleTags {
+        if let download = request.download {
+            return TitleTags(isAnime: download.isAnime ?? full.isAnime, countries: download.countries ?? full.countries)
+        }
+        return await session.anime.tags(full, in: library)
     }
 
     /// The route at `quality`, decided without changing the playing one.
     private func chooseRoute(tracks: MediaTracks, media: PlexMedia, part: PlexPart, quality: VideoQuality) async -> RouteChoice {
         let settings = session.settings
         let picked = TrackRules.pick(
-            from: tracks, isAnime: taggedAnime,
+            from: tracks, isAnime: titleTags.isAnime, countries: titleTags.countries,
             choices: TrackRules.Choices(audio: handAudio, subtitle: handSubtitle, memory: session.trackMemory(for: item))
         )
         let device = await capabilities.current()
@@ -3351,7 +3353,7 @@ extension PlayerModel: CastPlayer {
     private func decideCastRoute(_ device: CastDevice, tracks: MediaTracks, media: PlexMedia, part: PlexPart) {
         let settings = session.settings
         let picked = TrackRules.pick(
-            from: tracks, isAnime: taggedAnime,
+            from: tracks, isAnime: titleTags.isAnime, countries: titleTags.countries,
             choices: TrackRules.Choices(audio: handAudio, subtitle: handSubtitle, memory: session.trackMemory(for: item))
         )
         let reason: RouteReason? = castReceiverFailed ? .receiverFailed : settings.directPlay == .disabled ? .directPlayOff : nil

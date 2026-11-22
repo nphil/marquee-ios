@@ -163,6 +163,9 @@ public struct DownloadRecord: Hashable, Sendable, Codable, Identifiable {
     /// Whether the title, or an episode's show, is anime (`AnimeLookup`), saved because the show's tags are
     /// out of reach offline; absent on downloads saved by older versions.
     public var isAnime: Bool?
+    /// The production countries of the title, or an episode's show (`AnimeLookup`), saved for the same reason:
+    /// they say the original audio. Absent on downloads saved by older versions.
+    public var countries: [String]?
 
     public init(
         item: PlexMetadata, scope: DownloadScope, quality: DownloadQuality, target: DownloadTarget? = nil, mediaIndex: Int,

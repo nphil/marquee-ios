@@ -89,7 +89,7 @@ How to read this: plain-English behaviour only. Plex endpoint names and query te
 
 **Track rules** (confirmed 2026-11-22; every profile, no settings):
 - English subtitles only, on by default everywhere, English audio included, in the remembered style. A track with no language is not picked.
-- Movies and non-anime TV play the original audio, never a dub, with one English subtitle: the `.en.srt` beside the file, else its `.en.cc.srt`, else embedded English text. Full beats captions, and captions beat on-screen text.
+- Movies and non-anime TV play the original audio, never a dub: the main track in the language of the first production country Plex lists that the file has a track for, else the file's default track. They show one English subtitle: the `.en.srt` beside the file, else its `.en.cc.srt`, else embedded English text. Full beats captions, and captions beat on-screen text.
 - Anime is Plex genre "Anime", or genres Animation and country Japan, on the title or its show. It plays the English dub when the file has one, with the dub-matched English subtitle (`.en.cc.srt`, Plex `hearingImpaired`); otherwise the original audio with the original-matched one (`.en.srt`). Switching audio switches the subtitle, unless the viewer chose the subtitle.
 - A choice made in the player wins and is remembered. Off is per show or film. The per-show anime override (Automatic, Anime, Not Anime) is hidden in Advanced.
 - A picture subtitle (PGS, VobSub) is never picked automatically.

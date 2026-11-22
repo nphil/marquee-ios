@@ -46,7 +46,9 @@ public enum AnimeOverride: String, Sendable, Hashable, Codable, CaseIterable {
 /// The audio and subtitle that play, by one set of rules for every profile and both apps.
 ///
 /// - Movies and TV that is not anime play the original audio, never a dub, with the English subtitle: the
-///   `.en` file, else the `.en.cc` file, else English text inside the video.
+///   `.en` file, else the `.en.cc` file, else English text inside the video. The original language is the one
+///   of the first production country that has a track (`OriginalLanguage`); with none, it is the file's
+///   default track.
 /// - Anime plays the English dub when the file has one, else the original audio, with the English
 ///   subtitle written for that audio: the dub script (`.en.cc`) with English audio, the translation
 ///   (`.en`) with any other. A file beside the video comes before text inside it.
@@ -77,11 +79,15 @@ public enum TrackRules {
         public var isAnime: Bool
     }
 
-    /// - Parameter isAnime: What Plex's tags say (`Anime.matches`); the viewer's override in `choices.memory`
-    ///   comes before it.
-    public static func pick(from tracks: MediaTracks, isAnime tagged: Bool, choices: Choices = Choices()) -> Pick {
+    /// - Parameters:
+    ///   - isAnime: What Plex's tags say (`Anime.matches`); the viewer's override in `choices.memory` comes before it.
+    ///   - countries: The production countries Plex lists for the title, or for an episode's show, which say the
+    ///     original language of a title that is not anime.
+    public static func pick(
+        from tracks: MediaTracks, isAnime tagged: Bool, countries: [String] = [], choices: Choices = Choices()
+    ) -> Pick {
         let isAnime = (choices.memory?.anime ?? .automatic).resolve(tagged)
-        let audio = pickAudio(in: tracks, isAnime: isAnime, choices: choices)
+        let audio = pickAudio(in: tracks, isAnime: isAnime, countries: countries, choices: choices)
         let subtitle = pickSubtitle(in: tracks, audio: audio, isAnime: isAnime, choices: choices)
         return Pick(audio: audio, subtitle: subtitle, isAnime: isAnime)
     }
@@ -103,14 +109,16 @@ public enum TrackRules {
         return english.closest { [$0.kind == .onScreenText, !$0.isExternal, $0.isDubScript != wantsDubScript] }
     }
 
-    private static func pickAudio(in tracks: MediaTracks, isAnime: Bool, choices: Choices) -> AudioTrack? {
+    private static func pickAudio(in tracks: MediaTracks, isAnime: Bool, countries: [String], choices: Choices) -> AudioTrack? {
         if let id = choices.audio, let track = tracks.audioTrack(id: id) { return track }
         if let track = choices.memory?.audio?.match(in: tracks.audio) { return track }
         let main = tracks.audio.filter { !$0.isCommentary && !$0.isAudioDescription }
         if isAnime, let english = main.first(where: { $0.language.matches(.english) }) { return english }
-        // The file's own language: its default track, else the first, leaving out a dub unless the file has only dubs.
+        // A dub is left out unless the file has only dubs.
         let original = main.filter { !$0.isDub }
         let pool = original.isEmpty ? main : original
+        // A file's default track is often a dub that is not labelled one, so the country says which is the original.
+        if !isAnime, let track = OriginalLanguage.firstMatch(among: pool, countries: countries) { return track }
         return pool.first(where: \.isDefault) ?? pool.first ?? tracks.audio.first(where: \.isDefault) ?? tracks.audio.first
     }
 

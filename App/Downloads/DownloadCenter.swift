@@ -268,7 +268,9 @@ final class DownloadCenter {
                 item: snapshot.item, scope: scope, quality: chosen, target: option?.target, mediaIndex: mediaIndex, addedAt: .now,
                 expectedLength: option?.bytes
             )
-            record.isAnime = await anime.isAnime(snapshot.item, in: library)
+            let tags = await anime.tags(snapshot.item, in: library)
+            record.isAnime = tags.isAnime
+            record.countries = tags.countries
             let poster: Data?
             if let thumb = record.thumb { poster = try? await PlexFetch.data(thumb, library: library, session: metadataSession) }
             else { poster = nil }

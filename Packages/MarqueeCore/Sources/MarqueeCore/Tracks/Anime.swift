@@ -14,21 +14,40 @@ extension PlexMetadata {
     public var isAnime: Bool { Anime.matches(genres: genres, countries: countries) }
 }
 
-/// Tells whether a title is anime, reading the show of an episode or season once. The lookup is made
+/// What a title's tags say: whether it is anime, and the countries it was made in.
+public struct TitleTags: Sendable, Hashable {
+    public var isAnime: Bool
+    public var countries: [String]
+
+    public init(isAnime: Bool, countries: [String]) {
+        self.isAnime = isAnime
+        self.countries = countries
+    }
+
+    init(_ item: PlexMetadata) {
+        self.init(isAnime: item.isAnime, countries: item.countries)
+    }
+}
+
+/// Reads the tags of a title, taking an episode's or season's from its show once. The lookup is made
 /// for a play or a download, never for a list of items, so the cost is one read per show.
 public actor AnimeLookup {
-    private var shows: [String: Bool] = [:]
+    private var shows: [String: TitleTags] = [:]
 
     public init() {}
 
-    /// A failed read answers no and is made again next time.
-    public func isAnime(_ item: PlexMetadata, in library: PlexLibrary) async -> Bool {
-        if item.isAnime { return true }
-        guard item.type != .show, let show = item.showRatingKey else { return false }
+    /// A failed read answers the item's own tags and is made again next time.
+    public func tags(_ item: PlexMetadata, in library: PlexLibrary) async -> TitleTags {
+        let own = TitleTags(item)
+        guard item.type != .show, let show = item.showRatingKey else { return own }
         let key = "\(library.server.clientIdentifier)/\(show)"
-        if let known = shows[key] { return known }
-        guard let found = try? await library.metadata(show) else { return false }
-        shows[key] = found.isAnime
-        return found.isAnime
+        if let known = shows[key] { return merged(own, known) }
+        guard let found = try? await library.metadata(show) else { return own }
+        shows[key] = TitleTags(found)
+        return merged(own, TitleTags(found))
+    }
+
+    private func merged(_ own: TitleTags, _ show: TitleTags) -> TitleTags {
+        TitleTags(isAnime: own.isAnime || show.isAnime, countries: own.countries.isEmpty ? show.countries : own.countries)
     }
 }

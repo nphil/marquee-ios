@@ -44,6 +44,8 @@ struct TrackRulesTableTests {
         var name: String
         /// Plex tags the title anime.
         var tagged: Bool
+        /// The production countries Plex lists, as it spells them.
+        var countries: [String]
         var audio: [Audio]
         var subtitles: [Sub]
         var handAudio: Int?
@@ -54,12 +56,13 @@ struct TrackRulesTableTests {
         var source: SubtitleDecision.Source
 
         init(
-            _ name: String, tagged: Bool = false, audio: [Audio], subtitles: [Sub] = [], handAudio: Int? = nil,
+            _ name: String, tagged: Bool = false, countries: [String] = [], audio: [Audio], subtitles: [Sub] = [], handAudio: Int? = nil,
             handSubtitle: SubtitleChoice? = nil, remembered: [Remembered] = [], plays: Int?, shows: Int? = nil,
             source: SubtitleDecision.Source = .rules
         ) {
             self.name = name
             self.tagged = tagged
+            self.countries = countries
             self.audio = audio
             self.subtitles = subtitles
             self.handAudio = handAudio
@@ -122,6 +125,35 @@ struct TrackRulesTableTests {
             audio: [audio(1, "eng", "English Dub", isDefault: true), audio(2, "jpn")], plays: 2),
         Row("a dub is played when it is all the file has",
             audio: [audio(1, "eng", "English Dub")], plays: 1),
+        // The production country says the original language when the file's default is an unlabelled dub.
+        Row("a Korean film whose default is an English dub plays Korean",
+            countries: ["Republic of Korea"], audio: [audio(1, "eng", isDefault: true), audio(2, "kor")], plays: 2),
+        Row("Taiwan, Province of China plays Chinese",
+            countries: ["Taiwan, Province of China"], audio: [audio(1, "eng", isDefault: true), audio(2, "zho")], plays: 2),
+        Row("Russian Federation plays Russian",
+            countries: ["Russian Federation"], audio: [audio(1, "eng", isDefault: true), audio(2, "rus")], plays: 2),
+        Row("Iran, Islamic Republic of plays Persian",
+            countries: ["Iran, Islamic Republic of"], audio: [audio(1, "eng", isDefault: true), audio(2, "fas")], plays: 2),
+        Row("Hong Kong plays Cantonese before Mandarin",
+            countries: ["Hong Kong"], audio: [audio(1, "eng", isDefault: true), audio(2, "zho"), audio(3, "yue")], plays: 3),
+        Row("a country is matched whatever its case",
+            countries: ["JAPAN"], audio: [audio(1, "eng", isDefault: true), audio(2, "jpn")], plays: 2),
+        Row("the first country with a track in its language decides",
+            countries: ["Denmark", "France"], audio: [audio(1, "eng", isDefault: true), audio(2, "fra"), audio(3, "eng")], plays: 2),
+        Row("an English-speaking country plays English",
+            countries: ["Ireland"], audio: [audio(1, "fra", isDefault: true), audio(2, "eng")], plays: 2),
+        Row("the country's language is taken in its main track, not commentary",
+            countries: ["France"], audio: [audio(1, "eng", isDefault: true), audio(2, "fra", "Commentary"), audio(3, "fra")], plays: 3),
+        Row("the country's language is not taken from a titled dub",
+            countries: ["Japan"], audio: [audio(1, "eng", isDefault: true), audio(2, "jpn", "Japanese Dub")], plays: 1),
+        Row("an unknown country plays the default track",
+            countries: ["Atlantis"], audio: [audio(1, "eng", isDefault: true), audio(2, "kor")], plays: 1),
+        Row("a country whose language the file lacks plays the default track",
+            countries: ["Republic of Korea"], audio: [audio(1, "eng", isDefault: true), audio(2, "fra")], plays: 1),
+        Row("anime keeps its dub whatever the country",
+            tagged: true, countries: ["Japan"], audio: release, plays: 2),
+        Row("a picked track comes before the country",
+            countries: ["Republic of Korea"], audio: [audio(1, "eng", isDefault: true), audio(2, "kor")], handAudio: 1, plays: 1),
         Row("commentary is not the main audio",
             audio: [audio(1, "eng", "Commentary", isDefault: true), audio(2, "eng")], plays: 2),
         Row("audio description is not the main audio",
@@ -230,7 +262,7 @@ struct TrackRulesTableTests {
         let tracks = try Fixture.tracks(row.audio.map(\.stream) + row.subtitles.map(\.stream))
         let choices = TrackRules.Choices(audio: row.handAudio, subtitle: row.handSubtitle, memory: try row.memory)
 
-        let pick = TrackRules.pick(from: tracks, isAnime: row.tagged, choices: choices)
+        let pick = TrackRules.pick(from: tracks, isAnime: row.tagged, countries: row.countries, choices: choices)
 
         #expect(pick.audio?.id == row.plays)
         #expect(pick.subtitle.track?.id == row.shows)
@@ -270,12 +302,13 @@ struct AnimeClassifierTableTests {
         let lookup = AnimeLookup()
         let first = try decode(PlexMetadata.self, ["ratingKey": "50", "type": "episode", "grandparentRatingKey": "5"])
         let second = try decode(PlexMetadata.self, ["ratingKey": "51", "type": "episode", "grandparentRatingKey": "5"])
-        let film = try decode(PlexMetadata.self, ["ratingKey": "9", "type": "movie", "Genre": [["tag": "Drama"]]])
+        let filmItem = try decode(PlexMetadata.self, ["ratingKey": "9", "type": "movie", "Genre": [["tag": "Drama"]]])
 
-        let episodes = [await lookup.isAnime(first, in: library), await lookup.isAnime(second, in: library)]
-        let isFilmAnime = await lookup.isAnime(film, in: library)
+        let episodes = [await lookup.tags(first, in: library), await lookup.tags(second, in: library)]
+        let film = await lookup.tags(filmItem, in: library)
 
-        #expect(episodes == [true, true] && !isFilmAnime)
+        #expect(episodes == [TitleTags(isAnime: true, countries: ["Japan"]), TitleTags(isAnime: true, countries: ["Japan"])])
+        #expect(!film.isAnime && film.countries.isEmpty)
         #expect(await transport.requests(to: "/library/metadata/5").count == 1)
     }
 }
