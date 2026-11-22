@@ -2,6 +2,7 @@ import AVFoundation
 import Foundation
 import MarqueeCore
 import UIKit
+import VideoEngine
 
 /// Where the player makes its own scrub frames from: the file it plays, which is a stream the phone reads
 /// directly or a download. The URL carries the playback token; it is held in memory and never logged.
@@ -9,6 +10,7 @@ struct ScrubPreviewSource: Equatable, Sendable {
     let part: Int
     let url: URL
     let isLocal: Bool
+    var remuxHeaders: [String: String]? = nil
 }
 
 /// What the background fill reads from the player each time it picks a frame.
@@ -38,10 +40,17 @@ enum ScrubPreviews {
 /// tolerance is half a slot either side, which lets the generator take the nearest keyframe instead of
 /// decoding up to the exact time.
 final class FrameMaker: @unchecked Sendable {
-    private let generator: AVAssetImageGenerator
+    private let generator: AVAssetImageGenerator?
+    private let extractor: FrameExtractor?
 
-    init(url: URL) {
-        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
+    init(source: ScrubPreviewSource) {
+        if let headers = source.remuxHeaders {
+            generator = nil
+            extractor = (try? ByteRangeSources.make(for: source.url, headers: headers)).map { FrameExtractor(source: $0) }
+            return
+        }
+        extractor = nil
+        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: source.url))
         generator.appliesPreferredTrackTransform = true
         let side = CGFloat(ScrubPreviewPlan.width)
         generator.maximumSize = CGSize(width: side, height: side)
@@ -54,12 +63,21 @@ final class FrameMaker: @unchecked Sendable {
     /// A JPEG of the frame near `time`; nil when it could not be made or the task was cancelled.
     @concurrent
     func jpeg(at time: TimeInterval) async -> Data? {
-        guard let made = try? await generator.image(at: CMTime(seconds: time, preferredTimescale: 600)) else { return nil }
-        return UIImage(cgImage: made.image).jpegData(compressionQuality: 0.6)
+        let image: CGImage
+        if let extractor {
+            guard let frame = try? await extractor.frame(at: time, maxWidth: ScrubPreviewPlan.width) else { return nil }
+            image = frame.image
+        } else if let generator, let frame = try? await generator.image(at: CMTime(seconds: time, preferredTimescale: 600)) {
+            image = frame.image
+        } else {
+            return nil
+        }
+        guard !Task.isCancelled else { return nil }
+        return UIImage(cgImage: image).jpegData(compressionQuality: 0.6)
     }
 
     func cancel() {
-        generator.cancelAllCGImageGeneration()
+        generator?.cancelAllCGImageGeneration()
     }
 }
 
@@ -218,7 +236,7 @@ final class TrickplayFrames {
         if have.contains(slot) { data = await ScrubPreviews.disk.data(part: source.part, slot: slot) }
         if data == nil {
             origin = "made"
-            let maker = scrubMaker ?? FrameMaker(url: source.url)
+            let maker = scrubMaker ?? (source.remuxHeaders != nil ? fillMaker : nil) ?? FrameMaker(source: source)
             if generation == self.generation { scrubMaker = maker }
             data = await maker.jpeg(at: ScrubPreviewPlan.time(of: slot, duration: knownDuration))
             if let data {
@@ -270,7 +288,7 @@ final class TrickplayFrames {
                 Diag.event(.player, "scrub.fill.done", ["frames": made, "ms": Diag.ms(since: begun)], .debug)
                 return
             }
-            let maker = fillMaker ?? FrameMaker(url: source.url)
+            let maker = fillMaker ?? (source.remuxHeaders != nil ? scrubMaker : nil) ?? FrameMaker(source: source)
             fillMaker = maker
             let started = ContinuousClock.now
             let data = await maker.jpeg(at: ScrubPreviewPlan.time(of: slot, duration: reading.duration))

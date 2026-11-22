@@ -121,9 +121,8 @@ final class PlayerModel: Identifiable {
     private(set) var trickplay: Trickplay?
     /// Plex has the index but it did not load, so the player makes its own previews.
     private(set) var trickplayFailed = false
-    /// The file the phone itself plays (direct play, a download included): the scrub preview makes frames
-    /// from it. The remux's loopback playlist and a server transcode give none. Carries the token; never logged.
-    private(set) var directFile: URL?
+    /// The original part, never the loopback playlist. Its URL and headers are not logged.
+    private var previewFile: ScrubPreviewSource?
     private(set) var offer: Offer?
     private(set) var countdown: Countdown?
     private(set) var cueText: AttributedString?
@@ -1312,7 +1311,7 @@ final class PlayerModel: Identifiable {
                     reporter = TimelineReporter(library: library, item: item)
                 }
                 stream = .direct
-                directFile = url
+                previewFile = ScrubPreviewSource(part: part.id, url: url, isLocal: url.isFileURL)
                 origin = 0
             case .remux:
                 let source: URL
@@ -1329,6 +1328,7 @@ final class PlayerModel: Identifiable {
                 }
                 let remux = makeRemux(source: source, part: part, route: route)
                 stream = .remux(remux)
+                previewFile = ScrubPreviewSource(part: part.id, url: source, isLocal: source.isFileURL, remuxHeaders: library.authorizationHeaders())
                 listen(to: remux)
                 remuxFinished = false
                 url = try await remux.start(at: target)
@@ -1514,7 +1514,7 @@ final class PlayerModel: Identifiable {
         lastTransfer = nil
         longestWait = 0
         if pictureInPicture?.isActive ?? false { backend.hold() } else { backend.load(nil) }
-        directFile = nil
+        previewFile = nil
         itemReady = false
         farSeeking = false
         switch stream {
@@ -3083,10 +3083,10 @@ final class PlayerModel: Identifiable {
     /// Where the scrub preview makes its own frames when Plex has no index: the file being played, for a
     /// title without an index, one that failed to load, or a download.
     var scrubPreviewSource: ScrubPreviewSource? {
-        guard let directFile, let part, castDevice == nil else { return nil }
+        guard let previewFile, let part, castDevice == nil else { return nil }
         let isDownload = request.download != nil
         guard isDownload || !part.hasSceneThumbnails || trickplayFailed else { return nil }
-        return ScrubPreviewSource(part: part.id, url: directFile, isLocal: isDownload)
+        return previewFile
     }
 
     /// Scene thumbnails wait for the picture, then ten seconds more for the stream's buffer, so they never
