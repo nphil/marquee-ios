@@ -22,6 +22,7 @@ The UI tests launch the app with `MARQUEE_FAKE_PLEX` set to this folder. `App/Te
 - The server root `/` reads `pms/root.json`: Living Room allows deleting media from the apps.
 - Every channel's tune, `POST /livetv/dvrs/<dvr>/channels/<channel>/tune`, reads `pms/livetv/tune.json`: a rolling grab holding a 720p MPEG-2 session, the shape PMS 1.43.5 answers with. The player shows the `-marquee.uitest.frame` picture for every channel.
 - Scene thumbnails, `GET /library/parts/<id>/indexes/sd`, read the BIF file `pms/library/parts/<id>/indexes/sd.bif`. Part 2121 (Caminandes episode 2) has 15 frames, one per 10 s, cut from the fixture artwork.
+- Part 99011 has no scene index. The player generates a preview from the 20-second synthetic video at `pms/library/parts/99011/file.mkv.bin`, served with the same byte-range support as other binary fixtures. The fixture is made with `ffmpeg -f lavfi -i 'testsrc=size=160x90:rate=24:duration=20' -c:v libx264 -pix_fmt yuv420p -g 24 -bf 0 -threads 1 -fflags +bitexact -flags:v +bitexact -f matroska file.mkv.bin`.
 - `"__anchor": T` at the top of a fixture moves every `beginsAt` and `endsAt` in it by 9 PM today minus T. The app draws the Live TV guide at 9:41 PM today while the fake Plex is active, so the guide fixtures, written around T = 1800000000, always air at the same times.
 - `live.json` holds the Live TV favourites and recent channels each profile starts with.
 

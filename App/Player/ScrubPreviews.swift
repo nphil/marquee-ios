@@ -46,7 +46,11 @@ final class FrameMaker: @unchecked Sendable {
     init(source: ScrubPreviewSource) {
         if let headers = source.remuxHeaders {
             generator = nil
-            extractor = (try? ByteRangeSources.make(for: source.url, headers: headers)).map { FrameExtractor(source: $0) }
+            if !source.url.isFileURL, let configuration = FakePlex.engineRangeConfiguration() {
+                extractor = FrameExtractor(source: HTTPRangeSource(url: source.url, headers: headers, configuration: configuration))
+            } else {
+                extractor = (try? ByteRangeSources.make(for: source.url, headers: headers)).map { FrameExtractor(source: $0) }
+            }
             return
         }
         extractor = nil
@@ -149,14 +153,14 @@ final class TrickplayFrames {
         unavailable = false
         failures = 0
         pacer.reset()
-        guard let source = self.source else { return }
+        // Fixture runs make every requested frame afresh, with no background fill or disk cache.
+        guard let source = self.source, !FakePlex.isActive else { return }
         let part = source.part
         let current = generation
         ready = Task {
             let slots = await ScrubPreviews.disk.slots(part: part)
             if current == self.generation { have = slots }
         }
-        guard !FakePlex.isActive else { return }
         fill = Task(priority: .background) {
             await runFill(source, generation: current)
         }
@@ -239,7 +243,7 @@ final class TrickplayFrames {
             let maker = scrubMaker ?? (source.remuxHeaders != nil ? fillMaker : nil) ?? FrameMaker(source: source)
             if generation == self.generation { scrubMaker = maker }
             data = await maker.jpeg(at: ScrubPreviewPlan.time(of: slot, duration: knownDuration))
-            if let data {
+            if let data, !FakePlex.isActive {
                 await ScrubPreviews.disk.store(data, part: source.part, slot: slot)
                 if generation == self.generation { have.insert(slot) }
             }

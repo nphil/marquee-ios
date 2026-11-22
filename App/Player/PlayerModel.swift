@@ -1448,7 +1448,10 @@ final class PlayerModel: Identifiable {
         return RemuxSession(
             sourceFactory: {
                 if source.isFileURL { return try FileRangeSource(fileURL: source) }
-                return HTTPRangeSource(url: source, headers: headers, knownLength: length)
+                return HTTPRangeSource(
+                    url: source, headers: headers, knownLength: length,
+                    configuration: FakePlex.engineRangeConfiguration()
+                )
             },
             options: options,
             logger: EngineLog.logger

@@ -149,6 +149,12 @@ struct PlayerView: View {
                     )
                 }
             }
+            #if DEBUG
+            // The test may hold the thumb before the preview source's setup task runs.
+            if model.isScrubbing, let time = FakePlex.heldScrubTime(duration: model.duration) {
+                frames.want(time, duration: model.duration)
+            }
+            #endif
         }
         .onAppear { PlayerOrientation.opened(session.settings.videoOrientation) }
         .onDisappear {

@@ -29,11 +29,10 @@ struct Scrubber: View {
     /// UI tests hold the scrubber mid-drag at a fraction of the item (`-marquee.uitest.scrub`), since a
     /// touch cannot be held while the test takes its screenshot.
     private func holdForTest() {
-        guard FakePlex.isActive, model.duration > 0, !model.isScrubbing,
-              let fraction = UserDefaults.standard.string(forKey: "marquee.uitest.scrub").flatMap(Double.init) else { return }
+        guard !model.isScrubbing, let time = FakePlex.heldScrubTime(duration: model.duration) else { return }
         model.beginScrub()
         speed = .full
-        scrubTime = min(1, max(0, fraction)) * model.duration
+        scrubTime = time
         frameIndex = frames.index(at: scrubTime, duration: model.duration)
         frames.want(scrubTime, duration: model.duration)
     }

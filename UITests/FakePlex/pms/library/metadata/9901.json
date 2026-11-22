@@ -1,0 +1,35 @@
+{
+ "MediaContainer": {
+  "size": 1,
+  "Metadata": [
+   {
+    "ratingKey": "9901",
+    "key": "/library/metadata/9901",
+    "type": "movie",
+    "title": "Scrub Preview Test Pattern",
+    "duration": 20000,
+    "Media": [
+     {
+      "id": 9901,
+      "duration": 20000,
+      "width": 160,
+      "height": 90,
+      "videoCodec": "h264",
+      "container": "mkv",
+      "Part": [
+       {
+        "id": 99011,
+        "key": "/library/parts/99011/file.mkv",
+        "duration": 20000,
+        "container": "mkv",
+        "Stream": [
+         { "id": 990111, "streamType": 1, "index": 0, "codec": "h264", "default": true }
+        ]
+       }
+      ]
+     }
+    ]
+   }
+  ]
+ }
+}

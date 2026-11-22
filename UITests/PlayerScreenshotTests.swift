@@ -193,6 +193,26 @@ final class PlayerScreenshotTests: XCTestCase {
         try scrubPreviewFlow(suffix: "rose-pine")
     }
 
+    @MainActor
+    func testGeneratesScrubPreviewForUnindexedMKV() {
+        XCUIDevice.shared.orientation = .landscapeLeft
+        addTeardownBlock {
+            await MainActor.run { XCUIDevice.shared.orientation = .portrait }
+        }
+        let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine", arguments: [
+            "-marquee.fakeSignedIn", "YES",
+            "-marquee.uitest.play", "9901",
+            "-marquee.uitest.directPlay", "force",
+            "-marquee.uitest.paused", "YES",
+            "-marquee.uitest.scrub", "0.5",
+        ], waitingFor: nil)
+        let preview = element("player.seekPreview", in: app)
+        let drawn = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label == %@ AND value == %@", "0:10", "ready"), object: preview
+        )
+        XCTAssertEqual(XCTWaiter().wait(for: [drawn], timeout: 20), .completed, "No frame decoded from the unindexed MKV")
+    }
+
     /// The Chromecast plugin's route popover, a hand-off to FakeCast's receiver and back to the phone.
     @MainActor
     func testCastsToAChromecastAndBack() throws {

@@ -82,6 +82,22 @@ enum FakePlex {
         configuration.urlCache = nil
         #endif
     }
+
+    /// VideoEngine owns its transport; only fixture runs give it a private session.
+    static func engineRangeConfiguration() -> URLSessionConfiguration? {
+        guard isActive else { return nil }
+        let configuration = URLSessionConfiguration.ephemeral
+        install(into: configuration)
+        return configuration
+    }
+
+    #if DEBUG
+    static func heldScrubTime(duration: TimeInterval) -> TimeInterval? {
+        guard isActive, duration > 0,
+              let fraction = UserDefaults.standard.string(forKey: "marquee.uitest.scrub").flatMap(Double.init) else { return nil }
+        return min(1, max(0, fraction)) * duration
+    }
+    #endif
 }
 
 #if DEBUG
