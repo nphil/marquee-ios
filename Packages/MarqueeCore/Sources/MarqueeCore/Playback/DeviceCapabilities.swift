@@ -12,7 +12,8 @@ public struct DeviceCapabilities: Sendable, Hashable {
     /// The current screen shows HDR. False when mirroring or connected to an SDR screen.
     public var hdrDisplay: Bool
     /// Dolby Vision profiles the player is known to show as Dolby Vision. Profile 5 has no HDR10 base
-    /// layer, so without it in this set such files go to the server.
+    /// layer, so without it in this set such files go to the server. A player that lists 7 plays that
+    /// profile's HDR10 base layer itself; without it a profile 7 file is copied to a clean base layer first.
     public var dolbyVisionProfiles: Set<Int>
     /// Audio codecs the player plays as they are (Plex codec names).
     public var nativeAudioCodecs: Set<String>

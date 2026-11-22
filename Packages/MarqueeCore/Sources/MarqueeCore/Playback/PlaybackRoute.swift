@@ -274,7 +274,7 @@ public enum PlaybackRouteDecider {
             remuxReasons.append(.hevcTag)
         }
         let dolbyVisionProfile = isHEVC(codec) ? video?.dolbyVision?.profile : nil
-        if dolbyVisionProfile == 7 { remuxReasons.append(.dolbyVisionBaseLayer) }
+        if dolbyVisionProfile == 7, !capabilities.dolbyVisionProfiles.contains(7) { remuxReasons.append(.dolbyVisionBaseLayer) }
 
         var playedAudio = audio
         var audioIsStandIn = false

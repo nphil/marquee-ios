@@ -92,6 +92,16 @@ struct PlaybackRouteTests {
         #expect(Self.route(try Self.file("mp4", video: Fixture.video("hevc")), capabilities: opens).reasons == [.hevcTag])
     }
 
+    @Test func aPlayerThatListsDolbyVisionSevenPlaysItsBaseLayerDirectly() throws {
+        let p7 = try Self.file("mkv", video: Fixture.video("hevc", bitDepth: 10, dolbyVision: (7, 6)))
+        let opens = DeviceCapabilities(dolbyVisionProfiles: [7], directContainers: ["mkv"], canRemux: true)
+        let without = DeviceCapabilities(directContainers: ["mkv"], canRemux: true)
+
+        #expect(Self.route(p7, capabilities: opens).kind == .directPlay)
+        let copied = Self.route(p7, capabilities: without)
+        #expect(copied.kind == .remux && copied.reasons == [.dolbyVisionBaseLayer])
+    }
+
     struct Undecodable: Sendable, CustomTestStringConvertible {
         var codec: String
         var bitDepth = 8
