@@ -69,6 +69,19 @@ struct NetworkPath: Equatable, @unchecked Sendable {
         }
     }
 
+    /// Whether the link is Wi-Fi or Ethernet and not metered, and whether Low Data Mode (Save Data) is on, now
+    /// and on each change: the background scrub-preview fill reads the file only on an unmetered link.
+    static func scrubFillUpdates() -> AsyncStream<(isUnmeteredWiFi: Bool, saveData: Bool)> {
+        AsyncStream { continuation in
+            let monitor = Monitor()
+            monitor.start { path in
+                let wired = path.usesInterfaceType(.wifi) || path.usesInterfaceType(.wiredEthernet)
+                continuation.yield((path.status == .satisfied && wired && !path.isExpensive, path.isConstrained))
+            }
+            continuation.onTermination = { _ in monitor.cancel() }
+        }
+    }
+
     /// Whether an IPv4 address is on a network one of the phone's own interfaces is attached to; nil for a host
     /// name or IPv6. VPN tunnels are point-to-point and do not count, so an address reached through a VPN's route
     /// into the home network is not attached.

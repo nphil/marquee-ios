@@ -119,6 +119,11 @@ final class PlayerModel: Identifiable {
     /// The Chromecast playing this item, while one does.
     private(set) var castDevice: CastDevice?
     private(set) var trickplay: Trickplay?
+    /// Plex has the index but it did not load, so the player makes its own previews.
+    private(set) var trickplayFailed = false
+    /// The file the phone itself plays (direct play, a download included): the scrub preview makes frames
+    /// from it. The remux's loopback playlist and a server transcode give none. Carries the token; never logged.
+    private(set) var directFile: URL?
     private(set) var offer: Offer?
     private(set) var countdown: Countdown?
     private(set) var cueText: AttributedString?
@@ -1307,6 +1312,7 @@ final class PlayerModel: Identifiable {
                     reporter = TimelineReporter(library: library, item: item)
                 }
                 stream = .direct
+                directFile = url
                 origin = 0
             case .remux:
                 let source: URL
@@ -1508,6 +1514,7 @@ final class PlayerModel: Identifiable {
         lastTransfer = nil
         longestWait = 0
         if pictureInPicture?.isActive ?? false { backend.hold() } else { backend.load(nil) }
+        directFile = nil
         itemReady = false
         farSeeking = false
         switch stream {
@@ -2232,6 +2239,7 @@ final class PlayerModel: Identifiable {
         timing.reset()
         showsTiming = false
         trickplay = nil
+        trickplayFailed = false
         trickplayLoad?.task.cancel()
         trickplayLoad = nil
         reporter = nil
@@ -3072,6 +3080,15 @@ final class PlayerModel: Identifiable {
         nowPlaying?.setInSight(inSight, time: time, rate: isPlaying && !isBuffering ? 1 : 0)
     }
 
+    /// Where the scrub preview makes its own frames when Plex has no index: the file being played, for a
+    /// title without an index, one that failed to load, or a download.
+    var scrubPreviewSource: ScrubPreviewSource? {
+        guard let directFile, let part, castDevice == nil else { return nil }
+        let isDownload = request.download != nil
+        guard isDownload || !part.hasSceneThumbnails || trickplayFailed else { return nil }
+        return ScrubPreviewSource(part: part.id, url: directFile, isLocal: isDownload)
+    }
+
     /// Scene thumbnails wait for the picture, then ten seconds more for the stream's buffer, so they never
     /// share the link with the start: one episode's index was 7.3 MB, 8.8 s over a 10 Mbit/s path. A scrub
     /// fetches them at once.
@@ -3083,10 +3100,11 @@ final class PlayerModel: Identifiable {
         let library = library, urlSession = session.transport.session, key = item.ratingKey
         let task = Task(priority: .utility) { [weak self] in
             if !now { try? await Task.sleep(for: .seconds(10)) }
-            guard !Task.isCancelled,
-                  let data = try? await PlexFetch.data("/library/parts/\(part.id)/indexes/sd", library: library, session: urlSession),
-                  let self, item.ratingKey == key else { return }
-            trickplay = Trickplay(data: data)
+            guard !Task.isCancelled else { return }
+            let data = try? await PlexFetch.data("/library/parts/\(part.id)/indexes/sd", library: library, session: urlSession)
+            guard !Task.isCancelled, let self, item.ratingKey == key else { return }
+            trickplay = data.flatMap { Trickplay(data: $0) }
+            trickplayFailed = trickplay == nil
         }
         trickplayLoad = (part.id, task, !now)
     }

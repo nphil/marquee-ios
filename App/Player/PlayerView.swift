@@ -140,11 +140,21 @@ struct PlayerView: View {
         .onChange(of: voiceOver || switchControl) { _, on in
             if on { model.showChrome() }
         }
-        .task(id: "\(model.item.ratingKey)/\(model.trickplay?.count ?? 0)") {
-            frames.reset(model.trickplay)
+        .task(id: ScrubSetup(item: model.item.ratingKey, indexed: model.trickplay?.count ?? 0, source: model.scrubPreviewSource)) {
+            frames.reset(model.trickplay, preview: model.scrubPreviewSource) { [weak model] in
+                model.map {
+                    ScrubPreviewContext(
+                        playhead: $0.time, duration: $0.duration, isPlaying: $0.isPlaying,
+                        isStalled: $0.isStalled || $0.isBuffering, isScrubbing: $0.isScrubbing
+                    )
+                }
+            }
         }
         .onAppear { PlayerOrientation.opened(session.settings.videoOrientation) }
-        .onDisappear { PlayerOrientation.closed() }
+        .onDisappear {
+            PlayerOrientation.closed()
+            frames.reset(nil)
+        }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("player")
     }

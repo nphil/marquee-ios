@@ -89,6 +89,7 @@ Tracks titled Signs or Songs count as on-screen text, as the spec's forced-word 
 
 - `DeviceCapabilities`: what the phone, screen and player can do; the app fills it.
 - `PlaybackRouteDecider.decide(media:part:tracks:audio:subtitle:capabilities:limits:hevcSampleEntry:)`: `PlaybackRoute`.
+- `ScrubPreviewPlan`: the player's own scrub previews, a slot every 10 s (`slot(at:duration:)`, `time(of:duration:)`, `fillOrder(playhead:duration:)`). `ScrubPreviewFillPolicy.allows`: the background fill runs while playing, not stalled or hot, on unmetered Wi-Fi without Low Data Mode (a local file always). `ScrubPreviewPacer`: 80 ms between frames while dragging. `ScrubPreviewDisk`: the frames as JPEGs per part id, 20 MB, oldest evicted.
 - `TrailerAutoplay`: `dwell` (2 s); `decide(_ conditions:)` → `.play(muted:)` or `.hold` from the setting, Low Power Mode, Reduce Motion, a metered link, app activity, hero visibility, an open player and other audio; `directPart(of:capabilities:)` → the first trailer file the phone plays untouched.
   - Direct play for MP4/MOV with H.264 or hvc1 HEVC and playable audio.
   - On-device remux for other containers, hev1 HEVC, Dolby Vision 7 and audio the remux converts. Without the remux, the server copies the video instead.

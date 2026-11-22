@@ -34,7 +34,8 @@ struct Scrubber: View {
         model.beginScrub()
         speed = .full
         scrubTime = min(1, max(0, fraction)) * model.duration
-        frameIndex = frames.index(at: scrubTime)
+        frameIndex = frames.index(at: scrubTime, duration: model.duration)
+        frames.want(scrubTime, duration: model.duration)
     }
     #endif
 
@@ -140,7 +141,8 @@ struct Scrubber: View {
                     model.beginScrub()
                     speed = .full
                     scrubTime = Double(min(1, max(0, value.location.x / width))) * model.duration
-                    frameIndex = frames.index(at: scrubTime)
+                    frameIndex = frames.index(at: scrubTime, duration: model.duration)
+                    frames.want(scrubTime, duration: model.duration)
                 } else {
                     let tier = ScrubSpeed(distance: value.location.y - Self.hitHeight / 2)
                     if tier != speed {
@@ -149,7 +151,8 @@ struct Scrubber: View {
                     }
                     let moved = Double((value.location.x - (lastX ?? value.location.x)) / width)
                     scrubTime = min(model.duration, max(0, scrubTime + moved * model.duration * speed.rate))
-                    if let index = frames.index(at: scrubTime), index != frameIndex {
+                    frames.want(scrubTime, duration: model.duration)
+                    if let index = frames.index(at: scrubTime, duration: model.duration), index != frameIndex {
                         frameIndex = index
                         Haptics.selection()
                     }
@@ -164,6 +167,7 @@ struct Scrubber: View {
         lastX = nil
         speed = .full
         frameIndex = nil
+        frames.scrubEnded()
         model.endScrub(at: scrubTime)
     }
 
@@ -352,71 +356,5 @@ struct SeekPreview: View {
         .accessibilityLabel(time)
         .accessibilityValue(image == nil ? "pending" : "ready")
         .accessibilityIdentifier("player.seekPreview")
-    }
-}
-
-/// Decoded scene thumbnails for the scrub preview. Frames decode off the main thread; asking for one
-/// not decoded yet returns the nearest decoded neighbour meanwhile and redraws when it lands.
-@MainActor @Observable
-final class TrickplayFrames {
-    private var trickplay: Trickplay?
-    private var landed = 0
-    @ObservationIgnored private var cache: [Int: UIImage] = [:]
-    @ObservationIgnored private var recent: [Int] = []
-    @ObservationIgnored private var pending: Set<Int> = []
-    @ObservationIgnored private var generation = 0
-
-    /// Plex's frames are 320 pt wide, about 230 KB decoded: 32 is about 7 MB.
-    private static let limit = 32
-
-    func reset(_ trickplay: Trickplay?) {
-        generation += 1
-        self.trickplay = trickplay
-        cache = [:]
-        recent = []
-        pending = []
-    }
-
-    var hasFrames: Bool { trickplay != nil }
-
-    func index(at time: TimeInterval) -> Int? {
-        trickplay?.index(at: time)
-    }
-
-    func image(near time: TimeInterval) -> UIImage? {
-        _ = landed
-        guard let trickplay else { return nil }
-        let index = trickplay.index(at: time)
-        if let image = cache[index] { return image }
-        decode(index, from: trickplay)
-        for distance in 1...4 {
-            if let image = cache[index - distance] ?? cache[index + distance] { return image }
-        }
-        return nil
-    }
-
-    private func decode(_ index: Int, from trickplay: Trickplay) {
-        guard pending.insert(index).inserted else { return }
-        let generation = generation
-        Task {
-            let image = await FrameDecoding.decode(trickplay, at: index)
-            guard generation == self.generation else { return }
-            pending.remove(index)
-            guard let image else { return }
-            cache[index] = image
-            recent.append(index)
-            if recent.count > Self.limit {
-                cache[recent.removeFirst()] = nil
-            }
-            landed += 1
-        }
-    }
-}
-
-private enum FrameDecoding {
-    @concurrent
-    static func decode(_ trickplay: Trickplay, at index: Int) async -> UIImage? {
-        guard let image = trickplay.image(at: index) else { return nil }
-        return await image.byPreparingForDisplay() ?? image
     }
 }
