@@ -137,6 +137,12 @@ public enum TrackRules {
         case .off?:
             return SubtitleDecision(track: nil, source: .remembered)
         case .track(let description)?:
+            // An anime's separate English file is remembered as English only: the audio picks its variant, the
+            // dub script with the dub and the translation with the original, as without a memory.
+            if isAnime, description.followsAudio,
+               let track = automaticSubtitle(in: tracks, audio: audio, isAnime: true) {
+                return SubtitleDecision(track: track, source: .remembered)
+            }
             if let track = description.match(in: tracks.visibleSubtitles) { return SubtitleDecision(track: track, source: .remembered) }
         case nil:
             break

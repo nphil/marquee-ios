@@ -73,6 +73,11 @@ public enum RememberedSubtitle: Sendable, Hashable, Codable {
             wasExternal = track.isExternal
         }
 
+        /// A separate English file, whose variant (`.en` or `.en.cc`) the playing audio decides for anime.
+        var followsAudio: Bool {
+            wasExternal && language.matches(.english) && kind != .onScreenText && kind != .commentary
+        }
+
         /// The track in another episode that matches: the same language, on-screen-text-ness and
         /// commentary-ness are required. A separate file is matched by another separate file before an
         /// embedded track; then the same kind, dub-ness and region win.
