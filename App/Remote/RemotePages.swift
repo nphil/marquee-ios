@@ -101,7 +101,7 @@ struct RemotePageView: View {
         case .more: RemoteMore()
         case .keyboard: RemoteKeyboardPage()
         case .settings: RemoteSettingsView(model: model)
-        case .diagnostics: DiagnosticsView(model: model)
+        case .diagnostics: LumaRemoteKit.DiagnosticsView(model: model)
         case .list(let list): RemoteItemList(list: list)
         }
     }

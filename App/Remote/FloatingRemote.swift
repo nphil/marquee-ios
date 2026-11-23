@@ -48,6 +48,7 @@ private struct RemoteLayer: View {
     @Environment(AppSession.self) private var session
     @Environment(RemoteStage.self) private var stage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.theme) private var theme
     /// 0 is the button, 1 the open panel.
     @State private var progress: CGFloat = 0
     /// Under Reduce Motion the panel fades in and out where it is, instead of growing.
@@ -76,9 +77,10 @@ private struct RemoteLayer: View {
                 DockSpots(space: space)
             }
             if showsOrb || stage.shown {
-                RemoteContainer(progress: progress, from: origin, to: panel, fromButton: showsOrb, lifted: stage.drag != nil) {
+                Group {
                     if stage.shown { RemotePanel(size: panel.size) }
                 }
+                .modifier(RemoteContainer(progress: progress, from: origin, to: panel, fromButton: showsOrb, lifted: stage.drag != nil, theme: theme))
                 .opacity(stage.shown ? fade : (stage.dimmed ? OrbDimming.dimmedOpacity : 1))
                 .animation(stage.dimmed ? Self.dimIn : Self.dimOut, value: stage.dimmed)
                 .allowsHitTesting(stage.shown)
@@ -297,25 +299,15 @@ private struct DockSpots: View {
 /// move from the button's to the panel's; the glyph fades out as the panel's face fades in, laid out at its
 /// full size under the surface's clip. Rectangles are animated data, so a button that glides to a new spot or a
 /// panel that refits for the keyboard moves the same way.
-private struct RemoteContainer<Content: View>: View, Animatable {
+private struct RemoteContainer: ViewModifier, Animatable {
     var progress: CGFloat
     var from: CGRect
     var to: CGRect
     /// False when no button is on screen: the surface then fades in as it grows.
     let fromButton: Bool
     let lifted: Bool
-    let content: Content
-
-    @Environment(\.theme) private var theme
-
-    init(progress: CGFloat, from: CGRect, to: CGRect, fromButton: Bool, lifted: Bool, @ViewBuilder content: () -> Content) {
-        self.progress = progress
-        self.from = from
-        self.to = to
-        self.fromButton = fromButton
-        self.lifted = lifted
-        self.content = content()
-    }
+    /// Passed in rather than read from the environment, so the modifier stays off the main actor as `Animatable` is.
+    let theme: Theme
 
     var animatableData: AnimatablePair<CGFloat, AnimatablePair<CGRect.AnimatableData, CGRect.AnimatableData>> {
         get { AnimatablePair(progress, AnimatablePair(from.animatableData, to.animatableData)) }
@@ -330,7 +322,7 @@ private struct RemoteContainer<Content: View>: View, Animatable {
     private static let handover: CGFloat = 0.35
     private static let lift: CGFloat = 1.06
 
-    var body: some View {
+    func body(content: Content) -> some View {
         let t = min(max(progress, 0), 1)
         let rect = CGRect(
             x: from.minX + (to.minX - from.minX) * t, y: from.minY + (to.minY - from.minY) * t,
