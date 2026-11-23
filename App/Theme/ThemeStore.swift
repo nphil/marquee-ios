@@ -18,8 +18,6 @@ final class ThemeStore {
     private(set) var tabBar: TabBarBehavior
     private(set) var tabLayout: TabLayout
     private(set) var showsScrollBars: Bool
-    /// How tall the mini player's bar was left, in points; nil while it is slim.
-    private(set) var miniBarHeight: Double?
 
     private enum Key {
         static let matchSystem = "marquee.theme.matchSystem"
@@ -32,7 +30,6 @@ final class ThemeStore {
         static let tabOrder = "marquee.tabOrder"
         static let tabs = "marquee.tabs"
         static let scrollBars = "marquee.scrollBars"
-        static let miniBarHeight = "marquee.miniBarHeight"
     }
 
     init() {
@@ -48,7 +45,6 @@ final class ThemeStore {
             TabLayout(savedOrder: defaults.stringArray(forKey: Key.tabOrder) ?? [], savedShown: $0)
         } ?? .standard
         showsScrollBars = defaults.object(forKey: Key.scrollBars) == nil || defaults.bool(forKey: Key.scrollBars)
-        miniBarHeight = defaults.object(forKey: Key.miniBarHeight) as? Double
     }
 
     /// The theme on screen when the iPhone's appearance is `systemScheme`.
@@ -110,11 +106,6 @@ final class ThemeStore {
         UserDefaults.standard.set(on, forKey: Key.scrollBars)
     }
 
-    func setMiniBarHeight(_ height: Double?) {
-        miniBarHeight = height
-        UserDefaults.standard.set(height, forKey: Key.miniBarHeight)
-    }
-
     /// Back to the first-launch choice, after Delete All Local Data emptied the saved one.
     func reset() {
         let catalog = ThemeCatalog.bundled
@@ -126,7 +117,6 @@ final class ThemeStore {
         tabBar = .minimise
         tabLayout = .standard
         showsScrollBars = true
-        miniBarHeight = nil
     }
 
     private func save() {

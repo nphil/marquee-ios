@@ -35,34 +35,6 @@ final class MiniPlayerTests: XCTestCase {
         XCTAssertTrue(bar.waitForNonExistence(timeout: 10), "A swipe sideways did not stop the playback")
     }
 
-    /// The grip at the bar's top centre makes the bar taller and, dragged down, slim again; a tap on it
-    /// opens the player as a tap on the bar does. The system's accessory cannot grow under the finger, so
-    /// from slim the bar takes the height it was pulled to when the grip is let go, and moves into the
-    /// tab's own inset. The glass itself shows in the screenshot.
-    @MainActor
-    func testTheBarResizesFromItsGrip() throws {
-        let app = playFilm()
-        tap("player.minimise", in: app)
-        let bar = element("miniplayer", in: app)
-        XCTAssertTrue(bar.waitForExistence(timeout: 10), "Minimising left no bar")
-        XCTAssertTrue(element("miniplayer.resize", in: app).waitForExistence(timeout: 5), "The bar has no grip")
-        // The height is kept between launches, and a run that stopped part way leaves the bar tall.
-        dragGrip(in: app, by: -3)
-        XCTAssertTrue(eventually { bar.frame.height < 60 }, "The bar did not start slim")
-        let slim = bar.frame.height
-
-        dragGrip(in: app, by: 3)
-        XCTAssertTrue(eventually { bar.frame.height > slim + 20 }, "The grip did not make the bar taller than \(slim) pt")
-        assertBar(in: app)
-        try snap("miniplayer-04-resized-rose-pine")
-
-        dragGrip(in: app, by: -3)
-        XCTAssertTrue(eventually { bar.frame.height < slim + 2 }, "The grip did not bring the bar back to \(slim) pt")
-
-        element("miniplayer.resize", in: app).tap()
-        waitFor("player", in: app)
-    }
-
     /// A channel minimised from the live player plays on in the bar, on every tab; Close stops it and the
     /// guide tunes it again.
     @MainActor
@@ -89,7 +61,7 @@ final class MiniPlayerTests: XCTestCase {
         try snap("miniplayer-03-live-rose-pine")
 
         open(tab: "Home", title: "Home", in: app)
-        XCTAssertTrue(bar.exists, "The bar did not follow to the Home tab")
+        XCTAssertTrue(bar.waitForExistence(timeout: 5), "The bar did not follow to the Home tab")
         tap("miniplayer.close", in: app)
         XCTAssertTrue(bar.waitForNonExistence(timeout: 10), "Close left the bar")
 
@@ -141,7 +113,7 @@ private extension XCTestCase {
         XCTAssertTrue(control.wait(for: \.label, toEqual: "Pause", timeout: 5), "The bar's button did not play the episode")
 
         open(tab: "Library", title: "Movies", in: app)
-        XCTAssertTrue(bar.exists, "The bar did not follow to the Library tab")
+        XCTAssertTrue(bar.waitForExistence(timeout: 5), "The bar did not follow to the Library tab")
         try snap("miniplayer-02-library-\(suffix)")
 
         // Paused, as a playing picture fades the controls 3 s after the player opens, which can come before
@@ -153,35 +125,22 @@ private extension XCTestCase {
         XCTAssertTrue(element("player.minimise", in: app).waitForExistence(timeout: 5), "The player came back without its controls")
     }
 
-    /// The bar sits inside the screen and every button in it is 44 pt or more at any text size.
+    /// The bar is the tall one, sits inside the screen and above the tab bar, and every button in it is 44 pt
+    /// or more at any text size.
     @MainActor
     func assertBar(in app: XCUIApplication) {
         let screen = app.windows.firstMatch.frame
         let frame = element("miniplayer", in: app).frame
         XCTAssertTrue(screen.insetBy(dx: -1, dy: -1).contains(frame), "The bar is not inside the screen: \(frame)")
+        XCTAssertGreaterThan(frame.height, 80, "The bar is not the tall one: \(frame)")
+        let tabBar = app.tabBars.firstMatch
+        if tabBar.exists {
+            XCTAssertLessThanOrEqual(frame.maxY, tabBar.frame.minY + 1, "The bar overlaps the tab bar: \(frame), \(tabBar.frame)")
+        }
         for control in ["miniplayer.expand", "miniplayer.control", "miniplayer.close"] {
             let button = element(control, in: app)
             XCTAssertTrue(button.waitForExistence(timeout: 5) && button.isHittable, "\(control) is not on screen")
             XCTAssertGreaterThanOrEqual(min(button.frame.width, button.frame.height), 44, "\(control) is under 44 pt")
         }
-    }
-
-    /// Whether `condition` holds within `timeout` seconds, checked every 100 ms.
-    @MainActor
-    func eventually(timeout: TimeInterval = 5, _ condition: () -> Bool) -> Bool {
-        let deadline = Date().addingTimeInterval(timeout)
-        while !condition() {
-            if Date() >= deadline { return false }
-            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
-        }
-        return true
-    }
-
-    /// Drags the grip up by `lines` of its own height, or down for a negative number.
-    @MainActor
-    func dragGrip(in app: XCUIApplication, by lines: CGFloat) {
-        let grip = element("miniplayer.resize", in: app)
-        grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.1, thenDragTo: grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5 - lines)))
     }
 }
