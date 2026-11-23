@@ -22,6 +22,8 @@ final class MiniPlayerTests: XCTestCase {
         bar.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: 0.5))
             .press(forDuration: 0.1, thenDragTo: bar.coordinate(withNormalizedOffset: CGVector(dx: 0.4, dy: -3)))
         waitFor("player", in: app)
+        // The pull starts once the player has finished opening; one during the zoom can miss the picture.
+        XCTAssertTrue(element("player.minimise", in: app).wait(for: \.isHittable, toEqual: true, timeout: 10), "The player did not finish opening")
 
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
             .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)))
