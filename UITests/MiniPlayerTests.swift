@@ -94,7 +94,7 @@ private extension XCTestCase {
     }
 
     /// Minimise leaves the episode in the bar, named and paused where it was; the bar plays it, follows to
-    /// another tab and opens the player again with a tap.
+    /// another tab, pauses it and opens the player again with a tap, controls up.
     @MainActor
     func filmFlow(suffix: String) throws {
         let app = playFilm()
@@ -115,6 +115,10 @@ private extension XCTestCase {
         XCTAssertTrue(bar.exists, "The bar did not follow to the Library tab")
         try snap("miniplayer-02-library-\(suffix)")
 
+        // Paused, as a playing picture fades the controls 3 s after the player opens, which can come before
+        // the check below.
+        control.tap()
+        XCTAssertTrue(control.wait(for: \.label, toEqual: "Play", timeout: 5), "The bar's button did not pause the episode")
         tap("miniplayer.expand", in: app)
         waitFor("player", in: app)
         XCTAssertTrue(element("player.minimise", in: app).waitForExistence(timeout: 5), "The player came back without its controls")
