@@ -168,6 +168,8 @@ struct QualityMapTests {
 
         #expect(verified(nil, version: "7") == .useOriginal(sourceKbps: nil, mediaID: "7"))
         #expect(verified(800, version: "8") == .unscored)
+        // With a version, the bitrate is not consulted: sourceKbps may be the video's or the file's.
+        #expect(verified(20_000, version: "7") == .useOriginal(sourceKbps: 20_000, mediaID: "7"))
         // Without a version, the bitrate must be this one's, as the file's or the video's.
         #expect(verified(800, version: nil) == .useOriginal(sourceKbps: 800, mediaID: nil))
         #expect(verified(1440, version: nil) == .useOriginal(sourceKbps: 1440, mediaID: nil))

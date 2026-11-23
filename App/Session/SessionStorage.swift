@@ -37,6 +37,11 @@ final class SessionStorage {
         static let linkName = "marquee.link.name"
         static let remoteEnabled = "marquee.remote.enabled"
         static let remoteAccess = "marquee.remote.access"
+        static let remoteDock = "marquee.remote.dock"
+        static let remotePanel = "marquee.remote.panel"
+        static let remoteModules = "marquee.remote.modules"
+        static let remoteMode = "marquee.remote.mode"
+        static let remoteAirMouse = "marquee.remote.airMouse"
         static let glassesEnabled = "marquee.glasses.enabled"
         static let glassesUse = "marquee.glasses.use"
         static let glassesTilt = "marquee.glasses.tilt"
@@ -209,8 +214,43 @@ final class SessionStorage {
     }
 
     var remoteAccess: RemoteAccess {
-        get { defaults.string(forKey: Key.remoteAccess).flatMap(RemoteAccess.init(rawValue:)) ?? .miniBar }
+        get { RemoteAccess(stored: defaults.string(forKey: Key.remoteAccess)) }
         set { defaults.set(newValue.rawValue, forKey: Key.remoteAccess) }
+    }
+
+    /// The remote's layout, per iPhone: where the floating button rests, the panel's rectangle, the groups of
+    /// controls it shows, the pad it opens on and whether the touchpad points by the phone's turns. Absent
+    /// means the default.
+    var remoteDock: RemoteDock? {
+        get { RemoteDock(decoding: defaults.string(forKey: Key.remoteDock)) }
+        set { defaults.set(newValue?.encoded, forKey: Key.remoteDock) }
+    }
+
+    var remotePanel: PanelFractions? {
+        get { PanelFractions(decoding: defaults.string(forKey: Key.remotePanel)) }
+        set { defaults.set(newValue?.encoded, forKey: Key.remotePanel) }
+    }
+
+    var remoteModules: Set<RemoteModule> {
+        get { decodeRemoteModules(defaults.string(forKey: Key.remoteModules)) }
+        set { defaults.set(encodeRemoteModules(newValue), forKey: Key.remoteModules) }
+    }
+
+    var remoteMode: RemotePadMode {
+        get { RemotePadMode(decoding: defaults.string(forKey: Key.remoteMode)) }
+        set { defaults.set(newValue.rawValue, forKey: Key.remoteMode) }
+    }
+
+    var remoteAirMouse: Bool {
+        get { defaults.bool(forKey: Key.remoteAirMouse) }
+        set { defaults.set(newValue, forKey: Key.remoteAirMouse) }
+    }
+
+    /// Arrange › Reset: the panel, the groups and the pad go back to the defaults.
+    func resetRemoteLayout() {
+        for key in [Key.remotePanel, Key.remoteModules, Key.remoteMode] {
+            defaults.removeObject(forKey: key)
+        }
     }
 
     /// The big-screen plugin (XR glasses and TVs) is on, what a connected display is for, which kind a
