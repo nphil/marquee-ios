@@ -24,6 +24,8 @@ final class SessionStorage {
         static let speechDockAddress = "marquee.speechDock.address"
         static let bazarrAddress = "marquee.bazarr.address"
         static let bazarrKey = "marquee.bazarr.key"
+        static func arrAddress(_ kind: ArrKind) -> String { "marquee.\(kind.rawValue).address" }
+        static func arrKey(_ kind: ArrKind) -> String { "marquee.\(kind.rawValue).key" }
         static let homelabberAddress = "marquee.homelabber.address"
         static let homelabberToken = "marquee.homelabber.token"
         static let seerrAddress = "marquee.seerr.address"
@@ -146,6 +148,17 @@ final class SessionStorage {
             defaults.set(newValue?.address, forKey: Key.bazarrAddress)
             setSecret(newValue.map { Data($0.apiKey.utf8) }, for: Key.bazarrKey)
         }
+    }
+
+    /// Radarr's or Sonarr's address and API key; the key is a secret like Bazarr's. Kept through sign-out.
+    func arr(_ kind: ArrKind) -> ArrConfig? {
+        guard let address = defaults.url(forKey: Key.arrAddress(kind)), let key = secret(Key.arrKey(kind)) else { return nil }
+        return ArrConfig(address: address, apiKey: String(decoding: key, as: UTF8.self))
+    }
+
+    func setArr(_ config: ArrConfig?, for kind: ArrKind) {
+        defaults.set(config?.address, forKey: Key.arrAddress(kind))
+        setSecret(config.map { Data($0.apiKey.utf8) }, for: Key.arrKey(kind))
     }
 
     /// HomeLabber's address and its read-only token for the quality map; the token is a secret like
@@ -290,6 +303,8 @@ final class SessionStorage {
         seerr = nil
         homelabber = nil
         ntfy = nil
+        setArr(nil, for: .radarr)
+        setArr(nil, for: .sonarr)
         defaults.removePersistentDomain(forName: domain)
     }
 

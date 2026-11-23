@@ -82,7 +82,7 @@ Screens do not own fetch logic scattered across views:
 
 ### Integrations
 
-Integrations (SpeechDock, Bazarr, Chromecast, the direct Live TV path, anything added later) are off until enabled in Settings, each with its own page and stored connection. They supply data to the core and never styling. Secrets such as an API key go to the Keychain, and an address that is not a viewing preference is kept per iPhone rather than per profile.
+Integrations (SpeechDock, Bazarr, Radarr, Sonarr, Chromecast, the direct Live TV path, anything added later) are off until enabled in Settings, each with its own page and stored connection. They supply data to the core and never styling. Secrets such as an API key go to the Keychain, and an address that is not a viewing preference is kept per iPhone rather than per profile. Radarr and Sonarr are asked only by a title delete (`MediaDeletion`), which removes the title from them with its files and adds it to their import exclusion lists.
 
 ### Seerr requests
 

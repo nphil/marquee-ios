@@ -37,11 +37,19 @@ private struct DeleteConfirmation: ViewModifier {
     @Environment(\.plexWatchlist) private var watchlist
     @Environment(LibraryChanges.self) private var changes
     @Environment(ToastCenter.self) private var toasts
+    @Environment(AppSession.self) private var session
     @State private var failure: Failure?
+    @State private var leftover: Leftover?
 
     private struct Failure {
         let target: DeleteTarget
         let outcome: DeleteOutcome
+    }
+
+    /// A title that is gone from the server, with the steps after the delete that did not go through.
+    private struct Leftover {
+        let target: DeleteTarget
+        let result: MediaDeletionResult
     }
 
     func body(content: Content) -> some View {
@@ -56,7 +64,7 @@ private struct DeleteConfirmation: ViewModifier {
                     .accessibilityIdentifier("delete.confirm")
                 Button("Cancel", role: .cancel) {}
             } message: { target in
-                Text(Self.message(target))
+                Text(Self.message(target, also: Self.places(for: target, session: session)))
             }
             .alert(
                 failure?.outcome == .notAllowed ? "Deleting Is Turned Off" : "Couldn't Delete",
@@ -74,6 +82,20 @@ private struct DeleteConfirmation: ViewModifier {
                     ? "The server doesn't allow deleting media. Its owner can turn on Allow media deletion in the Plex server's Settings, under Library."
                     : "“\(failure.target.item.title)” is still on the server. Check the connection, then try again.")
             }
+            .alert(
+                "Deleted, but Not Everywhere",
+                isPresented: Binding { leftover != nil } set: { if !$0 { leftover = nil } },
+                presenting: leftover
+            ) { leftover in
+                if leftover.result.canRetry {
+                    Button("Retry") { retry(leftover) }
+                    Button("Not Now", role: .cancel) {}
+                } else {
+                    Button("OK", role: .cancel) {}
+                }
+            } message: { leftover in
+                Text(Self.shortfall(of: leftover.result, arrName: Self.arrName(leftover.target)).joined(separator: "\n"))
+            }
     }
 
     static func title(_ target: DeleteTarget) -> String {
@@ -83,17 +105,64 @@ private struct DeleteConfirmation: ViewModifier {
         }
     }
 
-    static func message(_ target: DeleteTarget) -> String {
+    /// `places` are the connected services that also drop the title, which the message names.
+    static func message(_ target: DeleteTarget, also places: [String] = []) -> String {
         switch target {
         case .title(let item):
-            switch item.type {
-            case .show: "Every season and episode, and their files, are removed from the server's disk. This can't be undone."
-            case .season: "Every episode in this season, and their files, are removed from the server's disk. This can't be undone."
-            default: "Its files are removed from the server's disk. This can't be undone."
+            let files = switch item.type {
+            case .show: "Every season and episode, and their files, are removed from the server's disk."
+            case .season: "Every episode in this season, and their files, are removed from the server's disk."
+            default: "Its files are removed from the server's disk."
             }
+            guard !places.isEmpty else { return "\(files) This can't be undone." }
+            return "\(files) It is also removed from \(places.formatted(.list(type: .and))), so it isn't downloaded again. This can't be undone."
         case .version(let item, let index):
-            "The \(item.media[index].versionLabel) file is removed from the server's disk. The other versions stay. This can't be undone."
+            return "The \(item.media[index].versionLabel) file is removed from the server's disk. The other versions stay. This can't be undone."
         }
+    }
+
+    /// The connected services that also drop a movie or show: Radarr or Sonarr, and Seerr.
+    static func places(for target: DeleteTarget, session: AppSession) -> [String] {
+        guard case .title(let item) = target, item.type == .movie || item.type == .show else { return [] }
+        let kind = item.type == .movie ? ArrKind.radarr : ArrKind.sonarr
+        var names: [String] = []
+        if session.arr.config(kind) != nil { names.append(kind.appName) }
+        if session.seerr.isEnabled { names.append("Seerr") }
+        return names
+    }
+
+    /// Radarr holds movies; Sonarr holds shows, and so their seasons and episodes.
+    static func arrName(_ target: DeleteTarget) -> String {
+        (target.item.type == .movie ? ArrKind.radarr : ArrKind.sonarr).appName
+    }
+
+    /// What a delete left undone after the server dropped the title, one line each; empty when there is
+    /// nothing to report. A service that was not connected, or had nothing to remove, says nothing.
+    static func shortfall(of result: MediaDeletionResult, arrName: String) -> [String] {
+        var lines: [String] = []
+        if result.watchlist.isFailed {
+            lines.append("It is still on your Watchlist, which can request it again.")
+        }
+        switch result.arr {
+        case .failed: lines.append("\(arrName) didn't answer, so it may still hold the title and download it again.")
+        case .refused: lines.append("\(arrName) refused the API key. Check it in Settings, under Integrations.")
+        case .notConnected, .notApplicable, .unmatched, .removed: break
+        }
+        switch result.requests {
+        case .failed: lines.append("Seerr didn't answer, so it may still show the title as requested.")
+        case .refused: lines.append("Seerr wouldn't remove it: the signed-in account can't manage requests.")
+        case .notConnected, .notApplicable, .unmatched, .removed: break
+        }
+        return lines
+    }
+
+    /// The toast when every step went through: the title, and the services that dropped it.
+    static func summary(of result: MediaDeletionResult, target: DeleteTarget, arrName: String) -> String {
+        var names: [String] = []
+        if result.arr == .removed { names.append(arrName) }
+        if result.requests == .removed { names.append("Seerr") }
+        let deleted = "Deleted “\(target.item.title)”"
+        return names.isEmpty ? deleted : "\(deleted) and removed it from \(names.formatted(.list(type: .and)))"
     }
 
     private func perform(_ target: DeleteTarget) {
@@ -101,29 +170,20 @@ private struct DeleteConfirmation: ViewModifier {
         let item = target.item
         let changes = changes
         let toasts = toasts
-        let watchlist = watchlist
+        let deleting = deletion(on: library)
         let onDeleted = onDeleted
         Task {
             switch target {
             case .title:
-                let result = await MediaDeletion(server: library, watchlist: watchlist)
-                    .delete(item, alreadyDeleted: changes.deleted) { @MainActor in
-                        changes.recordDeletion(of: item, server: library.server.id)
-                        onDeleted(target)
-                    }
+                let result = await deleting.delete(item, alreadyDeleted: changes.deleted) { @MainActor in
+                    changes.recordDeletion(of: item, server: library.server.id)
+                    onDeleted(target)
+                }
                 guard result.outcome == .deleted else {
                     failure = Failure(target: target, outcome: result.outcome)
                     return
                 }
-                switch result.watchlist {
-                case .removed(let guid):
-                    changes.hideFromWatchlist(guid: guid)
-                    toasts.show("Deleted “\(item.title)”")
-                case .failed:
-                    toasts.show("Deleted, but couldn't remove it from your Watchlist.")
-                case .unchanged:
-                    toasts.show("Deleted “\(item.title)”")
-                }
+                conclude(result, of: target)
             case .version(_, let index):
                 let outcome = await library.deleteVersion(item.media[index].id, of: item.ratingKey)
                 guard outcome == .deleted else {
@@ -134,6 +194,35 @@ private struct DeleteConfirmation: ViewModifier {
                 toasts.show("Deleted the \(item.media[index].versionLabel) version")
                 onDeleted(target)
             }
+        }
+    }
+
+    /// The delete and what follows it: the Watchlist, Radarr or Sonarr, and Seerr, each only where connected.
+    private func deletion(on library: PlexLibrary) -> MediaDeletion {
+        MediaDeletion(server: library, watchlist: watchlist, arr: session.arr.services, requests: session.seerr.client)
+    }
+
+    /// Repeats the steps that failed. The title is already off the server and out of every list.
+    private func retry(_ leftover: Leftover) {
+        guard let library else { return }
+        let deleting = deletion(on: library)
+        let changes = changes
+        Task {
+            let result = await deleting.retry(leftover.result, alreadyDeleted: changes.deleted)
+            conclude(result, of: leftover.target)
+        }
+    }
+
+    /// A toast when every step went through; otherwise an alert that says what is left, with Retry.
+    private func conclude(_ result: MediaDeletionResult, of target: DeleteTarget) {
+        if case .removed(let guid) = result.watchlist {
+            changes.hideFromWatchlist(guid: guid)
+        }
+        let arrName = Self.arrName(target)
+        if Self.shortfall(of: result, arrName: arrName).isEmpty {
+            toasts.show(Self.summary(of: result, target: target, arrName: arrName))
+        } else {
+            leftover = Leftover(target: target, result: result)
         }
     }
 }

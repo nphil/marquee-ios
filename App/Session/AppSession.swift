@@ -74,6 +74,8 @@ final class AppSession {
     private var settingsLoaded = false
     /// Bazarr (DESIGN §8.7 Integrations), kept per iPhone.
     let bazarr: BazarrSettings
+    /// Radarr and Sonarr (DESIGN §8.7 Integrations), kept per iPhone: where a deleted title is also removed.
+    let arr: ArrSettings
     /// HomeLabber's quality map for download sizes (DESIGN §8.7 Integrations), kept per iPhone.
     let homelabber: HomeLabberSettings
     /// Seerr (DESIGN §8.7 Integrations, §8.8 Requests), kept per iPhone.
@@ -115,6 +117,7 @@ final class AppSession {
         let downloads = DownloadCenter()
         self.downloads = downloads
         bazarr = BazarrSettings(storage: storage, transport: transport)
+        arr = ArrSettings(storage: storage, transport: transport)
         homelabber = HomeLabberSettings(storage: storage, transport: transport, downloads: downloads)
         seerr = SeerrSettings(storage: storage)
         speechDock = SpeechDockSettings(storage: storage, transport: transport)

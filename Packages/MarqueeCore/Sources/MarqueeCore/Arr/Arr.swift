@@ -4,7 +4,7 @@ import Foundation
 public enum ArrKind: String, Sendable, Hashable, CaseIterable, Codable {
     case radarr, sonarr
 
-    var appName: String { rawValue.capitalized }
+    public var appName: String { rawValue.capitalized }
 }
 
 /// Where Sonarr or Radarr answers and the API key it accepts. The settings page takes both the way

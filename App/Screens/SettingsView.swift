@@ -1,3 +1,4 @@
+import MarqueeCore
 import SwiftUI
 
 /// Settings (DESIGN §8.7). Home rows and playback, audio and subtitle choices belong to the active Plex
@@ -141,6 +142,17 @@ struct SettingsView: View {
                     }
                 }
                 .accessibilityIdentifier("settings.bazarr")
+                ForEach(ArrKind.allCases, id: \.self) { kind in
+                    NavigationLink {
+                        ArrView(kind: kind)
+                    } label: {
+                        LabeledContent(kind.appName) {
+                            Text(session.arr.config(kind) == nil ? "Off" : "On")
+                                .foregroundStyle(theme.ink2)
+                        }
+                    }
+                    .accessibilityIdentifier("settings.\(kind.rawValue)")
+                }
                 NavigationLink {
                     HomeLabberView()
                 } label: {
