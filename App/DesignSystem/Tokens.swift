@@ -40,6 +40,8 @@ enum Size {
     /// `target` squares.
     static let miniPicture = CGSize(width: 64, height: 36)
     static let miniProgress: CGFloat = 2
+    /// The grip that resizes the mini player bar: its touch box (DESIGN §8.6.1).
+    static let miniHandle = CGSize(width: 96, height: 20)
 }
 
 enum Radius {

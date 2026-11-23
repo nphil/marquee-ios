@@ -167,8 +167,8 @@ private struct LiveMiniBar: View {
 
 /// The bar itself (DESIGN §8.6.1): the picture, the title and a second line, the transport and Close,
 /// and a thin accent line along the bottom for how far the playback has run. A tap or a swipe up opens the
-/// player; a swipe sideways stops the playback. In the inline placement, with the tab bar minimised, only
-/// the picture and the transport stay.
+/// player; a swipe sideways stops the playback. A grip at the top centre makes the bar taller or shorter
+/// by dragging. In the inline placement, with the tab bar minimised, only the picture and the transport stay.
 struct MiniPlayerBar<Picture: View>: View {
     let title: String
     let detail: String?
@@ -185,8 +185,14 @@ struct MiniPlayerBar<Picture: View>: View {
     @Environment(\.sheetZoomNamespace) private var zoomNamespace
     @Environment(\.tabViewBottomAccessoryPlacement) private var placement
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(ThemeStore.self) private var store
     /// How far a sideways swipe has carried the bar.
     @State private var slide: CGFloat = 0
+    /// The bar's measured width, which limits how tall it may grow; zero until it is measured.
+    @State private var width: CGFloat = 0
+    /// The height the bar had when the grip was grabbed, and the height the grip holds it at while dragged.
+    @State private var grabbed: Double?
+    @State private var held: Double?
 
     /// A swipe up of this much opens the player; a swipe sideways of this much, or flung this far, stops it.
     private static var upDistance: CGFloat { 30 }
@@ -207,7 +213,35 @@ struct MiniPlayerBar<Picture: View>: View {
         self.picture = picture()
     }
 
+    private var limits: MiniBarSize {
+        MiniBarSize(slim: Size.target, margin: (Size.target - Size.miniPicture.height) / 2, width: width)
+    }
+
+    /// Slim in the inline placement; else the height the grip holds, or the one it left.
+    private var barHeight: Double {
+        placement == .inline ? limits.slim : (held ?? limits.rest(store.miniBarHeight ?? limits.slim))
+    }
+
+    private var fade: Double {
+        1 - Double(min(abs(slide), 160)) / 320
+    }
+
     var body: some View {
+        bar
+            // Above the bar and outside its swipe, so dragging the grip never opens the player; it follows
+            // the bar's slide.
+            .overlay(alignment: .top) {
+                if placement != .inline, limits.tallest > limits.slim {
+                    handle
+                        .offset(x: slide)
+                        .opacity(fade)
+                }
+            }
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("miniplayer")
+    }
+
+    private var bar: some View {
         HStack(spacing: Space.s2) {
             Button(action: expand) {
                 HStack(spacing: Space.s3) {
@@ -250,13 +284,12 @@ struct MiniPlayerBar<Picture: View>: View {
             }
         }
         .padding(.horizontal, Space.s3)
-        .frame(maxWidth: .infinity, minHeight: Size.target)
+        .frame(maxWidth: .infinity, minHeight: CGFloat(barHeight))
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .overlay(alignment: .bottom) { line }
         .offset(x: slide)
-        .opacity(1 - min(abs(slide), 160) / 320)
+        .opacity(fade)
         .simultaneousGesture(swipe)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("miniplayer")
     }
 
     private var tile: some View {
@@ -270,7 +303,10 @@ struct MiniPlayerBar<Picture: View>: View {
                     .foregroundStyle(theme.ink)
             }
         }
-        .frame(width: Size.miniPicture.width, height: Size.miniPicture.height)
+        .frame(
+            width: CGFloat(limits.pictureWidth(inBar: barHeight)),
+            height: CGFloat(limits.pictureHeight(inBar: barHeight))
+        )
         .clipShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
         .miniPlayerZoomSource(in: zoomNamespace)
         .accessibilityHidden(true)
@@ -333,5 +369,61 @@ struct MiniPlayerBar<Picture: View>: View {
                 }
                 withAnimation(Motion.spring(reduceMotion: reduceMotion)) { slide = 0 }
             }
+    }
+
+    /// The grip: drag it up for a taller bar and a larger picture, down for a smaller one. Faint at rest;
+    /// the accent and longer while held.
+    private var handle: some View {
+        Capsule()
+            .fill(held == nil ? theme.ink3.opacity(0.5) : theme.accent)
+            .frame(width: held == nil ? Space.s8 : Space.s8 + Space.s7, height: Space.s1)
+            .padding(.top, Space.s1)
+            .frame(width: Size.miniHandle.width, height: Size.miniHandle.height, alignment: .top)
+            .contentShape(Rectangle())
+            .animation(Motion.spring(reduceMotion: reduceMotion), value: held == nil)
+            .gesture(resize)
+            .accessibilityElement()
+            .accessibilityLabel("Resize player bar")
+            .accessibilityValue("\(Int((limits.fraction(barHeight) * 100).rounded())) percent")
+            .accessibilityAdjustableAction { direction in
+                let step = (limits.tallest - limits.slim) / 4
+                switch direction {
+                case .increment: land(barHeight + step)
+                case .decrement: land(barHeight - step)
+                @unknown default: break
+                }
+            }
+            .accessibilityIdentifier("miniplayer.resize")
+    }
+
+    /// Up makes the bar taller. A tap that does not move opens the player, as a tap on the bar does.
+    private var resize: some Gesture {
+        DragGesture(minimumDistance: 0, coordinateSpace: .global)
+            .onChanged { value in
+                let start = grabbed ?? barHeight
+                grabbed = start
+                held = limits.held(start - value.translation.height)
+            }
+            .onEnded { value in
+                let start = grabbed ?? barHeight
+                grabbed = nil
+                if abs(value.translation.width) < 4, abs(value.translation.height) < 4 {
+                    held = nil
+                    expand()
+                } else {
+                    land(start - value.translation.height)
+                }
+            }
+    }
+
+    /// Lets the bar go at `height`: it rests within the limits and is kept, unless it is slim.
+    private func land(_ height: Double) {
+        let rest = limits.rest(height)
+        let changed = rest != limits.rest(store.miniBarHeight ?? limits.slim)
+        withAnimation(Motion.spring(reduceMotion: reduceMotion)) {
+            held = nil
+            store.setMiniBarHeight(rest > limits.slim ? rest : nil)
+        }
+        if changed { Diag.event(.ui, "miniBar.resize", ["pt": "\(Int(rest.rounded()))"]) }
     }
 }
