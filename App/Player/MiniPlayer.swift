@@ -133,6 +133,8 @@ private struct LiveMiniBar: View {
             // The programme and its progress move every 30 s, as in the live player.
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(30))
+                // The tick redraws every page that shows the guide's clock, so a scroll in progress finishes first.
+                await ScrollMonitor.shared.untilSettled()
                 model.store.tick()
             }
         }

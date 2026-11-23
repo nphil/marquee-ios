@@ -105,6 +105,12 @@ final class GuideGridView: UIView, UICollectionViewDataSource, UICollectionViewD
     private var needsAnchor = true
     private var reportedNowVisible: Bool?
     private var cornerDay = ""
+    /// The quarter hour under the channel column that `cornerDay` was last worked out for.
+    private var cornerSlot: Int?
+    /// The horizontal offset the pinned titles and the day label were last placed for.
+    private var scrolledX: CGFloat?
+
+    private static let surface = "GuideGrid"
 
     init() {
         collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
@@ -146,6 +152,7 @@ final class GuideGridView: UIView, UICollectionViewDataSource, UICollectionViewD
         let oldStyle = self.style
         self.content = content
         self.style = style
+        if content.now != old.now { cornerSlot = nil }
         let metrics = GuideLayout.Metrics(regular: style.regular, typeSize: style.typeSize)
         let dataChanged = content.channels != old.channels || content.guide != old.guide
         if dataChanged {
@@ -209,7 +216,7 @@ final class GuideGridView: UIView, UICollectionViewDataSource, UICollectionViewD
             scrollToNow(animated: false)
         }
         placeNow(animated: false)
-        scrolled()
+        scrolled(force: true)
     }
 
     override func safeAreaInsetsDidChange() {
@@ -236,11 +243,31 @@ final class GuideGridView: UIView, UICollectionViewDataSource, UICollectionViewD
         scrolled()
     }
 
-    private func scrolled() {
-        pinTitles()
+    func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
+        ScrollMonitor.shared.moving(true, surface: Self.surface, phase: "interacting")
+    }
+
+    func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
+        ScrollMonitor.shared.moving(decelerate, surface: Self.surface, phase: "decelerating")
+    }
+
+    func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
+        ScrollMonitor.shared.moving(false, surface: Self.surface, phase: "idle")
+    }
+
+    override func willMove(toWindow newWindow: UIWindow?) {
+        super.willMove(toWindow: newWindow)
+        if newWindow == nil { ScrollMonitor.shared.moving(false, surface: Self.surface, phase: "idle") }
+    }
+
+    private func scrolled(force: Bool = false) {
         placePill()
-        let x = layout.x(for: content.now)
         let offset = collectionView.contentOffset
+        // The rest follows the time axis, which a vertical scroll never moves.
+        guard force || offset.x != scrolledX else { return }
+        scrolledX = offset.x
+        pinTitles()
+        let x = layout.x(for: content.now)
         let visible = !rows.isEmpty && x >= offset.x + layout.columnWidth && x <= offset.x + collectionView.bounds.width - layout.trailing
         if visible != reportedNowVisible {
             reportedNowVisible = visible
@@ -248,7 +275,13 @@ final class GuideGridView: UIView, UICollectionViewDataSource, UICollectionViewD
             // Not during a SwiftUI update: the first report comes from the update's layout pass.
             Task { @MainActor in report?(visible) }
         }
-        let day = LiveText.day(layout.date(at: offset.x + layout.columnWidth), now: content.now)
+        // The label turns at midnight and at 5 PM, which fall on a quarter hour in every time zone, so the
+        // calendar is asked once per 15 minutes scrolled and not on every frame.
+        let moment = layout.date(at: offset.x + layout.columnWidth)
+        let slot = Int((moment.timeIntervalSinceReferenceDate / 900).rounded(.down))
+        guard slot != cornerSlot else { return }
+        cornerSlot = slot
+        let day = LiveText.day(moment, now: content.now)
         if day != cornerDay {
             cornerDay = day
             for case let corner as GuideCorner in collectionView.visibleSupplementaryViews(ofKind: GuideLayout.cornerKind) {

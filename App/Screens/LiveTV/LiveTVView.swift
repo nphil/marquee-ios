@@ -98,6 +98,8 @@ private struct LiveGuideScreen: View {
                 // The now line, progress and "left" move every 30 s; a stale guide reloads.
                 while !Task.isCancelled {
                     try? await Task.sleep(for: .seconds(30))
+                    // A tick redraws the whole guide, so a scroll in progress finishes first.
+                    await ScrollMonitor.shared.untilSettled()
                     store.tick()
                 }
             }
