@@ -35,29 +35,31 @@ final class MiniPlayerTests: XCTestCase {
         XCTAssertTrue(bar.waitForNonExistence(timeout: 10), "A swipe sideways did not stop the playback")
     }
 
-    /// The grip at the bar's top centre drags the bar taller and, dragged down, slim again; a tap on it
-    /// opens the player as a tap on the bar does. The glass itself shows in the screenshot.
+    /// The grip at the bar's top centre makes the bar taller and, dragged down, slim again; a tap on it
+    /// opens the player as a tap on the bar does. The system's accessory cannot grow under the finger, so
+    /// from slim the bar takes the height it was pulled to when the grip is let go, and moves into the
+    /// tab's own inset. The glass itself shows in the screenshot.
     @MainActor
     func testTheBarResizesFromItsGrip() throws {
         let app = playFilm()
         tap("player.minimise", in: app)
         let bar = element("miniplayer", in: app)
         XCTAssertTrue(bar.waitForExistence(timeout: 10), "Minimising left no bar")
-        let grip = element("miniplayer.resize", in: app)
-        XCTAssertTrue(grip.waitForExistence(timeout: 5), "The bar has no grip")
+        XCTAssertTrue(element("miniplayer.resize", in: app).waitForExistence(timeout: 5), "The bar has no grip")
+        // The height is kept between launches, and a run that stopped part way leaves the bar tall.
+        dragGrip(in: app, by: -3)
+        XCTAssertTrue(eventually { bar.frame.height < 60 }, "The bar did not start slim")
         let slim = bar.frame.height
 
-        grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.1, thenDragTo: grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: -3)))
+        dragGrip(in: app, by: 3)
         XCTAssertTrue(eventually { bar.frame.height > slim + 20 }, "The grip did not make the bar taller than \(slim) pt")
         assertBar(in: app)
         try snap("miniplayer-04-resized-rose-pine")
 
-        grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-            .press(forDuration: 0.1, thenDragTo: grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 8)))
+        dragGrip(in: app, by: -3)
         XCTAssertTrue(eventually { bar.frame.height < slim + 2 }, "The grip did not bring the bar back to \(slim) pt")
 
-        grip.tap()
+        element("miniplayer.resize", in: app).tap()
         waitFor("player", in: app)
     }
 
@@ -173,5 +175,13 @@ private extension XCTestCase {
             RunLoop.current.run(until: Date().addingTimeInterval(0.1))
         }
         return true
+    }
+
+    /// Drags the grip up by `lines` of its own height, or down for a negative number.
+    @MainActor
+    func dragGrip(in app: XCUIApplication, by lines: CGFloat) {
+        let grip = element("miniplayer.resize", in: app)
+        grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.1, thenDragTo: grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5 - lines)))
     }
 }

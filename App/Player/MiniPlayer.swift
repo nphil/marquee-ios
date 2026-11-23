@@ -2,10 +2,11 @@ import MarqueeCore
 import SwiftUI
 import UIKit
 
-/// The bar above the tab bar for a playback that was minimised (DESIGN §8.6.1). It is the tab view's
+/// The bar above the tab bar for a playback that was minimised (DESIGN §8.6.1). Slim, it is the tab view's
 /// bottom accessory, so the system draws its glass, keeps it above the tab bar on every tab and shrinks
-/// it beside the bar when the bar minimises on scroll. It takes the place of the TV remote's mini bar
-/// while a playback is minimised, and gives it back when the playback ends.
+/// it beside the bar when the bar minimises on scroll. Taller, it sits in the selected tab's own inset
+/// (`miniBarInset`). It takes the place of the TV remote's mini bar while a playback is minimised, and
+/// gives it back when the playback ends.
 struct MiniPlayerAccessory: View {
     @Environment(AppSession.self) private var session
     /// The remote's mini bar is on: it shows whenever no playback is minimised.
@@ -184,6 +185,7 @@ struct MiniPlayerBar<Picture: View>: View {
     @Environment(\.theme) private var theme
     @Environment(\.sheetZoomNamespace) private var zoomNamespace
     @Environment(\.tabViewBottomAccessoryPlacement) private var placement
+    @Environment(\.growsMiniBar) private var grows
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(ThemeStore.self) private var store
     /// How far a sideways swipe has carried the bar.
@@ -217,9 +219,14 @@ struct MiniPlayerBar<Picture: View>: View {
         MiniBarSize(slim: Size.target, margin: (Size.target - Size.miniPicture.height) / 2, width: width)
     }
 
-    /// Slim in the inline placement; else the height the grip holds, or the one it left.
+    /// Slim in the system accessory, whose glass keeps its own height whatever it holds (a 91 pt bar in
+    /// it showed 48 pt of glass and clipped the rest); in the tab's own inset the height the grip holds,
+    /// or the one it left. Until the bar is measured the kept height stands, so a rebuilt bar does not
+    /// flash slim.
     private var barHeight: Double {
-        placement == .inline ? limits.slim : (held ?? limits.rest(store.miniBarHeight ?? limits.slim))
+        guard grows else { return limits.slim }
+        let kept = store.miniBarHeight ?? limits.slim
+        return held ?? (width > 0 ? limits.rest(kept) : kept)
     }
 
     private var fade: Double {
@@ -372,7 +379,8 @@ struct MiniPlayerBar<Picture: View>: View {
     }
 
     /// The grip: drag it up for a taller bar and a larger picture, down for a smaller one. Faint at rest;
-    /// the accent and longer while held.
+    /// the accent and longer while held. In the system accessory the bar cannot grow under the finger, so
+    /// it takes the height it was pulled to when the grip is let go, and moves into the tab's own inset.
     private var handle: some View {
         Capsule()
             .fill(held == nil ? theme.ink3.opacity(0.5) : theme.accent)
@@ -426,4 +434,39 @@ struct MiniPlayerBar<Picture: View>: View {
         }
         if changed { Diag.event(.ui, "miniBar.resize", ["pt": "\(Int(rest.rounded()))"]) }
     }
+}
+
+extension View {
+    /// A bar made taller than the system's bottom accessory can be, above the tab bar in the tab's own
+    /// bottom inset. Only the selected tab shows it: the playback's layer view lives in one place at a time.
+    func miniBarInset(isSelected: Bool) -> some View {
+        modifier(MiniBarInset(isSelected: isSelected))
+    }
+}
+
+/// The accessory's glass keeps its height whatever it holds, so above slim the bar is ours: the same glass,
+/// with the corners a 48 pt capsule has.
+private struct MiniBarInset: ViewModifier {
+    let isSelected: Bool
+    @Environment(AppSession.self) private var session
+    @Environment(ThemeStore.self) private var store
+
+    func body(content: Content) -> some View {
+        content.safeAreaInset(edge: .bottom, spacing: 0) {
+            if isSelected, session.player.docked != nil, store.miniBarHeight != nil {
+                MiniPlayerAccessory(showsRemote: false)
+                    .environment(\.growsMiniBar, true)
+                    .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+                    .padding(.horizontal, Space.s5)
+                    .padding(.bottom, Space.s2)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+    }
+}
+
+extension EnvironmentValues {
+    /// Set in the tab's own inset, where the bar is as tall as the person made it; in the system's
+    /// accessory it stays slim.
+    @Entry var growsMiniBar = false
 }

@@ -184,12 +184,13 @@ private struct MainTabs: View {
             ForEach(tabs) { destination in
                 Tab(destination.title, systemImage: destination.systemImage, value: destination, role: destination == .search ? .search : nil) {
                     BrowseStack(tab: destination.rawValue) { destination.page() }
+                        .miniBarInset(isSelected: destination == selection)
                 }
                 .badge(destination.badge(in: session))
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .tabViewBottomAccessory(isEnabled: showsRemoteBar || session.player.docked != nil) {
+        .tabViewBottomAccessory(isEnabled: showsAccessory) {
             MiniPlayerAccessory(showsRemote: showsRemoteBar)
         }
         .diagPresentation("livetv.player", isPresented: session.player.livePresented != nil)
@@ -234,6 +235,12 @@ private struct MainTabs: View {
     /// The remote's mini bar, which a minimised playback takes the place of.
     private var showsRemoteBar: Bool {
         session.remote.isEnabled && session.remote.access == .miniBar && session.place == .home && !session.glasses.isConnected
+    }
+
+    /// The system's bottom accessory: a minimised playback while its bar is slim, else the remote's mini
+    /// bar. A taller bar sits in each tab's own inset (`miniBarInset`), as the accessory's glass cannot grow.
+    private var showsAccessory: Bool {
+        session.player.docked != nil ? store.miniBarHeight == nil : showsRemoteBar
     }
 
     /// The live player's cover hangs here, over every tab, so the mini player bar can open it from any.
