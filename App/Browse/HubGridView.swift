@@ -12,7 +12,6 @@ struct HubGridView: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(LibraryChanges.self) private var changes
     @State private var titles = PagedLoader<PlexMetadata>()
-    private let prefetch = ArtPrefetcher()
 
     var body: some View {
         WidthReader { width in
@@ -26,11 +25,12 @@ struct HubGridView: View {
                                 PosterCell(item: item, width: metrics.cellWidth, zoomID: zoomID)
                             }
                             .buttonStyle(.press)
-                            .onAppear { appeared(item, metrics: metrics) }
+                            .onAppear { titles.cellAppeared(item.id) }
                         }
                     }
                     .padding(.horizontal, Space.inset)
                     .padding(.vertical, Space.s3)
+                    .prefetchesNewestPage(of: titles, cellWidth: metrics.cellWidth)
                 }
                 .refreshable { await titles.refresh() }
                 .scrollHeader()
@@ -57,12 +57,5 @@ struct HubGridView: View {
                 try await library.list(key, start: start, size: size)
             }
         }
-    }
-
-    private func appeared(_ item: PlexMetadata, metrics: PosterGridMetrics) {
-        Task { await titles.loadMoreIfNeeded(after: item.id) }
-        guard let index = titles.items.firstIndex(where: { $0.id == item.id }), index % metrics.columns == 0 else { return }
-        let ahead = titles.items.dropFirst(index + metrics.columns * 2).prefix(metrics.columns * 2)
-        prefetch(ahead.map(\.posterPath), size: PosterCell.artSize(width: metrics.cellWidth))
     }
 }

@@ -129,7 +129,6 @@ private struct SectionBrowser: View {
     @State private var letters = Remote<[AlphabetIndexEntry]>()
     @State private var genres = Remote<[PlexDirectory]>()
     @State private var jumpTask: Task<Void, Never>? = nil
-    private let prefetch = ArtPrefetcher()
 
     enum Segment: Hashable {
         case all, collections, recommended
@@ -374,11 +373,12 @@ private struct SectionBrowser: View {
                 .buttonStyle(.press)
                 .showWatchedMenu(item) { shown in _ = loader.patch(item.markedWatched(shown)) }
                 .id(item.id)
-                .onAppear { appeared(item, in: loader, metrics: metrics) }
+                .onAppear { loader.cellAppeared(item.id) }
             }
         }
         .padding(.leading, Space.inset)
         .padding(.trailing, trailingInset)
+        .prefetchesNewestPage(of: loader, cellWidth: metrics.cellWidth)
     }
 
     @ViewBuilder
@@ -393,14 +393,6 @@ private struct SectionBrowser: View {
     }
 
     // MARK: Loading
-
-    /// Asks for the next page near the end, and starts the posters two to four rows ahead.
-    private func appeared(_ item: PlexMetadata, in loader: PagedLoader<PlexMetadata>, metrics: PosterGridMetrics) {
-        Task { await loader.loadMoreIfNeeded(after: item.id) }
-        guard let index = loader.items.firstIndex(where: { $0.id == item.id }), index % metrics.columns == 0 else { return }
-        let ahead = loader.items.dropFirst(index + metrics.columns * 2).prefix(metrics.columns * 2)
-        prefetch(ahead.map(\.posterPath), size: PosterCell.artSize(width: metrics.cellWidth))
-    }
 
     private func loadLetters(_ library: PlexLibrary) async {
         let key = section.key

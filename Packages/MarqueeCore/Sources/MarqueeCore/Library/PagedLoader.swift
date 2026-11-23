@@ -85,9 +85,15 @@ public final class PagedLoader<Item: Identifiable & Sendable> {
         isLoading = false
     }
 
+    /// Whether the item with `id` is near enough to the end that its appearing should load the next page. A
+    /// cell asks this before it starts a task, so scrolling through the middle of a list starts none.
+    public func wantsNextPage(after id: Item.ID) -> Bool {
+        canLoadMore && items.suffix(max(1, pageSize * 3 / 4)).contains(where: { $0.id == id })
+    }
+
     /// Call when the item with `id` appears; loads the next page once it is near the end.
     public func loadMoreIfNeeded(after id: Item.ID) async {
-        guard canLoadMore, items.suffix(max(1, pageSize * 3 / 4)).contains(where: { $0.id == id }) else { return }
+        guard wantsNextPage(after: id) else { return }
         await loadNext(size: pageSize)
     }
 

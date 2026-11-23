@@ -47,6 +47,20 @@ struct PagedLoaderTests {
         #expect(await server.requests == [[0, 8], [8, 8], [16, 8]])
     }
 
+    @Test func nextPageIsWantedFromAQuarterIntoTheNewestPage() async {
+        let server = Server(total: 16)
+        let loader = PagedLoader<Row>(pageSize: 8)
+        await loader.reload { await server.page($0, $1) }
+
+        #expect(!loader.wantsNextPage(after: 1))
+        #expect(loader.wantsNextPage(after: 2))
+        #expect(loader.wantsNextPage(after: 7))
+
+        await loader.loadMoreIfNeeded(after: 2)
+        #expect(loader.items.count == 16)
+        #expect(!loader.wantsNextPage(after: 15))
+    }
+
     @Test func overlappingPageSkipsRowsAlreadyShown() async {
         let server = Server(total: 20)
         let loader = PagedLoader<Row>(pageSize: 8)
