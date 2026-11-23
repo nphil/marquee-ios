@@ -48,7 +48,6 @@ private struct RemoteLayer: View {
     @Environment(AppSession.self) private var session
     @Environment(RemoteStage.self) private var stage
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.theme) private var theme
     /// 0 is the button, 1 the open panel.
     @State private var progress: CGFloat = 0
     /// Under Reduce Motion the panel fades in and out where it is, instead of growing.
@@ -80,7 +79,7 @@ private struct RemoteLayer: View {
                 Group {
                     if stage.shown { RemotePanel(size: panel.size) }
                 }
-                .modifier(RemoteContainer(progress: progress, from: origin, to: panel, fromButton: showsOrb, lifted: stage.drag != nil, theme: theme))
+                .modifier(RemoteContainer(progress: progress, from: origin, to: panel, fromButton: showsOrb, lifted: stage.drag != nil))
                 .opacity(stage.shown ? fade : (stage.dimmed ? OrbDimming.dimmedOpacity : 1))
                 .animation(stage.dimmed ? Self.dimIn : Self.dimOut, value: stage.dimmed)
                 .allowsHitTesting(stage.shown)
@@ -297,26 +296,18 @@ private struct DockSpots: View {
 
 /// One surface that is the button at 0 and the panel at 1, and everything between. Its rectangle and corners
 /// move from the button's to the panel's; the glyph fades out as the panel's face fades in, laid out at its
-/// full size under the surface's clip. Rectangles are animated data, so a button that glides to a new spot or a
-/// panel that refits for the keyboard moves the same way.
-private struct RemoteContainer: ViewModifier, Animatable {
-    var progress: CGFloat
-    var from: CGRect
-    var to: CGRect
+/// full size under the surface's clip. Every value is an ordinary modifier parameter, so the animation that
+/// changes `progress` also carries a button that glides to a new spot and a panel that refits for the keyboard.
+/// A custom `Animatable` conformance would cross into the main actor, which Swift 6 rejects.
+private struct RemoteContainer: ViewModifier {
+    let progress: CGFloat
+    let from: CGRect
+    let to: CGRect
     /// False when no button is on screen: the surface then fades in as it grows.
     let fromButton: Bool
     let lifted: Bool
-    /// Passed in rather than read from the environment, so the modifier stays off the main actor as `Animatable` is.
-    let theme: Theme
 
-    var animatableData: AnimatablePair<CGFloat, AnimatablePair<CGRect.AnimatableData, CGRect.AnimatableData>> {
-        get { AnimatablePair(progress, AnimatablePair(from.animatableData, to.animatableData)) }
-        set {
-            progress = newValue.first
-            from.animatableData = newValue.second.first
-            to.animatableData = newValue.second.second
-        }
-    }
+    @Environment(\.theme) private var theme
 
     /// Where in the growth the glyph is gone and the face begins to appear.
     private static let handover: CGFloat = 0.35
