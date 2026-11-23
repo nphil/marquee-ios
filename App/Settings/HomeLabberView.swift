@@ -120,6 +120,7 @@ struct HomeLabberView: View {
                 .accessibilityIdentifier("homelabber.test")
             } footer: {
                 status(homelabber)
+                    .accessibilityElement(children: .combine)
                     .accessibilityIdentifier("homelabber.status")
             }
             .listRowBackground(theme.sheet)

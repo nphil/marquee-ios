@@ -192,8 +192,10 @@ extension XCTestCase {
         reveal("settings.homelabber", in: app).tap()
         waitForBar("HomeLabber Quality Map", in: app)
         tap("homelabber.test", in: app)
-        let measured = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS '812 of 1,204 titles measured'")).firstMatch
-        XCTAssertTrue(measured.waitForExistence(timeout: 10), "No measuring progress after the connection test")
+        // The result is the footer under the button; at large text sizes it sits below the fold, which the list has not built yet.
+        let status = reveal("homelabber.status", in: app)
+        let measured = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label CONTAINS '812 of 1,204 titles measured'"), object: status)
+        XCTAssertEqual(XCTWaiter.wait(for: [measured], timeout: 10), .completed, "No measuring progress after the connection test: \(status.label)")
         try snap("acct-09c-homelabber-\(suffix)", turned: turned)
         goBack(from: "HomeLabber Quality Map", in: app)
 
