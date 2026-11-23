@@ -2,7 +2,7 @@ import MarqueeCore
 import SwiftUI
 
 /// A browse tab's navigation stack (DESIGN §7): its own path, the namespace its artwork zooms in, every
-/// page a browse screen can push, the toast overlay above the tab bar and, under Hide on Scroll, whether
+/// page a browse screen can push, the toast overlay above the tab bar and, with Hide chosen, whether
 /// the tab bar is away.
 struct BrowseStack<Root: View>: View {
     private let root: Root
@@ -52,7 +52,7 @@ struct BrowseStack<Root: View>: View {
 }
 
 /// What every page of a browse stack carries: the zoom namespace, the push actions, toasts above the tab
-/// bar and the stack's Hide on Scroll state.
+/// bar and the stack's Hide state.
 private struct StackChrome: ViewModifier {
     let zoom: Namespace.ID
     let open: OpenRouteAction

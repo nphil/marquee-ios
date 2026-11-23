@@ -99,8 +99,8 @@ extension XCTestCase {
         try snap("header-\(style)-06-livetv-scrolled-\(suffix)")
     }
 
-    /// Hide on Scroll chosen in Settings › Appearance › Tab Bar, then Home scrolled down with the tab bar away
-    /// and back up with it returned; then Home scrolled under Always Show and Minimise on Scroll.
+    /// Hide chosen in Settings › Appearance › Tab Bar, then Home scrolled down with the tab bar away
+    /// and back up with it returned; then Home scrolled under Always Show and Minimise.
     @MainActor
     func tabBarFlow(mode: String, suffix: String) throws {
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine")

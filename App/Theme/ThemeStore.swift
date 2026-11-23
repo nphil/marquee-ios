@@ -3,7 +3,7 @@ import SwiftUI
 import Observation
 
 /// The appearance choices: the theme (DESIGN §5.2), the header style, the tab bar's tabs and what it does
-/// on scroll (DESIGN §7), and whether scroll bars show. Matching the system keeps one theme per mode and
+/// while a page scrolls (DESIGN §7), and whether scroll indicators show. Matching the system keeps one theme per mode and
 /// follows the iPhone's appearance; with matching off one fixed mode shows. Saved in UserDefaults, so
 /// launch arguments such as `-marquee.theme.dark noir` override them (the UI tests rely on that).
 @Observable @MainActor

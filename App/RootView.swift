@@ -93,7 +93,7 @@ struct RootView: View {
         // Here rather than on the tabs, so the sheets above resolve artwork too.
         .environment(\.plexLibrary, session.library)
         .environment(\.posterLabels, session.settings.posterLabels)
-        // Show Scroll Bars (DESIGN §8.7) reaches the sheets from here too; the A–Z rail is its own control.
+        // Scroll Indicators (DESIGN §8.7) reaches the sheets from here too; the A–Z rail is its own control.
         .scrollIndicators(store.showsScrollBars ? .automatic : .hidden)
         .tint(theme.accentText)
         .preferredColorScheme(scheme)
@@ -201,8 +201,8 @@ private struct MainTabs: View {
             .miniPlayerZoom(in: zoomNamespace, enabled: session.player.zoomsFromBar && !reduceMotion)
             .interactiveDismissDisabled(session.player.zoomsFromBar)
         }
-        // Minimise on Scroll shrinks the bar while a page scrolls down; Hide on Scroll is each browse stack's
-        // own (BrowseStack). Search keeps the bar still while its results scroll and the keyboard comes and goes.
+        // Minimise shrinks the bar while a page scrolls down; Hide is each browse stack's own (BrowseStack).
+        // Search keeps the bar still while its results scroll and the keyboard comes and goes.
         .tabBarMinimizeBehavior(store.tabBar == .minimise && selection != .search ? .onScrollDown : .never)
         // Above the environment lines below, which the alert reads.
         .deletionFollowUp()

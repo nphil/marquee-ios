@@ -30,7 +30,7 @@ struct GuideGrid: UIViewRepresentable {
         view.onNowVisibility = { visible in
             if binding.wrappedValue != visible { binding.wrappedValue = visible }
         }
-        // Show Scroll Bars (DESIGN §8.7) reaches this UIKit grid only through the environment.
+        // Scroll Indicators (DESIGN §8.7) reaches this UIKit grid only through the environment.
         let indicators = environment.verticalScrollIndicatorVisibility
         view.showsScrollIndicator = indicators != .hidden && indicators != .never
         view.update(
