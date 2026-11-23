@@ -33,7 +33,7 @@ struct RemotePanel: View {
         .lumaRemoteTheme(RemoteTheme(theme))
         .tint(theme.accentText)
         .overlay(alignment: .top) {
-            RemoteNotice()
+            RemoteNotice(model: model)
                 .padding(.top, RemoteMetrics.header)
         }
         .background {
@@ -57,9 +57,11 @@ struct RemotePanel: View {
     }
 }
 
-/// The model's latest notice, for three seconds, and read out by VoiceOver.
+/// The model's latest notice, for three seconds, and read out by VoiceOver. It sits over the panel, outside the
+/// environment the panel gives its own views, so it takes the model as a parameter.
 private struct RemoteNotice: View {
-    @Environment(RemoteModel.self) private var model
+    let model: RemoteModel
+
     @Environment(\.theme) private var theme
 
     var body: some View {
