@@ -378,12 +378,13 @@ struct MiniPlayerBar<Picture: View>: View {
             }
     }
 
-    /// The grip: drag it up for a taller bar and a larger picture, down for a smaller one. Faint at rest;
+    /// The grip: drag it up for a taller bar and a larger picture, down for a smaller one. Secondary ink at rest
+    /// (ink3 at half strength was lost against the title on a phone);
     /// the accent and longer while held. In the system accessory the bar cannot grow under the finger, so
     /// it takes the height it was pulled to when the grip is let go, and moves into the tab's own inset.
     private var handle: some View {
         Capsule()
-            .fill(held == nil ? theme.ink3.opacity(0.5) : theme.accent)
+            .fill(held == nil ? theme.ink2 : theme.accent)
             .frame(width: held == nil ? Space.s8 : Space.s8 + Space.s7, height: Space.s1)
             .padding(.top, Space.s1)
             .frame(width: Size.miniHandle.width, height: Size.miniHandle.height, alignment: .top)
