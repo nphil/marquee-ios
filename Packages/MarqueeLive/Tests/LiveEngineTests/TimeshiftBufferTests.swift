@@ -76,6 +76,17 @@ final class TimeshiftBufferTests {
         #expect(due(reader) == ([9], .wait(until: nil)))
     }
 
+    @Test func theLongestWriteGapIsTakenAndCountsAgain() {
+        let buffer = buffer(onDisk: false)
+        write(0...2, to: buffer)
+        clock.now = 7
+        buffer.write(Data(repeating: 7, count: 188))
+        #expect(buffer.takeLongestWriteGap() == 5)
+        clock.now = 8
+        buffer.write(Data(repeating: 8, count: 188))
+        #expect(buffer.takeLongestWriteGap() == 1)
+    }
+
     @Test func theByteCapDeletesTheOldestSegment() throws {
         let buffer = buffer(limits: TimeshiftBuffer.Limits(bytes: 4 * 188, seconds: 3600))
         write(0...5, to: buffer)

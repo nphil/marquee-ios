@@ -57,6 +57,8 @@ public final class TimeshiftBuffer: @unchecked Sendable {
     private var diskFailed = false
     fileprivate private(set) var finished = false
     fileprivate private(set) var discarded = false
+    private var lastWriteAt: Double?
+    private var longestGap = 0.0
 
     private struct Segment {
         let start: Int64
@@ -136,6 +138,8 @@ public final class TimeshiftBuffer: @unchecked Sendable {
         defer { condition.unlock() }
         guard !finished, !discarded else { return }
         let now = clock()
+        if let lastWriteAt { longestGap = max(longestGap, now - lastWriteAt) }
+        lastWriteAt = now
         var offset = 0
         while offset < bytes.count {
             if needsSegment { addSegment() }
@@ -156,6 +160,15 @@ public final class TimeshiftBuffer: @unchecked Sendable {
         mark(now)
         evict(now)
         condition.broadcast()
+    }
+
+    /// The longest silence between two writes since the last call, which restarts the count. Tells a tuner or network
+    /// that stopped sending from a reader that stopped reading.
+    public func takeLongestWriteGap() -> Double {
+        condition.withLock {
+            defer { longestGap = 0 }
+            return longestGap
+        }
     }
 
     /// No more bytes will come; readers play out what is left, then see `.end`.
