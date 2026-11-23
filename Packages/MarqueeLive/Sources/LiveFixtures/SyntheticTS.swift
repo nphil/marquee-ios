@@ -24,6 +24,14 @@ public final class SyntheticTS {
         public var bitRate: Int
         /// How far the stream's clock jumps at the segment's start; the bytes keep coming at the same pace.
         public var jump: Double = 0
+        /// How long before the station's first picture (its decode time) the sound after a slate starts. LumaTuner's
+        /// splice sends it 0.22-0.46 s before the slate's last picture, so 0.25-0.5 s before the station's first.
+        public var soundLeadIn: Double = 0.5
+        /// How far a station's pictures run ahead of their arrival; its sound runs 0.25 s ahead.
+        public var videoLeadSeconds: Double = 0.8
+        /// How many sound frames the splice writes ahead of the station's first picture: those that arrive while the
+        /// picture is still coming in.
+        public var soundFramesBeforePicture: Int = 3
 
         public static func slate(width: Int32 = 320, height: Int32 = 240, seconds: Double) -> Segment {
             Segment(kind: .slate, width: width, height: height, interlaced: false, seconds: seconds, bitRate: 400_000)
@@ -31,15 +39,16 @@ public final class SyntheticTS {
 
         public static func station(
             width: Int32 = 352, height: Int32 = 240, interlaced: Bool = true, seconds: Double, bitRate: Int = 1_500_000,
-            jump: Double = 0
+            jump: Double = 0, soundLeadIn: Double = 0.5, videoLeadSeconds: Double = 0.8, soundFramesBeforePicture: Int = 3
         ) -> Segment {
             Segment(
                 kind: .station, width: width, height: height, interlaced: interlaced, seconds: seconds, bitRate: bitRate,
-                jump: jump
+                jump: jump, soundLeadIn: soundLeadIn, videoLeadSeconds: videoLeadSeconds,
+                soundFramesBeforePicture: soundFramesBeforePicture
             )
         }
 
-        var videoLead: Double { kind == .slate ? 1.0 : 0.8 }
+        var videoLead: Double { kind == .slate ? 1.0 : videoLeadSeconds }
         var audioLead: Double { kind == .slate ? 0.5 : 0.25 }
     }
 
@@ -161,7 +170,10 @@ public final class SyntheticTS {
         var following: [Timed]?
         if index < segments.count {
             var next = try encode(index)
-            splice(&current, &next, intoStation: segments[index - 1].kind == .slate && segments[index].kind == .station)
+            splice(
+                &current, &next, intoStation: segments[index - 1].kind == .slate && segments[index].kind == .station,
+                station: segments[index]
+            )
             index += 1
             following = next
         }
@@ -195,9 +207,9 @@ public final class SyntheticTS {
     /// station's sound starts with its first frame from there. LumaTuner writes each PES whole once the next on its
     /// PID starts, so the sound frames that arrive while a broadcast's intra picture is still coming in go out before
     /// it: three here, as for a 100 KB picture at 19.4 Mb/s.
-    private func splice(_ current: inout [Timed], _ next: inout [Timed], intoStation: Bool) {
+    private func splice(_ current: inout [Timed], _ next: inout [Timed], intoStation: Bool, station: Segment) {
         guard let picture = next.first(where: \.isVideo) else { return }
-        let soundFrom = intoStation ? picture.packet.pointee.dts - 45_000 : Int64.min
+        let soundFrom = intoStation ? picture.packet.pointee.dts - Int64(station.soundLeadIn * 90_000) : Int64.min
         current.removeAll { item in
             let drop = item.time >= picture.time || (intoStation && !item.isVideo && item.packet.pointee.pts >= soundFrom)
             if drop { Self.free(item) }
@@ -209,7 +221,7 @@ public final class SyntheticTS {
             return drop
         }
         guard intoStation else { return }
-        let early = next.indices.filter { !next[$0].isVideo }.prefix(3)
+        let early = next.indices.filter { !next[$0].isVideo }.prefix(station.soundFramesBeforePicture)
         for (n, i) in early.enumerated() {
             next[i] = Timed(packet: next[i].packet, isVideo: false, time: picture.time - 0.001 * Double(early.count - n))
         }

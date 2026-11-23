@@ -208,7 +208,10 @@ private final class FixtureCache: @unchecked Sendable {
     private var entries: [String: Entry] = [:]
 
     func stream(for segments: [SyntheticTS.Segment]) throws -> Simulation.Stream {
-        let key = segments.map { "\($0.kind) \($0.width)x\($0.height) \($0.interlaced) \($0.seconds) \($0.bitRate) \($0.jump)" }
+        let key = segments.map {
+            "\($0.kind) \($0.width)x\($0.height) \($0.interlaced) \($0.seconds) \($0.bitRate) \($0.jump) \($0.soundLeadIn) "
+                + "\($0.videoLeadSeconds) \($0.soundFramesBeforePicture)"
+        }
             .joined(separator: "|")
         let entry = lock.withLock {
             if let entry = entries[key] { return entry }

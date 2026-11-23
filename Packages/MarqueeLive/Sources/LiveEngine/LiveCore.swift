@@ -60,6 +60,40 @@ public struct LiveTimings: Sendable, Equatable {
     public init() {}
 }
 
+/// What one stall looked like from inside, for telling a tuner that stopped sending from an engine that stopped
+/// counting what it was sent.
+public struct StallDetail: Sendable, Equatable {
+    /// How far the newest sound and picture ran ahead of the clock, and whether the picture's end stood in for the
+    /// sound's.
+    public struct Reading: Sendable, Equatable {
+        public var audioAhead: Double?
+        public var videoAhead: Double?
+        public var soundGone: Bool
+
+        var text: String {
+            func s(_ value: Double?) -> String { value.map { String(format: "%.2f", $0) } ?? "-" }
+            return "audio \(s(audioAhead)) video \(s(videoAhead)) gone \(soundGone)"
+        }
+    }
+
+    public var began: Reading
+    /// How far the clock had run past the anchor when it began.
+    public var played: Double?
+    public var resumed: Reading?
+    public var audioPackets = 0
+    /// Sound packets turned away for being more than 2 s off the pictures' clock.
+    public var audioRejected = 0
+    public var audioDecoded = 0
+    public var videoPackets = 0
+
+    /// "began audio 0.04 video 0.85 gone false · played 0.15 · resumed audio 0.46 … · audio 31 rejected 0 decoded 31 · video 60".
+    public var line: String {
+        let played = played.map { String(format: "%.2f", $0) } ?? "-"
+        return "began \(began.text) · played \(played) · resumed \(resumed?.text ?? "-")"
+            + " · audio \(audioPackets) rejected \(audioRejected) decoded \(audioDecoded) · video \(videoPackets)"
+    }
+}
+
 /// Playback's state for the diagnostics line.
 public struct LiveDiagnostics: Sendable, Equatable {
     public var timings = LiveTimings()
@@ -73,6 +107,8 @@ public struct LiveDiagnostics: Sendable, Equatable {
     /// Pictures dropped: late, corrupt, or behind a re-anchor.
     public var drops = 0
     public var underruns = 0
+    /// The latest stall: what the buffer looked like as it began and ended, and what came in meanwhile.
+    public var stall: StallDetail?
 
     public init() {}
 
@@ -309,6 +345,7 @@ final class LiveCore: @unchecked Sendable {
                 newestVideo = nil
                 timelineJump = true
             }
+            if phase == .stalled { diagnostics.stall?.videoPackets += 1 }
             if let dts {
                 lastVideoDTS = dts
                 picturesSinceSound = (picturesSinceSound?.first ?? dts, dts)
@@ -360,10 +397,14 @@ final class LiveCore: @unchecked Sendable {
         var events: [LiveEvent] = []
         let accepting: Double? = lock.withLock {
             if let description { diagnostics.audio = description }
+            if phase == .stalled { diagnostics.stall?.audioPackets += 1 }
             // Sound off the pictures' clock is from before a jump in it, or ahead of one the pictures have not made
             // yet (a demuxer holds a picture until the next starts, so sound can show a jump first): it has no place
             // on the clock. Not counting it as sound lets a picture start without it.
-            if let pts, let clock = lastVideoDTS, abs(pts - clock) > ClockServo.reanchorError { return nil }
+            if let pts, let clock = lastVideoDTS, abs(pts - clock) > ClockServo.reanchorError {
+                if phase == .stalled { diagnostics.stall?.audioRejected += 1 }
+                return nil
+            }
             audioPacketAt = now
             switch (audioMode, silence) {
             case (.slate, false):
@@ -406,6 +447,7 @@ final class LiveCore: @unchecked Sendable {
             guard end > anchor else { return }
             output.enqueueAudio(samples, time: time)
             lock.withLock {
+                if phase == .stalled { diagnostics.stall?.audioDecoded += 1 }
                 audioEnd = max(audioEnd ?? end, end)
                 picturesSinceSound = nil
             }
@@ -669,6 +711,12 @@ final class LiveCore: @unchecked Sendable {
                 let buffered = newest - clock
                 if inputEnded { break }
                 if buffered < 0.05 {
+                    diagnostics.stall = StallDetail(
+                        began: StallDetail.Reading(
+                            audioAhead: audioEnd.map { $0 - clock }, videoAhead: newestVideo.map { $0 - clock }, soundGone: soundGone
+                        ),
+                        played: anchor.map { clock - $0 }
+                    )
                     output.setRate(0, time: nil)
                     jitter.underrun(at: now)
                     servo.reset()
@@ -698,6 +746,9 @@ final class LiveCore: @unchecked Sendable {
                 diagnostics.buffered = servo.buffered
             case .stalled:
                 guard let newest, inputEnded || newest - clock >= jitter.seconds else { break }
+                diagnostics.stall?.resumed = StallDetail.Reading(
+                    audioAhead: audioEnd.map { $0 - clock }, videoAhead: newestVideo.map { $0 - clock }, soundGone: soundGone
+                )
                 output.setRate(1, time: nil)
                 diagnostics.rate = 1
                 reportedRate = 1

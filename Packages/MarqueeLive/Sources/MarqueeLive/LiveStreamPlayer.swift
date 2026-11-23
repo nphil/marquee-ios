@@ -279,6 +279,7 @@ public final class LiveStreamPlayer {
                     let gap = pipeline?.feed.buffer.takeLongestWriteGap()
                     LiveLog.line("resumed", [
                         "stalled": LiveLog.seconds(stalledAt.map { Self.tapClock() - $0 }), "write_gap": LiveLog.seconds(gap),
+                        "detail": pipeline?.diagnostics.stall?.line ?? "-",
                     ])
                 } else {
                     LiveLog.line("sound", ["after": LiveLog.seconds(timings.sound)])

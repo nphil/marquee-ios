@@ -67,6 +67,20 @@ struct LiveCoreTests {
         #expect(sim.core.snapshot.drops == 0)
     }
 
+    @Test func stationSoundArrivingAfterItsFirstPictureStartsOnTheNextIntraPicture() throws {
+        // An SD station's pictures run 1.1 s ahead of their arrival, its sound 0.25 s: the sound after the splice
+        // comes in behind the first picture, which until then is taken for the slate's.
+        let station = SyntheticTS.Segment.station(
+            width: 720, height: 480, seconds: 6, bitRate: 1_300_000, soundLeadIn: 0.3, videoLeadSeconds: 1.1,
+            soundFramesBeforePicture: 0
+        )
+        let sim = try Simulation.run([.slate(width: 720, height: 480, seconds: 1.5), station], tail: 0)
+        #expect(sim.phases == [.slate, .picture, .playing])
+        #expect(sim.count { $0 == .underrun } == 0)
+        #expect(sim.count { $0 == .reanchor } == 0)
+        #expect(sim.core.snapshot.drops == 0)
+    }
+
     @Test func pictureBeforeSoundIsCalledTheSlateUntilSoundComes() throws {
         let sim = try Simulation.run([.station(seconds: 3)], tail: 0)
         #expect(sim.phases == [.slate, .picture, .playing])
@@ -81,6 +95,11 @@ struct LiveCoreTests {
         #expect(sim.count { $0 == .underrun } == 1)
         #expect(Array(sim.phases.suffix(2)) == [.stalled, .playing])
         #expect(abs(sim.core.snapshot.jitterTarget - 0.45) < 1e-9)
+        let stall = try #require(sim.core.snapshot.stall)
+        #expect(stall.began.audioAhead.map { $0 < 0.05 } == true)
+        #expect(stall.resumed?.audioAhead.map { $0 >= 0.45 } == true)
+        #expect(stall.audioPackets > 0 && stall.audioPackets == stall.audioDecoded + stall.audioRejected)
+        #expect(stall.videoPackets > 0)
     }
 
     @Test func pauseHoldsTheClockAndPlaysOnFromTheSamePicture() throws {
