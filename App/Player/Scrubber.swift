@@ -82,7 +82,8 @@ struct Scrubber: View {
         // Read here, not in the preference's closure, so a thumbnail that lands redraws the preview.
         let content = model.isScrubbing
             ? (image: frames.image(near: scrubTime), hasFrames: frames.hasFrames,
-               time: clockText(scrubTime, hours: model.duration >= 3600), speed: speed.label)
+               time: clockText(scrubTime, hours: model.duration >= 3600), speed: speed.label,
+               chapter: chapters.name(at: scrubTime))
             : nil
         return ZStack(alignment: .leading) {
             ZStack(alignment: .leading) {
@@ -112,7 +113,7 @@ struct Scrubber: View {
             content.map {
                 SeekPreviewState(
                     track: track, thumbX: x, thumbSize: thumbSize,
-                    image: $0.image, hasFrames: $0.hasFrames, time: $0.time, speed: $0.speed
+                    image: $0.image, hasFrames: $0.hasFrames, time: $0.time, speed: $0.speed, chapter: $0.chapter
                 )
             }
         }
@@ -123,11 +124,18 @@ struct Scrubber: View {
         return width * min(1, max(0, Double(milliseconds) / 1000 / model.duration))
     }
 
-    /// The edges of the intro and credits along the track, leaving out those at its ends.
+    /// The edges of the intro and credits and the start of each chapter along the track, leaving out those
+    /// at its ends.
     private func cuts(width: CGFloat) -> [CGFloat] {
-        model.markers
+        let marked = model.markers
             .flatMap { [position(of: $0.start, width: width), position(of: $0.end, width: width)] }
-            .filter { $0 > Self.trackHeight && $0 < width - Self.trackHeight }
+        let chaptered = chapters.cutFractions.map { width * CGFloat($0) }
+        return (marked + chaptered).filter { $0 > Self.trackHeight && $0 < width - Self.trackHeight }
+    }
+
+    /// The chapters of the playing title; none unless it has two or more.
+    private var chapters: ChapterMarks {
+        ChapterMarks(model.item.chapters, duration: model.duration)
     }
 
     private func drag(width: CGFloat) -> some Gesture {
@@ -149,11 +157,15 @@ struct Scrubber: View {
                         Haptics.selection()
                     }
                     let moved = Double((value.location.x - (lastX ?? value.location.x)) / width)
+                    let before = scrubTime
                     scrubTime = min(model.duration, max(0, scrubTime + moved * model.duration * speed.rate))
                     frames.want(scrubTime, duration: model.duration)
+                    // A chapter start takes the place of the frame tick, once per crossing.
+                    let crossed = chapters.crossesStart(from: before, to: scrubTime)
+                    if crossed { Haptics.impact(.light) }
                     if let index = frames.index(at: scrubTime, duration: model.duration), index != frameIndex {
                         frameIndex = index
-                        Haptics.selection()
+                        if !crossed { Haptics.selection() }
                     }
                 }
                 lastX = value.location.x
@@ -253,6 +265,7 @@ struct SeekPreviewState {
     let hasFrames: Bool
     let time: String
     let speed: String?
+    let chapter: String?
 }
 
 struct SeekPreviewKey: PreferenceKey {
@@ -284,7 +297,10 @@ struct SeekPreviewLayer: View {
                 let lowest = Space.inset + half
                 let centre = min(max(thumb.midX, lowest), max(lowest, proxy.size.width - lowest))
                 ZStack(alignment: .bottomLeading) {
-                    SeekPreview(image: state.image, hasFrames: state.hasFrames, time: state.time, speed: state.speed)
+                    SeekPreview(
+                        image: state.image, hasFrames: state.hasFrames, time: state.time, speed: state.speed,
+                        chapter: state.chapter
+                    )
                         .offset(x: centre - half, y: thumb.minY - Self.gap - proxy.size.height)
                     // Where the thumb is, for the UI tests: the scrubber's own element hides its children.
                     Color.clear
@@ -309,6 +325,8 @@ struct SeekPreview: View {
     let hasFrames: Bool
     let time: String
     var speed: String?
+    /// The chapter under the thumb; nil for a title without chapters.
+    var chapter: String?
 
     @Environment(\.theme) private var theme
     /// 25-30% over the first version's 176 pt.
@@ -334,6 +352,13 @@ struct SeekPreview: View {
                 .overlay(shape.strokeBorder(theme.edgeRaised, lineWidth: 1))
             }
             VStack(spacing: 2) {
+                if let chapter {
+                    Text(chapter)
+                        .textRole(.caption)
+                        .foregroundStyle(theme.ink2)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                }
                 Text(time)
                     .monospacedDigit()
                     .textRole(.label)
@@ -346,7 +371,7 @@ struct SeekPreview: View {
             }
             .padding(.horizontal, Space.s3)
             .padding(.vertical, Space.s1)
-            .background(theme.glass, in: Capsule())
+            .background(theme.glass, in: chapter == nil ? AnyShape(Capsule()) : AnyShape(RoundedRectangle(cornerRadius: Radius.control)))
         }
         .frame(width: Self.width)
         .fixedSize(horizontal: false, vertical: true)
