@@ -163,6 +163,7 @@ private struct MainTabs: View {
     @State private var picked: Destination?
     @Environment(\.scenePhase) private var scenePhase
     @State private var toasts = ToastCenter()
+    @State private var followUp = DeletionFollowUp()
 
     var body: some View {
         let tabs = store.tabLayout.tabs(available: Destination.available(in: session))
@@ -182,8 +183,11 @@ private struct MainTabs: View {
         // Minimise on Scroll shrinks the bar while a page scrolls down; Hide on Scroll is each browse stack's
         // own (BrowseStack). Search keeps the bar still while its results scroll and the keyboard comes and goes.
         .tabBarMinimizeBehavior(store.tabBar == .minimise && selection != .search ? .onScrollDown : .never)
+        // Above the environment lines below, which the alert reads.
+        .deletionFollowUp()
         .environment(\.tabSelection, TabSelection(tabs: tabs, select: { picked = $0 }))
         .environment(toasts)
+        .environment(followUp)
         .environment(session.changes)
         .onChange(of: session.server?.id) { session.changes.forgetDeletions() }
         .onChange(of: selection, initial: true) { _, tab in

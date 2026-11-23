@@ -27,6 +27,63 @@ extension View {
     func deleteConfirmation(_ target: Binding<DeleteTarget?>, onDeleted: @escaping @MainActor (DeleteTarget) -> Void = { _ in }) -> some View {
         modifier(DeleteConfirmation(target: target, onDeleted: onDeleted))
     }
+
+    /// Says what a delete left undone. It hangs from the tab host, not from the page that started the
+    /// delete: that page closes as soon as the server has deleted the title, and the steps after it
+    /// finish later.
+    func deletionFollowUp() -> some View {
+        modifier(DeletionFollowUpAlert())
+    }
+}
+
+/// What the steps after a delete left undone, waiting for the alert that says so. Held at the tab host
+/// because the page that started the delete is gone by the time they finish.
+@MainActor @Observable
+final class DeletionFollowUp {
+    struct Leftover: Identifiable {
+        let id = UUID()
+        let target: DeleteTarget
+        let result: MediaDeletionResult
+    }
+
+    private var queue: [Leftover] = []
+
+    /// The alert on screen, or the next to be.
+    var current: Leftover? { queue.first }
+
+    func dismiss(_ leftover: Leftover) {
+        queue.removeAll { $0.id == leftover.id }
+    }
+
+    /// A toast when no step failed; otherwise the alert says what is left, with Retry where asking again may help.
+    func conclude(_ result: MediaDeletionResult, of target: DeleteTarget, changes: LibraryChanges, toasts: ToastCenter) {
+        if case .removed(let guid) = result.watchlist {
+            changes.hideFromWatchlist(guid: guid)
+        }
+        let kind = DeleteWording.arrKind(target)
+        let leftovers = DeleteWording.shortfall(of: result, kind: kind)
+        Diag.event(.integration, "delete.cleanup", [
+            "watchlist": DeleteWording.word(result.watchlist), "arr": "\(result.arr)", "requests": "\(result.requests)",
+        ], leftovers.isEmpty ? .info : .warning)
+        if leftovers.isEmpty {
+            toasts.show(DeleteWording.summary(of: result, target: target, kind: kind))
+        } else {
+            queue.append(Leftover(target: target, result: result))
+        }
+    }
+
+    /// Repeats the steps that failed. The title is already off the server and out of every list.
+    func retry(_ leftover: Leftover, with deleting: MediaDeletion, changes: LibraryChanges, toasts: ToastCenter) async {
+        let result = await deleting.retry(leftover.result, alreadyDeleted: changes.deleted)
+        conclude(result, of: leftover.target, changes: changes, toasts: toasts)
+    }
+}
+
+extension AppSession {
+    /// The delete and the steps after it: the Watchlist, Radarr or Sonarr, and Seerr, each only where connected.
+    func mediaDeletion(on library: PlexLibrary, watchlist: PlexWatchlist?) -> MediaDeletion {
+        MediaDeletion(server: library, watchlist: watchlist, arr: arr.services, requests: seerr.client)
+    }
 }
 
 private struct DeleteConfirmation: ViewModifier {
@@ -37,25 +94,19 @@ private struct DeleteConfirmation: ViewModifier {
     @Environment(\.plexWatchlist) private var watchlist
     @Environment(LibraryChanges.self) private var changes
     @Environment(ToastCenter.self) private var toasts
+    @Environment(DeletionFollowUp.self) private var followUp
     @Environment(AppSession.self) private var session
     @State private var failure: Failure?
-    @State private var leftover: Leftover?
 
     private struct Failure {
         let target: DeleteTarget
         let outcome: DeleteOutcome
     }
 
-    /// A title that is gone from the server, with the steps after the delete that did not go through.
-    private struct Leftover {
-        let target: DeleteTarget
-        let result: MediaDeletionResult
-    }
-
     func body(content: Content) -> some View {
         content
             .confirmationDialog(
-                target.map(Self.title) ?? "",
+                target.map { DeleteWording.title($0) } ?? "",
                 isPresented: Binding { target != nil } set: { if !$0 { target = nil } },
                 titleVisibility: .visible,
                 presenting: target
@@ -64,7 +115,7 @@ private struct DeleteConfirmation: ViewModifier {
                     .accessibilityIdentifier("delete.confirm")
                 Button("Cancel", role: .cancel) {}
             } message: { target in
-                Text(Self.message(target, also: Self.places(for: target, session: session)))
+                Text(DeleteWording.message(target, also: DeleteWording.places(for: target, session: session)))
             }
             .alert(
                 failure?.outcome == .notAllowed ? "Deleting Is Turned Off" : "Couldn't Delete",
@@ -82,22 +133,81 @@ private struct DeleteConfirmation: ViewModifier {
                     ? "The server doesn't allow deleting media. Its owner can turn on Allow media deletion in the Plex server's Settings, under Library."
                     : "“\(failure.target.item.title)” is still on the server. Check the connection, then try again.")
             }
-            .alert(
-                "Deleted, but Not Everywhere",
-                isPresented: Binding { leftover != nil } set: { if !$0 { leftover = nil } },
-                presenting: leftover
-            ) { leftover in
-                if leftover.result.canRetry {
-                    Button("Retry") { retry(leftover) }
-                    Button("Not Now", role: .cancel) {}
-                } else {
-                    Button("OK", role: .cancel) {}
-                }
-            } message: { leftover in
-                Text(Self.shortfall(of: leftover.result, kind: Self.arrKind(leftover.target)).joined(separator: "\n"))
-            }
     }
 
+    private func perform(_ target: DeleteTarget) {
+        guard let library else { return }
+        let item = target.item
+        let changes = changes
+        let toasts = toasts
+        let followUp = followUp
+        let deleting = session.mediaDeletion(on: library, watchlist: watchlist)
+        let onDeleted = onDeleted
+        Task {
+            switch target {
+            case .title:
+                let result = await deleting.delete(item, alreadyDeleted: changes.deleted) { @MainActor in
+                    changes.recordDeletion(of: item, server: library.server.id)
+                    onDeleted(target)
+                }
+                guard result.outcome == .deleted else {
+                    failure = Failure(target: target, outcome: result.outcome)
+                    return
+                }
+                followUp.conclude(result, of: target, changes: changes, toasts: toasts)
+            case .version(_, let index):
+                let outcome = await library.deleteVersion(item.media[index].id, of: item.ratingKey)
+                guard outcome == .deleted else {
+                    failure = Failure(target: target, outcome: outcome)
+                    return
+                }
+                changes.record(Set([item.ratingKey, item.parentRatingKey, item.grandparentRatingKey].compactMap(\.self)))
+                toasts.show("Deleted the \(item.media[index].versionLabel) version")
+                onDeleted(target)
+            }
+        }
+    }
+}
+
+/// The alert for what a delete left undone, on the tab host.
+private struct DeletionFollowUpAlert: ViewModifier {
+    @Environment(DeletionFollowUp.self) private var followUp
+    @Environment(\.plexWatchlist) private var watchlist
+    @Environment(LibraryChanges.self) private var changes
+    @Environment(ToastCenter.self) private var toasts
+    @Environment(AppSession.self) private var session
+
+    func body(content: Content) -> some View {
+        let shown = followUp.current
+        return content.alert(
+            "Deleted, but Not Everywhere",
+            isPresented: Binding { shown != nil } set: { if !$0, let shown { followUp.dismiss(shown) } },
+            presenting: shown
+        ) { leftover in
+            if leftover.result.canRetry {
+                Button("Retry") { retry(leftover) }
+                Button("Not Now", role: .cancel) {}
+            } else {
+                Button("OK", role: .cancel) {}
+            }
+        } message: { leftover in
+            Text(DeleteWording.shortfall(of: leftover.result, kind: DeleteWording.arrKind(leftover.target)).joined(separator: "\n"))
+        }
+    }
+
+    private func retry(_ leftover: DeletionFollowUp.Leftover) {
+        guard let library = session.library else { return }
+        let deleting = session.mediaDeletion(on: library, watchlist: watchlist)
+        let followUp = followUp
+        let changes = changes
+        let toasts = toasts
+        Task { await followUp.retry(leftover, with: deleting, changes: changes, toasts: toasts) }
+    }
+}
+
+/// What the delete dialogs, alerts and toasts say.
+@MainActor
+enum DeleteWording {
     static func title(_ target: DeleteTarget) -> String {
         switch target {
         case .title(let item): "Delete “\(item.title)”?"
@@ -179,72 +289,7 @@ private struct DeleteConfirmation: ViewModifier {
         return sentences.joined(separator: ". ")
     }
 
-    private func perform(_ target: DeleteTarget) {
-        guard let library else { return }
-        let item = target.item
-        let changes = changes
-        let toasts = toasts
-        let deleting = deletion(on: library)
-        let onDeleted = onDeleted
-        Task {
-            switch target {
-            case .title:
-                let result = await deleting.delete(item, alreadyDeleted: changes.deleted) { @MainActor in
-                    changes.recordDeletion(of: item, server: library.server.id)
-                    onDeleted(target)
-                }
-                guard result.outcome == .deleted else {
-                    failure = Failure(target: target, outcome: result.outcome)
-                    return
-                }
-                conclude(result, of: target)
-            case .version(_, let index):
-                let outcome = await library.deleteVersion(item.media[index].id, of: item.ratingKey)
-                guard outcome == .deleted else {
-                    failure = Failure(target: target, outcome: outcome)
-                    return
-                }
-                changes.record(Set([item.ratingKey, item.parentRatingKey, item.grandparentRatingKey].compactMap(\.self)))
-                toasts.show("Deleted the \(item.media[index].versionLabel) version")
-                onDeleted(target)
-            }
-        }
-    }
-
-    /// The delete and what follows it: the Watchlist, Radarr or Sonarr, and Seerr, each only where connected.
-    private func deletion(on library: PlexLibrary) -> MediaDeletion {
-        MediaDeletion(server: library, watchlist: watchlist, arr: session.arr.services, requests: session.seerr.client)
-    }
-
-    /// Repeats the steps that failed. The title is already off the server and out of every list.
-    private func retry(_ leftover: Leftover) {
-        guard let library else { return }
-        let deleting = deletion(on: library)
-        let changes = changes
-        Task {
-            let result = await deleting.retry(leftover.result, alreadyDeleted: changes.deleted)
-            conclude(result, of: leftover.target)
-        }
-    }
-
-    /// A toast when no step failed; otherwise an alert that says what is left, with Retry where asking again may help.
-    private func conclude(_ result: MediaDeletionResult, of target: DeleteTarget) {
-        if case .removed(let guid) = result.watchlist {
-            changes.hideFromWatchlist(guid: guid)
-        }
-        let kind = Self.arrKind(target)
-        let leftovers = Self.shortfall(of: result, kind: kind)
-        Diag.event(.integration, "delete.cleanup", [
-            "watchlist": Self.word(result.watchlist), "arr": "\(result.arr)", "requests": "\(result.requests)",
-        ], leftovers.isEmpty ? .info : .warning)
-        if leftovers.isEmpty {
-            toasts.show(Self.summary(of: result, target: target, kind: kind))
-        } else {
-            leftover = Leftover(target: target, result: result)
-        }
-    }
-
-    private static func word(_ cleanup: WatchlistCleanup) -> String {
+    static func word(_ cleanup: WatchlistCleanup) -> String {
         switch cleanup {
         case .unchanged: "unchanged"
         case .removed: "removed"
