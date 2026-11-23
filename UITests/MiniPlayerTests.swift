@@ -46,10 +46,9 @@ final class MiniPlayerTests: XCTestCase {
         open(tab: "Live TV", title: "Live TV", in: app)
         tap("livetv.row.ch-0201", in: app)
         waitFor("liveplayer", in: app)
-        // The controls are up as the channel opens and fade 3 s after it plays; a tap on the picture brings them back.
-        if !element("liveplayer.minimise", in: app).waitForExistence(timeout: 5) {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3)).tap()
-        }
+        // The controls fade 3 s after the channel plays and a tap on the picture toggles them, so a tap
+        // guessed from a missed wait can hide them. This waits for them to fade and brings them back.
+        raiseLiveControls(in: app)
         tap("liveplayer.minimise", in: app)
         let bar = element("miniplayer", in: app)
         XCTAssertTrue(bar.waitForExistence(timeout: 10), "Minimising left no bar")
