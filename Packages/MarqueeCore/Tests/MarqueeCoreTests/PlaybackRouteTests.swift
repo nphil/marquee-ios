@@ -311,6 +311,24 @@ struct PlaybackRouteTests {
         #expect(Self.route(large, limits: RouteLimits(phoneOnly: true, quality: .mbps8)).kind == .directPlay)
     }
 
+    @Test func aQualityMapsTargetStandsInForTheQualitysCapAndFrame() throws {
+        let large = try Self.file("mp4", bitrate: 20_000)
+        let target = DownloadTarget(videoKbps: 3_000, height: 720)
+
+        // The target is the limit though the quality names a higher rung, and the slow-link cap, 3200 here, does not
+        // lower the cap the target needs to get its size from Plex.
+        let route = Self.route(large, limits: RouteLimits(quality: .mbps8, target: target, linkKbps: 4_000))
+
+        #expect(route.kind == .serverTranscode && route.reencodesVideo)
+        #expect(route.reasons.contains(.bitrateLimit(kbps: 3_192)))
+        #expect(route.maxVideoBitrateKbps == target.maxVideoBitrateKbps && target.maxVideoBitrateKbps > 3_200)
+        #expect(route.videoResolution == "1280x720")
+        // A file the target does not save on plays as it is, and the phone-only setting still wins.
+        let lean = try Self.file("mp4", bitrate: 3_000)
+        #expect(Self.route(lean, limits: RouteLimits(target: DownloadTarget(videoKbps: 5_000, height: 1080))).kind == .directPlay)
+        #expect(Self.route(large, limits: RouteLimits(phoneOnly: true, target: target)).kind == .directPlay)
+    }
+
     @Test func aLowerQualityHalvesTheRatePlayingNow() {
         #expect(VideoQuality.original.lower(mediaKbps: 11_200) == .mbps4)
         #expect(VideoQuality.original.lower(mediaKbps: 40_000) == .mbps20)

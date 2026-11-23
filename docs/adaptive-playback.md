@@ -41,9 +41,13 @@ A plain restart at the playhead, the old behaviour, is used instead when Picture
 
 The preparation deadline is checked against playback even while the standby player is still opening or prerolling; a late completion cannot replace the fallback.
 
-## Per-title quality scores
+## Per-title quality: HomeLabber's map
 
-`QualityScores` holds a title's VMAF score per rung. With scores, Auto climbs no higher than the lowest rung within 1.5 points of the best score, so a cartoon that looks the same at 8 Mbps does not pull 20. Nothing supplies scores for playback yet. HomeLabber's quality map scores titles for the download tiers (`QualityMapEntry.curve`, H.264 from 480p to 1080p) and could fill them.
+With HomeLabber's quality map enabled (Settings › HomeLabber), Auto on a title it has measured streams at the best-looking size and bitrate the link carries, in place of the presets. The ladder is Original, then the steps of the title's curve (`QualityCurve.steps()`: about fifteen, each at least 1.5 VMAF better than the next cheaper one, all cheaper than the file). A step costs its video bitrate plus 192 kbit/s of audio and fits when that is at most 75% of the link estimate, a quarter kept for swings. Each size's curve is joined in log-bitrate and held flat outside the measured range, so nothing is guessed past it. A size is left out of a budget below Plex's own floor for it (480p 1050, 720p 2960, 1080p 6520 kbit/s); below the lowest step Auto holds that step and warns, as for the presets.
+
+A step reaches the server as `RouteLimits.target`, which replaces the preset's cap and frame. Direct play, a fixed quality, Force Direct Play, a title HomeLabber has not measured and one measured for another version of the file (`mediaId`) keep the presets. The lookup is cached per session (`QualityMapCache`), asked for as the item starts and waited for at most 1.5 s; a later answer, and Auto picked in the player's menu mid-item, apply from the next item. A phone uses the curve HomeLabber measured for a phone screen (`vmafPhone`, `phoneTiers`) where it gives one; an iPad uses the general one.
+
+`QualityScores` (a VMAF score per preset rung) still caps a preset ladder's climb: with scores, Auto climbs no higher than the lowest rung within 1.5 points of the best. Nothing supplies them, and a mapped ladder ignores them.
 
 ## Open: Picture in Picture shows LIVE for a remux
 

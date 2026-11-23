@@ -165,15 +165,17 @@ final class PlayerModel: Identifiable {
     var qualitySetting: QualitySetting { qualityCap.map(QualitySetting.fixed) ?? session.settings.quality }
     /// The highest quality videos play at: the fixed one, or Auto's rung.
     var quality: VideoQuality {
-        guard case .fixed(let fixed) = qualitySetting else { return autoRung }
+        guard case .fixed(let fixed) = qualitySetting else { return autoRung.quality }
         guard let cap = dataCap, fixed == .original || fixed.rawValue > cap.rawValue else { return fixed }
         return cap
     }
+    /// The quality as the player words it: Auto's rung may be a step of the title's curve, such as "3.2 Mbps 720p".
+    var qualityTitle: String { qualitySetting == .auto ? autoRung.title : quality.title }
     /// Save Data's cap on this item while the phone is on a metered network (`savedDataCap`); Auto keeps under it.
     private(set) var dataCap: VideoQuality?
     private(set) var qualityCap: VideoQuality?
     /// Auto's rung on this item (docs/adaptive-playback.md); Original while Auto does not adapt.
-    private(set) var autoRung = VideoQuality.original
+    private(set) var autoRung = AutoRung.original
     /// Auto's estimate of the link to the server, for stats for nerds.
     private(set) var linkEstimateKbps: Int?
     /// Auto holds its lowest rung on a link that cannot sustain it; a wait on the network then says why.
@@ -204,7 +206,7 @@ final class PlayerModel: Identifiable {
 
     /// The stream Auto moves to, open on the backend's standby player until the playhead reaches its start.
     private struct Standby {
-        var rung: VideoQuality
+        var rung: AutoRung
         var choice: RouteChoice
         var stream: Stream
         var reporter: TimelineReporter
@@ -335,6 +337,9 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var castReceiverFailed = false
     /// Auto's rung keeper while it adapts: Auto picked and not Force Direct Play.
     @ObservationIgnored private var adaptive: AdaptiveQuality?
+    /// HomeLabber's quality curve for the playing version on this screen, asked for as the item starts. Nil when Auto
+    /// is not picking, HomeLabber has not measured this version, or its answer came too late for the start.
+    @ObservationIgnored private var qualityCurve: QualityCurve?
     @ObservationIgnored private var qualityTask: Task<Void, Never>?
     @ObservationIgnored private var moveTask: Task<Void, Never>?
     /// Auto asked for a rung and the move has not settled (`settleMove`).
@@ -832,13 +837,13 @@ final class PlayerModel: Identifiable {
 
     func setQuality(_ setting: QualitySetting) {
         scheduleHide()
-        let playing = quality
+        let playing = quality, playingTarget = autoTarget
         Diag.event(.player, "quality.set", ["setting": "\(setting)", "playing": "\(playing)"])
         qualityCap = nil
         if setting != session.settings.quality { session.settings.quality = setting }
         abandonMove()
         startAdapting(connection: streamConnection)
-        if quality != playing { reroute(handPick: false) }
+        if quality != playing || autoTarget != playingTarget { reroute(handPick: false) }
     }
 
     func setSpeed(_ speed: Float) {
@@ -1077,7 +1082,11 @@ final class PlayerModel: Identifiable {
         async let tagged = tags(of: full)
         // The measured link sets Auto's start and whether the phone reads the file itself.
         if request.download == nil {
+            // HomeLabber's curve for this version is asked for while the connection is found.
+            async let curve = measuredCurve(of: full, media: media)
             let connection = try? await library.connection.connection()
+            guard generation == self.generation else { return }
+            qualityCurve = await curve
             guard generation == self.generation else { return }
             startAdapting(connection: connection)
         }
@@ -1090,18 +1099,19 @@ final class PlayerModel: Identifiable {
         await startStream(at: start, generation: generation)
     }
 
-    private func routeLimits(connection: PlexConnection?, quality: VideoQuality) -> RouteLimits {
+    private func routeLimits(connection: PlexConnection?, quality: VideoQuality, target: DownloadTarget?) -> RouteLimits {
         switch session.settings.directPlay {
         case .force:
             return RouteLimits(phoneOnly: true)
         case .disabled:
-            return RouteLimits(serverReason: .directPlayOff, quality: quality)
+            return RouteLimits(serverReason: .directPlayOff, quality: quality, target: target)
         case .auto:
             // A file that failed on the phone earlier in this run goes straight to the server when reopened.
             let failedBefore = part.map { session.player.phoneFailures.contains($0.id) } ?? false
             return RouteLimits(
                 serverReason: onDeviceFailed || failedBefore ? .onDeviceFailed : nil,
                 quality: quality,
+                target: target,
                 // Decided as the item started, from the measured link (`startAdapting`).
                 reach: reach,
                 // Auto's rung already fits the link.
@@ -1133,12 +1143,12 @@ final class PlayerModel: Identifiable {
             decideCastRoute(castDevice, tracks: tracks, media: media, part: part)
             return
         }
-        var choice = await chooseRoute(tracks: tracks, media: media, part: part, quality: quality)
+        var choice = await chooseRoute(tracks: tracks, media: media, part: part, quality: quality, target: autoTarget)
         guard owner == generation, !Task.isCancelled else { return }
         // Nothing measured the link lately: it is measured now, and the route and Auto's start go by the reading.
         if LinkProbe.isNeeded(route: choice.route, reach: reach), await probeLink(part: part) {
             guard owner == generation, !Task.isCancelled else { return }
-            choice = await chooseRoute(tracks: tracks, media: media, part: part, quality: quality)
+            choice = await chooseRoute(tracks: tracks, media: media, part: part, quality: quality, target: autoTarget)
             guard owner == generation, !Task.isCancelled else { return }
         }
         take(choice)
@@ -1155,7 +1165,9 @@ final class PlayerModel: Identifiable {
     }
 
     /// The route at `quality`, decided without changing the playing one.
-    private func chooseRoute(tracks: MediaTracks, media: PlexMedia, part: PlexPart, quality: VideoQuality) async -> RouteChoice {
+    private func chooseRoute(
+        tracks: MediaTracks, media: PlexMedia, part: PlexPart, quality: VideoQuality, target: DownloadTarget?
+    ) async -> RouteChoice {
         let settings = session.settings
         let picked = TrackRules.pick(
             from: tracks, isAnime: titleTags.isAnime, countries: titleTags.countries,
@@ -1164,7 +1176,8 @@ final class PlayerModel: Identifiable {
         let device = await capabilities.current()
         let connection = request.download == nil ? try? await library.connection.connection() : nil
         // A download plays on the phone or not at all: offline there is no server to convert it.
-        var limits = request.download == nil ? routeLimits(connection: connection, quality: quality) : RouteLimits(phoneOnly: true)
+        var limits = request.download == nil
+            ? routeLimits(connection: connection, quality: quality, target: target) : RouteLimits(phoneOnly: true)
         func decide() -> PlaybackRoute {
             PlaybackRouteDecider.decide(
                 media: media, part: part, tracks: tracks, audio: picked.audio, subtitle: picked.subtitle, capabilities: device, limits: limits
@@ -1646,7 +1659,8 @@ final class PlayerModel: Identifiable {
         guard size.width > 0, size.height > 0, scale > 0 else { return }
         viewport = size
         viewportScale = scale
-        guard phase == .playing, let current = adaptive else { return }
+        // A mapped ladder holds the title's own steps, which the size of the picture on screen does not change.
+        guard phase == .playing, let current = adaptive, !current.isMapped else { return }
         var resized = AdaptiveQuality(
             mediaKbps: media?.bitrate, linkKbps: current.estimateKbps, cap: dataCap,
             source: sourcePicture, view: viewPicture, now: ProcessInfo.processInfo.systemUptime
@@ -1705,12 +1719,35 @@ final class PlayerModel: Identifiable {
         reach = RouteReach.decide(connection: connection, mediaKbps: media?.bitrate, linkKbps: linkKbps)
         guard qualitySetting == .auto, !forcesDirectPlay, connection != nil else { return }
         let adaptive = AdaptiveQuality(
-            mediaKbps: media?.bitrate, linkKbps: linkKbps, cap: dataCap,
+            mediaKbps: media?.bitrate, linkKbps: linkKbps, cap: dataCap, map: qualityCurve,
             source: sourcePicture, view: viewPicture,
             now: ProcessInfo.processInfo.systemUptime
         )
         self.adaptive = adaptive
         autoRung = adaptive.rung
+    }
+
+    /// The bitrate and picture size Auto's rung asks of the server when it is a step of the title's quality curve;
+    /// nil for Original, a preset, or a quality the viewer fixed.
+    private var autoTarget: DownloadTarget? {
+        qualitySetting == .auto ? autoRung.target : nil
+    }
+
+    /// How long the start waits for HomeLabber's answer. A slower one is kept by the lookup's cache for the next item.
+    private static let curveWait = Duration.seconds(1.5)
+
+    /// HomeLabber's quality curve for the version playing, on this screen (`QualityMapAnswer.curve(for:screen:)`). It
+    /// is asked for only while Auto picks the stream: a fixed quality is the viewer's own choice, and Force Direct
+    /// Play keeps every file as it is.
+    private func measuredCurve(of full: PlexMetadata, media: PlexMedia) async -> QualityCurve? {
+        guard qualitySetting == .auto, !forcesDirectPlay else { return nil }
+        let downloads = session.downloads
+        let server = library.server.clientIdentifier
+        let key = full.ratingKey
+        let answer = await TimeLimit.answer(within: Self.curveWait) {
+            await downloads.qualityMapAnswer(server: server, ratingKey: key)
+        }
+        return answer?.curve(for: media, screen: .current)
     }
 
     /// The highest quality Save Data plays at on mobile data, a hotspot or Low Data Mode: 720p at 4 Mbit/s, about
@@ -1721,11 +1758,11 @@ final class PlayerModel: Identifiable {
     func dataCapMayHaveChanged() {
         guard request.download == nil, phase == .playing,
               (session.settings.savesData && session.isMetered ? Self.savedDataCap : nil) != dataCap else { return }
-        let playing = quality
+        let playing = quality, playingTarget = autoTarget
         abandonMove()
         startAdapting(connection: streamConnection)
         Diag.event(.player, "data.cap", ["cap": dataCap.map { "\($0)" }, "playing": "\(playing)", "now": "\(quality)"], .notice)
-        if quality != playing { reroute(handPick: false) }
+        if quality != playing || autoTarget != playingTarget { reroute(handPick: false) }
     }
 
     /// The reading of the link to `connection` that serves: recent, from this network, and not given up on (`LinkMemory`).
@@ -1841,13 +1878,13 @@ final class PlayerModel: Identifiable {
     }
 
     /// Moves Auto to `rung`: beside the playing stream when it can, else by a new stream at the playhead.
-    private func adapt(to rung: VideoQuality) {
+    private func adapt(to rung: AutoRung) {
         guard let tracks, let media, let part else { return settleMove(at: autoRung) }
         Diag.event(.player, "auto.move", ["from": "\(autoRung)", "to": "\(rung)", "estimateKbps": adaptive?.estimateKbps, "at": time], .notice)
         movePending = true
         moveTask = Task { [weak self] in
             guard let self else { return }
-            let choice = await chooseRoute(tracks: tracks, media: media, part: part, quality: rung)
+            let choice = await chooseRoute(tracks: tracks, media: media, part: part, quality: rung.quality, target: rung.target)
             guard !Task.isCancelled else { return }
             if StreamKey(choice.route) == streamKey {
                 // The file plays the same at this rung.
@@ -1873,7 +1910,7 @@ final class PlayerModel: Identifiable {
     /// Opens the stream at `rung` on the standby player, primed at a movie time `lead` seconds ahead (the usual lead
     /// when nil), and arms the switch for when the playhead gets there. False, with nothing of it left, when that
     /// failed or came too late.
-    private func prepareSwitch(to choice: RouteChoice, rung: VideoQuality, lead: TimeInterval? = nil) async -> Bool {
+    private func prepareSwitch(to choice: RouteChoice, rung: AutoRung, lead: TimeInterval? = nil) async -> Bool {
         guard let part, let playingOrigin = origin else { return false }
         // A move given up meanwhile has dropped its standby; a later one may hold the next.
         func failed() -> Bool {
@@ -1969,7 +2006,7 @@ final class PlayerModel: Identifiable {
     }
 
     /// Moves Auto by a new stream at the playhead, keeping the screen as it is.
-    private func restartForMove(_ choice: RouteChoice, rung: VideoQuality) {
+    private func restartForMove(_ choice: RouteChoice, rung: AutoRung) {
         // The lost stream's last reads say nothing of the link.
         let lost = replacingLost
         if lost { stopStream(measured: false) }
@@ -2078,7 +2115,7 @@ final class PlayerModel: Identifiable {
         }
     }
 
-    private func settleMove(at rung: VideoQuality) {
+    private func settleMove(at rung: AutoRung) {
         movePending = false
         replacingLost = false
         autoRung = rung

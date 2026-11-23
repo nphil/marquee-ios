@@ -1,9 +1,10 @@
 import Foundation
 
 /// The Download menu's choices for one version of a title: Original, then High, Medium and Low as the
-/// server converts them, each with its size. A tier's bitrate and size come from HomeLabber's
-/// measured VMAF scores when it has the title, else from an estimate made here. On a phone that
-/// decodes HEVC, a 4K title adds High at 4K, always estimated: HomeLabber scores H.264 only.
+/// server converts them, each with its size. A tier's bitrate and size come from HomeLabber's measured VMAF
+/// scores when it has the title (on a phone, the phone model's where HomeLabber has them), else from an
+/// estimate made here. On a phone that decodes HEVC, a 4K title adds High at 4K, always estimated: HomeLabber
+/// scores H.264 only. A title HomeLabber calls too small to convert is Original at every tier.
 ///
 /// A conversion is never asked for above the original's video bitrate. A tier that would be is
 /// Original instead when the phone plays the original offline, and is capped at its bitrate when not.
@@ -48,10 +49,16 @@ public struct DownloadQualityPlan: Sendable, Hashable {
     ///   - animated: The title, or an episode's show, is animation (`isAnimated(genres:)`).
     ///   - hevc: The phone decodes HEVC, which the 4K choice needs.
     ///   - originalPlays: The phone plays the original offline.
-    ///   - map: HomeLabber's scores for the title; ignored when they are for another version.
-    public init(media: PlexMedia, animated: Bool, hevc: Bool, originalPlays: Bool, map: QualityMapEntry?) {
-        let source = Source(media: media, fallbackFPS: map?.fps)
-        let measured = map?.mediaID == String(media.id) ? map : nil
+    ///   - answer: HomeLabber's word on the title. It counts only when it is about this version
+    ///     (`QualityMapAnswer.verified(for:)`). A file it calls smaller than any conversion is Original at every
+    ///     tier when the phone plays it offline, and is otherwise converted at its own bitrate, like an unmeasured one.
+    ///   - screen: The screen the download is for; a phone is judged by HomeLabber's phone model where it has one.
+    public init(media: PlexMedia, animated: Bool, hevc: Bool, originalPlays: Bool, answer: QualityMapAnswer, screen: ScreenClass) {
+        let answer = answer.verified(for: media)
+        let measured: QualityMapEntry?
+        if case .scored(let entry) = answer { measured = entry } else { measured = nil }
+        let scores = measured?.tiers(for: screen) ?? [:]
+        let source = Source(media: media, fallbackFPS: measured?.fps)
         let factor = Self.factor(source, animated: animated)
         let sizes = media.parts.compactMap(\.size)
         let frame = DownloadRecord.Frame(media: media, target: nil)
@@ -67,6 +74,12 @@ public struct DownloadQualityPlan: Sendable, Hashable {
             )
         }
 
+        if case .useOriginal = answer, originalPlays {
+            self.options = [original]
+            self.tiers = Dictionary(uniqueKeysWithValues: DownloadTier.allCases.map { ($0, original) })
+            return
+        }
+
         var options = [original]
         if source.height >= 2160, hevc {
             let kbps = max(TranscodeLadder.floor(height: 2160), TranscodeLadder.roundUp(Int((Self.uhdNeed * factor).rounded())))
@@ -78,7 +91,7 @@ public struct DownloadQualityPlan: Sendable, Hashable {
         var above: Option?
         for tier in DownloadTier.allCases {
             let found: Option?
-            if let point = measured?.tiers[tier] {
+            if let point = scores[tier] {
                 let height = PictureClass.heights.last { $0 <= min(point.height, source.height) } ?? 480
                 found = option(.tier(tier), DownloadTarget(videoKbps: point.kbps, height: height), .measured(vmaf: point.vmaf))
             } else {

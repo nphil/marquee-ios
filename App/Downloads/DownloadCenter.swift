@@ -97,17 +97,14 @@ final class DownloadCenter {
         didSet {
             guard qualityMap?.config != oldValue?.config else { return }
             qualityMaps = [:]
-            unscored = []
         }
     }
-    /// HomeLabber's scores fetched for the Download menus, by title.
-    private(set) var qualityMaps: [String: QualityMapEntry] = [:]
+    /// HomeLabber's word on each title the Download menus asked about.
+    private(set) var qualityMaps: [String: QualityMapAnswer] = [:]
     /// Whether a show is animation, which its episodes do not say themselves.
     private(set) var animatedShows: [String: Bool] = [:]
-    @ObservationIgnored private var unscored: Set<String> = []
-    /// After HomeLabber does not answer, the menus leave it alone for a minute: away from home every
-    /// question would wait for its timeout.
-    @ObservationIgnored private var qualityMapQuietUntil = Date.distantPast
+    /// The session's lookups, one per title; the player's Auto reads the same ones (`qualityMapAnswer`).
+    @ObservationIgnored private let qualityMapCache = QualityMapCache()
     /// Segments handed to iOS at a time; at Plex's 8 s segments, most of an hour.
     private static let handoffSegments = 400
     /// Sessions begun again in a row without a segment saved before the download queue takes over.
@@ -164,7 +161,6 @@ final class DownloadCenter {
         self.scope = scope
         qualityMaps = [:]
         animatedShows = [:]
-        unscored = []
         if let library { libraries[library.server.id] = library }
         // iOS relaunches the app in the background to deliver a finished slice; the in-app fetcher
         // would be suspended within seconds there.
@@ -181,7 +177,7 @@ final class DownloadCenter {
     }
 
     /// The Download menu's choices for one version of a title, from what is known now: HomeLabber's
-    /// scores once `prepareChoices` has them, else the estimate. Unknown capabilities leave Original
+    /// word on it once `prepareChoices` has it, else the estimate. Unknown capabilities leave Original
     /// in the menu; the Download tap checks it.
     func plan(for item: PlexMetadata, mediaIndex: Int, capabilities: DeviceCapabilities?) -> DownloadQualityPlan? {
         guard item.media.indices.contains(mediaIndex) else { return nil }
@@ -192,11 +188,18 @@ final class DownloadCenter {
             ? item.grandparentRatingKey.flatMap { animatedShows[$0] } ?? false
             : DownloadQualityPlan.isAnimated(genres: item.genres)
         return DownloadQualityPlan(
-            media: media, animated: animated, hevc: capabilities?.hevc ?? false, originalPlays: originalPlays, map: qualityMaps[item.ratingKey]
+            media: media, animated: animated, hevc: capabilities?.hevc ?? false, originalPlays: originalPlays,
+            answer: qualityMaps[item.ratingKey] ?? .unscored, screen: .current
         )
     }
 
-    /// Fetches what the choices need beyond the title's own answer: HomeLabber's scores for it and,
+    /// HomeLabber's word on a title, from the session's one lookup per title; `.unscored` while the plugin is off
+    /// or HomeLabber does not answer.
+    func qualityMapAnswer(server: String, ratingKey: String) async -> QualityMapAnswer {
+        await qualityMapCache.answer(qualityMap, server: server, ratingKey: ratingKey)
+    }
+
+    /// Fetches what the choices need beyond the title's own answer: HomeLabber's word on it and,
     /// for an episode, whether its show is animation.
     func prepareChoices(for item: PlexMetadata) async {
         guard let library else { return }
@@ -204,16 +207,10 @@ final class DownloadCenter {
            let found = try? await library.metadata(show) {
             animatedShows[show] = DownloadQualityPlan.isAnimated(genres: found.genres)
         }
-        guard let qualityMap, qualityMaps[item.ratingKey] == nil, !unscored.contains(item.ratingKey), qualityMapQuietUntil < .now else { return }
-        do {
-            if let entry = try await qualityMap.entry(server: library.server.clientIdentifier, ratingKey: item.ratingKey) {
-                qualityMaps[item.ratingKey] = entry
-            } else {
-                unscored.insert(item.ratingKey)
-            }
-        } catch {
-            qualityMapQuietUntil = Date.now.addingTimeInterval(60)
-        }
+        let answer = await qualityMapAnswer(server: library.server.clientIdentifier, ratingKey: item.ratingKey)
+        // The menus moved to another server while HomeLabber was asked: its ratingKeys are not these.
+        guard self.library?.server == library.server, answer != qualityMaps[item.ratingKey] ?? .unscored else { return }
+        qualityMaps[item.ratingKey] = answer
     }
 
     /// Queues each episode of a season or show that is not already downloaded or queued, in episode order, at
@@ -681,7 +678,8 @@ final class DownloadCenter {
     private static func target(of record: DownloadRecord, media: PlexMedia) -> DownloadTarget? {
         if let target = record.target { return target }
         guard record.quality != .original else { return nil }
-        return DownloadQualityPlan(media: media, animated: false, hevc: false, originalPlays: false, map: nil).option(for: record.quality)?.target
+        return DownloadQualityPlan(media: media, animated: false, hevc: false, originalPlays: false, answer: .unscored, screen: .current)
+            .option(for: record.quality)?.target
     }
 
     /// A transcode session's segments and the playlist they are relative to.

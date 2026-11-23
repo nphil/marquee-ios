@@ -19,9 +19,10 @@ struct DownloadQualityTests {
     }
 
     static func plan(
-        _ media: PlexMedia, animated: Bool = false, hevc: Bool = false, originalPlays: Bool = true, map: QualityMapEntry? = nil
+        _ media: PlexMedia, animated: Bool = false, hevc: Bool = false, originalPlays: Bool = true,
+        answer: QualityMapAnswer = .unscored, screen: ScreenClass = .tablet
     ) -> DownloadQualityPlan {
-        DownloadQualityPlan(media: media, animated: animated, hevc: hevc, originalPlays: originalPlays, map: map)
+        DownloadQualityPlan(media: media, animated: animated, hevc: hevc, originalPlays: originalPlays, answer: answer, screen: screen)
     }
 
     /// "medium 720 4000 estimated" for each choice after Original.
@@ -98,13 +99,13 @@ struct DownloadQualityTests {
     }
 
     @Test func measuredScoresReplaceTheEstimate() throws {
-        let plan = Self.plan(try Self.media(), map: Self.entry())
+        let plan = Self.plan(try Self.media(), answer: .scored(Self.entry()))
         #expect(Self.summary(plan) == ["high 1080 7400 h264 vmaf 95.2", "medium 720 3600 h264 vmaf 90.1"])
-        #expect(Self.summary(Self.plan(try Self.media(kbps: 7000), map: Self.entry())) == ["medium 720 3600 h264 vmaf 90.1"])
+        #expect(Self.summary(Self.plan(try Self.media(kbps: 7000), answer: .scored(Self.entry()))) == ["medium 720 3600 h264 vmaf 90.1"])
     }
 
     @Test func scoresOfAnotherVersionAreIgnored() throws {
-        let plan = Self.plan(try Self.media(), map: Self.entry(mediaID: "2"))
+        let plan = Self.plan(try Self.media(), answer: .scored(Self.entry(mediaID: "2")))
         #expect(Self.summary(plan).allSatisfy { $0.hasSuffix("estimated") })
     }
 
@@ -295,7 +296,7 @@ struct DownloadQualityTests {
 
     // MARK: HomeLabber
 
-    static let config = HomeLabberConfig(address: URL(string: "https://homelabber.example.net")!, token: "hl_0123456789abcdef0123")
+    static let config = HomeLabberConfig(address: URL(string: "https://homelabber.example.net")!, token: "hlmq_0123456789abcdef0123")
 
     static func client(_ answer: @escaping @Sendable (PlexRequest) throws -> PlexHTTPResponse) -> (HomeLabberClient, FakeTransport) {
         let transport = FakeTransport { request, _ in try answer(request) }
@@ -303,16 +304,18 @@ struct DownloadQualityTests {
     }
 
     @Test func parseAcceptsHTTPSAnywhereAndHTTPOnlyAtHome() throws {
-        let token = "hl_0123456789abcdef0123"
+        let token = "hlmq_0123456789abcdef0123"
         #expect(try HomeLabberConfig.parse(address: " https://homelabber.example.net/ ", token: token).get().token == token)
         #expect((try? HomeLabberConfig.parse(address: "http://192.168.1.69:3009", token: token).get()) != nil)
         #expect(HomeLabberConfig.parse(address: "http://homelabber.example.net", token: token) == .failure(.plaintext))
         #expect(HomeLabberConfig.parse(address: "homelabber.example.net", token: token) == .failure(.scheme))
         #expect(HomeLabberConfig.parse(address: "https://homelabber.example.net", token: "short") == .failure(.token))
         #expect(HomeLabberConfig.parse(address: "https://homelabber.example.net", token: "has a space in it ok") == .failure(.token))
+        // Only the token HomeLabber makes for Marquee is kept, not another kind of its credentials.
+        #expect(HomeLabberConfig.parse(address: "https://homelabber.example.net", token: "hl_0123456789abcdef0123") == .failure(.token))
     }
 
-    @Test func entryReadsTheTiersWithTheBearerToken() async throws {
+    @Test func theAnswerReadsTheTiersWithTheBearerToken() async throws {
         let (client, transport) = Self.client { _ in
             json([
                 "ratingKey": "301", "mediaId": 1, "scoredAt": "2026-11-12T03:00:00Z", "encoder": "h264_vaapi",
@@ -326,20 +329,26 @@ struct DownloadQualityTests {
             ])
         }
 
-        let entry = try #require(try await client.entry(server: "machine-1", ratingKey: "301"))
+        guard case .scored(let entry) = try await client.answer(server: "machine-1", ratingKey: "301") else {
+            Issue.record("the title was not read as measured")
+            return
+        }
 
         #expect(entry.mediaID == "1" && entry.encoder == "h264_vaapi" && entry.fps == 23.976 && entry.curve.count == 2)
         #expect(entry.tiers[.medium] == QualityMapEntry.Point(kbps: 3600, vmaf: 90.1, height: 720))
         #expect(entry.scoredAt == Date(timeIntervalSince1970: 1_794_452_400))
+        // A response from before HomeLabber scored for phones has no phone tiers and no phone score.
+        #expect(entry.phoneTiers == nil && entry.curve.allSatisfy { $0.vmafPhone == nil })
         let request = try #require(await transport.requests(to: "/api/media-quality/v1/servers/machine-1/items/301").first)
         #expect(request.headers["Authorization"] == "Bearer \(Self.config.token)")
     }
 
-    @Test func entryAnswersNothingUntilScoredAndNamesFailures() async throws {
-        #expect(try await Self.client { _ in json([:], status: 404) }.0.entry(server: "m", ratingKey: "1") == nil)
-        await #expect(throws: HomeLabberError.badToken) { try await Self.client { _ in json([:], status: 401) }.0.entry(server: "m", ratingKey: "1") }
+    @Test func theAnswerIsUnscoredUntilMeasuredAndNamesFailures() async throws {
+        #expect(try await Self.client { _ in json([:], status: 404) }.0.answer(server: "m", ratingKey: "1") == .unscored)
+        #expect(try await Self.client { _ in json(["error": "Not scored yet"], status: 404) }.0.answer(server: "m", ratingKey: "1") == .unscored)
+        await #expect(throws: HomeLabberError.badToken) { try await Self.client { _ in json([:], status: 401) }.0.answer(server: "m", ratingKey: "1") }
         await #expect(throws: HomeLabberError.notHomeLabber) {
-            try await Self.client { _ in PlexHTTPResponse(status: 200, body: Data("<html>".utf8)) }.0.entry(server: "m", ratingKey: "1")
+            try await Self.client { _ in PlexHTTPResponse(status: 200, body: Data("<html>".utf8)) }.0.answer(server: "m", ratingKey: "1")
         }
         await #expect(throws: HomeLabberError.timedOut) { try await Self.client { _ in throw NetworkFailure.timedOut }.0.status() }
         await #expect(throws: HomeLabberError.unreachable) { try await Self.client { _ in throw NetworkFailure.offline }.0.status() }

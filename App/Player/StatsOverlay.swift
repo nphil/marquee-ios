@@ -159,7 +159,7 @@ enum PlayerStats {
         }
         if model.qualitySetting == .auto, !model.forcesDirectPlay {
             let link = model.linkEstimateKbps.map { " · link \(mbps(Double($0) * 1000))" } ?? ""
-            lines.append(Line("Auto", model.quality.title + link))
+            lines.append(Line("Auto", model.qualityTitle + link))
         }
         for (i, line) in (server?.probes.last?.lines ?? []).enumerated() {
             lines.append(Line("Probe \(i + 1)", line))

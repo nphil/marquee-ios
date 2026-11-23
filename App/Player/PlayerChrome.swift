@@ -1059,7 +1059,7 @@ struct MoreMenu: View {
 
     private var qualityValue: String {
         if model.forcesDirectPlay { return "Original" }
-        if model.qualitySetting == .auto { return "Auto · " + model.quality.title }
+        if model.qualitySetting == .auto { return "Auto · " + model.qualityTitle }
         return model.quality == .original && model.isConverting ? "Original · Converted" : model.quality.title
     }
 }

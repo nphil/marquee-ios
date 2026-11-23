@@ -425,7 +425,8 @@ final class AppSession {
             bazarr.save(BazarrConfig(address: address, apiKey: "fakefakefakefakefakefakefakefake"))
         }
         if let address = arguments.string(forKey: "marquee.uitest.homelabber").flatMap(URL.init(string:)) {
-            homelabber.save(HomeLabberConfig(address: address, token: "fakefakefakefakefakefakefakefake"))
+            // The page validates the token's prefix, as it does on a real phone.
+            homelabber.save(HomeLabberConfig(address: address, token: HomeLabberConfig.tokenPrefix + "fakefakefakefakefakefake"))
         }
         if let address = arguments.string(forKey: "marquee.uitest.seerr").flatMap(URL.init(string:)) {
             // The fake server cannot set Seerr's session cookie, so the tests sign in with a key.

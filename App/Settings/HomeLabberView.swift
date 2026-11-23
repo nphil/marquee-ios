@@ -2,7 +2,7 @@ import MarqueeCore
 import SwiftUI
 
 /// HomeLabber's address and Marquee token, and the last connection test since either changed. A
-/// saved address and token hand the quality map to the downloads.
+/// saved address and token hand the quality map to the downloads and the player's Auto quality.
 @MainActor @Observable
 final class HomeLabberSettings {
     enum Check: Equatable {
@@ -100,7 +100,7 @@ struct HomeLabberView: View {
                 if let problem = shownProblem {
                     ProblemLine(text: Self.text(for: problem))
                 } else {
-                    Text("HomeLabber measures overnight how each title looks at different sizes. With its address and a Marquee token, High, Medium and Low downloads use the measured sizes instead of estimates. Make the token in HomeLabber under Settings, Media quality.")
+                    Text("HomeLabber measures overnight how each title looks at different sizes. With its address and a Marquee token, High, Medium and Low downloads use the measured sizes, and Auto quality picks the best picture a slow connection can carry, instead of estimates. Make the token in HomeLabber under Settings, Media quality; it starts with hlmq_.")
                         .foregroundStyle(theme.ink2)
                 }
             }
@@ -135,7 +135,7 @@ struct HomeLabberView: View {
                                 token = ""
                             }
                         } message: {
-                            Text("The address and token are removed from this iPhone. Download sizes are estimated again.")
+                            Text("The address and token are removed from this iPhone. Download sizes are estimated again, and Auto quality goes back to its usual steps.")
                         }
                 }
                 .listRowBackground(theme.sheet)
@@ -181,7 +181,7 @@ struct HomeLabberView: View {
     private func status(_ homelabber: HomeLabberSettings) -> some View {
         switch homelabber.check {
         case _ where homelabber.config == nil:
-            Text("Not set up. Add the address and token, then test the connection. The token stays on this iPhone, in the Keychain like the Plex sign-in. Until then, download sizes are estimated from each title's details.")
+            Text("Not set up. Add the address and token, then test the connection. The token stays on this iPhone, in the Keychain like the Plex sign-in. Until then, download sizes are estimated from each title's details and Auto quality uses its usual steps.")
                 .foregroundStyle(theme.ink2)
         case .untested:
             Text("Not tested yet.")
@@ -201,14 +201,15 @@ struct HomeLabberView: View {
         case .scheme: "The address must start with https:// or http://."
         case .host: "That is not a valid address."
         case .plaintext: "Plain http:// is only for addresses on your home network. Use https:// for any other."
-        case .token: "That is not a valid token."
+        case .token: "That is not a Marquee token. HomeLabber's start with hlmq_."
         }
     }
 
     static func text(for status: QualityMapStatus) -> String {
-        guard status.enabled else { return "Connected · The quality map is off in HomeLabber, so download sizes are estimated." }
+        guard status.enabled else { return "Connected · The quality map is off in HomeLabber, so download sizes are estimated and Auto quality uses its usual steps." }
         let progress = "\(status.scored.formatted()) of \(status.total.formatted()) titles measured"
-        return "Connected · \(progress)\(status.running ? ", measuring now" : ""). The others' download sizes are estimated."
+        let lastRun = status.lastRun.map { " Last run \($0.formatted(date: .abbreviated, time: .shortened))." } ?? ""
+        return "Connected · \(progress)\(status.running ? ", measuring now" : ""). The others are estimated for downloads and streamed by Auto's usual steps.\(lastRun)"
     }
 
     static func text(for error: HomeLabberError) -> String {

@@ -2,6 +2,14 @@ import Foundation
 import Testing
 @testable import MarqueeCore
 
+/// The presets as rungs, to read a ladder at a glance.
+private extension AutoRung {
+    static let mbps20 = AutoRung.preset(.mbps20)
+    static let mbps12 = AutoRung.preset(.mbps12)
+    static let mbps8 = AutoRung.preset(.mbps8)
+    static let mbps4 = AutoRung.preset(.mbps4)
+}
+
 /// A 10 Mbit/s file, looked at every 2 s on a made-up clock; each move finishes at once.
 struct AdaptiveQualityTests {
     static let fileKbps = 10_000
@@ -28,7 +36,7 @@ struct AdaptiveQualityTests {
 
     struct Move: Equatable {
         let at: TimeInterval
-        let to: VideoQuality
+        let to: AutoRung
     }
 
     @Test func theLadderIsOriginalAndThePresetsBelowTheFile() {
@@ -185,5 +193,81 @@ struct AdaptiveQualityTests {
         #expect(QualitySetting.saved(legacy: nil) == .auto)
         #expect(QualitySetting.saved(legacy: .original) == .auto)
         #expect(QualitySetting.saved(legacy: .mbps4) == .fixed(.mbps4))
+    }
+}
+
+/// Auto on a title HomeLabber has measured: the ladder is the steps of its quality curve, not the presets.
+extension AdaptiveQualityTests {
+    private func mapped(link: Int?, cap: VideoQuality? = nil, scores: QualityScores? = nil) -> AdaptiveQuality {
+        AdaptiveQuality(mediaKbps: 15_000, linkKbps: link, cap: cap, scores: scores, map: QualityMapTests.curve, now: 0)
+    }
+
+    private static func step(of rung: AutoRung) -> StreamStep? {
+        guard case .mapped(let step) = rung else { return nil }
+        return step
+    }
+
+    @Test func aMeasuredTitlesLadderIsOriginalThenTheCurvesStepsBelowTheFile() {
+        let abr = mapped(link: nil)
+        #expect(abr.ladder.first == .original)
+        #expect(abr.ladder.dropFirst().allSatisfy { $0.target != nil })
+        #expect(abr.ladder.count == QualityMapTests.curve.steps().count + 1)
+        #expect(abr.isMapped && !make().isMapped)
+        // A step that costs as much as the file saves nothing.
+        let lean = AdaptiveQuality(mediaKbps: 5_000, linkKbps: nil, map: QualityMapTests.curve, now: 0)
+        let rates = lean.ladder.compactMap { Self.step(of: $0)?.rateKbps }
+        #expect(!rates.isEmpty && rates.allSatisfy { $0 < 5_000 })
+    }
+
+    @Test func aRungIsLoggedByItsPresetNameOrItsStepsSizeAndRate() throws {
+        #expect("\(AutoRung.preset(.mbps8))" == "mbps8")
+        let step = try #require(Self.step(of: mapped(link: 1_000).floor))
+        #expect("\(AutoRung.mapped(step))" == "480p@1050k")
+    }
+
+    @Test func theStartIsTheBestLookTheLinkCarriesWithAQuarterInHand() throws {
+        #expect(mapped(link: 50_000).rung == .original)
+        // 7.5 of 10 Mbit/s buys 720p at about 6, where the presets would start at 4.
+        let ten = mapped(link: 10_000)
+        let step = try #require(Self.step(of: ten.rung))
+        #expect(step.target.height == 720 && step.rateKbps > 4_000 && step.rateKbps <= 7_500)
+        #expect(make(link: 10_000).rung == .mbps4)
+        #expect(!ten.belowFloor)
+    }
+
+    @Test func belowTheCheapestStepTheLowestOneHoldsAndWarns() throws {
+        let slow = mapped(link: 1_000)
+        #expect(slow.rung == slow.floor && slow.belowFloor)
+        let cheapest = try #require(Self.step(of: slow.floor))
+        #expect(cheapest.target.height == 480 && cheapest.target.videoKbps == 1050)
+        // 1.5 of 2 Mbit/s carries it.
+        #expect(!mapped(link: 2_000).belowFloor)
+    }
+
+    @Test func aWaitMovesToTheBestStepTheEstimateFitsNotJustOneDown() throws {
+        var abr = mapped(link: 50_000)
+        _ = play(&abr, from: 0, to: 10, kbps: 8_000) { _ in 30 }
+
+        let move = abr.observe(.init(now: 12, bufferSeconds: 0, waitingSeconds: 2))
+        let moved = try #require(move)
+
+        let step = try #require(Self.step(of: moved))
+        #expect(step.rateKbps <= 6_000 && step.rateKbps > 4_000)
+        #expect(moved != abr.ladder[1])
+    }
+
+    @Test func theDataCapBoundsTheMappedLadderToo() throws {
+        let abr = mapped(link: 160_000, cap: .mbps4)
+        let step = try #require(Self.step(of: abr.rung))
+        #expect(step.target.maxVideoBitrateKbps <= 4_000 && step.target.height <= 720)
+        let index = try #require(abr.ladder.firstIndex(of: abr.rung))
+        let above = try #require(Self.step(of: abr.ladder[index - 1]))
+        #expect(above.target.maxVideoBitrateKbps > 4_000 || above.target.height > 720)
+    }
+
+    @Test func presetScoresDoNotApplyToAMappedLadder() {
+        let scores = QualityScores([.original: 96, .mbps8: 95, .mbps4: 92, .mbps2: 85])
+        #expect(mapped(link: 50_000, scores: scores).rung == .original)
+        #expect(make(link: 50_000, scores: scores).rung == .mbps8)
     }
 }

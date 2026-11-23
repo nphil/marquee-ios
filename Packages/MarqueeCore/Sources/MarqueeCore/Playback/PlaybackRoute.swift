@@ -201,6 +201,9 @@ public struct RouteLimits: Sendable, Hashable {
     public var phoneOnly: Bool
     /// The picked quality; a source above its bitrate or picture size is converted down.
     public var quality: VideoQuality
+    /// A bitrate and picture size Auto picked from the title's quality map (`AutoRung.target`). While set they are
+    /// the limit in place of `quality`'s cap and frame, and `quality` only names the rung.
+    public var target: DownloadTarget?
     /// How near the server is by the measured link (`RouteReach`); nil where the link does not matter (a
     /// download, a Chromecast). A file that needs the remux streams from the server unless the link carries it:
     /// the remux reads the file's header, index and start point one request at a time, which took 11 s before
@@ -212,12 +215,13 @@ public struct RouteLimits: Sendable, Hashable {
     public var audioEnhancements: AudioEnhancements
 
     public init(
-        serverReason: RouteReason? = nil, phoneOnly: Bool = false, quality: VideoQuality = .original, reach: RouteReach? = nil,
-        linkKbps: Int? = nil, audioEnhancements: AudioEnhancements = []
+        serverReason: RouteReason? = nil, phoneOnly: Bool = false, quality: VideoQuality = .original, target: DownloadTarget? = nil,
+        reach: RouteReach? = nil, linkKbps: Int? = nil, audioEnhancements: AudioEnhancements = []
     ) {
         self.serverReason = serverReason
         self.phoneOnly = phoneOnly
         self.quality = quality
+        self.target = target
         self.reach = reach
         self.linkKbps = linkKbps
         self.audioEnhancements = audioEnhancements
@@ -264,8 +268,10 @@ public enum PlaybackRouteDecider {
         if let reason = limits.serverReason { serverReasons.append(reason) }
         if !limits.audioEnhancements.isEmpty { serverReasons.append(.audioEnhancement) }
         if let video, let reason = undecodable(video, codec: codec, capabilities) { serverReasons.append(reason) }
-        let shrinks = exceeds(media, video, limits.quality.frame)
-        if let cap = limits.quality.maxBitrateKbps, shrinks || (media.bitrate ?? 0) > cap { serverReasons.append(.bitrateLimit(kbps: cap)) }
+        let limitFrame = limits.target.map { (width: $0.width, height: $0.height) } ?? limits.quality.frame
+        let limitKbps = limits.target.map { $0.videoKbps + DownloadTarget.audioKbps } ?? limits.quality.maxBitrateKbps
+        let shrinks = exceeds(media, video, limitFrame)
+        if let cap = limitKbps, shrinks || (media.bitrate ?? 0) > cap { serverReasons.append(.bitrateLimit(kbps: cap)) }
         if let link = limits.linkKbps, let bitrate = media.bitrate, link * 4 < bitrate * 5 { serverReasons.append(.slowLink(kbps: link)) }
 
         if !capabilities.directContainers.contains(container) {
@@ -365,7 +371,10 @@ public enum PlaybackRouteDecider {
             return nil
         }.first
         let converts = kind == .serverTranscode && reencodes
-        let frame = limits.quality.frame.map { "\($0.width)x\($0.height)" }
+        let frame = limitFrame.map { "\($0.width)x\($0.height)" }
+        // A target already fits the link; the slow-link cap on top could land under the size's floor, and Plex
+        // would send a smaller picture than asked for.
+        let requestKbps = limits.target?.maxVideoBitrateKbps ?? [limits.quality.maxBitrateKbps, slowLinkCap].compactMap(\.self).min()
         var reasons = kind == .directPlay ? [] : serverReasons + remuxReasons
         // The note belongs to the route it explains: the phone does the remux the link makes possible.
         if kind == .remux, !limits.phoneOnly, case .nearByLink(let kbps)? = limits.reach { reasons.append(.fastLink(kbps: kbps)) }
@@ -376,7 +385,7 @@ public enum PlaybackRouteDecider {
             audioIsStandIn: audioIsStandIn,
             convertsAudio: kind == .remux && audioNeedsConversion,
             reencodesVideo: converts,
-            maxVideoBitrateKbps: converts ? [limits.quality.maxBitrateKbps, slowLinkCap].compactMap(\.self).min() : nil,
+            maxVideoBitrateKbps: converts ? requestKbps : nil,
             videoResolution: converts && shrinks ? frame : nil,
             audioEnhancements: kind == .serverTranscode ? limits.audioEnhancements : [],
             subtitle: delivery
