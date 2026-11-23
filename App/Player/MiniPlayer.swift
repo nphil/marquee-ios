@@ -333,32 +333,31 @@ struct MiniPlayerBar<Picture: View>: View {
 
 extension View {
     /// The bar of a minimised playback, in the tab's own bottom inset above the tab bar. Only the selected
-    /// tab shows it: the playback's layer view lives in one place at a time.
-    func miniBarInset(isSelected: Bool) -> some View {
-        modifier(MiniBarInset(isSelected: isSelected))
+    /// tab shows it: the playback's layer view lives in one place at a time. `width` is the tab view's.
+    func miniBarInset(isSelected: Bool, width: CGFloat) -> some View {
+        modifier(MiniBarInset(isSelected: isSelected, width: width))
     }
 }
 
 /// The tab view's bottom accessory keeps its own 48 pt of glass whatever it holds (a 91 pt bar in it showed
 /// 48 pt of glass and clipped the rest, in CI on the simulator), so the bar is ours: system glass with the
-/// corners a 48 pt capsule has, always as tall as its width allows. [INFERENCE: when the tab bar minimises
-/// on scroll the bar stays above it, big; that needs a phone check.]
+/// corners a 48 pt capsule has, always as tall as its width allows. Every tab keeps the bar's space while a
+/// playback is minimised, so a page's bottom inset (the floating remote rests above it) and its layout are
+/// the same before and after a tab change. [INFERENCE: when the tab bar minimises on scroll the bar stays
+/// above it, big; that needs a phone check.]
 private struct MiniBarInset: ViewModifier {
     let isSelected: Bool
+    let width: CGFloat
     @Environment(AppSession.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    /// The tab's width, measured before a bar shows, so the bar opens at its height and does not grow into it.
-    @State private var width: CGFloat = 0
 
     func body(content: Content) -> some View {
         let docked = session.player.docked != nil
+        let size = MiniBarSize(least: Size.target, margin: Size.miniMargin, width: width - Space.s5 * 2)
         content
-            .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if isSelected, docked {
-                    DockedMiniPlayer()
-                        .environment(\.miniBarSize, MiniBarSize(least: Size.target, margin: Size.miniMargin, width: width - Space.s5 * 2))
-                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+                if docked {
+                    hosted(size)
                         .padding(.horizontal, Space.s5)
                         .padding(.bottom, Space.s2)
                         .transition(.opacity)
@@ -366,6 +365,17 @@ private struct MiniBarInset: ViewModifier {
             }
             // The bar fades as the playback is minimised and ended, and does not as the tabs change.
             .animation(Motion.spring(reduceMotion: reduceMotion), value: docked)
+    }
+
+    @ViewBuilder
+    private func hosted(_ size: MiniBarSize) -> some View {
+        if isSelected {
+            DockedMiniPlayer()
+                .environment(\.miniBarSize, size)
+                .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
+        } else {
+            Color.clear.frame(height: CGFloat(size.height))
+        }
     }
 }
 

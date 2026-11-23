@@ -171,6 +171,8 @@ private struct MainTabs: View {
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.sheetZoomNamespace) private var zoomNamespace
+    /// The tab view's width: the mini player's bar is sized from it in every tab, visited or not.
+    @State private var tabsWidth: CGFloat = 0
 
     var body: some View {
         let tabs = store.tabLayout.tabs(available: Destination.available(in: session))
@@ -179,12 +181,13 @@ private struct MainTabs: View {
             ForEach(tabs) { destination in
                 Tab(destination.title, systemImage: destination.systemImage, value: destination, role: destination == .search ? .search : nil) {
                     BrowseStack(tab: destination.rawValue) { destination.page() }
-                        .miniBarInset(isSelected: destination == selection)
+                        .miniBarInset(isSelected: destination == selection, width: tabsWidth)
                 }
                 .badge(destination.badge(in: session))
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { tabsWidth = $0 }
         .tabViewBottomAccessory(isEnabled: showsAccessory) {
             TVRemoteMiniBar()
         }

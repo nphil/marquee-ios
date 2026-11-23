@@ -60,7 +60,8 @@ private struct StackChrome: ViewModifier {
 
     @Environment(\.tabSelection) private var tabSelection
     @Environment(AppSession.self) private var session
-    /// How far the tab bar and its accessory reach up from the window's foot, as this page last laid out.
+    /// How far the tab bar and what sits above it (the TV remote's accessory, a minimised playback's bar)
+    /// reach up from the window's foot, as this page last laid out.
     @State private var bottomInset: CGFloat?
 
     func body(content: Content) -> some View {

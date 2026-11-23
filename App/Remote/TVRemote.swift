@@ -31,8 +31,9 @@ final class TVRemote {
     private(set) var mode: RemotePadMode
     /// The touchpad's pointer follows the phone's turns (the air mouse) instead of a finger.
     private(set) var airMouse: Bool
-    /// How far the tab bar and its accessory reach up from the window's bottom edge, measured by the tab
-    /// content; 0 until a tab has laid out. The floating button rests above it.
+    /// How far the tab bar and what sits above it (the TV remote's accessory, a minimised playback's bar)
+    /// reach up from the window's bottom edge, measured by the tab content; 0 until a tab has laid out. The
+    /// floating button rests above it.
     private(set) var bottomChrome: CGFloat = 0
     /// Made again by Delete All Local Data, so the remote's own settings start over too.
     private(set) var model: RemoteModel

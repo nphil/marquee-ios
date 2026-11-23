@@ -4,7 +4,7 @@ import CoreGraphics
 #endif
 
 /// Where the floating remote may rest and open: the window less the system's insets, the bar along the bottom
-/// (the tab bar and its accessory) and the keyboard while it is up.
+/// (the tab bar and what sits above it) and the keyboard while it is up.
 public struct RemoteSpace: Equatable, Sendable {
     public let window: CGRect
     /// The window inside the status bar, the notch and the home indicator.
