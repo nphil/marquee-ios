@@ -344,8 +344,10 @@ struct PlayerView: View {
     }
 
     /// A mostly vertical drag down moves the picture with the finger and minimises the player past 140 pt or on a flick.
+    /// Measured in the window: the picture carries this gesture, so in its own space the translation shrinks as the
+    /// picture follows the finger, and the pull flickers between the two and can end on either.
     private var pullGesture: some Gesture {
-        DragGesture(minimumDistance: 24)
+        DragGesture(minimumDistance: 24, coordinateSpace: .global)
             .onChanged { value in
                 let move = value.translation
                 guard pull > 0 || (move.height > 0 && move.height > abs(move.width) * 1.2) else { return }
