@@ -99,6 +99,7 @@ final class LivePlaybackModel: Identifiable {
     func close() {
         guard !closed else { return }
         closed = true
+        let began = ContinuousClock.now
         holderCheck?.cancel()
         surfCommit?.cancel()
         tuneTask?.cancel()
@@ -109,6 +110,7 @@ final class LivePlaybackModel: Identifiable {
         audio.deactivate {
             if wasStarted { playbackActive(false) }
         }
+        Diag.event(.live, "close.teardown", ["ms": Diag.ms(since: began)], .debug)
     }
 
     // MARK: Channels
@@ -194,6 +196,12 @@ final class LivePlaybackModel: Identifiable {
         guard !closed, state != .idle else { return }
         source.pause()
         showChrome()
+    }
+
+    /// Holds the stream, without the controls coming up, while the player's cover leaves; `close()` follows.
+    func silence() {
+        guard !closed, state != .idle else { return }
+        source.pause()
     }
 
     /// Plays on from a pause, or tunes again after the stream ended.

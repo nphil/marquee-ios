@@ -569,6 +569,7 @@ final class PlayerModel: Identifiable {
     func close() {
         guard !closed else { return }
         closed = true
+        let began = ContinuousClock.now
         Diag.event(.player, "close", [
             "at": time, "duration": duration, "phase": Self.diagPhase(phase), "route": route?.kind.rawValue, "seeks": diagSeeks,
             "stalls": diagStalls, "recoveries": recoveries?.count ?? 0, "watched": markedWatched, "start": startTiming.summary,
@@ -598,6 +599,7 @@ final class PlayerModel: Identifiable {
             session.cast.disconnect()
             session.cast.endSearch()
         }
+        Diag.event(.player, "close.teardown", ["ms": Diag.ms(since: began)], .debug)
         Diag.endPlayback()
     }
 
@@ -3275,6 +3277,12 @@ final class PlayerCenter {
     /// The bar draws the picture only after the full-screen player has left. Both draw the same layer, and
     /// the bar taking it at once would blank the player while it shrinks into the bar.
     private(set) var barShowsPicture = false
+    /// The film or channel whose full-screen cover is leaving after its close button. It ends once the cover
+    /// has gone (`dismissed`, `liveDismissed`), so its teardown does not run under the dismiss animation or
+    /// the first scroll after it.
+    @ObservationIgnored private weak var closingFilm: PlayerModel?
+    @ObservationIgnored private weak var closingLive: LivePlaybackModel?
+    @ObservationIgnored private var closeFallback: Task<Void, Never>?
     let capabilities = PlaybackCapabilities()
     /// Parts that failed to play on the phone in this run; reopening one goes straight to the server.
     @ObservationIgnored var phoneFailures: Set<Int> = []
@@ -3359,7 +3367,39 @@ final class PlayerCenter {
         livePresented = model
     }
 
+    /// The player's own close button. With its cover up the playback is silenced and the cover leaves first;
+    /// `dismissed()` ends it once the cover has gone. The stream, remux, audio session and Now Playing
+    /// teardown is the heaviest work the player does on the main thread, and under the dismiss animation or
+    /// the first scroll after it a freeze showed (Stashy measured 53 ms).
     func close(_ model: PlayerModel) {
+        guard closingFilm !== model else { return }
+        guard presented === model, active === model, !onGlasses else {
+            end(model)
+            return
+        }
+        model.pause()
+        closingFilm = model
+        minimised = false
+        presented = nil
+        endIfCoverStays()
+    }
+
+    /// The same for a live channel: held now, ended by `liveDismissed()`.
+    func closeLive(_ model: LivePlaybackModel) {
+        guard closingLive !== model else { return }
+        guard livePresented === model, live === model else {
+            endLive(model)
+            return
+        }
+        model.silence()
+        closingLive = model
+        minimised = false
+        livePresented = nil
+        endIfCoverStays()
+    }
+
+    /// Ends the playback now: there is no cover to wait for (the bar's stop, the glasses, the tabs going).
+    private func end(_ model: PlayerModel) {
         if presented === model { presented = nil }
         if active === model {
             model.close()
@@ -3368,12 +3408,24 @@ final class PlayerCenter {
         }
     }
 
-    func closeLive(_ model: LivePlaybackModel) {
+    private func endLive(_ model: LivePlaybackModel) {
         if livePresented === model { livePresented = nil }
         if live === model {
             model.close()
             live = nil
             minimised = false
+        }
+    }
+
+    /// `onDismiss` ends a closing playback. If SwiftUI never reports the cover's end, this does, so a held
+    /// stream cannot keep its tuner or audio session open.
+    private func endIfCoverStays() {
+        closeFallback?.cancel()
+        closeFallback = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled, let self else { return }
+            if let model = closingFilm, model === active { dismissed() }
+            if let model = closingLive, model === live { liveDismissed() }
         }
     }
 
@@ -3433,8 +3485,8 @@ final class PlayerCenter {
     /// The tabs left the screen (sign-out, the server list). The live player's cover and the bar hang from
     /// them, so what they showed ends; a film's full-screen cover hangs from the root and stays.
     func tabsLeft() {
-        if let live { closeLive(live) }
-        if presented == nil, minimised, let active { close(active) }
+        if let live { endLive(live) }
+        if presented == nil, minimised, let active { end(active) }
     }
 
     func stopAll() {
