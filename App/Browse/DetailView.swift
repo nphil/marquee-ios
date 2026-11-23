@@ -203,6 +203,7 @@ private struct DetailPage: View {
         // edge or Blur's band would cover the artwork at rest.
         .scrollEdgeEffectStyle(.soft, for: .top)
         .tabBarFollowsScroll()
+        .scrollTelemetry()
         .swipeActionsContainer()
         .onScrollGeometryChange(for: Bool.self) { geometry in
             geometry.contentOffset.y + geometry.contentInsets.top > barTitlePoint

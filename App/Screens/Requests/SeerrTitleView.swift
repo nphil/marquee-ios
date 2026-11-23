@@ -135,6 +135,7 @@ struct SeerrTitleView: View {
             .padding(.bottom, Space.s7)
         }
         .tabBarFollowsScroll()
+        .scrollTelemetry()
     }
 
     private func metadata(_ details: SeerrDetails) -> String {

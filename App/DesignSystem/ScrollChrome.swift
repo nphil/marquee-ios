@@ -47,9 +47,17 @@ final class TabBarScroll {
 
 extension View {
     /// The header style on this scroll view. `band: false` keeps a page on system glass, such as a partial
-    /// sheet, on the soft edge, since Blur's band is drawn in the canvas.
-    func scrollHeader(band: Bool = true) -> some View {
+    /// sheet, on the soft edge, since Blur's band is drawn in the canvas. `surface` names the page in the
+    /// scroll log; the file that calls this names it.
+    func scrollHeader(band: Bool = true, surface: String = #fileID) -> some View {
         modifier(ScrollHeader(band: band))
+            .scrollTelemetry(surface)
+    }
+
+    /// Reports this scroll view moving and resting to `ScrollMonitor`: work that can wait holds off while it
+    /// moves, and Detailed diagnostics log the frame timing of each gesture.
+    func scrollTelemetry(_ surface: String = #fileID) -> some View {
+        modifier(ScrollTelemetry(surface: ScrollMonitor.name(ofFile: surface)))
     }
 
     /// Lets this scroll view, a browse page's main one, slide the tab bar away under the Hide choice.
@@ -80,6 +88,18 @@ private struct ScrollHeader: ViewModifier {
                     HeaderBand(inset: shape.inset, opacity: Double(shape.step) / Double(BandShape.steps))
                 }
             }
+    }
+}
+
+private struct ScrollTelemetry: ViewModifier {
+    let surface: String
+
+    func body(content: Content) -> some View {
+        content
+            .onScrollPhaseChange { _, phase in
+                ScrollMonitor.shared.moving(phase.isScrolling, surface: surface, phase: String(describing: phase))
+            }
+            .onDisappear { ScrollMonitor.shared.moving(false, surface: surface, phase: "idle") }
     }
 }
 
