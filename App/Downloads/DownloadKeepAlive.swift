@@ -29,6 +29,9 @@ final class DownloadKeepAlive {
     private var ticks = 0
     private var refusals = 0
     private var startedAt = Date.now
+    /// Last seen state of the session and of `play()`, so the log carries changes, not every cycle.
+    private var sessionHeld = false
+    private var playRefused = false
 
     /// Pumps for as long as `needed()` holds; it is asked again at the top of every cycle, so the end
     /// of the work stops the pump without anyone watching for it.
@@ -40,6 +43,8 @@ final class DownloadKeepAlive {
             return
         }
         isRunning = true
+        sessionHeld = false
+        playRefused = false
         stillNeeded = needed
         ticks = 0
         refusals = 0
@@ -94,8 +99,14 @@ final class DownloadKeepAlive {
                 stop()
                 return
             }
+            // iOS 27 may interrupt on backgrounding without ever posting the `.ended` half, so the
+            // session is re-claimed every cycle; on an active mixable session this is a no-op.
+            let held = await Task.detached { (try? AVAudioSession.sharedInstance().setActive(true)) == nil }.value
+            guard !Task.isCancelled, isRunning else { return }
+            noteTransition(&sessionHeld, to: held, "session", on: "held", off: "reclaimed")
             // A few frames of real output before the swap, as iTorrent does.
-            player.play()
+            let refused = !player.play()
+            noteTransition(&playRefused, to: refused, "play", on: "refused", off: "ok")
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled, isRunning else { return }
             endAssertion()
@@ -130,6 +141,12 @@ final class DownloadKeepAlive {
         } catch {
             return false
         }
+    }
+
+    private func noteTransition(_ state: inout Bool, to now: Bool, _ key: String, on: String, off: String) {
+        guard now != state else { return }
+        state = now
+        Diag.event(.download, "keepalive.\(key)", ["result": now ? on : off], now ? .error : .notice)
     }
 
     /// Gives up while work remains, unlike `stop()`, which means nothing is left to do.
