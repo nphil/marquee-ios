@@ -1,17 +1,11 @@
 import LumaRemoteCore
 import LumaRemoteKit
-import MarqueeCore
 import SwiftUI
 
 enum RemoteAccess: String, CaseIterable, Identifiable {
-    case miniBar, floatingButton
+    case miniBar, homeButton
     var id: String { rawValue }
-    var title: String { self == .miniBar ? "Mini Bar" : "Floating Button" }
-
-    /// The saved choice. Builds before the floating button kept the Home button's `homeButton`.
-    init(stored raw: String?) {
-        self = raw == Self.floatingButton.rawValue || raw == "homeButton" ? .floatingButton : .miniBar
-    }
+    var title: String { self == .miniBar ? "Mini Bar" : "Home Button" }
 }
 
 /// The optional LumaTV remote, opened from the selected access point or its pairing link.
@@ -19,21 +13,11 @@ enum RemoteAccess: String, CaseIterable, Identifiable {
 final class TVRemote {
     private(set) var isEnabled: Bool
     private(set) var access: RemoteAccess
-    /// The remote's panel over whatever the app shows.
+    /// The remote's sheet over whatever the app shows.
     var isPresented = false
+    /// Whether the sheet opened from Home's remote button, so it zooms out of that button and back into it.
+    private(set) var zoomsFromButton = false
     var opensAfterSettings = false
-    /// Where the floating button rests when it is not being dragged.
-    private(set) var dock: RemoteDock
-    /// The panel's rectangle as fractions of the window; nil until it has been moved or resized.
-    private(set) var panel: PanelFractions?
-    /// The groups of controls the panel shows.
-    private(set) var modules: Set<RemoteModule>
-    private(set) var mode: RemotePadMode
-    /// The touchpad's pointer follows the phone's turns (the air mouse) instead of a finger.
-    private(set) var airMouse: Bool
-    /// How far the tab bar and its accessory reach up from the window's bottom edge, measured by the tab
-    /// content; 0 until a tab has laid out. The floating button rests above it.
-    private(set) var bottomChrome: CGFloat = 0
     /// Made again by Delete All Local Data, so the remote's own settings start over too.
     private(set) var model: RemoteModel
     @ObservationIgnored private let storage: SessionStorage
@@ -47,11 +31,6 @@ final class TVRemote {
         self.inMemory = inMemory
         isEnabled = storage.remoteEnabled
         access = storage.remoteAccess
-        dock = storage.remoteDock ?? .default
-        panel = storage.remotePanel
-        modules = storage.remoteModules
-        mode = storage.remoteMode
-        airMouse = storage.remoteAirMouse
         model = Self.makeModel(inMemory: inMemory)
     }
 
@@ -80,45 +59,10 @@ final class TVRemote {
         storage.remoteAccess = access
     }
 
-    func setDock(_ dock: RemoteDock) {
-        self.dock = dock
-        storage.remoteDock = dock
-    }
-
-    func setPanel(_ panel: PanelFractions) {
-        self.panel = panel
-        storage.remotePanel = panel
-    }
-
-    func setModules(_ modules: Set<RemoteModule>) {
-        self.modules = modules
-        storage.remoteModules = modules
-    }
-
-    func setMode(_ mode: RemotePadMode) {
-        self.mode = mode
-        storage.remoteMode = mode
-    }
-
-    func setAirMouse(_ on: Bool) {
-        airMouse = on
-        storage.remoteAirMouse = on
-    }
-
-    /// Arrange › Reset: the default panel, every module and the D-pad. The button keeps its spot.
-    func resetLayout() {
-        panel = nil
-        modules = .all
-        mode = .dpad
-        storage.resetRemoteLayout()
-    }
-
-    func setBottomChrome(_ inset: CGFloat) {
-        if abs(inset - bottomChrome) > 0.5 { bottomChrome = inset }
-    }
-
-    /// Opens the panel, from the floating button when it is showing.
-    func present() {
+    /// Opens the remote. Only Home's remote button asks for the zoom; the mini bar, a pairing link and
+    /// Settings' Open Remote use the sheet's own motion.
+    func present(fromButton: Bool = false) {
+        if !isPresented { zoomsFromButton = fromButton }
         isPresented = true
     }
 
@@ -139,11 +83,6 @@ final class TVRemote {
         isPresented = false
         isEnabled = false
         access = .miniBar
-        dock = .default
-        panel = nil
-        modules = .all
-        mode = .dpad
-        airMouse = false
         if !inMemory {
             let store = KeychainPairingStore()
             for tv in (try? store.all()) ?? [] { try? store.remove(tv.id) }
@@ -169,12 +108,12 @@ final class TVRemote {
 }
 
 extension RemoteTheme {
-    /// The remote in Marquee's theme: the panel's own fill for the canvas, glass for its surfaces, the inks,
-    /// accent and status roles, card and control radii, and Manrope for titles as in the rest of the app.
+    /// The remote in Marquee's theme: canvas, glass for its surfaces, the inks, accent and status roles,
+    /// card and control radii, and Manrope for titles as in the rest of the app.
     init(_ theme: Theme) {
         self.init(
             palette: Palette(
-                canvas: theme.remotePanel, surface: theme.glass, surfaceRaised: theme.glassRaised, edge: theme.edge,
+                canvas: theme.canvas, surface: theme.glass, surfaceRaised: theme.glassRaised, edge: theme.edge,
                 ink: theme.ink, ink2: theme.ink2, ink3: theme.ink3, accent: theme.accent, accentInk: theme.accentInk,
                 focus: theme.focus, positive: theme.positive, warning: theme.warning, danger: theme.danger, info: theme.info
             ),
@@ -191,11 +130,31 @@ extension RemoteTheme {
     }
 }
 
+/// The remote as a sheet, in the app's theme; it follows a theme change while open.
+struct TVRemoteScreen: View {
+    @Environment(AppSession.self) private var session
+    @Environment(\.theme) private var theme
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+
+    var body: some View {
+        // The app keeps the link up (TVRemote.refreshLifecycle). Left to the screen, closing the sheet would
+        // drop the link, and the mini bar would read Offline until the app asked for it again.
+        LumaRemoteView(model: session.remote.model, managesLifecycle: false) { session.remote.isPresented = false }
+            .lumaRemoteTheme(RemoteTheme(theme))
+            // The kit's bar starts at the sheet's top edge, where the system's rounded corners (a 38 pt
+            // continuous curve, measured on iOS 27) crowd the 56 pt close and power buttons. The sides
+            // keep 16 pt, so the top keeps the same and the buttons clear the corner evenly. In landscape
+            // the sheet is full screen and the side safe areas keep the buttons off the display corners.
+            .safeAreaPadding(.top, verticalSizeClass == .compact ? 0 : Space.inset)
+    }
+}
+
 /// A compact entry point that adopts the system's inline placement when the tab bar minimises.
 struct TVRemoteMiniBar: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
     @Environment(\.tabViewBottomAccessoryPlacement) private var placement
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var status: String {
         switch session.remote.model.connection {
@@ -245,7 +204,41 @@ struct TVRemoteMiniBar: View {
     }
 
     private func open() {
-        session.remote.present()
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.22)) {
+            session.remote.present()
+        }
+    }
+}
+
+/// Home's remote button, beside the profile button while the remote is on. It wears the profile button's
+/// shape (a 36 pt disc, a 2 pt gap and a 2 pt accent ring, 44 pt across) so the two read as a pair,
+/// and stands outside the bar's glass capsule as the profile button does.
+struct TVRemoteButton: View {
+    @Environment(AppSession.self) private var session
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Button {
+            session.remote.present(fromButton: true)
+        } label: {
+            Image(systemName: "appletvremote.gen4.fill")
+                // 40% of the disc, the player controls' glyph proportion (Size.controlGlyph).
+                .font(.system(size: (Size.barButton - 2 * Space.s1) * Size.controlGlyph / Size.control, weight: .semibold))
+                .foregroundStyle(theme.accentText)
+                .frame(width: Size.barButton - 2 * Space.s1, height: Size.barButton - 2 * Space.s1)
+                .background(theme.sheet, in: Circle())
+                .padding(Space.s1)
+                .overlay(Circle().strokeBorder(theme.accent, lineWidth: 2))
+                .frame(width: Size.barButton, height: Size.barButton)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("TV Remote")
+        .accessibilityHint("Controls the LumaTV.")
+        .accessibilityShowsLargeContentViewer {
+            Label("TV Remote", systemImage: "appletvremote.gen4.fill")
+        }
+        .accessibilityIdentifier("remote.button")
     }
 }
 
@@ -275,7 +268,7 @@ struct TVRemoteSettingsView: View {
                     .accessibilityIdentifier("remote.setup")
                 }
             } footer: {
-                Text("Controls a LumaTV on the same Wi-Fi. The selected entry appears when the phone is at home: the Mini Bar above the tabs, or the Floating Button, which rests at the screen's edge and opens the remote's panel. Pair or open the remote here at any time.")
+                Text("Controls a LumaTV on the same Wi-Fi. The selected entry appears when the phone is at home. Pair or open the remote here at any time.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)
