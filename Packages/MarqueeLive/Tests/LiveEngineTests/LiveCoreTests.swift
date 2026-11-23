@@ -60,6 +60,9 @@ struct LiveCoreTests {
         #expect(firstSound.at <= playing)
         let timings = sim.core.snapshot.timings
         #expect(timings.slate != nil && timings.picture != nil && timings.sound != nil)
+        let format = try #require(timings.format)
+        let decoded = try #require(timings.decoded)
+        #expect(try format <= decoded && decoded <= #require(timings.slate))
         #expect(sim.count { $0 == .underrun } == 0)
         #expect(sim.core.snapshot.drops == 0)
     }

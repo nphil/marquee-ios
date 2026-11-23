@@ -52,12 +52,19 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
     }
 
     func play(_ channel: LiveChannel) async {
+        await play(channel, tappedAt: nil)
+    }
+
+    /// `tappedAt` is `tapClock` at the channel change, so the tune's timing line counts from the tap.
+    func play(_ channel: LiveChannel, tappedAt: Double?) async {
         self.channel = channel
         #if DEBUG
         if FakeTuner.isActive { return FakeTuner.play(on: player) }
         #endif
-        player.open(channel.device.streamURL(channel))
+        player.open(channel.device.streamURL(channel), tappedAt: tappedAt)
     }
+
+    static func tapClock() -> Double { LiveStreamPlayer.tapClock() }
 
     func pause() {
         player.pause()

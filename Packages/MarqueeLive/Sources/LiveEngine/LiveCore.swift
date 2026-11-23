@@ -46,6 +46,10 @@ public struct LiveAudioTrack: Sendable, Hashable, Identifiable {
 public struct LiveTimings: Sendable, Equatable {
     public var response: Double?
     public var firstByte: Double?
+    /// The first packet came out of the demuxer: the PAT and PMT are read and the streams have their codecs.
+    public var format: Double?
+    /// The first picture came out of the decoder.
+    public var decoded: Double?
     /// The tuner's slate first on screen.
     public var slate: Double?
     /// The station's first picture on screen.
@@ -163,6 +167,9 @@ final class LiveCore: @unchecked Sendable {
     private var showNextImmediately = true
     private var needsKey = true
     private var cleanSinceStart = false
+    /// Whether the first packet and the first decoded picture have been timed; each is touched by one thread only.
+    private var formatTimed = false
+    private var decodedTimed = false
     private var skipUntil = 0.0
     private var lastControl = -Double.infinity
     private var firstPictureAt: Double?
@@ -255,6 +262,10 @@ final class LiveCore: @unchecked Sendable {
     /// Takes one demuxed packet. Returns true when the video side has work now.
     @discardableResult
     func ingest(_ packet: UnsafeMutablePointer<AVPacket>, stream: UnsafeMutablePointer<AVStream>, now: Double) -> Bool {
+        if !formatTimed {
+            formatTimed = true
+            lock.withLock { diagnostics.timings.format = now - startedAt }
+        }
         guard let parameters = stream.pointee.codecpar else { return false }
         switch parameters.pointee.codec_type {
         case AVMEDIA_TYPE_VIDEO: return ingestVideo(packet, stream: stream, parameters: parameters)
@@ -518,6 +529,10 @@ final class LiveCore: @unchecked Sendable {
             return
         }
         cleanSinceStart = true
+        if !decodedTimed {
+            decodedTimed = true
+            lock.withLock { diagnostics.timings.decoded = now - startedAt }
+        }
         if frame.pointee.pts == FF.noPTS { frame.pointee.pts = frame.pointee.best_effort_timestamp }
         try prepareFilter(for: frame, events: &events)
         guard let filter else { return }

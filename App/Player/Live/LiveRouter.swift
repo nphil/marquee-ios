@@ -64,6 +64,7 @@ final class LiveRouter: LiveVideoSource {
     var timeshift: LiveTimeshift { ownState == nil ? active?.timeshift ?? LiveTimeshift() : LiveTimeshift() }
 
     func play(_ channel: LiveChannel) async {
+        let tappedAt = DirectLiveSource.tapClock()
         generation += 1
         let mine = generation
         self.channel = channel
@@ -81,7 +82,7 @@ final class LiveRouter: LiveVideoSource {
             await show(direct, generation: mine)
             guard mine == generation else { return }
             ownState = nil
-            await direct.play(channel)
+            await direct.play(channel, tappedAt: tappedAt)
             guard mine == generation, ownState == nil, active === direct else { return }
             guardRecordings(channel, generation: mine)
         case .plex:

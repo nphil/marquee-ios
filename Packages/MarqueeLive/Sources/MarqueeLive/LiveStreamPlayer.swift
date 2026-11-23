@@ -72,6 +72,8 @@ public final class LiveStreamPlayer {
     @ObservationIgnored private var seeking = false
     /// The tune's milestones, kept in the diagnostics after seeks replaced its pipeline.
     @ObservationIgnored private var tuneTimings: LiveTimings?
+    /// Seconds from the channel tap to `open`, until the first thing on screen has been logged as `live-tune.timing`.
+    @ObservationIgnored private var tapLead: Double?
     @ObservationIgnored private(set) var isInBackground = false
     @ObservationIgnored var isPictureInPictureActive = false {
         didSet { pipeline?.setVideoEnabled(showsVideo) }
@@ -95,9 +97,14 @@ public final class LiveStreamPlayer {
     /// Closed, failed or never opened.
     public var isStopped: Bool { pipeline == nil }
 
-    /// Opens the tuner's stream (`…/auto/v<channel>`); while another plays, this is a channel change.
-    public func open(_ url: URL) {
+    /// The clock of `open`'s `tappedAt`: monotonic seconds.
+    public static func tapClock() -> Double { Double(DispatchTime.now().uptimeNanoseconds) / 1e9 }
+
+    /// Opens the tuner's stream (`…/auto/v<channel>`); while another plays, this is a channel change. `tappedAt`
+    /// (`tapClock()` when the viewer chose the channel) makes the tune's `live-tune.timing` line count from the tap.
+    public func open(_ url: URL, tappedAt: Double? = nil) {
         self.url = url
+        tapLead = tappedAt.map { Self.tapClock() - $0 }
         start(LiveFeed(url: url, buffer: .temporary()), name: url.absoluteString)
     }
 
@@ -257,8 +264,12 @@ public final class LiveStreamPlayer {
             signposts?.reached(phase)
             switch phase {
             case .opening: break
-            case .slate: LiveLog.line("slate", ["after": LiveLog.seconds(timings.slate)])
-            case .picture: LiveLog.line("picture", ["after": LiveLog.seconds(timings.picture)])
+            case .slate:
+                LiveLog.line("slate", ["after": LiveLog.seconds(timings.slate)])
+                logTune(shown: "slate", rendered: timings.slate, timings)
+            case .picture:
+                LiveLog.line("picture", ["after": LiveLog.seconds(timings.picture)])
+                logTune(shown: "picture", rendered: timings.picture, timings)
             case .playing: LiveLog.line(resumed ? "resumed" : "sound", ["after": LiveLog.seconds(timings.sound)])
             case .stalled: LiveLog.line("stalled")
             }
@@ -413,5 +424,21 @@ private final class AppObservers {
 
     deinit {
         for token in tokens { NotificationCenter.default.removeObserver(token) }
+    }
+}
+
+extension LiveStreamPlayer {
+    /// One line per tune, in milliseconds from the tap: the request going out, the tuner's response, the first bytes,
+    /// the first packet out of the demuxer (PAT and PMT read), the first decoded picture and the first picture or
+    /// slate on screen. Logged once, at the first thing shown.
+    func logTune(shown: String, rendered: Double?, _ timings: LiveTimings) {
+        guard let lead = tapLead else { return }
+        tapLead = nil
+        func ms(_ seconds: Double?) -> String { seconds.map { String(Int(((lead + $0) * 1000).rounded())) } ?? "-" }
+        LiveLog.line("tune.timing", [
+            "route": "direct", "shown": shown, "request_ms": String(Int((lead * 1000).rounded())),
+            "response_ms": ms(timings.response), "first_bytes_ms": ms(timings.firstByte), "tracks_ms": ms(timings.format),
+            "decoded_ms": ms(timings.decoded), "rendered_ms": ms(rendered),
+        ])
     }
 }
