@@ -203,10 +203,11 @@ final class GlassesScreenshotTests: XCTestCase {
         waitFor("glasses.remote", in: app)
         try snap("glasses-phone-05-exit-strip")
         tap("glasses.exit", in: app)
-        waitFor("glasses.button", in: app)
-        XCTAssertFalse(element("glasses.remote", in: app).exists, "The remote stayed up after Phone App")
+        // The hint is a toast that leaves after 3 s, so it is asked for before the slower checks.
         let hint = app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'brings the remote back'")).firstMatch
         XCTAssertTrue(hint.waitForExistence(timeout: 5), "The first exit did not say how to bring the remote back")
+        waitFor("glasses.button", in: app)
+        XCTAssertFalse(element("glasses.remote", in: app).exists, "The remote stayed up after Phone App")
         tap("glasses.button", in: app)
         waitFor("glasses.remote", in: app)
         tap("glasses.settings", in: app)
