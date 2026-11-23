@@ -322,6 +322,7 @@ final class AppSession {
     func deleteAllLocalData() async {
         signOut()
         storage.eraseAll()
+        for kind in ArrKind.allCases { arr.save(nil, for: kind) }
         diagnostics.eraseAll()
         remote.eraseAll()
         glasses.reset()

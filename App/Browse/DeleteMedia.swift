@@ -94,7 +94,7 @@ private struct DeleteConfirmation: ViewModifier {
                     Button("OK", role: .cancel) {}
                 }
             } message: { leftover in
-                Text(Self.shortfall(of: leftover.result, arrName: Self.arrName(leftover.target)).joined(separator: "\n"))
+                Text(Self.shortfall(of: leftover.result, kind: Self.arrKind(leftover.target)).joined(separator: "\n"))
             }
     }
 
@@ -124,7 +124,7 @@ private struct DeleteConfirmation: ViewModifier {
     /// The connected services that also drop a movie or show: Radarr or Sonarr, and Seerr.
     static func places(for target: DeleteTarget, session: AppSession) -> [String] {
         guard case .title(let item) = target, item.type == .movie || item.type == .show else { return [] }
-        let kind = item.type == .movie ? ArrKind.radarr : ArrKind.sonarr
+        let kind = arrKind(target)
         var names: [String] = []
         if session.arr.config(kind) != nil { names.append(kind.appName) }
         if session.seerr.isEnabled { names.append("Seerr") }
@@ -132,37 +132,51 @@ private struct DeleteConfirmation: ViewModifier {
     }
 
     /// Radarr holds movies; Sonarr holds shows, and so their seasons and episodes.
-    static func arrName(_ target: DeleteTarget) -> String {
-        (target.item.type == .movie ? ArrKind.radarr : ArrKind.sonarr).appName
+    static func arrKind(_ target: DeleteTarget) -> ArrKind {
+        target.item.type == .movie ? .radarr : .sonarr
     }
 
-    /// What a delete left undone after the server dropped the title, one line each; empty when there is
-    /// nothing to report. A service that was not connected, or had nothing to remove, says nothing.
-    static func shortfall(of result: MediaDeletionResult, arrName: String) -> [String] {
+    /// What a delete left undone after the server dropped the title, one line each; empty when nothing
+    /// is left to say. A service that has nothing to remove says nothing.
+    static func shortfall(of result: MediaDeletionResult, kind: ArrKind) -> [String] {
         var lines: [String] = []
         if result.watchlist.isFailed {
             lines.append("It is still on your Watchlist, which can request it again.")
         }
+        let arrID = kind == .radarr ? "TMDB" : "TVDB"
         switch result.arr {
-        case .failed: lines.append("\(arrName) didn't answer, so it may still hold the title and download it again.")
-        case .refused: lines.append("\(arrName) refused the API key. Check it in Settings, under Integrations.")
-        case .notConnected, .notApplicable, .unmatched, .removed: break
+        case .failed: lines.append("\(kind.appName) didn't answer, so it may still hold the title and download it again.")
+        case .refused: lines.append("\(kind.appName) refused the API key. Check it in Settings, under Integrations.")
+        case .unmatched: lines.append("\(kind.appName) was not asked: the server has no \(arrID) id for this title.")
+        case .notConnected, .notApplicable, .removed: break
         }
         switch result.requests {
         case .failed: lines.append("Seerr didn't answer, so it may still show the title as requested.")
         case .refused: lines.append("Seerr wouldn't remove it: the signed-in account can't manage requests.")
-        case .notConnected, .notApplicable, .unmatched, .removed: break
+        case .unmatched: lines.append("Seerr was not asked: the server has no TMDB id for this title.")
+        case .notConnected, .notApplicable, .removed: break
         }
         return lines
     }
 
-    /// The toast when every step went through: the title, and the services that dropped it.
-    static func summary(of result: MediaDeletionResult, target: DeleteTarget, arrName: String) -> String {
-        var names: [String] = []
-        if result.arr == .removed { names.append(arrName) }
-        if result.requests == .removed { names.append("Seerr") }
-        let deleted = "Deleted “\(target.item.title)”"
-        return names.isEmpty ? deleted : "\(deleted) and removed it from \(names.formatted(.list(type: .and)))"
+    /// The toast when no step failed: the title, the services that dropped it and, for a movie or show,
+    /// the ones that were not asked because they are not set up, so the title may come back through them.
+    static func summary(of result: MediaDeletionResult, target: DeleteTarget, kind: ArrKind) -> String {
+        let item = target.item
+        var dropped: [String] = []
+        if result.arr == .removed { dropped.append(kind.appName) }
+        if result.requests == .removed { dropped.append("Seerr") }
+        let deleted = "Deleted “\(item.title)”"
+        var sentences = [dropped.isEmpty ? deleted : "\(deleted) and removed it from \(dropped.formatted(.list(type: .and)))"]
+        if item.type == .movie || item.type == .show {
+            var idle: [String] = []
+            if result.arr == .notConnected { idle.append(kind.appName) }
+            if result.requests == .notConnected { idle.append("Seerr") }
+            if !idle.isEmpty {
+                sentences.append("\(idle.formatted(.list(type: .and))) \(idle.count == 1 ? "wasn't" : "weren't") asked: not set up in Settings.")
+            }
+        }
+        return sentences.joined(separator: ". ")
     }
 
     private func perform(_ target: DeleteTarget) {
@@ -213,16 +227,28 @@ private struct DeleteConfirmation: ViewModifier {
         }
     }
 
-    /// A toast when every step went through; otherwise an alert that says what is left, with Retry.
+    /// A toast when no step failed; otherwise an alert that says what is left, with Retry where asking again may help.
     private func conclude(_ result: MediaDeletionResult, of target: DeleteTarget) {
         if case .removed(let guid) = result.watchlist {
             changes.hideFromWatchlist(guid: guid)
         }
-        let arrName = Self.arrName(target)
-        if Self.shortfall(of: result, arrName: arrName).isEmpty {
-            toasts.show(Self.summary(of: result, target: target, arrName: arrName))
+        let kind = Self.arrKind(target)
+        let leftovers = Self.shortfall(of: result, kind: kind)
+        Diag.event(.integration, "delete.cleanup", [
+            "watchlist": Self.word(result.watchlist), "arr": "\(result.arr)", "requests": "\(result.requests)",
+        ], leftovers.isEmpty ? .info : .warning)
+        if leftovers.isEmpty {
+            toasts.show(Self.summary(of: result, target: target, kind: kind))
         } else {
             leftover = Leftover(target: target, result: result)
+        }
+    }
+
+    private static func word(_ cleanup: WatchlistCleanup) -> String {
+        switch cleanup {
+        case .unchanged: "unchanged"
+        case .removed: "removed"
+        case .failed: "failed"
         }
     }
 }
