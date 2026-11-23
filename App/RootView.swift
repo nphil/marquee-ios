@@ -33,6 +33,8 @@ struct RootView: View {
             switch session.state {
             case .ready:
                 MainTabs()
+                    // Over the tabs and under every sheet and cover.
+                    .overlay { FloatingRemote() }
             case .choosingServer:
                 NavigationStack { ServerListView(isRoot: true) }
             case .signedOut, .signingIn, .failed:
@@ -52,13 +54,6 @@ struct RootView: View {
                 // pull-down is the way back, so the system's dismissal gesture stays off.
                 .miniPlayerZoom(in: sheetNamespace, enabled: session.player.zoomsFromBar && !reduceMotion)
                 .interactiveDismissDisabled(session.player.zoomsFromBar)
-        }
-        .sheet(isPresented: $remote.isPresented) {
-            TVRemoteScreen()
-                .preferredColorScheme(scheme)
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-                .sheetZoom(from: .remote, in: sheetNamespace, enabled: remote.zoomsFromButton && !reduceMotion)
         }
         // The TV's pairing QR code carries a lumaremote:// link. The remote opens from here, so Settings,
         // a sheet over the same view, closes first.

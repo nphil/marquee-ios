@@ -166,6 +166,18 @@ The endpoints and the route rules are in `docs/LIVE-TV.md`.
 - `Destination`: Home, Library, Live TV, Watchlist, Search, Requests, Downloads.
 - `TabLayout`: the order and the tabs switched on; `standard`, `init(savedOrder:savedShown:)` (unknown names dropped, missing ones appended off), `tabs(available:)`, `canSwitch(_:available:)`, `setTab(_:_:available:)`, `reorder(_:)`. Home is always a tab, Search always last, at most `maximumTabs` (5).
 
+## Remote (`Remote/`)
+
+The floating LumaTV remote's geometry and input maths; LumaRemoteKit owns the connection and the keys.
+
+- `RemoteDock`: one of `rows` (5) edge spots on a `DockSide` (`start` or `end`); `default` is the right side's fourth, `all` lists the ten, `encoded` and `init?(decoding:)` save and read it.
+- `RemoteSpace`: the room the remote has: the window, its safe area, the top of the bottom bar (`barTop`, never less than the home indicator's reach) and the keyboard's top. `orbField` is where the orb may rest, a 16 pt margin inside the safe area and above the bar and keyboard; `panelBounds` is where the panel may be, above the keyboard and free to cover the bar; `orbRect(for:size:)` is the orb at a dock.
+- `OrbDimming`: `isDimmed(overContent:panelOpen:idle:)` is true once the orb has sat untouched for `dwell` (4 s) over content with the panel closed; it then shows at `dimmedOpacity` (0.4).
+- `PanelFractions`: the panel's rectangle as fractions of the window, so it survives a rotation or another size; `init(rect:in:)`, `rect(in:)`, `encoded`, `init?(decoding:)`. `PanelHandle.all`: the eight edge and corner handles that resize it.
+- `RemoteLayout`: `init(width:height:visible:tray:)` places the pad and the `RemoteStrip`s (nav, volume, channel, playback, launchers) for a panel size and the visible `RemoteModule`s: `shape` is `column` when tall, `row` when wide, `compact` when small; `area`, `pad`, `strips` (`StripPlacement`, with `keyRects` and `moduleRects`) and `dropped` (the modules that no longer fit). `RemoteMetrics` holds the sizes: grid 4 pt, margin 16, gap 12, key 56, header 56, pad minimum 144, tray 56, panel minimum 232. `Set<RemoteModule>.all` is every module.
+- `RemotePadMode`: `dpad`, `joystick`, `touchpad`; anything unknown or unsaved is `dpad`.
+- `JoystickRepeater`: turns a held joystick into `DpadKey` repeats, slow near the centre and fast at the edge. `TrackpadTracker` and `ScrollMomentum`: the touchpad's taps, drags, two-finger scroll and fling. `AirMouseMath` and `OneEuroFilter`: the air mouse's turn rates and their smoothing.
+
 ## Not yet checked against a live server
 
 - The status codes for a wrong profile PIN (the live Plex Home has no protected profile). `/api/v2/resources`, `/api/v2/user` and `/api/v2/home/users` were decoded from a live account on 2026-11-06 with no mismatch.

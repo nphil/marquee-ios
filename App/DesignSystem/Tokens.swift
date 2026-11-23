@@ -17,8 +17,8 @@ enum Space {
 
 enum Size {
     static let target: CGFloat = 48
-    /// A round button standing in the navigation bar without its glass capsule (Home's profile and
-    /// remote buttons). Measured on iOS 27 (0.1.37), the bar gives such an item 36 pt of height and cuts
+    /// A round button standing in the navigation bar without its glass capsule (Home's profile, glasses and
+    /// phone-control buttons). Measured on iOS 27 (0.1.37), the bar gives such an item 36 pt of height and cuts
     /// anything taller, both at rest and in a sheet's zoom back into it, so the ring is exactly that.
     static let barButton: CGFloat = 36
     static let rowMin: CGFloat = 56
