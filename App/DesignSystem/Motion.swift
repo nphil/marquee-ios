@@ -16,7 +16,7 @@ enum Motion {
         reduceMotion ? nil : .easeInOut(duration: 0.3)
     }
 
-    /// Hide on Scroll's tab bar sliding away or back: 300 ms, critically damped; under Reduce Motion it
+    /// The tab bar sliding away or back under Hide: 300 ms, critically damped; under Reduce Motion it
     /// goes and comes without sliding.
     static func tabBar(reduceMotion: Bool) -> Animation? {
         reduceMotion ? nil : .spring(response: 0.3, dampingFraction: 1)

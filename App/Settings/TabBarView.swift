@@ -46,7 +46,7 @@ struct TabBarView: View {
             .listRowBackground(theme.sheet)
 
             Section {
-                Picker("On Scroll", selection: Binding(
+                Picker("Tab Bar While Scrolling", selection: Binding(
                     get: { store.tabBar },
                     set: { store.setTabBar($0) }
                 )) {
@@ -58,9 +58,9 @@ struct TabBarView: View {
                 .pickerStyle(.inline)
                 .labelsHidden()
             } header: {
-                Text("On Scroll")
+                Text("Tab Bar While Scrolling")
             } footer: {
-                Text("Scrolling down, Hide on Scroll slides the bar away and Minimise on Scroll shrinks it to the current tab. Scrolling up brings it back.")
+                Text("Scrolling down, Minimise shrinks the bar to the current tab and Hide slides it away. Scrolling up brings it back.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)

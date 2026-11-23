@@ -26,13 +26,13 @@ enum TabBarBehavior: String, CaseIterable, Identifiable {
     var name: String {
         switch self {
         case .always: "Always Show"
-        case .hide: "Hide on Scroll"
-        case .minimise: "Minimise on Scroll"
+        case .hide: "Hide"
+        case .minimise: "Minimise"
         }
     }
 }
 
-/// Hide on Scroll's state for one browse tab: whether its tab bar is away. Each tab's stack owns one, so a
+/// The Hide choice's state for one browse tab: whether its tab bar is away. Each tab's stack owns one, so a
 /// push or a pop can bring the bar back.
 @Observable @MainActor
 final class TabBarScroll {
@@ -52,7 +52,7 @@ extension View {
         modifier(ScrollHeader(band: band))
     }
 
-    /// Lets this scroll view, a browse page's main one, slide the tab bar away under Hide on Scroll.
+    /// Lets this scroll view, a browse page's main one, slide the tab bar away under the Hide choice.
     func tabBarFollowsScroll() -> some View {
         modifier(TabBarFollowsScroll())
     }

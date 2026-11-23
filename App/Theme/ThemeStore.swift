@@ -3,7 +3,8 @@ import SwiftUI
 import Observation
 
 /// The appearance choices: the theme (DESIGN §5.2), the header style, the tab bar's tabs and what it does
-/// on scroll (DESIGN §7), and whether scroll bars show. Matching the system keeps one theme per mode and
+/// while a page scrolls (DESIGN §7), whether scroll indicators show and how tall the mini player's bar is
+/// (§8.6.1). Matching the system keeps one theme per mode and
 /// follows the iPhone's appearance; with matching off one fixed mode shows. Saved in UserDefaults, so
 /// launch arguments such as `-marquee.theme.dark noir` override them (the UI tests rely on that).
 @Observable @MainActor
@@ -17,6 +18,8 @@ final class ThemeStore {
     private(set) var tabBar: TabBarBehavior
     private(set) var tabLayout: TabLayout
     private(set) var showsScrollBars: Bool
+    /// How tall the mini player's bar was left, in points; nil while it is slim.
+    private(set) var miniBarHeight: Double?
 
     private enum Key {
         static let matchSystem = "marquee.theme.matchSystem"
@@ -29,6 +32,7 @@ final class ThemeStore {
         static let tabOrder = "marquee.tabOrder"
         static let tabs = "marquee.tabs"
         static let scrollBars = "marquee.scrollBars"
+        static let miniBarHeight = "marquee.miniBarHeight"
     }
 
     init() {
@@ -44,6 +48,7 @@ final class ThemeStore {
             TabLayout(savedOrder: defaults.stringArray(forKey: Key.tabOrder) ?? [], savedShown: $0)
         } ?? .standard
         showsScrollBars = defaults.object(forKey: Key.scrollBars) == nil || defaults.bool(forKey: Key.scrollBars)
+        miniBarHeight = defaults.object(forKey: Key.miniBarHeight) as? Double
     }
 
     /// The theme on screen when the iPhone's appearance is `systemScheme`.
@@ -91,7 +96,7 @@ final class ThemeStore {
         save()
     }
 
-    // These two save only their own keys, so a layout a UI test gives as a launch argument is not written
+    // These save only their own keys, so a layout a UI test gives as a launch argument is not written
     // back for the tests after it when another choice saves.
     func setTabLayout(_ layout: TabLayout) {
         tabLayout = layout
@@ -105,6 +110,11 @@ final class ThemeStore {
         UserDefaults.standard.set(on, forKey: Key.scrollBars)
     }
 
+    func setMiniBarHeight(_ height: Double?) {
+        miniBarHeight = height
+        UserDefaults.standard.set(height, forKey: Key.miniBarHeight)
+    }
+
     /// Back to the first-launch choice, after Delete All Local Data emptied the saved one.
     func reset() {
         let catalog = ThemeCatalog.bundled
@@ -116,6 +126,7 @@ final class ThemeStore {
         tabBar = .minimise
         tabLayout = .standard
         showsScrollBars = true
+        miniBarHeight = nil
     }
 
     private func save() {

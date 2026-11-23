@@ -35,6 +35,32 @@ final class MiniPlayerTests: XCTestCase {
         XCTAssertTrue(bar.waitForNonExistence(timeout: 10), "A swipe sideways did not stop the playback")
     }
 
+    /// The grip at the bar's top centre drags the bar taller and, dragged down, slim again; a tap on it
+    /// opens the player as a tap on the bar does. The glass itself shows in the screenshot.
+    @MainActor
+    func testTheBarResizesFromItsGrip() throws {
+        let app = playFilm()
+        tap("player.minimise", in: app)
+        let bar = element("miniplayer", in: app)
+        XCTAssertTrue(bar.waitForExistence(timeout: 10), "Minimising left no bar")
+        let grip = element("miniplayer.resize", in: app)
+        XCTAssertTrue(grip.waitForExistence(timeout: 5), "The bar has no grip")
+        let slim = bar.frame.height
+
+        grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.1, thenDragTo: grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: -3)))
+        XCTAssertTrue(eventually { bar.frame.height > slim + 20 }, "The grip did not make the bar taller than \(slim) pt")
+        assertBar(in: app)
+        try snap("miniplayer-04-resized-rose-pine")
+
+        grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 0.1, thenDragTo: grip.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 8)))
+        XCTAssertTrue(eventually { bar.frame.height < slim + 2 }, "The grip did not bring the bar back to \(slim) pt")
+
+        grip.tap()
+        waitFor("player", in: app)
+    }
+
     /// A channel minimised from the live player plays on in the bar, on every tab; Close stops it and the
     /// guide tunes it again.
     @MainActor
@@ -136,5 +162,16 @@ private extension XCTestCase {
             XCTAssertTrue(button.waitForExistence(timeout: 5) && button.isHittable, "\(control) is not on screen")
             XCTAssertGreaterThanOrEqual(min(button.frame.width, button.frame.height), 44, "\(control) is under 44 pt")
         }
+    }
+
+    /// Whether `condition` holds within `timeout` seconds, checked every 100 ms.
+    @MainActor
+    func eventually(timeout: TimeInterval = 5, _ condition: () -> Bool) -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while !condition() {
+            if Date() >= deadline { return false }
+            RunLoop.current.run(until: Date().addingTimeInterval(0.1))
+        }
+        return true
     }
 }

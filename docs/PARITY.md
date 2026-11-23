@@ -118,7 +118,7 @@ Plex/Bazarr API column: Plex endpoints marked `[code]` are already used by the i
 | Favourite libraries | Done | Settings › Favorite Libraries: switched-off libraries leave Home's shelves and the Library title menu; one always stays on. | local |
 | Privacy / consent (crash, product reports) | N/A | Nothing goes to Plex or a third party, so there is no consent to ask for. Diagnostic Logs sends only to the owner's own ntfy server and is off until set up; Delete All Local Data covers what is stored on the phone. | none (local) |
 | Delete all local data | Done | Settings › Delete All Local Data, after a confirmation: signs out and removes Keychain items, preferences, themes, cached artwork and guide data; the sign-in screen says what happened. | local |
-| Appearance | Done | Settings › Appearance: Theme (theme picker), Tab Bar, Header Style, Show Scroll Bars. | local [code] |
+| Appearance | Done | Settings › Appearance: Theme (theme picker), Tab Bar, Header Style, Scroll Indicators. | local [code] |
 | Diagnostic logs | Done | Settings › Integrations › Diagnostic Logs: the app's log to the owner's ntfy topic, live or as Report a Problem with a screenshot and the journal; off until a server and topic are set. | ntfy `POST /<topic>`, `PUT` attachment [code] |
 | Sign out | Done | Confirmation dialog. | local [code] |
 

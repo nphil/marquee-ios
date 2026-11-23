@@ -2,7 +2,7 @@ import MarqueeCore
 import SwiftUI
 
 /// Settings › Appearance (DESIGN §8.7): one row for each thing that changes how Marquee looks, each on its
-/// own page except the scroll bars switch. Saved with the theme, not per profile.
+/// own page except the scroll indicators switch. Saved with the theme, not per profile.
 struct AppearanceView: View {
     @Environment(ThemeStore.self) private var store
     @Environment(AppSession.self) private var session
@@ -22,14 +22,14 @@ struct AppearanceView: View {
             .listRowBackground(theme.sheet)
 
             Section {
-                Toggle("Show Scroll Bars", isOn: Binding(
+                Toggle("Scroll Indicators", isOn: Binding(
                     get: { store.showsScrollBars },
                     set: { store.setShowsScrollBars($0) }
                 ))
                 .tint(theme.accent)
                 .accessibilityIdentifier("appearance.scrollBars")
             } footer: {
-                Text("The Library's A–Z rail shows either way.")
+                Text("A thin bar beside a page while it scrolls. The Library's A–Z rail shows either way.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)
