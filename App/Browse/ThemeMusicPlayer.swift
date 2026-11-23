@@ -239,7 +239,7 @@ private struct ThemeMusicPage: ViewModifier {
     @State private var onScreen = false
 
     private var playerOpen: Bool {
-        app.player.presented != nil || app.player.active != nil
+        app.player.isOpen
     }
 
     private var wanted: String? {

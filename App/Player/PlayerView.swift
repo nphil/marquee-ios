@@ -71,7 +71,8 @@ struct PlayerView: View {
             // that read it itself could miss an update and keep showing it.
             if model.chromeVisible || model.phase != .playing {
                 PlayerChrome(
-                    model: model, offer: model.offer, waitsForNetwork: model.waitsForNetwork, frames: frames, close: close
+                    model: model, offer: model.offer, waitsForNetwork: model.waitsForNetwork, frames: frames, close: close,
+                    minimise: minimise
                 ) { bottomControls = $0 }
                     .transition(.opacity)
             }
@@ -108,7 +109,7 @@ struct PlayerView: View {
         .preferredColorScheme(.dark)
         .statusBarHidden(!model.chromeVisible)
         .persistentSystemOverlays(model.chromeVisible ? .automatic : .hidden)
-        .accessibilityAction(.escape) { close() }
+        .accessibilityAction(.escape) { minimise() }
         .accessibilityAction(.magicTap) { model.togglePlay() }
         .diagPresentation("player.episodes", isPresented: model.showsEpisodes && !sideLayout)
         .sheet(isPresented: Binding(get: { model.showsEpisodes && !sideLayout }, set: { if !$0 { model.showsEpisodes = false } })) {
@@ -342,7 +343,7 @@ struct PlayerView: View {
         }
     }
 
-    /// A mostly vertical drag down moves the picture with the finger and closes past 140 pt or on a flick.
+    /// A mostly vertical drag down moves the picture with the finger and minimises the player past 140 pt or on a flick.
     private var pullGesture: some Gesture {
         DragGesture(minimumDistance: 24)
             .onChanged { value in
@@ -353,7 +354,7 @@ struct PlayerView: View {
             .onEnded { value in
                 guard pull > 0 else { return }
                 if pull > 140 || value.predictedEndTranslation.height > 360 {
-                    close()
+                    minimise()
                 } else {
                     withAnimation(reduceMotion ? .linear(duration: 0.12) : .spring(response: 0.26, dampingFraction: 1)) { pull = 0 }
                 }
@@ -372,6 +373,10 @@ struct PlayerView: View {
 
     private func close() {
         session.player.close(model)
+    }
+
+    private func minimise() {
+        session.player.minimise()
     }
 }
 

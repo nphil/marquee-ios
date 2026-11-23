@@ -36,6 +36,10 @@ enum Size {
     static let linkCode: CGFloat = 240
     /// The screenshot preview in Report a Problem: tall enough to recognise the screen.
     static let reportShot: CGFloat = 240
+    /// The mini player bar (DESIGN §8.6.1): a 16:9 picture and a thin progress line; its buttons are
+    /// `target` squares.
+    static let miniPicture = CGSize(width: 64, height: 36)
+    static let miniProgress: CGFloat = 2
 }
 
 enum Radius {

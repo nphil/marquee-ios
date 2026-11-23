@@ -17,7 +17,7 @@ Source key used in citations:
 3. **Direct renderer: FFmpeg into sample-buffer layers.** The engine's `FFmpeg` product demuxes and decodes into `AVSampleBufferDisplayLayer` plus `AVSampleBufferAudioRenderer` under one `AVSampleBufferRenderSynchronizer`, in a new `MarqueeLive` package. No on-phone remux to HLS.
 4. **Channel change reopens the stream with a warm decoder.** The last picture stays on screen; the tuner's own slates fill the gap. The app draws no spinner over video.
 5. **Measure software MPEG-2 first.** Slice L0 measures decode plus deinterlace on the oldest supported iPhone before the renderer is built out.
-6. **Guide first.** The Live TV tab opens on the guide: a now/next list in portrait, a grid in landscape and at regular width. In the player, swipe left/right surfs, swipe up opens the Quick Guide, swipe down closes and frees the tuner.
+6. **Guide first.** The Live TV tab opens on the guide: a now/next list in portrait, a grid in landscape and at regular width. In the player, swipe left/right surfs, swipe up opens the Quick Guide, swipe down minimises the channel to the mini bar (M DESIGN.md §8.6.1), which keeps the tuner until its Close button or a sideways swipe frees it.
 
 ## 1. Plex Live TV API
 
@@ -151,6 +151,7 @@ The engine's `ByteRangeSource`/`HTTPRangeSource` need 206 range responses (E ENG
 ### 3.3 PiP, AirPlay, Now Playing, audio session
 
 - **PiP:** `AVPictureInPictureController(contentSource: .init(sampleBufferDisplayLayer:playbackDelegate:))`. `timeRangeForPlayback` returns an infinite range (start `-infinity`, duration `+infinity`), which tells the system the content is live (WWDC21 10290). Pause in PiP pauses into the timeshift buffer (§6.7), so the tuner stays in use; play goes on from the same picture, or reopens a stream that ended. Skip requests are ignored. PiP starts automatically on leaving the app (as in Channels, https://getchannels.com/releases/). PB builds PiP from an `AVPlayerLayer` only (PB PlayerSurface.swift:39-61) and needs a sample-buffer variant. The Plex path uses PB's as it is (`PlexLiveSource`): the window's pause and play act on AVPlayer and the source follows them. On both paths the window opens only on leaving the app while a channel plays, the player screen stays open under it and takes the picture back, and closing the window away from the app ends the tune.
+- **Mini bar:** a channel minimised to the bar (M DESIGN.md §8.6.1) stays on the same layer view, so leaving the app moves its picture into the PiP window as from the player [INFERENCE: the start from the bar needs a phone check]. On the Plex path the window's restore hands the picture back to the bar and does not open the player; closing the window away from the app ends the tune either way.
 - **AirPlay:** audio follows the system route. Choosing an AirPlay video receiver from the route picker switches the session to the Plex path (`allowsExternalPlayback`), one Plex tune of about 3 s.
 - **Now Playing:** set by hand: `MPNowPlayingInfoPropertyIsLiveStream = true`, title = programme, artist = "2.1 WXXX", artwork = programme or channel image, no elapsed time. Remote commands: play/pause (pause into the buffer and play on), next/previous track = channel up/down; skip and seek disabled. PB's Now Playing is AVPlayer-based (PB NowPlaying.swift:24-82) and is generalised to take a `LiveSource`.
 - **Audio session:** `.playback` / `.moviePlayback`, as PB already activates it (PB AudioSession.swift:34); the background audio mode is already declared (M project.yml:60-61). An interruption, or the headphones going, pauses the stream into the buffer; an interruption's end plays on if the system says to resume. Local-network access and the plain-HTTP exception for LAN addresses are already declared (M project.yml:51-53).
@@ -409,15 +410,15 @@ rail │ Today ▾   8:00            8:30            9:00            9:30   8:18
 └──────────────────────────────────────────────────────────────────┘
 ```
 
-- Player rules of M DESIGN.md:333-363: 56 pt `glass` buttons with 26 pt glyphs, chrome fades after 3 s, swipe down closes. Text over video sits on `scrim` at 0.55 or more (M DESIGN.md:148-150).
-- Top: close (`xmark`, "Close"), channel card (logo, "2.1 WXXX", programme, times), captions (`captions.bubble`), audio (`speaker.wave.2`, track menu), AirPlay route picker.
+- Player rules of M DESIGN.md:333-363: 56 pt `glass` buttons with 26 pt glyphs, chrome fades after 3 s, swipe down minimises to the mini bar. Text over video sits on `scrim` at 0.55 or more (M DESIGN.md:148-150).
+- Top: close (`xmark`, "Close") and minimise (`chevron.down`, "Minimise"), channel card (logo, "2.1 WXXX", programme, times), captions (`captions.bubble`), audio (`speaker.wave.2`, track menu), AirPlay route picker.
 - Centre: previous channel (`backward.end.fill`), skip back (`gobackward.N`, the app's skip interval), pause/play (`pause.fill`/`play.fill`), skip forward (`goforward.N`, only behind live), next channel (`forward.end.fill`). Pause holds the picture while the stream goes on into the timeshift buffer, so the tuner stays in use; play goes on from the same picture. Skips stay within what the buffer holds, and one that would land within 3 s of live goes live.
 
 Pause intent is retained while a channel opens or a seek completes, and also applies to the outgoing picture during a direct-stream replacement.
 - Timeshift buffer: on the Direct path the app keeps the tuner's stream in segment files under the temporary folder, up to 30 min, half the free space and 4 GB, or 64 MB in memory when space is short; changing channel or closing the player deletes it, and launch deletes any a crash left. On the Plex path playback moves within the HLS window the server keeps (AVPlayer's seekable range); how long that window is has not been measured. On a one-tuner device the status line says the tuner stays in use while paused.
 - Bottom: LIVE chip (`scrim` 0.80 with a `live` dot); behind live it greys its dot, adds "−m:ss" and becomes a button ("Go to live") that jumps to the live edge. Programme progress 4 pt (white on white at 0.35) with start and end, for the moment on screen; last channel (`arrow.uturn.backward`), guide (`list.bullet.rectangle`). No seek bar.
 - Status label (bottom left, `caption` on `scrim`) only when it says something: "Tuning 7.1" (stations without slates), "Weak signal", "Playing through Plex", a tuner refusal. Never a spinner over the picture.
-- Gestures: swipe left/right surfs (§6.8); swipe up opens the Quick Guide; swipe down closes and frees the tuner; tap toggles chrome; double tap toggles fit and fill.
+- Gestures: swipe left/right surfs (§6.8); swipe up opens the Quick Guide; swipe down minimises the channel to the mini bar, which plays on and keeps the tuner (Close, or a sideways swipe on the bar, frees it); tap toggles chrome; double tap toggles fit and fill.
 
 ### 6.8 Channel card
 
@@ -481,7 +482,7 @@ Every result goes into the receipt with its diagnostics line.
 | LT5 | Swipe across 5 channels quickly | One tune in the diagnostics |
 | LT6 | Last channel | Back to the previous channel |
 | LT7 | Quick Guide, pick a recent channel | Channel changes, sheet closes |
-| LT8 | Swipe down | Tuner free: Plex tunes at once |
+| LT8 | Close, once in the player and once on the bar | Tuner free each time: Plex tunes at once |
 | LT9 | Lock the phone without PiP | Sound continues; picture back within 1 s of unlocking |
 | LT10 | Go home while playing, once direct and once through Plex | PiP shows live with no scrubber; pause and play in it show on the player after returning; closing it frees the tuner |
 | LT11 | AirPlay to an Apple TV | Switches to Plex; video on the TV |
@@ -496,5 +497,6 @@ Every result goes into the receipt with its diagnostics line.
 | LT20 | Reduce Motion | Now line jumps; transitions fade |
 | LT21 | Change theme with the guide open | Colours change live |
 | LT22 | Play for 30 min | Buffer 0.2-0.5 s, rate within ±0.5 %, memory flat |
+| LT23 | Swipe down on a channel, browse the other tabs, tap the bar, then swipe the bar sideways | The picture runs in the bar on every tab; the player returns with no new tune; the sideways swipe frees the tuner |
 
 Out of scope: start over, a seek bar over the buffer, multiview, live previews in the guide, ATSC 3.0 (the TV's tuner is a single ATSC 1.0 tuner, T capture.md:36), CEA-708 captions, guide sources other than Plex.

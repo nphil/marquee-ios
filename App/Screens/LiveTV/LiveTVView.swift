@@ -46,7 +46,6 @@ private struct LiveGuideScreen: View {
     @Environment(AppSession.self) private var session
     @Environment(ToastCenter.self) private var toasts
     @Environment(\.theme) private var theme
-    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -60,7 +59,6 @@ private struct LiveGuideScreen: View {
     @State private var nowVisible = true
     @State private var details: ProgrammeSelection?
     @State private var showsRecordings = false
-    @State private var playing: LivePlaybackModel?
     /// Watch in the programme sheet: plays once the sheet has gone, so the player can present.
     @State private var watchAfterSheet: LiveChannel?
 
@@ -88,13 +86,6 @@ private struct LiveGuideScreen: View {
                 ProgrammeSheet(store: store, selection: selection) { channel in
                     watchAfterSheet = channel
                     details = nil
-                }
-            }
-            .diagPresentation("livetv.player", isPresented: playing != nil)
-            .fullScreenCover(item: $playing) { model in
-                LivePlayerView(model: model, outerTheme: theme, outerScheme: colorScheme) {
-                    model.close()
-                    playing = nil
                 }
             }
             .onAppear { backToNow() }
@@ -314,12 +305,11 @@ private struct LiveGuideScreen: View {
 
     /// Opens the live player; a film playing, in Picture in Picture too, stops first.
     private func play(_ channel: LiveChannel) {
-        session.player.stopAll()
-        playing = LivePlaybackModel(
+        session.player.playLive(LivePlaybackModel(
             store: store, channel: channel, readsTunerDirectly: session.settings.readsTunerDirectly,
             skipInterval: TimeInterval(session.settings.skipInterval),
             playbackActive: { session.downloads.setPlaybackActive($0) }
-        )
+        ))
     }
 
     private func playAfterSheet() {

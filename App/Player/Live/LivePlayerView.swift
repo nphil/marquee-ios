@@ -11,6 +11,8 @@ struct LivePlayerView: View {
     let outerTheme: Theme
     let outerScheme: ColorScheme
     let close: () -> Void
+    /// Minimise to the bar above the tab bar (DESIGN §8.6.1).
+    let minimise: () -> Void
 
     @Environment(AppSession.self) private var session
     @Environment(ThemeStore.self) private var themes
@@ -31,7 +33,7 @@ struct LivePlayerView: View {
     private enum Drag {
         /// Sideways: changes channel, one per `surfStep` from `origin`.
         case surf(origin: LiveChannel)
-        /// Down: closes.
+        /// Down: minimises.
         case pull
         /// Up: opens the Quick Guide.
         case guide
@@ -59,7 +61,10 @@ struct LivePlayerView: View {
             Color.black.ignoresSafeArea()
             picture
             if showsChrome && !model.showsGuide {
-                LiveChrome(model: model, showsCard: model.surfing != nil || model.state == .opening, lean: lean, close: close)
+                LiveChrome(
+                    model: model, showsCard: model.surfing != nil || model.state == .opening, lean: lean,
+                    close: close, minimise: minimise
+                )
                     .transition(.opacity)
             } else if !model.showsGuide, let status = model.status {
                 LiveStatusLabel(text: status)
@@ -94,7 +99,7 @@ struct LivePlayerView: View {
         .statusBarHidden(!showsChrome)
         .persistentSystemOverlays(showsChrome ? .automatic : .hidden)
         .accessibilityAction(.escape) {
-            if model.showsGuide { model.setGuide(false) } else { close() }
+            if model.showsGuide { model.setGuide(false) } else { minimise() }
         }
         .accessibilityAction(.magicTap) { model.togglePlay() }
         .diagPresentation("live.details", isPresented: details != nil)
@@ -126,8 +131,8 @@ struct LivePlayerView: View {
             model.start()
         }
         .onDisappear {
-            // However the player goes away, the tuner is freed.
-            model.close()
+            // Whoever ends the channel frees the tuner (`PlayerCenter`), not the screen leaving: a
+            // minimised channel keeps playing in the bar.
             PlayerOrientation.closed()
         }
         .accessibilityElement(children: .contain)
@@ -158,7 +163,7 @@ struct LivePlayerView: View {
 
     // MARK: Swipes
 
-    /// Sideways surfs, down closes, up opens the Quick Guide (docs/LIVE-TV.md §6.7).
+    /// Sideways surfs, down minimises, up opens the Quick Guide (docs/LIVE-TV.md §6.7).
     private var swipe: some Gesture {
         DragGesture(minimumDistance: 20)
             .updating($dragging) { _, active, _ in active = true }
@@ -187,7 +192,7 @@ struct LivePlayerView: View {
     }
 
     /// Finishes a swipe: a flick shorter than one step still moves one channel, and a pull past 140 pt
-    /// or flung down closes.
+    /// or flung down minimises.
     private func settle(_ value: DragGesture.Value?) {
         let ended = drag
         drag = nil
@@ -201,7 +206,7 @@ struct LivePlayerView: View {
             withAnimation(Motion.spring(reduceMotion: reduceMotion)) { lean = 0 }
         case .pull:
             if let value, pull > 140 || value.predictedEndTranslation.height > 360 {
-                close()
+                minimise()
             } else {
                 withAnimation(Motion.spring(reduceMotion: reduceMotion)) { pull = 0 }
             }
@@ -227,6 +232,8 @@ private struct LiveChrome: View {
     let showsCard: Bool
     let lean: CGFloat
     let close: () -> Void
+    /// Minimise to the bar above the tab bar (DESIGN §8.6.1).
+    let minimise: () -> Void
 
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -270,6 +277,13 @@ private struct LiveChrome: View {
             .buttonStyle(PlayerButtonStyle())
             .accessibilityLabel("Close")
             .accessibilityIdentifier("liveplayer.close")
+
+            Button(action: minimise) {
+                Image(systemName: "chevron.down")
+            }
+            .buttonStyle(PlayerButtonStyle())
+            .accessibilityLabel("Minimise")
+            .accessibilityIdentifier("liveplayer.minimise")
 
             NowWatching(model: model)
                 .frame(maxWidth: .infinity, alignment: .leading)

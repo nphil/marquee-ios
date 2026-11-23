@@ -42,8 +42,16 @@ struct RootView: View {
         // Sign-in, the server list and the tabs fade into each other rather than cut (DESIGN §9 layer;
         // Reduce Motion keeps a short fade).
         .animation(reduceMotion ? .linear(duration: 0.12) : .easeOut(duration: 0.22), value: stage)
+        .onChange(of: session.state) { _, state in
+            // The bar and the live player's cover hang from the tabs; a playback only they showed would play on unseen.
+            if state != .ready { session.player.tabsLeft() }
+        }
         .fullScreenCover(item: playerCover(overSettings: false), onDismiss: { session.player.dismissed() }) { model in
             PlayerView(model: model, outerTheme: theme, outerScheme: scheme ?? colorScheme)
+                // Opened from the mini player bar the player grows out of the bar's picture, and its own
+                // pull-down is the way back, so the system's dismissal gesture stays off.
+                .miniPlayerZoom(in: sheetNamespace, enabled: session.player.zoomsFromBar && !reduceMotion)
+                .interactiveDismissDisabled(session.player.zoomsFromBar)
         }
         .sheet(isPresented: $remote.isPresented) {
             TVRemoteScreen()
@@ -164,6 +172,10 @@ private struct MainTabs: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var toasts = ToastCenter()
     @State private var followUp = DeletionFollowUp()
+    @Environment(\.theme) private var theme
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.sheetZoomNamespace) private var zoomNamespace
 
     var body: some View {
         let tabs = store.tabLayout.tabs(available: Destination.available(in: session))
@@ -177,8 +189,17 @@ private struct MainTabs: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
-        .tabViewBottomAccessory(isEnabled: session.remote.isEnabled && session.remote.access == .miniBar && session.place == .home && !session.glasses.isConnected) {
-            TVRemoteMiniBar()
+        .tabViewBottomAccessory(isEnabled: showsRemoteBar || session.player.docked != nil) {
+            MiniPlayerAccessory(showsRemote: showsRemoteBar)
+        }
+        .diagPresentation("livetv.player", isPresented: session.player.livePresented != nil)
+        .fullScreenCover(item: liveCover, onDismiss: { session.player.liveDismissed() }) { model in
+            LivePlayerView(
+                model: model, outerTheme: theme, outerScheme: colorScheme,
+                close: { session.player.closeLive(model) }, minimise: { session.player.minimise() }
+            )
+            .miniPlayerZoom(in: zoomNamespace, enabled: session.player.zoomsFromBar && !reduceMotion)
+            .interactiveDismissDisabled(session.player.zoomsFromBar)
         }
         // Minimise on Scroll shrinks the bar while a page scrolls down; Hide on Scroll is each browse stack's
         // own (BrowseStack). Search keeps the bar still while its results scroll and the keyboard comes and goes.
@@ -208,6 +229,17 @@ private struct MainTabs: View {
             signInAgain: { session.signOut() },
             canDeleteMedia: session.canDeleteMedia
         ))
+    }
+
+    /// The remote's mini bar, which a minimised playback takes the place of.
+    private var showsRemoteBar: Bool {
+        session.remote.isEnabled && session.remote.access == .miniBar && session.place == .home && !session.glasses.isConnected
+    }
+
+    /// The live player's cover hangs here, over every tab, so the mini player bar can open it from any.
+    private var liveCover: Binding<LivePlaybackModel?> {
+        let session = session
+        return Binding(get: { session.player.livePresented }, set: { session.player.livePresented = $0 })
     }
 }
 

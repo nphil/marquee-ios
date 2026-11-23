@@ -43,6 +43,16 @@ final class PlayerOrientationTests: XCTestCase {
         tap("player.close", in: app)
         XCTAssertTrue(screenTurns(sideways: false, in: app), "Closing the player left the screen on its side")
     }
+
+    /// Minimising gives the screen back to the phone's hold as closing does; the bar is the app, upright.
+    @MainActor
+    func testMinimisingLeavesTheLockedLandscape() {
+        let app = openPlayer(under: "lockToLandscape")
+        XCTAssertTrue(screenTurns(sideways: true, in: app, within: 1.5), "The player did not open on its side")
+        tap("player.minimise", in: app)
+        XCTAssertTrue(screenTurns(sideways: false, in: app), "Minimising left the screen on its side")
+        waitFor("miniplayer", in: app)
+    }
 }
 
 extension PlayerOrientationTests {

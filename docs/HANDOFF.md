@@ -18,6 +18,10 @@ Settings › Integrations › Diagnostic Logs sends the app's log to the write-o
 
 Replace the profile Settings screen's Done button with an X matching the profile button's size and alignment, so closing the screen collapses cleanly back into the profile icon. Check the return animation as well as the icon at rest.
 
+## Next build: mini player
+
+Built, not released and not yet seen in CI or on a phone. A film, episode or live channel minimises to a bar above the tab bar (DESIGN §8.6.1): the player's Minimise button or a pull down minimises it, a tap or swipe up on the bar opens it again with a zoom, and Close or a sideways swipe stops it. `PlayerCenter.docked` holds what is minimised, `RootView` hosts the bar as the tab view's bottom accessory (`MiniPlayer.swift`), and the live player's cover now lives in `MainTabs`. The new UI tests (`MiniPlayerTests`, `PlayerOrientationTests.testMinimisingLeavesTheLockedLandscape`) have not run, so their swipe coordinates may need adjusting after the first CI run. Open on a phone, DEVICE-TEST check 33: the zoom out of the bar's picture, Picture in Picture from the bar, orientation under Lock to Landscape, the inline placement and the largest text sizes. The one design cost is the portrait title: Minimise makes four controls in the player's top row, leaving the title about 86 pt on a 390 pt phone while Picture in Picture shows.
+
 ## Away from home
 
 A server conversion asks Plex's decision first, as PMS 1.43.5 refused the start of a player's later sessions without one; the player gives the stream 30 s to be ready, tries twice more on a new session with the addresses probed again, then shows the error with Retry. Ending a conversion also reports its playback stopped. Downloads report an address that stops answering, so the next transfer probes again; on cellular only with cellular downloads off a row says Waiting for Wi-Fi and offers Download on Cellular; after two failed tries a row says the server can't be reached while it keeps trying.
@@ -92,7 +96,6 @@ The complete backlog and acceptance criteria are maintained once in [PLAN.md](PL
 
 - Network-aware VMAF streaming: S1–S7, preserving picture quality and using quiet, Wi-Fi/cellular-aware measurements. Planned, not started.
 - Browser-viewable XR mockups: L1, delivery unconfirmed; no screenshot approval gate before an XR release.
-- YouTube-style mini player: L2.
 - Feel-your-way LG TV remote: L3, separate from linked iPhones.
 - Remux Picture in Picture LIVE-label/scrubber limitation: L4, an upstream VideoEngine dependency.
 

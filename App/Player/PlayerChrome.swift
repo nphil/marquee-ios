@@ -15,6 +15,8 @@ struct PlayerChrome: View {
     let waitsForNetwork: Bool
     let frames: TrickplayFrames
     let close: () -> Void
+    /// Minimise to the bar above the tab bar (DESIGN §8.6.1).
+    let minimise: () -> Void
     /// The bottom controls' frame on screen.
     let bottomChanged: (CGRect) -> Void
 
@@ -70,6 +72,13 @@ struct PlayerChrome: View {
             .buttonStyle(PlayerButtonStyle())
             .accessibilityLabel("Close")
             .accessibilityIdentifier("player.close")
+
+            Button(action: minimise) {
+                Image(systemName: "chevron.down")
+            }
+            .buttonStyle(PlayerButtonStyle())
+            .accessibilityLabel("Minimise")
+            .accessibilityIdentifier("player.minimise")
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.title)

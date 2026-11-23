@@ -3208,12 +3208,31 @@ extension AppSession {
     }
 }
 
-/// The one playback at a time. `presented` drives the full-screen player; `active` stays while Picture
-/// in Picture carries the playback without it.
+/// The one playback at a time, a film or a live channel. `presented` and `livePresented` drive the
+/// full-screen players; `active` stays while Picture in Picture carries a film without one. A playback
+/// minimised to the bar above the tab bar (DESIGN §8.6.1) has no screen and plays on in the bar.
 @MainActor @Observable
 final class PlayerCenter {
+    /// What the bar above the tab bar plays.
+    enum Docked {
+        case film(PlayerModel)
+        case live(LivePlaybackModel)
+    }
+
     var presented: PlayerModel?
     private(set) var active: PlayerModel?
+    /// The live channel playing; `livePresented` is its full-screen player.
+    private(set) var live: LivePlaybackModel?
+    var livePresented: LivePlaybackModel?
+    /// The playback was minimised and has not ended since. It stays set while the player is full screen
+    /// again, so the bar is in place for the player to shrink into.
+    private(set) var minimised = false
+    /// The player opens out of the bar's picture: set by the bar, not by a start or Picture in Picture's
+    /// restore. It holds for the whole presentation; a zoom added midway would rebuild the player's view.
+    private(set) var zoomsFromBar = false
+    /// The bar draws the picture only after the full-screen player has left. Both draw the same layer, and
+    /// the bar taking it at once would blank the player while it shrinks into the bar.
+    private(set) var barShowsPicture = false
     let capabilities = PlaybackCapabilities()
     /// Parts that failed to play on the phone in this run; reopening one goes straight to the server.
     @ObservationIgnored var phoneFailures: Set<Int> = []
@@ -3228,6 +3247,10 @@ final class PlayerCenter {
                 presented = nil
             } else if let active {
                 active.pause()
+                // Back on the phone it opens full screen as a new presentation, not out of the bar.
+                minimised = false
+                zoomsFromBar = false
+                barShowsPicture = false
                 presented = active
             }
         }
@@ -3237,6 +3260,17 @@ final class PlayerCenter {
         RemuxSession.sweepStaleFiles()
         capabilities.startWatching()
     }
+
+    /// The playback in the bar above the tab bar; nil until one is minimised. A film the glasses show is
+    /// theirs, while a live channel, which the glasses never take over, keeps its bar on the phone.
+    var docked: Docked? {
+        guard minimised else { return nil }
+        if let active { return onGlasses ? nil : .film(active) }
+        return live.map { Docked.live($0) }
+    }
+
+    /// Whether a player is open: full screen, minimised or in Picture in Picture.
+    var isOpen: Bool { presented != nil || active != nil || live != nil }
 
     func play(_ request: PlaybackRequest, session: AppSession) {
         guard let library = session.library else { return }
@@ -3254,6 +3288,8 @@ final class PlayerCenter {
                     completion(false)
                     return
                 }
+                zoomsFromBar = false
+                barShowsPicture = false
                 presented = model
                 // The screen has to host the picture again before the window shrinks into it.
                 Task {
@@ -3266,6 +3302,7 @@ final class PlayerCenter {
                 guard let self, let model, active === model, presented == nil else { return }
                 model.close()
                 active = nil
+                minimised = false
             }
         }
         active = model
@@ -3273,25 +3310,101 @@ final class PlayerCenter {
         model.start()
     }
 
+    /// A live channel opens full screen; whatever played before stops, a film in Picture in Picture too.
+    func playLive(_ model: LivePlaybackModel) {
+        stopAll()
+        live = model
+        livePresented = model
+    }
+
     func close(_ model: PlayerModel) {
         if presented === model { presented = nil }
         if active === model {
             model.close()
             active = nil
+            minimised = false
         }
     }
 
-    /// The full-screen player went away: playback ends unless Picture in Picture carries it.
+    func closeLive(_ model: LivePlaybackModel) {
+        if livePresented === model { livePresented = nil }
+        if live === model {
+            model.close()
+            live = nil
+            minimised = false
+        }
+    }
+
+    /// The full-screen player goes to the bar: the playback goes on and the screen is the app's again
+    /// (the player's own disappearance gives a forced landscape back to the phone's hold). Only what is on
+    /// screen minimises: a second call, as the cover leaves, would leave the bar without its picture.
+    func minimise() {
+        guard presented != nil || livePresented != nil else { return }
+        Diag.event(.player, "minimise", ["film": active != nil])
+        minimised = true
+        barShowsPicture = false
+        presented = nil
+        livePresented = nil
+    }
+
+    /// The bar opens the player again, growing out of the bar's picture, with its controls up.
+    func expand() {
+        guard docked != nil, presented == nil, livePresented == nil else { return }
+        Diag.event(.player, "expand", ["film": active != nil])
+        barShowsPicture = false
+        zoomsFromBar = true
+        if let active {
+            presented = active
+            active.showChrome()
+            // A window still up would keep the picture from coming back to the screen. Presented first, so
+            // the window's closing is not taken for the end of the film.
+            if let window = active.pictureInPicture, window.isActive { window.stop() }
+        } else if let live {
+            live.showChrome()
+            livePresented = live
+        }
+    }
+
+    /// The full-screen player went away: playback ends unless Picture in Picture carries it, or the
+    /// player was minimised and the bar does.
     func dismissed() {
         guard !onGlasses, presented == nil, let model = active, !(model.pictureInPicture?.isActive ?? false) else { return }
+        if minimised {
+            barShowsPicture = true
+            return
+        }
         model.close()
         active = nil
+    }
+
+    /// The live player's screen went away: the channel stops and the tuner is freed unless the bar plays it.
+    func liveDismissed() {
+        guard livePresented == nil, let model = live else { return }
+        if minimised {
+            barShowsPicture = true
+            return
+        }
+        model.close()
+        live = nil
+    }
+
+    /// The tabs left the screen (sign-out, the server list). The live player's cover and the bar hang from
+    /// them, so what they showed ends; a film's full-screen cover hangs from the root and stays.
+    func tabsLeft() {
+        if let live { closeLive(live) }
+        if presented == nil, minimised, let active { close(active) }
     }
 
     func stopAll() {
         active?.close()
         active = nil
+        live?.close()
+        live = nil
         presented = nil
+        livePresented = nil
+        minimised = false
+        zoomsFromBar = false
+        barShowsPicture = false
     }
 }
 

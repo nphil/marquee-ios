@@ -25,7 +25,7 @@ struct TrailerPreview: View {
             metered: model.metered,
             appActive: scenePhase == .active,
             heroVisible: onScreen && heroVisible,
-            playerOpen: app.player.presented != nil || app.player.active != nil,
+            playerOpen: app.player.isOpen,
             otherAudioPlaying: model.otherAudioPlaying || app.themeMusic.isHeard
         ))
     }

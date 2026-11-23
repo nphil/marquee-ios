@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// The buttons in Home's bar whose sheet grows out of the button and shrinks back into it (DESIGN §9).
+/// What the system's zoom grows a sheet or the player out of and shrinks it back into (DESIGN §9): the
+/// buttons in Home's bar, and the mini player's picture.
 enum SheetZoomSource: String, Hashable {
-    case remote, settings
+    case remote, settings, miniPlayer
 }
 
 extension EnvironmentValues {
@@ -23,6 +24,30 @@ extension View {
             matchedTransitionSource(id: source, in: namespace) {
                 $0.clipShape(RoundedRectangle(cornerRadius: Size.barButton / 2, style: .circular))
             }
+        } else {
+            self
+        }
+    }
+
+    /// The mini player's picture: the player grows out of it and shrinks back into it. Without a
+    /// namespace, as in a preview, the picture stays as it is.
+    @ViewBuilder
+    func miniPlayerZoomSource(in namespace: Namespace.ID?) -> some View {
+        if let namespace {
+            matchedTransitionSource(id: SheetZoomSource.miniPlayer, in: namespace) {
+                $0.clipShape(RoundedRectangle(cornerRadius: Radius.control, style: .continuous))
+            }
+        } else {
+            self
+        }
+    }
+
+    /// The player's zoom out of the mini player's picture. `enabled` is false for a start, which keeps
+    /// the cover's own motion, and for Reduce Motion.
+    @ViewBuilder
+    func miniPlayerZoom(in namespace: Namespace.ID?, enabled: Bool) -> some View {
+        if let namespace {
+            sheetZoom(from: .miniPlayer, in: namespace, enabled: enabled)
         } else {
             self
         }
