@@ -401,9 +401,10 @@ jobs:
           path: build/UITests*.xcresult
           if-no-files-found: ignore
 
-  # The route menu and the A–Z rail mid-scrub on the smallest and the largest iPhone simulator the image
-  # has: the menu's rows must stay inside the screen, upright and on its side, and scroll when they do not
-  # fit; the rail's lens and callout are shot for review. The standard shards run the same tests on the
+  # The route menu, Picture in Picture's place and the A–Z rail mid-scrub on the smallest and the
+  # largest iPhone simulator the image has: the menu's rows must stay inside the screen, upright and on its
+  # side, and scroll when they do not fit; Picture in Picture must be in More upright even on the widest
+  # phone; the rail's lens and callout are shot for review. The standard shards run the same tests on the
   # iPhone 18 Pro.
   ui-sizes:
     name: UI tests on the smallest and largest iPhone
@@ -477,6 +478,7 @@ jobs:
               -retry-tests-on-failure -test-iterations 2 \
               -only-testing:MarqueeUITests/PlayerRouteMenuScreenshots \
               -only-testing:MarqueeUITests/PlayerScreenshotTests/testAutoBuffersInsteadOfDroppingBelowPictureFloor \
+              -only-testing:MarqueeUITests/PlayerScreenshotTests/testPictureInPictureMovesIntoMoreUpright \
               -only-testing:MarqueeUITests/PlayerScreenshotTests/testFindSubtitlesFromBazarr \
               -only-testing:MarqueeUITests/PlayerScreenshotTests/testFindSubtitlesFromBazarrInLightTheme \
               -only-testing:MarqueeUITests/PlayerAccessibilityScreenshots/testFindSubtitles \

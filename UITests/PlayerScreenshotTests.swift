@@ -229,6 +229,37 @@ final class PlayerScreenshotTests: XCTestCase {
         tap("route.phone", in: app)
         XCTAssertTrue(playing.waitForNonExistence(timeout: 10), "The video did not come back to the phone")
     }
+
+    /// Picture in Picture stands in the top row on a phone on its side, where four buttons still leave the
+    /// title room, and is the first row of More upright (DESIGN §8.6 item 2). Turning the phone moves it.
+    @MainActor
+    func testPictureInPictureMovesIntoMoreUpright() throws {
+        let app = launchPlayer(at: 61, paused: true, mode: "dark", pictureInPicture: true)
+        let screen = app.windows.firstMatch.frame
+        let size = "\(Int(min(screen.width, screen.height)))x\(Int(max(screen.width, screen.height)))"
+        let pip = element("player.pip", in: app)
+
+        XCTAssertTrue(pip.waitForExistence(timeout: 5) && pip.isHittable, "No Picture in Picture button in the top row on its side")
+        XCTAssertGreaterThanOrEqual(min(pip.frame.width, pip.frame.height), 44, "The Picture in Picture button is under 44 pt")
+        XCTAssertEqual(pip.frame.midY, element("player.close", in: app).frame.midY, accuracy: 2, "The button is not in the top row")
+        try snap("player-34-pip-in-row-landscape-\(size)-rose-pine")
+
+        XCUIDevice.shared.orientation = .portrait
+        XCTAssertTrue(pip.waitForNonExistence(timeout: 10), "The top row keeps Picture in Picture upright")
+        assertChrome(in: app)
+        openMore(in: app)
+        let row = menuRow("Picture in Picture", in: app)
+        XCTAssertNotNil(row, "No Picture in Picture row in More upright")
+        let quality = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH 'Quality'")).firstMatch
+        if let row {
+            XCTAssertLessThan(row.frame.minY, quality.frame.minY, "Picture in Picture does not head the first group of More")
+        }
+        try snap("player-35-pip-in-more-portrait-\(size)-rose-pine")
+        dismissMenu(in: app)
+
+        XCUIDevice.shared.orientation = .landscapeLeft
+        XCTAssertTrue(pip.waitForExistence(timeout: 10) && pip.isHittable, "The top row did not take Picture in Picture back on its side")
+    }
 }
 
 /// The route menu with FakeCast's four receivers, on a phone on its side and upright. Besides the standard
@@ -678,12 +709,13 @@ private extension XCTestCase {
     /// Opens the player on episode 212 at `seconds` with the phone on its side, and waits until it
     /// has landed there. `introSkipDelay` overrides the profile's intro countdown for this launch;
     /// `bazarr` sets up Bazarr at that address; `scrub` holds the scrubber at that fraction; `cast` turns the
-    /// Chromecast plugin on with FakeCast's receiver; `stall` keeps playback waiting on data.
+    /// Chromecast plugin on with FakeCast's receiver; `stall` keeps playback waiting on data;
+    /// `pictureInPicture` offers a window to go to, which the simulator has none to give.
     @MainActor
     func launchPlayer(
         at seconds: Double, paused: Bool, mode: String, introSkipDelay: Int? = nil, instantCredits: Bool = false, bazarr: String? = nil, speechDock: Bool = false,
         scrub: Double? = nil, cast: Bool = false, stall: Bool = false, quality: Int? = nil, item: String = "212",
-        badgeSeconds: Double? = nil, linkTest: Bool = false
+        badgeSeconds: Double? = nil, linkTest: Bool = false, pictureInPicture: Bool = false
     ) -> XCUIApplication {
         XCUIDevice.shared.orientation = .landscapeLeft
         // A failed step ends the test early; the next test still has to start upright.
@@ -707,6 +739,7 @@ private extension XCTestCase {
         if let quality { arguments += ["-marquee.uitest.quality", String(quality)] }
         if let badgeSeconds { arguments += ["-marquee.uitest.badgeSeconds", String(badgeSeconds)] }
         if linkTest { arguments += ["-marquee.uitest.linkTest", "YES"] }
+        if pictureInPicture { arguments += ["-marquee.uitest.pip", "YES"] }
         let app = launch(matchSystem: false, fixedMode: mode, dark: "rose-pine", light: "paper", arguments: arguments, waitingFor: nil)
         // Up Next hides the transport, so whichever control shows first means the player is up.
         // The scrub hold hides the transport, so the preview stands for it.

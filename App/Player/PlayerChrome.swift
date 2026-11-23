@@ -3,10 +3,10 @@ import Combine
 import MarqueeCore
 import SwiftUI
 
-/// The controls over the picture (DESIGN §8.6): close, title and AirPlay on top; the transport in the
-/// middle; the scrubber, the tracks menu and More at the bottom. Everything else lives in More. While
-/// the finger is on the scrubber everything but the scrubber fades, so the preview has the picture to
-/// itself.
+/// The controls over the picture (DESIGN §8.6): close, minimise, title and AirPlay on top, with Picture in
+/// Picture where the row is wide enough for it; the transport in the middle; the scrubber, the tracks menu
+/// and More at the bottom. Everything else lives in More. While the finger is on the scrubber everything
+/// but the scrubber fades, so the preview has the picture to itself.
 struct PlayerChrome: View {
     let model: PlayerModel
     /// Handed down by the player screen, as for `OfferView`: the transport steps aside for Up Next by it, and
@@ -27,6 +27,9 @@ struct PlayerChrome: View {
     @State private var bottomRow: CGFloat = .infinity
     /// The bottom controls' bottom edge: the lowest a menu from the top row may reach.
     @State private var bottomEdge: CGFloat = 0
+    /// The top row's width as it lays out. Whether Picture in Picture has room beside the other buttons
+    /// follows it, not the device (DESIGN §8.6 item 2).
+    @State private var topWidth: CGFloat = 0
 
     var body: some View {
         VStack(spacing: 0) {
@@ -36,6 +39,11 @@ struct PlayerChrome: View {
                     proxy.frame(in: .global).maxY
                 } action: { maxY in
                     topRow = maxY
+                }
+                .onGeometryChange(for: CGFloat.self) { proxy in
+                    proxy.size.width
+                } action: { width in
+                    topWidth = width
                 }
             Spacer(minLength: Space.s3)
             centre
@@ -105,8 +113,9 @@ struct PlayerChrome: View {
                 model.showsStats.toggle()
             }
 
-            // Apple's player puts Picture in Picture beside the route button, top trailing.
-            if model.canPictureInPicture, model.castDevice == nil {
+            // Apple's player puts Picture in Picture beside the route button, top trailing. A row too
+            // narrow for it, a phone upright, has it in More.
+            if offersPictureInPicture, topRowFitsPictureInPicture {
                 Button {
                     model.togglePictureInPicture()
                 } label: {
@@ -118,6 +127,18 @@ struct PlayerChrome: View {
             }
             RouteButton(model: model, menuRoom: menuRoom)
         }
+    }
+
+    /// The video can go to a window and nothing is cast.
+    private var offersPictureInPicture: Bool { model.canPictureInPicture && model.castDevice == nil }
+
+    /// What the title keeps beside four buttons. A row that cannot spare it carries Picture in Picture in
+    /// More: 150 pt is a 390 pt phone upright with three buttons (154 pt), and a phone on its side or an
+    /// iPad has more.
+    private static let titleRoom: CGFloat = 150
+
+    private var topRowFitsPictureInPicture: Bool {
+        topWidth >= 4 * Size.control + 4 * Space.s3 + Self.titleRoom
     }
 
     /// Height below the top row for the route menu: down to the bottom controls' edge, less the popover's
@@ -271,7 +292,7 @@ struct PlayerChrome: View {
                     Spacer(minLength: 0)
                     TracksMenu(model: model)
                         .opacity(model.isScrubbing ? 0 : 1)
-                    MoreMenu(model: model)
+                    MoreMenu(model: model, carriesPictureInPicture: offersPictureInPicture && !topRowFitsPictureInPicture)
                         .opacity(model.isScrubbing ? 0 : 1)
                 }
             }
@@ -917,9 +938,11 @@ private extension AnimeOverride {
 }
 
 /// Everything the chrome keeps off its edges (DESIGN §8.6), in three groups: the picture's quality and
-/// aspect, speed and the audio enhancements, playback info and stats for nerds.
+/// aspect, speed and the audio enhancements, playback info and stats for nerds. Picture in Picture joins
+/// the first group when the top row has no room for its button.
 struct MoreMenu: View {
     let model: PlayerModel
+    var carriesPictureInPicture = false
 
     var body: some View {
         // Fixed, so the groups read top down above the button as they would below one.
@@ -949,9 +972,15 @@ struct MoreMenu: View {
         return UIMenu(identifier: UIMenu.Identifier(rawValue: "player.more"), children: sections)
     }
 
-    /// Quality, with the note that the server converts the picture, and aspect.
+    /// Picture in Picture when the top row cannot carry it, quality with the note that the server
+    /// converts the picture, and aspect.
     private var picture: [UIMenuElement] {
         var rows: [UIMenuElement] = []
+        if carriesPictureInPicture {
+            rows.append(UIAction.row("Picture in Picture", systemImage: "pip.enter", identifier: "player.pip") { [model] in
+                model.togglePictureInPicture()
+            })
+        }
         if model.forcesDirectPlay {
             // UIKit has no disabled submenu, so the quality stands as a row that opens nothing.
             let quality = UIAction(title: "Quality", subtitle: qualityValue, image: UIImage(systemName: "dial.medium"), attributes: .disabled) { _ in }

@@ -388,6 +388,11 @@ final class PlayerModel: Identifiable {
         layerView.playerLayer.videoGravity = .resize
         layerView.playerLayer.player = backend.player
         pictureInPicture = backend.player == nil ? nil : PictureInPicture(layer: layerView.playerLayer)
+        #if DEBUG
+        // The still frame has no player layer, so no window to open: `-marquee.uitest.pip YES` offers one anyway,
+        // for the tests that place its button.
+        if FakePlex.isActive, UserDefaults.standard.bool(forKey: "marquee.uitest.pip") { canPictureInPicture = true }
+        #endif
     }
 
     // MARK: Display
