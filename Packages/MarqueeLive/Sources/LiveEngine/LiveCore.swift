@@ -26,6 +26,8 @@ public enum LiveEvent: Sendable, Equatable {
     case underrun
     /// Playback dropped to the newest picture and restarted its clock.
     case reanchor
+    /// The clock was found this many seconds ahead of where it was started and was set back.
+    case clockReset(Double)
     /// The clock's rate changed by 0.5 % or more.
     case servo(Double)
     case audioTracks([LiveAudioTrack])
@@ -143,6 +145,10 @@ final class LiveCore: @unchecked Sendable {
     /// No sound packet this long after the first picture, or since the last one, and the clock runs on pictures alone.
     /// LumaTuner's slate sends its first silence with its first picture (within 5 ms on 10 channels, 2026-11-07).
     static let silentStart = 1.0
+    /// For this long after the clock starts, it is checked against the anchor plus the time it has run, and set back
+    /// when more than `clockJumpLimit` ahead.
+    static let clockCheckWindow = 1.0
+    static let clockJumpLimit = 0.5
 
     private enum AudioMode { case unknown, slate, station }
 
@@ -208,6 +214,9 @@ final class LiveCore: @unchecked Sendable {
     private var decodedTimed = false
     private var skipUntil = 0.0
     private var lastControl = -Double.infinity
+    /// When the clock was last started from the anchor, until the start has been checked; and how often it was reset.
+    private var clockStartedAt: Double?
+    private var clockResets = 0
     private var firstPictureAt: Double?
     private var jitter = JitterTarget()
     private var servo = ClockServo()
@@ -705,8 +714,25 @@ final class LiveCore: @unchecked Sendable {
                 reportedRate = 1
                 diagnostics.timings.sound = diagnostics.timings.sound ?? now - startedAt
                 lastControl = now
+                clockStartedAt = now
+                clockResets = 0
                 events.append(.phase(.playing))
             case .playing:
+                if let started = clockStartedAt, let anchor {
+                    // Sound's timeline is the anchor's; a clock already past it by the time it has run was not moved
+                    // there (seen on a channel change, when it carried on from the channel before: 5.65 s ahead, 0.13 s
+                    // after the start, and the stream then needed that long to catch up). Put it where it belongs.
+                    let expected = anchor + (now - started)
+                    if now - started > Self.clockCheckWindow || clockResets >= 3 {
+                        clockStartedAt = nil
+                    } else if clock - expected > Self.clockJumpLimit {
+                        output.setRate(1, time: expected)
+                        clockResets += 1
+                        servo.reset()
+                        events.append(.clockReset(clock - expected))
+                        break
+                    }
+                }
                 guard let newest else { break }
                 let buffered = newest - clock
                 if inputEnded { break }

@@ -102,6 +102,18 @@ struct LiveCoreTests {
         #expect(stall.videoPackets > 0)
     }
 
+    @Test func aClockStartedAheadOfTheAnchorIsSetBackInsteadOfStalling() throws {
+        // The channel before left the clock 5.5 s on; the start lands there.
+        let sim = try Simulation.run(tuned, tail: 0, clockStartsAhead: 5.5)
+        let resets = sim.events.compactMap { entry -> Double? in
+            if case .clockReset(let ahead) = entry.event { return ahead }
+            return nil
+        }
+        #expect(resets.count == 1 && abs(resets[0] - 5.5) < 0.2)
+        #expect(sim.count { $0 == .underrun || $0 == .reanchor } == 0)
+        #expect(sim.phases.last == .playing)
+    }
+
     @Test func pauseHoldsTheClockAndPlaysOnFromTheSamePicture() throws {
         // Paused 4 s in for 2 s; the reader holds the stream back as long.
         var pause: (from: Double, to: Double, rate: Double?) = (0, 0, nil)

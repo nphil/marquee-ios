@@ -37,10 +37,11 @@ public final class SampleBufferOutput: LiveOutput, @unchecked Sendable {
 
     public func setRate(_ rate: Double, time: Double?) {
         if let time {
-            synchronizer.setRate(Float(rate), time: Self.streamTime(time))
-        } else {
-            synchronizer.rate = Float(rate)
+            // Time while stopped, then the rate: on a channel change one call started the clock where the channel
+            // before had left it (5.65 s past the anchor 0.13 s later on 0.1.77).
+            synchronizer.setRate(0, time: Self.streamTime(time))
         }
+        synchronizer.rate = Float(rate)
     }
 
     public func enqueueVideo(_ frame: UnsafeMutablePointer<AVFrame>, time: Double, immediately: Bool) {

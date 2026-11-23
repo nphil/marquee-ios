@@ -299,6 +299,9 @@ public final class LiveStreamPlayer {
         case .underrun:
             LiveLog.line("underrun")
             LiveLog.signposter.emitEvent("underrun")
+        case .clockReset(let ahead):
+            LiveLog.line("clock-reset", ["ahead": LiveLog.seconds(ahead)])
+            LiveLog.signposter.emitEvent("clock-reset")
         case .reanchor:
             LiveLog.line("reanchor")
             LiveLog.signposter.emitEvent("reanchor")

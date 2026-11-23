@@ -38,6 +38,7 @@ final class RecordingOutput: LiveOutput, @unchecked Sendable {
     var pictures: [Picture] { lock.withLock { _pictures } }
     var sound: [Sound] { lock.withLock { _sound } }
     var rate: Double { lock.withLock { _rate } }
+    var firstStartAhead = 0.0
     var flushes: Int { lock.withLock { _flushes } }
 
     var time: Double {
@@ -47,7 +48,12 @@ final class RecordingOutput: LiveOutput, @unchecked Sendable {
     func setRate(_ rate: Double, time: Double?) {
         lock.withLock {
             let now = wallClock()
-            base = (time ?? base.time + (now - base.at) * _rate, now)
+            var moved = time
+            if let time, rate > 0 {
+                moved = time + firstStartAhead
+                firstStartAhead = 0
+            }
+            base = (moved ?? base.time + (now - base.at) * _rate, now)
             _rate = rate
         }
     }
@@ -95,16 +101,19 @@ struct Simulation {
     /// `delivery` maps when the tuner sent a byte to when it reached the phone, both in seconds from its first byte;
     /// `tail` runs the clock on after the last byte. Each hook runs at its time from the first byte's delivery, and
     /// gets the clock's reading.
+    /// `clockStartsAhead`: the first start of the clock lands that far past the time asked for, as when it carried on
+    /// from the channel before.
     static func run(
         _ segments: [SyntheticTS.Segment], options: VideoOptions = VideoOptions(), tail: Double = 1,
         delivery relative: (Double) -> Double = { $0 }, at hooks: [(Double, (LiveCore, Double) -> Void)] = [],
-        finishInput: Bool = false
+        finishInput: Bool = false, clockStartsAhead: Double = 0
     ) throws -> Simulation {
         let stream = try fixture(segments)
         let origin = stream.chunk.marks[0].time
         func delivery(_ sent: Double) -> Double { origin + relative(sent - origin) }
         let clock = TestClock()
         let output = RecordingOutput { [clock] in clock.now }
+        output.firstStartAhead = clockStartsAhead
         let collected = EventLog()
         let startedAt = delivery(origin) - 0.03
         let core = LiveCore(output: output, options: options, startedAt: startedAt) { [clock] event in
