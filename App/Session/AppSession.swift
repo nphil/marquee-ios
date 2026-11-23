@@ -416,7 +416,8 @@ final class AppSession {
     /// `-marquee.uitest.seerr` saves a Seerr signing in with an API key, answered by the `seerr`
     /// fixtures; `-marquee.uitest.speechDock` does the same for SpeechDock and its `speechdock`
     /// fixtures, `-marquee.uitest.homelabber` for HomeLabber and its `homelabber` fixtures, and
-    /// `-marquee.uitest.remote YES` turns the LumaTV remote on. `-marquee.uitest.ntfy` with a server saves
+    /// `-marquee.uitest.remote YES` turns the LumaTV remote on, and `-marquee.uitest.remoteAccess` chooses its
+    /// access (`floatingButton`; anything else is the Mini Bar). `-marquee.uitest.ntfy` with a server saves
     /// Diagnostic Logs sending to its `marquee-test` topic, answered by the `ntfy` fixtures.
     private func restoreUITest() {
         let arguments = UserDefaults.standard
@@ -440,6 +441,9 @@ final class AppSession {
         }
         if arguments.bool(forKey: "marquee.uitest.remote") {
             remote.setEnabled(true)
+        }
+        if let access = arguments.string(forKey: "marquee.uitest.remoteAccess") {
+            remote.setAccess(RemoteAccess(stored: access))
         }
         #if DEBUG
         glasses.simulate(arguments: arguments)

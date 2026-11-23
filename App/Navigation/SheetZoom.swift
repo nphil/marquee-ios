@@ -1,9 +1,9 @@
 import SwiftUI
 
 /// What the system's zoom grows a sheet or the player out of and shrinks it back into (DESIGN §9): the
-/// buttons in Home's bar, and the mini player's picture.
+/// profile button in Home's bar, and the mini player's picture.
 enum SheetZoomSource: String, Hashable {
-    case remote, settings, miniPlayer
+    case settings, miniPlayer
 }
 
 extension EnvironmentValues {

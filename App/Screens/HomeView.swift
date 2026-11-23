@@ -52,10 +52,6 @@ struct HomeView: View {
                 ToolbarItem(placement: .topBarTrailing) { LinkControlButton(phone: phone) }
                     .sharedBackgroundVisibility(.hidden)
                 ToolbarSpacer(.fixed, placement: .topBarTrailing)
-            } else if session.remote.isEnabled && session.remote.access == .homeButton && session.place == .home {
-                ToolbarItem(placement: .topBarTrailing) { TVRemoteButton().sheetZoomSource(.remote, in: sheetNamespace) }
-                    .sharedBackgroundVisibility(.hidden)
-                ToolbarSpacer(.fixed, placement: .topBarTrailing)
             }
             ToolbarItem(placement: .topBarTrailing) { ProfileButton().sheetZoomSource(.settings, in: sheetNamespace) }
                 .sharedBackgroundVisibility(.hidden)
