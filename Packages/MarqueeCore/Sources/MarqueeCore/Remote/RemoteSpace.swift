@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 
 /// Where the floating remote may rest and open: the window less the system's insets, the bar along the bottom
 /// (the tab bar and its accessory) and the keyboard while it is up.

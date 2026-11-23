@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 
 /// The panel's rectangle as fractions of the window, so a saved layout survives rotation and a new screen.
 public struct PanelFractions: Equatable, Sendable {

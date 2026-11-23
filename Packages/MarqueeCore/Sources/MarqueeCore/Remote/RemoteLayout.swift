@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(CoreGraphics)
+import CoreGraphics
+#endif
 
 /// The groups of controls the floating remote can show. `pad` is always on; the rest are the user's choice.
 public enum RemoteModule: String, CaseIterable, Sendable {
