@@ -35,7 +35,7 @@ public enum WatchlistCleanup: Equatable, Sendable {
     /// The title is on the Watchlist and could not be taken off it.
     case failed(guid: String)
 
-    var isFailed: Bool {
+    public var isFailed: Bool {
         switch self {
         case .failed: true
         case .unchanged, .removed: false
@@ -44,7 +44,7 @@ public enum WatchlistCleanup: Equatable, Sendable {
 }
 
 /// What happened in Sonarr, Radarr or Seerr after a delete.
-public enum ServiceCleanup: Equatable, Sendable {
+public enum ServiceCleanup: String, Equatable, Sendable {
     /// Marquee has no connection to the service, so it was not asked.
     case notConnected
     /// Nothing to do there: the delete left part of the show in place.
@@ -61,7 +61,7 @@ public enum ServiceCleanup: Equatable, Sendable {
 }
 
 /// What a delete knew of the title while the server still knew it: enough to finish the cleanup later.
-public struct DeletionTicket: Equatable, Sendable {
+public struct DeletionTicket: Equatable, Sendable, Codable {
     public var ratingKey: String
     public var kind: PlexMediaType
     /// The movie's or the show's title; an episode or season gives its show's.
@@ -200,6 +200,16 @@ public struct MediaDeletion: Sendable {
         alreadyDeleted: DeletedTitles = DeletedTitles(),
         afterDelete: @Sendable () async -> Void = {}
     ) async -> MediaDeletionResult {
+        let first = await deleteFromServer(item)
+        guard first.outcome == .deleted, let ticket = first.ticket else { return MediaDeletionResult(outcome: first.outcome) }
+        await afterDelete()
+        return await cleanUp(ticket, alreadyDeleted: alreadyDeleted)
+    }
+
+    /// Deletes `item` from the server and nothing else, for a caller that answers each call once and so
+    /// cannot run code between the delete and its cleanup: it shows the title gone, then asks `cleanUp`.
+    /// The ticket comes with `.deleted`.
+    public func deleteFromServer(_ item: PlexMetadata) async -> (outcome: DeleteOutcome, ticket: DeletionTicket?) {
         var ticket = DeletionTicket(item)
         var isGone = false
         do {
@@ -219,19 +229,23 @@ public struct MediaDeletion: Sendable {
                 case .deleted:
                     break
                 case .notAllowed:
-                    return MediaDeletionResult(outcome: .notAllowed)
+                    return (.notAllowed, nil)
                 case .failed:
                     guard Self.mayHaveSucceeded(after: error), await confirmsGone(item.ratingKey) else {
-                        return MediaDeletionResult(outcome: .failed)
+                        return (.failed, nil)
                     }
                 }
             }
         }
+        return (.deleted, ticket)
+    }
 
-        await afterDelete()
+    /// The steps after the server deleted the title: the Watchlist, Radarr or Sonarr, then Seerr.
+    /// `alreadyDeleted` is as for `delete`.
+    public func cleanUp(_ ticket: DeletionTicket, alreadyDeleted: DeletedTitles = DeletedTitles()) async -> MediaDeletionResult {
         var deleted = alreadyDeleted
-        deleted.insert(item.ratingKey)
-        return await cleanUp(MediaDeletionResult(outcome: .deleted, ticket: ticket), deleted: deleted, onlyFailed: false)
+        deleted.insert(ticket.ratingKey)
+        return await run(MediaDeletionResult(outcome: .deleted, ticket: ticket), deleted: deleted, onlyFailed: false)
     }
 
     /// Repeats the steps of `result` that failed and keeps the rest. The title is gone from the server
@@ -242,7 +256,7 @@ public struct MediaDeletion: Sendable {
         guard result.canRetry, let ticket = result.ticket else { return result }
         var deleted = alreadyDeleted
         deleted.insert(ticket.ratingKey)
-        return await cleanUp(result, deleted: deleted, onlyFailed: true)
+        return await run(result, deleted: deleted, onlyFailed: true)
     }
 
     /// A fault or silence says nothing about whether the server removed the files before it gave out.
@@ -272,7 +286,7 @@ public struct MediaDeletion: Sendable {
     // MARK: Cleanup
 
     /// Runs the steps, all of them or only those that failed before.
-    private func cleanUp(_ previous: MediaDeletionResult, deleted: DeletedTitles, onlyFailed: Bool) async -> MediaDeletionResult {
+    private func run(_ previous: MediaDeletionResult, deleted: DeletedTitles, onlyFailed: Bool) async -> MediaDeletionResult {
         guard let ticket = previous.ticket else { return previous }
         var result = previous
         // Whether the delete took the whole title; nil until a step needs to know and the server tells.

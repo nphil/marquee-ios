@@ -490,4 +490,25 @@ struct MediaDeletionTests {
         #expect(result == MediaDeletionResult(outcome: .notAllowed))
         #expect(await script.events == ["read 10", "ids 10", "delete 10"])
     }
+
+    /// The Android bridge answers each call once: it deletes, shows the title gone, then asks for the cleanup
+    /// with the ticket the first answer carried as JSON.
+    @Test func theServerDeleteAloneAsksNoOtherServiceAndItsTicketDrivesTheCleanup() async throws {
+        let script = Script(items: [try Self.movie(year: 2021)], .init(ids: ["10": Self.movieIDs]))
+        let deletion = MediaDeletion(server: script, watchlist: script, arr: script, requests: script) { _ in }
+
+        let first = await deletion.deleteFromServer(try Self.movie(year: 2021))
+
+        #expect(first.outcome == .deleted)
+        #expect(await script.events == ["read 10", "ids 10", "delete 10"])
+
+        let ticket = try JSONDecoder().decode(DeletionTicket.self, from: JSONEncoder().encode(try #require(first.ticket)))
+        let result = await deletion.cleanUp(ticket)
+
+        #expect(result == MediaDeletionResult(
+            outcome: .deleted, watchlist: .removed(guid: "plex://movie/abc"), arr: .removed, requests: .removed))
+        #expect(await script.events.dropFirst(3) == [
+            "contains plex://movie/abc", "remove plex://movie/abc", "radarr 438631 Charge 2021", "seerr movie 438631",
+        ])
+    }
 }
