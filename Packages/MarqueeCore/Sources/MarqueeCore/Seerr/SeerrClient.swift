@@ -118,6 +118,30 @@ public actor SeerrClient {
         try await get(DetailsWire.self, "/api/v1/\(kind.rawValue)/\(tmdbID)", kind: kind).details
     }
 
+    /// Clears Seerr's record of the title: the media entry and, with it, every request for it, so it
+    /// shows no status and nothing is left to approve or retry. Needs an account that may manage requests.
+    /// True when Seerr held a record. It does not block the title; anyone can request it again.
+    @discardableResult
+    public func removeMedia(_ kind: SeerrMediaKind, tmdbID: Int) async throws -> Bool {
+        struct Body: Decodable {
+            struct Media: Decodable { let id: Int }
+            let mediaInfo: Media?
+        }
+        let held: Body
+        do {
+            held = try await get(Body.self, "/api/v1/\(kind.rawValue)/\(tmdbID)")
+        } catch SeerrError.notFound {
+            return false
+        }
+        guard let id = held.mediaInfo?.id else { return false }
+        let response = try await send(.delete, "/api/v1/media/\(id)")
+        switch response.status {
+        case 200..<300: return true
+        case 404: return false
+        default: throw failure(response)
+        }
+    }
+
     /// Sends a request. Seerr approves it at once when the account may auto-approve; the title's page
     /// reloads to show which.
     public func request(_ order: SeerrOrder) async throws {

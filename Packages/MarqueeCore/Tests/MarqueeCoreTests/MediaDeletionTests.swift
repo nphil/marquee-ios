@@ -3,7 +3,7 @@ import Testing
 @testable import MarqueeCore
 
 /// Scripted server and account: every call is logged in order, in `events`.
-private actor Script: DeletionServer, WatchlistAccount {
+private actor Script: DeletionServer, WatchlistAccount, ArrAccount, RequestsAccount {
     struct Config {
         var deleteError: PlexError?
         /// The item answers 404 from the Nth metadata read on (1-based), as after a delete that timed out.
@@ -13,17 +13,29 @@ private actor Script: DeletionServer, WatchlistAccount {
         var containsFailures = 0
         var removeError: PlexError?
         var removeFailures = 0
+        /// What `externalIDs` lists, by rating key.
+        var ids: [String: [String]] = [:]
+        var idsFailures = 0
+        var arrError: ArrError?
+        var arrFailures = 0
+        var requestsError: SeerrError?
+        var requestsFailures = 0
     }
 
     private(set) var events: [String] = []
     private let items: [String: PlexMetadata]
     private let leaves: [PlexMetadata]
+    private let arrKinds: Set<ArrKind>
     private var config: Config
     private var reads = 0
 
-    init(items: [PlexMetadata] = [], leaves: [PlexMetadata] = [], _ config: Config = Config()) {
+    init(
+        items: [PlexMetadata] = [], leaves: [PlexMetadata] = [], arrKinds: Set<ArrKind> = [.radarr, .sonarr],
+        _ config: Config = Config()
+    ) {
         self.items = Dictionary(uniqueKeysWithValues: items.map { ($0.ratingKey, $0) })
         self.leaves = leaves
+        self.arrKinds = arrKinds
         self.config = config
     }
 
@@ -67,6 +79,42 @@ private actor Script: DeletionServer, WatchlistAccount {
         }
         if let error = config.removeError { throw error }
     }
+
+    func externalIDs(_ ratingKey: String) async throws -> [String] {
+        events.append("ids \(ratingKey)")
+        if config.idsFailures > 0 {
+            config.idsFailures -= 1
+            throw PlexError.unreachable(.timedOut)
+        }
+        return config.ids[ratingKey] ?? []
+    }
+
+    nonisolated func isConnected(_ kind: ArrKind) -> Bool {
+        arrKinds.contains(kind)
+    }
+
+    func remove(_ title: ArrTitle) async throws -> Bool {
+        switch title {
+        case .movie(let tmdbID, let name, let year): events.append("radarr \(tmdbID) \(name) \(year.map(String.init) ?? "-")")
+        case .series(let tvdbID, let name): events.append("sonarr \(tvdbID) \(name)")
+        }
+        if config.arrFailures > 0 {
+            config.arrFailures -= 1
+            throw ArrError.unreachable
+        }
+        if let error = config.arrError { throw error }
+        return true
+    }
+
+    func removeMedia(_ kind: SeerrMediaKind, tmdbID: Int) async throws -> Bool {
+        events.append("seerr \(kind.rawValue) \(tmdbID)")
+        if config.requestsFailures > 0 {
+            config.requestsFailures -= 1
+            throw SeerrError.unreachable
+        }
+        if let error = config.requestsError { throw error }
+        return true
+    }
 }
 
 /// Records each wait and returns at once.
@@ -76,14 +124,21 @@ private actor Waits {
 }
 
 struct MediaDeletionTests {
-    private static func movie(_ key: String = "10", guid: String? = "plex://movie/abc") throws -> PlexMetadata {
-        try decode(PlexMetadata.self, ["ratingKey": key, "type": "movie", "guid": guid as Any, "title": "Charge"])
+    private static let movieIDs = ["imdb://tt13433812", "tmdb://438631", "tvdb://77"]
+    private static let showIDs = ["imdb://tt10872600", "tmdb://90", "tvdb://121361"]
+
+    private static func movie(_ key: String = "10", guid: String? = "plex://movie/abc", year: Int? = nil) throws -> PlexMetadata {
+        try decode(PlexMetadata.self, ["ratingKey": key, "type": "movie", "guid": guid as Any, "title": "Charge", "year": year as Any])
+    }
+
+    private static func show(_ key: String = "30") throws -> PlexMetadata {
+        try decode(PlexMetadata.self, ["ratingKey": key, "type": "show", "guid": "plex://show/xyz", "title": "Dune Prophecy"])
     }
 
     private static func episode(_ key: String = "22", show: String? = "plex://show/xyz", showKey: String? = "20") throws -> PlexMetadata {
         try decode(PlexMetadata.self, [
             "ratingKey": key, "type": "episode", "parentRatingKey": "21", "grandparentRatingKey": showKey as Any,
-            "grandparentGuid": show as Any, "guid": "plex://episode/e1",
+            "grandparentGuid": show as Any, "guid": "plex://episode/e1", "grandparentTitle": "Dune Prophecy",
         ])
     }
 
@@ -91,10 +146,14 @@ struct MediaDeletionTests {
         _ item: PlexMetadata,
         on script: Script,
         watchlist: Bool = true,
+        arr: Bool = false,
+        requests: Bool = false,
         alreadyDeleted: DeletedTitles = DeletedTitles()
     ) async -> (MediaDeletionResult, [Duration]) {
         let waits = Waits()
-        let deletion = MediaDeletion(server: script, watchlist: watchlist ? script : nil) { await waits.add($0) }
+        let deletion = MediaDeletion(
+            server: script, watchlist: watchlist ? script : nil, arr: arr ? script : nil, requests: requests ? script : nil
+        ) { await waits.add($0) }
         let result = await deletion.delete(item, alreadyDeleted: alreadyDeleted)
         return (result, await waits.all)
     }
@@ -267,7 +326,8 @@ struct MediaDeletionTests {
 
         let (result, waits) = await Self.run(try Self.movie(), on: script)
 
-        #expect(result == MediaDeletionResult(outcome: .deleted, watchlist: .failed(guid: "plex://movie/abc")))
+        #expect(result == MediaDeletionResult(outcome: .deleted, watchlist: .failed(guid: "plex://movie/abc"), ticket: result.ticket))
+        #expect(result.canRetry)
         #expect(await script.events.filter { $0.hasPrefix("contains") }.count == 3)
         #expect(waits.count == 2)
     }
@@ -287,5 +347,147 @@ struct MediaDeletionTests {
         _ = await deletion.delete(try Self.movie()) { await script.note("afterDelete") }
 
         #expect(await script.events == ["read 10", "delete 10", "afterDelete", "contains plex://movie/abc", "remove plex://movie/abc"])
+    }
+
+    // MARK: Radarr, Sonarr and Seerr
+
+    @Test func aMovieLeavesRadarrAndSeerrAfterTheServerDeletedIt() async throws {
+        let script = Script(items: [try Self.movie(year: 2021)], .init(ids: ["10": Self.movieIDs]))
+
+        let (result, waits) = await Self.run(try Self.movie(year: 2021), on: script, arr: true, requests: true)
+
+        #expect(result == MediaDeletionResult(
+            outcome: .deleted, watchlist: .removed(guid: "plex://movie/abc"), arr: .removed, requests: .removed))
+        #expect(await script.events == [
+            "read 10", "ids 10", "delete 10", "contains plex://movie/abc", "remove plex://movie/abc",
+            "radarr 438631 Charge 2021", "seerr movie 438631",
+        ])
+        #expect(waits.isEmpty)
+    }
+
+    @Test func aShowLeavesSonarrByItsTVDBIDAndSeerrByItsTMDBID() async throws {
+        let script = Script(items: [try Self.show()], .init(ids: ["30": Self.showIDs]))
+
+        let (result, _) = await Self.run(try Self.show(), on: script, arr: true, requests: true)
+
+        #expect(result.arr == .removed && result.requests == .removed)
+        #expect(await script.events.suffix(2) == ["sonarr 121361 Dune Prophecy", "seerr tv 90"])
+    }
+
+    @Test func anEpisodeWithOthersLeftLeavesTheShowInSonarrAndSeerr() async throws {
+        let sibling = try decode(PlexMetadata.self, ["ratingKey": "23", "type": "episode", "parentRatingKey": "21", "grandparentRatingKey": "20"])
+        let script = Script(items: [try Self.episode()], leaves: [sibling], .init(ids: ["20": Self.showIDs]))
+
+        let (result, _) = await Self.run(try Self.episode(), on: script, arr: true, requests: true)
+
+        #expect(result == MediaDeletionResult(outcome: .deleted, watchlist: .unchanged, arr: .notApplicable, requests: .notApplicable))
+        #expect(await script.events == ["read 22", "ids 20", "delete 22", "leaves 20"])
+    }
+
+    @Test func theLastEpisodeTakesTheShowOutOfSonarrAndSeerrAfterOneCountOfWhatIsLeft() async throws {
+        let script = Script(items: [try Self.episode()], .init(ids: ["20": Self.showIDs]))
+
+        let (result, _) = await Self.run(try Self.episode(), on: script, arr: true, requests: true)
+
+        #expect(result.arr == .removed && result.requests == .removed)
+        #expect(await script.events.suffix(2) == ["sonarr 121361 Dune Prophecy", "seerr tv 90"])
+        #expect(await script.events.filter { $0 == "leaves 20" }.count == 1)
+    }
+
+    @Test func aTitleWithoutTheIDAServiceNeedsIsUnmatched() async throws {
+        let script = Script(items: [try Self.movie(), try Self.show()], .init(ids: ["10": ["imdb://tt1"], "30": ["tmdb://90"]]))
+
+        let (movie, _) = await Self.run(try Self.movie(), on: script, arr: true, requests: true)
+        let (show, _) = await Self.run(try Self.show(), on: script, arr: true, requests: true)
+
+        #expect(movie.arr == .unmatched && movie.requests == .unmatched)
+        #expect(show.arr == .unmatched && show.requests == .removed)
+        #expect(await script.events.allSatisfy { !$0.hasPrefix("radarr") && !$0.hasPrefix("sonarr") })
+    }
+
+    @Test func aTitleTheServerAlreadyForgotIsDeletedAndUnmatched() async throws {
+        let script = Script()
+
+        let (result, _) = await Self.run(try Self.movie(), on: script, arr: true, requests: true)
+
+        #expect(result == MediaDeletionResult(
+            outcome: .deleted, watchlist: .removed(guid: "plex://movie/abc"), arr: .unmatched, requests: .unmatched))
+        #expect(await script.events == ["read 10", "contains plex://movie/abc", "remove plex://movie/abc"])
+    }
+
+    @Test func aServiceThatFailsDoesNotStopTheOthersAndRetryRepeatsOnlyIt() async throws {
+        let script = Script(items: [try Self.movie()], .init(ids: ["10": Self.movieIDs], arrFailures: 2))
+        let waits = Waits()
+        let deletion = MediaDeletion(server: script, watchlist: script, arr: script, requests: script) { await waits.add($0) }
+
+        let first = await deletion.delete(try Self.movie())
+
+        #expect(first.outcome == .deleted)
+        #expect(first.watchlist == .removed(guid: "plex://movie/abc"))
+        #expect(first.arr == .failed)
+        #expect(first.requests == .removed)
+        #expect(first.canRetry)
+        #expect(await waits.all == [.seconds(1)])
+
+        let second = await deletion.retry(first)
+
+        #expect(second.arr == .removed)
+        #expect(second.requests == .removed)
+        #expect(second.watchlist == first.watchlist)
+        #expect(!second.canRetry)
+        let events = await script.events
+        #expect(events.filter { $0.hasPrefix("radarr") }.count == 3)
+        #expect(events.filter { $0 == "delete 10" }.count == 1)
+        #expect(events.filter { $0.hasPrefix("seerr") }.count == 1)
+        #expect(events.filter { $0.hasPrefix("contains") }.count == 1)
+    }
+
+    @Test func aRefusedServiceIsNotAskedAgain() async throws {
+        let script = Script(items: [try Self.movie()], .init(ids: ["10": Self.movieIDs], arrError: .badKey, requestsError: .notAllowed))
+
+        let (result, waits) = await Self.run(try Self.movie(), on: script, arr: true, requests: true)
+
+        #expect(result.arr == .refused && result.requests == .refused)
+        #expect(!result.canRetry)
+        #expect(waits.isEmpty)
+        #expect(await script.events.filter { $0.hasPrefix("radarr") || $0.hasPrefix("seerr") }.count == 2)
+    }
+
+    @Test func aServiceThatFailsOnceIsTriedAgainAfterOneSecond() async throws {
+        let script = Script(items: [try Self.movie()], .init(ids: ["10": Self.movieIDs], arrFailures: 1, requestsFailures: 1))
+
+        let (result, waits) = await Self.run(try Self.movie(), on: script, arr: true, requests: true)
+
+        #expect(result.arr == .removed && result.requests == .removed)
+        #expect(waits == [.seconds(1), .seconds(1)])
+    }
+
+    @Test func idsThatCannotBeReadDoNotStopTheDelete() async throws {
+        let script = Script(items: [try Self.movie()], .init(ids: ["10": Self.movieIDs], idsFailures: 2))
+
+        let (result, waits) = await Self.run(try Self.movie(), on: script, arr: true, requests: true)
+
+        #expect(result.outcome == .deleted)
+        #expect(result.arr == .unmatched && result.requests == .unmatched)
+        #expect(waits == [.seconds(1)])
+        #expect(await script.events.filter { $0 == "delete 10" }.count == 1)
+    }
+
+    @Test func servicesThatAreNotConnectedAreNotAskedAndNeedNoIDs() async throws {
+        let script = Script(items: [try Self.show()], arrKinds: [.radarr])
+
+        let (result, _) = await Self.run(try Self.show(), on: script, arr: true)
+
+        #expect(result.arr == .notConnected && result.requests == .notConnected)
+        #expect(await script.events == ["read 30", "delete 30", "contains plex://show/xyz", "remove plex://show/xyz"])
+    }
+
+    @Test func aRefusedDeleteNeverReachesTheServices() async throws {
+        let script = Script(items: [try Self.movie()], .init(deleteError: .server(status: 403, message: nil), ids: ["10": Self.movieIDs]))
+
+        let (result, _) = await Self.run(try Self.movie(), on: script, arr: true, requests: true)
+
+        #expect(result == MediaDeletionResult(outcome: .notAllowed))
+        #expect(await script.events == ["read 10", "ids 10", "delete 10"])
     }
 }
