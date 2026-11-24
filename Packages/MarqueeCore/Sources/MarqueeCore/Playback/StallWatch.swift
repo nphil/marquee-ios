@@ -26,10 +26,14 @@ public struct StallWatch: Sendable {
         public var produced: TimeInterval
         /// A read from the source is under way, also one waiting for the link to come back.
         public var fetching: Bool
+        /// The run reached the end of the movie. It then neither reads nor adds output, which is not being stuck:
+        /// a run started near the end finishes in 2-4 s on a LAN, before the player shows its first frame.
+        public var finished: Bool
 
-        public init(produced: TimeInterval, fetching: Bool) {
+        public init(produced: TimeInterval, fetching: Bool, finished: Bool = false) {
             self.produced = produced
             self.fetching = fetching
+            self.finished = finished
         }
     }
 
@@ -67,7 +71,7 @@ public struct StallWatch: Sendable {
             nil
         } else if waited >= Self.patience, ahead >= Self.ample {
             .unplayed
-        } else if now - wait.active >= Self.patience {
+        } else if run?.finished != true, now - wait.active >= Self.patience {
             .idle
         } else {
             nil

@@ -2543,7 +2543,10 @@ final class PlayerModel: Identifiable {
         var paced = false
         if case .remux(let remux) = stream, let origin {
             let progress = remux.progress
-            run = StallWatch.Run(produced: origin + progress.mediaSeconds, fetching: progress.isFetching)
+            // A run whose output reaches the movie's end has finished. VideoEngine 2.2.0's RemuxProgress.isFinished
+            // replaces this estimate when the app moves to it.
+            let produced = origin + progress.mediaSeconds
+            run = StallWatch.Run(produced: produced, fetching: progress.isFetching, finished: duration > 0 && produced >= duration - 1)
             paced = progress.isPaced
         }
         switch stallWatch.check(now: ProcessInfo.processInfo.systemUptime, position: time, run: run) {
