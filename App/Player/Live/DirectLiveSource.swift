@@ -17,10 +17,12 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
     let player = LiveStreamPlayer()
     private(set) var channel: LiveChannel?
 
-    /// A tune failed with a network error, no data, an end, or a stream the phone cannot decode, before its first
-    /// picture or while it played; the router carries on through Plex (§2.2 rule 8). A tuner's refusal is not passed
-    /// on, since Plex would be refused the same way.
+    /// A tune failed, before its first picture or while it played. The router carries on through Plex after a
+    /// network error, no data, an end, or a stream the phone cannot decode (§2.2 rule 8), but not after a tuner's
+    /// refusal, since Plex would be refused the same way. It also asks a LumaTV whether another client took the tuner.
     @ObservationIgnored var onFailed: ((LiveChannel, LiveError) -> Void)?
+    /// The name this phone gives a LumaTV tuner, so the tuner can tell it who took the stream.
+    @ObservationIgnored var clientName = ""
 
     init() {
         player.onStateChange = { [weak self] state in self?.stateChanged(state) }
@@ -61,7 +63,8 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
         #if DEBUG
         if FakeTuner.isActive { return FakeTuner.play(on: player) }
         #endif
-        player.open(channel.device.streamURL(channel), tappedAt: tappedAt)
+        let url = channel.device.streamURL(channel)
+        player.open(channel.device.isLumaTV ? TunerTakeover.naming(url, as: clientName) : url, tappedAt: tappedAt)
     }
 
     static func tapClock() -> Double { LiveStreamPlayer.tapClock() }
@@ -84,12 +87,7 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
 
     private func stateChanged(_ state: LiveStreamPlayer.State) {
         guard case .failed(let failure) = state, let channel else { return }
-        switch failure {
-        case .noPicture, .lost, .unreadable, .ended:
-            onFailed?(channel, Self.error(failure))
-        case .refused:
-            break
-        }
+        onFailed?(channel, Self.error(failure))
     }
 
     static func liveState(_ state: LiveStreamPlayer.State) -> LiveState {

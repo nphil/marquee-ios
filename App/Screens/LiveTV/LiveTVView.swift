@@ -309,6 +309,7 @@ private struct LiveGuideScreen: View {
     private func play(_ channel: LiveChannel) {
         session.player.playLive(LivePlaybackModel(
             store: store, channel: channel, readsTunerDirectly: session.settings.readsTunerDirectly,
+            clientName: session.diagnostics.deviceName,
             skipInterval: TimeInterval(session.settings.skipInterval),
             playbackActive: { session.downloads.setPlaybackActive($0) }
         ))

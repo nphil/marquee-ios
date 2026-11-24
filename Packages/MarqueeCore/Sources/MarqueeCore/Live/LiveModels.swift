@@ -79,15 +79,21 @@ public struct TunerDevice: Identifiable, Hashable, Sendable, Codable {
     public var tunerCount: Int
     /// False once Plex reports the device dead.
     public var isAlive: Bool
+    /// The device's make as Plex reports it ("LumaTV").
+    public var make: String?
 
-    public init(key: String, uuid: String, uri: URL, name: String, tunerCount: Int, isAlive: Bool) {
+    public init(key: String, uuid: String, uri: URL, name: String, tunerCount: Int, isAlive: Bool, make: String? = nil) {
         self.key = key
         self.uuid = uuid
         self.uri = uri
         self.name = name
         self.tunerCount = tunerCount
         self.isAlive = isAlive
+        self.make = make
     }
+
+    /// LumaTV's tuner, which names its clients and tells a displaced one who took the tuner.
+    public var isLumaTV: Bool { make?.localizedCaseInsensitiveContains("LumaTV") == true }
 
     /// Real HDHomeRuns, LumaTuner and the HDHomeRun-emulating IPTV proxies: the phone can read these itself.
     public var speaksHDHomeRun: Bool { uuid.hasPrefix("device://tv.plex.grabbers.hdhomerun/") }
@@ -286,9 +292,16 @@ public enum LiveError: Error, Sendable, Hashable {
     case protectedChannel
     /// Plex answered a tune or stream request with an error.
     case server(status: Int, message: String?)
+    /// Another client or the TV took LumaTV's tuner from this phone; the sentence says who.
+    case displaced(String)
 }
 
 extension LiveError {
+    public var isDisplaced: Bool {
+        if case .displaced = self { return true }
+        return false
+    }
+
     /// The tuner is taken: the device's 805 ("TV is busy") or a 503 from it or from Plex.
     public var isTunerBusy: Bool {
         switch self {
@@ -308,6 +321,7 @@ extension LiveError: CustomStringConvertible {
         case .unsupported(let detail): "This channel can't be played here (\(detail))"
         case .protectedChannel: "Protected channel"
         case .server(let status, let message): message ?? "Plex couldn't tune the channel (\(status))"
+        case .displaced(let message): message
         }
     }
 }

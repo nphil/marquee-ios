@@ -299,6 +299,8 @@ private struct LiveChrome: View {
         if case .failed(let error) = model.state, model.surfing == nil {
             if model.tunerHolder != nil || error.isTunerBusy {
                 TunerBusyCard(model: model, recording: model.tunerHolder, close: close)
+            } else if error.isDisplaced {
+                FailureCard(title: "Tuner in use", message: error.description, retryTitle: "Watch here", close: close, retry: model.retry)
             } else {
                 FailureCard(message: error.description, close: close, retry: model.retry)
             }

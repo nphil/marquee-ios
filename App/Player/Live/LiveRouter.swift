@@ -18,6 +18,11 @@ final class LiveRouter: LiveVideoSource {
     let plex: PlexLiveSource
     /// Settings › Video & Playback › Live TV › Direct from Tuner is off.
     var prefersPlex = false
+    /// This phone's name for a LumaTV tuner: sent with every direct stream, and matched in the tuner's list of
+    /// displaced clients.
+    var clientName = "" {
+        didSet { direct.clientName = clientName }
+    }
     /// The route of the current tune.
     private(set) var route: LiveRoute?
     /// The source of the current tune; nil before the first.
@@ -52,7 +57,7 @@ final class LiveRouter: LiveVideoSource {
     init(live: PlexLiveTV, plex: PlexLiveSource) {
         self.live = live
         self.plex = plex
-        direct.onFailed = { [weak self] channel, error in self?.fallBack(channel, after: error) }
+        direct.onFailed = { [weak self] channel, error in self?.directEnded(channel, after: error) }
     }
 
     // MARK: LiveSource
@@ -197,6 +202,33 @@ final class LiveRouter: LiveVideoSource {
         guard mine == generation else { return }
         active = next
         container.show(next.videoView)
+    }
+
+    /// A direct stream failed or ended. A LumaTV tuner is asked first whether another client took the tuner from
+    /// this phone: then playback stops there with the tuner's sentence, and only "Watch here" takes it back.
+    private func directEnded(_ channel: LiveChannel, after error: LiveError) {
+        guard active === direct, ownState == nil, self.channel?.id == channel.id, fellBack != generation else { return }
+        var refused = false
+        if case .refused = error { refused = true }
+        guard channel.device.isLumaTV else {
+            if !refused { fallBack(channel, after: error) }
+            return
+        }
+        let mine = generation
+        recordingGuard?.cancel()
+        if !refused { ownState = .opening }
+        Task {
+            let found = await tuners.displacement(channel.device.uri, clientName: clientName)
+            guard mine == generation else { return }
+            if let found {
+                Diag.event(.live, "displaced", ["by": found.by, "kind": found.byKind.rawValue], .notice)
+                direct.stop()
+                ownState = .failed(.displaced(found.message))
+            } else if !refused {
+                ownState = nil
+                fallBack(channel, after: error)
+            }
+        }
     }
 
     private func fallBack(_ channel: LiveChannel, after error: LiveError) {

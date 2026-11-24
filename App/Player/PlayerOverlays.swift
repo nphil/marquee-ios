@@ -368,7 +368,9 @@ struct FinishedCard: View {
 
 /// Playback failed (DESIGN §11): it stays in the player with the reason, Retry and Close.
 struct FailureCard: View {
+    var title = "Can't play this"
     let message: String
+    var retryTitle = "Retry"
     let close: () -> Void
     let retry: () -> Void
     @Environment(\.theme) private var theme
@@ -379,7 +381,7 @@ struct FailureCard: View {
                 .font(.system(size: 34, weight: .semibold))
                 .foregroundStyle(theme.warning)
                 .accessibilityHidden(true)
-            Text("Can't play this")
+            Text(title)
                 .textRole(.title)
                 .foregroundStyle(theme.ink)
                 .accessibilityAddTraits(.isHeader)
@@ -389,7 +391,7 @@ struct FailureCard: View {
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
             HStack(spacing: Space.s3) {
-                Button("Retry", action: retry)
+                Button(retryTitle, action: retry)
                     .buttonStyle(PlayerPillStyle(prominent: true))
                     .accessibilityIdentifier("player.retry")
                 Button("Close", action: close)

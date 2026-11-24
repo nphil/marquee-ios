@@ -99,7 +99,8 @@ struct WireDevice: Decodable {
             uri: uri,
             name: name ?? "Tuner",
             tunerCount: max(c.int(.tuners) ?? 1, 1),
-            isAlive: status != "dead" && status != "0"
+            isAlive: status != "dead" && status != "0",
+            make: c.string(.make)
         )
     }
 }

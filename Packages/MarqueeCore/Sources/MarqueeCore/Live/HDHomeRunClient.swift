@@ -96,6 +96,14 @@ public struct HDHomeRunClient: Sendable {
         try await get([HDHomeRunChannel].self, base.appendingPathComponent("lineup.json"), timeout: timeout)
     }
 
+    /// The entry of the tuner's `status.json` that says another client took the tuner from `clientName`; nil when
+    /// there is none, the tuner is older, or it did not answer.
+    public func displacement(_ base: URL, clientName: String, now: Date = Date(), timeout: TimeInterval = 1.5) async -> TunerDisplacement? {
+        let request = PlexRequest(url: base.appendingPathComponent("status.json"), timeout: timeout)
+        guard let response = try? await transport.send(request), (200..<300).contains(response.status) else { return nil }
+        return TunerTakeover.displacement(in: response.body, clientName: clientName, now: now)
+    }
+
     private func get<T: Decodable>(_ type: T.Type, _ url: URL, timeout: TimeInterval) async throws -> T {
         let response: PlexHTTPResponse
         do {
