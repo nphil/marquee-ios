@@ -57,3 +57,36 @@ public enum TunerTakeover {
 
     private static let unreserved = CharacterSet(charactersIn: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~")
 }
+
+/// Same-frequency sharing on LumaTV's tuner, read from `status.json`: viewers on one RF share a tuner, up to
+/// `capacity`; another RF displaces them, or is refused while Plex records. Every field is optional, so an older
+/// TV reads as "nothing shared" and keeps today's behaviour.
+public enum TunerSharing {
+    public static let capacity = 4
+    public static let fullMessage = "Four devices are already watching this channel group."
+    public static let recordingMessage = "The TV is recording, so its tuner can't change channel right now."
+
+    /// Whether `number` is on the RF a current viewer is on, so tuning it joins that tuner instead of taking it over.
+    public static func shares(in body: Data, wanting number: String) -> Bool {
+        viewers(in: body, wanting: number) > 0
+    }
+
+    /// The sentence for a 503 on the stream request of channel `number`; nil keeps the generic refusal.
+    public static func refusalMessage(in body: Data, wanting number: String) -> String? {
+        if viewers(in: body, wanting: number) >= capacity { return fullMessage }
+        guard let root = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+              let holder = root["holder"] as? [String: Any],
+              (holder["name"] as? String)?.localizedCaseInsensitiveContains("plex") == true else { return nil }
+        return recordingMessage
+    }
+
+    /// Viewers on the RF of `number`: those watching it, or another channel of an RF group that carries it.
+    private static func viewers(in body: Data, wanting number: String) -> Int {
+        guard let root = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
+              let viewers = root["viewers"] as? [[String: Any]] else { return 0 }
+        let group = (root["sameRf"] as? [[String: Any]])?
+            .compactMap { $0["channels"] as? [String] }
+            .first { $0.contains(number) } ?? [number]
+        return viewers.filter { ($0["channel"] as? String).map(group.contains) == true }.count
+    }
+}

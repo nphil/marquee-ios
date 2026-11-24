@@ -104,6 +104,14 @@ public struct HDHomeRunClient: Sendable {
         return TunerTakeover.displacement(in: response.body, clientName: clientName, now: now)
     }
 
+    /// The sentence for a 503 on `number`'s stream from a LumaTV tuner, read from `status.json`; nil when it has none
+    /// to give, the tuner is older, or it did not answer.
+    public func sharingRefusal(_ base: URL, wanting number: String, timeout: TimeInterval = 1.5) async -> String? {
+        let request = PlexRequest(url: base.appendingPathComponent("status.json"), timeout: timeout)
+        guard let response = try? await transport.send(request), (200..<300).contains(response.status) else { return nil }
+        return TunerSharing.refusalMessage(in: response.body, wanting: number)
+    }
+
     private func get<T: Decodable>(_ type: T.Type, _ url: URL, timeout: TimeInterval) async throws -> T {
         let response: PlexHTTPResponse
         do {

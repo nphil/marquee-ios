@@ -224,7 +224,14 @@ final class LiveRouter: LiveVideoSource {
                 Diag.event(.live, "displaced", ["by": found.by, "kind": found.byKind.rawValue], .notice)
                 direct.stop()
                 ownState = .failed(.displaced(found.message))
-            } else if !refused {
+            } else if refused {
+                guard error.isTunerBusy else { return }
+                // A 503 on the stream: the tuner's own sentence says whether it is full or recording.
+                if let message = await tuners.sharingRefusal(channel.device.uri, wanting: channel.number), mine == generation {
+                    direct.stop()
+                    ownState = .failed(.refused(code: nil, message: message))
+                }
+            } else {
                 ownState = nil
                 fallBack(channel, after: error)
             }

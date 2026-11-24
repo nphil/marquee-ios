@@ -36,4 +36,25 @@ struct LiveTakeoverTests {
         let long = String(repeating: "x", count: 60)
         #expect(TunerTakeover.naming(url, as: long).query == "device=" + String(repeating: "x", count: 40))
     }
+
+    private func sharing(viewers: [String], holder: String = "null", sameRf: String = #"[{"rf":29,"channels":["2.1","2.2"]}]"#) -> Data {
+        let list = viewers.map { #"{"ip":"192.0.2.9","channel":"\#($0)"}"# }.joined(separator: ",")
+        return Data(#"{"holder":\#(holder),"viewers":[\#(list)],"sameRf":\#(sameRf)}"#.utf8)
+    }
+
+    @Test func sameRfSharesAndOtherRfDoesNot() {
+        #expect(TunerSharing.shares(in: sharing(viewers: ["2.1"]), wanting: "2.2"))
+        #expect(TunerSharing.shares(in: sharing(viewers: ["7.1"]), wanting: "7.1"))
+        #expect(!TunerSharing.shares(in: sharing(viewers: ["2.1"]), wanting: "9.1"))
+        #expect(TunerSharing.refusalMessage(in: sharing(viewers: ["2.1", "2.2", "2.1"]), wanting: "2.2") == nil)
+        #expect(TunerSharing.refusalMessage(in: sharing(viewers: ["2.1", "2.2", "2.1", "2.2"]), wanting: "2.1") == TunerSharing.fullMessage)
+        #expect(TunerSharing.refusalMessage(in: sharing(viewers: ["2.1"], holder: #"{"name":"Plex Media Server"}"#), wanting: "9.1") == TunerSharing.recordingMessage)
+    }
+
+    @Test func missingFieldsAreTodaysBehaviour() {
+        let old = Data(#"{"holder":{"name":"Marquee"}}"#.utf8)
+        #expect(!TunerSharing.shares(in: old, wanting: "2.1"))
+        #expect(TunerSharing.refusalMessage(in: old, wanting: "2.1") == nil)
+        #expect(!TunerSharing.shares(in: Data("[]".utf8), wanting: "2.1"))
+    }
 }
