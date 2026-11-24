@@ -8,6 +8,7 @@ struct AudioSubtitleSettingsView: View {
     @Environment(\.theme) private var theme
 
     var body: some View {
+        @Bindable var session = session
         List {
             Section {
                 NavigationLink {
@@ -22,6 +23,15 @@ struct AudioSubtitleSettingsView: View {
                 .accessibilityIdentifier("subtitles.style")
             } footer: {
                 Text("English subtitles are on by default. Anime plays the English dub with its own subtitles; everything else keeps its original audio. A choice made in the player's Audio and subtitles menu is remembered for that show or movie.")
+                    .foregroundStyle(theme.ink2)
+            }
+            .listRowBackground(theme.sheet)
+
+            Section {
+                Toggle("Text from picture subtitles", isOn: $session.settings.textFromPictureSubtitles)
+                    .accessibilityIdentifier("subtitles.pictureText")
+            } footer: {
+                Text("Makes a text copy of picture-based subtitles (PGS, DVD) on the phone so they also show in Picture in Picture and AirPlay. Recognised text can contain mistakes.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)

@@ -294,6 +294,8 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var landing: TimeInterval?
     @ObservationIgnored private var itemReady = false
     @ObservationIgnored private var farSeeking = false
+    /// A far seek is waiting on the engine, which may replace the run under the playing item.
+    @ObservationIgnored private var runSeekPending = false
     @ObservationIgnored private var remuxFinished = false
     @ObservationIgnored private var transcodeOffset: TimeInterval = 0
     /// The playing server stream's `start.m3u8`, for measuring its clock (`ServerStreamClock`).
@@ -315,6 +317,8 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var closed = false
     @ObservationIgnored private var observers: [any NSObjectProtocol] = []
     @ObservationIgnored private var loadTask: Task<Void, Never>?
+    @ObservationIgnored private var prewarmTask: Task<Void, Never>?
+    @ObservationIgnored private var prewarmedKey: String?
     @ObservationIgnored private var queueTask: Task<Void, Never>?
     @ObservationIgnored private var seekTask: Task<Void, Never>?
     @ObservationIgnored private var eventsTask: Task<Void, Never>?
@@ -580,7 +584,7 @@ final class PlayerModel: Identifiable {
         generation += 1
         wordTiming?.stop()
         wordTiming = nil
-        for task in [loadTask, queueTask, seekTask, eventsTask, countdownTask, hideTask, stageTask, stallTask, qualityTask, moveTask, trickplayLoad?.task] {
+        for task in [loadTask, queueTask, seekTask, eventsTask, countdownTask, hideTask, stageTask, stallTask, qualityTask, moveTask, prewarmTask, trickplayLoad?.task] {
             task?.cancel()
         }
         sideTasks.forEach { $0.cancel() }
@@ -1451,6 +1455,7 @@ final class PlayerModel: Identifiable {
 
     private func makeRemux(source: URL, part: PlexPart, route: PlaybackRoute) -> RemuxSession {
         var options = RemuxOptions()
+        options.bitmapSubtitleText = session.settings.textFromPictureSubtitles
         if let audio = route.audio, let index = streamIndex(audio.id) { options.audio = AudioPolicy(preferredIndex: index) }
         if let vision = part.videoStream?.dolbyVision {
             // LoopbackHLS, which declares the record type, also has a SubtitleTrack; importing it would
@@ -2314,9 +2319,11 @@ final class PlayerModel: Identifiable {
                 land()
             }
         case .failed(let failure):
+            if runSeekPending { return }
             if failure.isNotFound, conversionFailed() { return }
             streamFailed(failure)
         case .ended:
+            if runSeekPending { return }
             ended()
         case .externalPlayback(let active):
             externalPlaybackChanged(active)
@@ -2419,7 +2426,8 @@ final class PlayerModel: Identifiable {
         }
     }
 
-    /// A seek outside what the remux has written restarts it there; quick repeats wait for the last.
+    /// A seek outside what the item holds: the remux keeps its run when the target is already written, else it
+    /// restarts there. Quick repeats wait for the last.
     private func farSeek(_ remux: RemuxSession, to target: TimeInterval) {
         landing = target
         farSeeking = true
@@ -2433,17 +2441,27 @@ final class PlayerModel: Identifiable {
             try? await Task.sleep(for: .milliseconds(350))
             guard let self, serial == seekSerial, !Task.isCancelled, case .remux(let current) = stream, current === remux else { return }
             Diag.event(.player, "far.seek", ["to": target, "written": remux.progress.mediaSeconds])
-            // The old item is let go first, so its end does not count as a failure.
-            backend.load(nil)
-            itemReady = false
-            origin = nil
+            // The item stays up while the engine decides, and a replaced run ends it: that end is not a failure.
+            runSeekPending = true
+            defer { runSeekPending = false }
             do {
-                remuxFinished = false
-                let url = try await remux.seek(to: target)
+                let seek = try await remux.seekReusing(to: target)
                 guard serial == seekSerial, case .remux(let current) = stream, current === remux else { return }
+                if seek.reused {
+                    // Same run, same item: it only needs to move.
+                    Diag.event(.player, "seek.reused", ["to": target, "item": seek.itemTime], .debug)
+                    land()
+                    return
+                }
+                // The old item is let go first, so its end does not count as a failure.
+                backend.load(nil)
+                itemReady = false
+                // The new run's timeline can arrive before this resumes, while the old origin still stood.
+                origin = remux.timelineOrigin
+                remuxFinished = false
                 try await handOff(remux, landing: target)
                 guard serial == seekSerial else { return }
-                load(url)
+                load(seek.url)
             } catch {
                 guard serial == seekSerial, !(error is CancellationError) else { return }
                 streamFailed(PlaybackFailure(text: Self.message(error)))
@@ -2543,10 +2561,7 @@ final class PlayerModel: Identifiable {
         var paced = false
         if case .remux(let remux) = stream, let origin {
             let progress = remux.progress
-            // A run whose output reaches the movie's end has finished. VideoEngine 2.2.0's RemuxProgress.isFinished
-            // replaces this estimate when the app moves to it.
-            let produced = origin + progress.mediaSeconds
-            run = StallWatch.Run(produced: produced, fetching: progress.isFetching, finished: duration > 0 && produced >= duration - 1)
+            run = StallWatch.Run(produced: origin + progress.mediaSeconds, fetching: progress.isFetching, finished: progress.isFinished)
             paced = progress.isPaced
         }
         switch stallWatch.check(now: ProcessInfo.processInfo.systemUptime, position: time, run: run) {
@@ -2646,7 +2661,9 @@ final class PlayerModel: Identifiable {
             }
         case .inStream(let track) where route.kind == .remux && track.isImageBased:
             guard case .remux(let remux) = stream, let index = streamIndex(track.id) else { return }
-            overlayTrack = remux.subtitleStreams.first { $0.streamIndex == index }?.overlay
+            // With the text copy on, the stream has a second entry for the same index. The app draws the overlay
+            // and never selects that rendition, so the two do not show together.
+            overlayTrack = remux.subtitleStreams.first { $0.streamIndex == index && !$0.isRecognizedFromPicture }?.overlay
         default:
             break
         }
@@ -2946,6 +2963,25 @@ final class PlayerModel: Identifiable {
         cancelCountdown("offer-changed")
         withAnimation(.easeOut(duration: 0.22)) { offer = next }
         startCountdownIfDue()
+        if case .upNext(let upcoming)? = next { prewarmNext(upcoming) }
+    }
+
+    /// Reads the opening bytes of the next episode once, as its card appears, so the remux that starts it opens
+    /// without a round trip. Only for a phone that already repackages this file itself (the next one usually takes
+    /// the same route), not on a metered link or with Save Data, and never for downloads.
+    private func prewarmNext(_ upcoming: PlexMetadata) {
+        guard prewarmedKey != upcoming.ratingKey, request.download == nil, castDevice == nil, route?.kind == .remux,
+              !session.isMetered, !session.settings.savesData,
+              let path = upcoming.media.first?.parts.first?.key else { return }
+        prewarmedKey = upcoming.ratingKey
+        let headers = library.authorizationHeaders()
+        prewarmTask?.cancel()
+        prewarmTask = Task { [weak self] in
+            guard let self, let connection = try? await library.connection.connection(), !Task.isCancelled,
+                  let url = PlexURL.make(base: connection.uri, path: path) else { return }
+            let held = await EnginePrewarm.prewarm(url: url, headers: headers)
+            Diag.event(.player, "prewarm", ["item": upcoming.ratingKey, "held": held], .debug)
+        }
     }
 
     private func startCountdownIfDue() {

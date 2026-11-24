@@ -25,6 +25,9 @@ struct ProfileSettings: Equatable, Sendable {
     /// Interlaced channels play the original broadcast (about 60 pictures a second) instead of the tuner's 30.
     var prefersSmoothMotion = true
     var subtitleStyle = SubtitleLook()
+    /// Reads picture subtitles (PGS, DVD) into a text rendition on the phone for Picture in Picture and AirPlay
+    /// (`RemuxOptions.bitmapSubtitleText`); off by default, since the recognised text can contain mistakes.
+    var textFromPictureSubtitles = false
     var homeRows = HomeLayout()
     var posterLabels = PosterLabels()
     /// The default quality: Auto, or a fixed one; picking one in the player's More menu saves it too.
@@ -57,7 +60,7 @@ struct ProfileSettings: Equatable, Sendable {
 extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
         case skipInterval, skipTaps, introSkipDelay, nextEpisodeDelay, autoplaysNext, creditsAutoplay, directPlay, aspect, videoOrientation, readsTunerDirectly, prefersSmoothMotion
-        case subtitleStyle, homeRows
+        case subtitleStyle, textFromPictureSubtitles, homeRows
         case posterLabels, audioEnhancements, hiddenLibraries, rewatchDismissed, playsTrailers, playsThemeMusic, themeMusicVolume, savesData
         /// "quality" held a fixed quality before Auto existed (`LegacyKeys`).
         case quality = "qualitySetting"
@@ -91,6 +94,7 @@ extension ProfileSettings: Codable {
         let legacy = try? decoder.container(keyedBy: LegacyKeys.self).decodeIfPresent(VideoQuality.self, forKey: .quality)
         quality = value(.quality) ?? QualitySetting.saved(legacy: legacy)
         savesData = value(.savesData) ?? savesData
+        textFromPictureSubtitles = value(.textFromPictureSubtitles) ?? textFromPictureSubtitles
         audioEnhancements = value(.audioEnhancements) ?? audioEnhancements
         hiddenLibraries = value(.hiddenLibraries) ?? hiddenLibraries
         rewatchDismissed = value(.rewatchDismissed) ?? rewatchDismissed
