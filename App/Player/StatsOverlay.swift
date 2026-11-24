@@ -183,6 +183,9 @@ enum PlayerStats {
             }
             lines.append(Line("Picture", picture.joined(separator: " · ")))
         }
+        if let enhance = model.enhance?.summary {
+            lines.append(Line("Enhance", enhance))
+        }
         if let audio = model.audio {
             let format = [audio.codec.uppercased(), audio.channels.map { "\($0) ch" }].compactMap { $0 }.joined(separator: " ")
             let converted = server?.transcode?.audioDecision.map { $0 == "transcode" } ?? (model.route?.convertsAudio == true)

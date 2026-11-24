@@ -2,6 +2,7 @@ import AVFoundation
 import AVKit
 import SwiftUI
 import UIKit
+import VideoEngine
 
 /// A view backed by an AVPlayerLayer. The model keeps one for the whole playback, so Picture in Picture
 /// carries on while the player screen is closed.
@@ -14,6 +15,30 @@ final class PlayerLayerView: UIView {
     /// (docs/adaptive-playback.md) shows it at once.
     private var standbyLayer: AVPlayerLayer?
     private var coverTask: Task<Void, Never>?
+    /// The picture enhancer drawing over the player layer, with the same frame and gravity
+    /// (docs/DESIGN.md, Enhance picture). Below the subtitles and controls, which are SwiftUI views above this one.
+    private(set) var enhancer: PictureEnhancer?
+
+    func setEnhancer(_ enhancer: PictureEnhancer?) {
+        guard enhancer !== self.enhancer else { return }
+        self.enhancer?.layer.removeFromSuperlayer()
+        self.enhancer = enhancer
+        if let enhancer {
+            layer.addSublayer(enhancer.layer)
+            layoutEnhancer()
+        }
+    }
+
+    private func layoutEnhancer() {
+        guard let enhancer else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        enhancer.layer.frame = bounds
+        enhancer.layer.videoGravity = playerLayer.videoGravity
+        CATransaction.commit()
+        let scale = traitCollection.displayScale
+        enhancer.displaySize = CGSize(width: bounds.width * scale, height: bounds.height * scale)
+    }
 
     func prepareStandby(_ player: AVPlayer) {
         discardStandby()
@@ -54,6 +79,7 @@ final class PlayerLayerView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        layoutEnhancer()
         guard let standbyLayer else { return }
         CATransaction.begin()
         CATransaction.setDisableActions(true)

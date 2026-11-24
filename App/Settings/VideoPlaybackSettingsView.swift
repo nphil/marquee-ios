@@ -122,6 +122,32 @@ struct VideoPlaybackSettingsView: View {
             .listRowBackground(theme.sheet)
 
             Section {
+                Picker("Enhance Picture", selection: $session.settings.pictureEnhance.upscaler) {
+                    ForEach(PictureEnhance.Upscaler.allCases, id: \.self) { upscaler in
+                        Text(upscaler.title).tag(upscaler)
+                    }
+                }
+                .accessibilityIdentifier("video.enhance")
+                if session.settings.pictureEnhance.upscaler != .off {
+                    LabeledContent("Sharpen") {
+                        Slider(value: $session.settings.pictureEnhance.sharpen, in: 0...1)
+                            .frame(maxWidth: 180)
+                    }
+                    .accessibilityIdentifier("video.enhanceSharpen")
+                    LabeledContent("Deband") {
+                        Slider(value: $session.settings.pictureEnhance.deband, in: 0...1)
+                            .frame(maxWidth: 180)
+                    }
+                    .accessibilityIdentifier("video.enhanceDeband")
+                }
+            } footer: {
+                Text("Sharpens and upscales standard video on the phone. HDR and Dolby Vision play unchanged. It pauses itself when the phone is hot, in Low Power Mode or when it cannot keep up.")
+                    .foregroundStyle(theme.ink2)
+            }
+            .listRowBackground(theme.sheet)
+            .onChange(of: session.settings.pictureEnhance) { session.player.active?.enhanceSettingsChanged() }
+
+            Section {
                 Toggle("Play Trailers Automatically", isOn: $session.settings.playsTrailers)
                     .accessibilityIdentifier("video.playsTrailers")
             } footer: {

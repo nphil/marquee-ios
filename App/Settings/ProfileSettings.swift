@@ -28,6 +28,8 @@ struct ProfileSettings: Equatable, Sendable {
     /// Reads picture subtitles (PGS, DVD) into a text rendition on the phone for Picture in Picture and AirPlay
     /// (`RemuxOptions.bitmapSubtitleText`); off by default, since the recognised text can contain mistakes.
     var textFromPictureSubtitles = false
+    /// Sharpening and upscaling of standard video on the phone (VideoEngine's `PictureEnhancer`); off by default.
+    var pictureEnhance = PictureEnhance()
     var homeRows = HomeLayout()
     var posterLabels = PosterLabels()
     /// The default quality: Auto, or a fixed one; picking one in the player's More menu saves it too.
@@ -60,7 +62,7 @@ struct ProfileSettings: Equatable, Sendable {
 extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
         case skipInterval, skipTaps, introSkipDelay, nextEpisodeDelay, autoplaysNext, creditsAutoplay, directPlay, aspect, videoOrientation, readsTunerDirectly, prefersSmoothMotion
-        case subtitleStyle, textFromPictureSubtitles, homeRows
+        case subtitleStyle, textFromPictureSubtitles, pictureEnhance, homeRows
         case posterLabels, audioEnhancements, hiddenLibraries, rewatchDismissed, playsTrailers, playsThemeMusic, themeMusicVolume, savesData
         /// "quality" held a fixed quality before Auto existed (`LegacyKeys`).
         case quality = "qualitySetting"
@@ -95,6 +97,7 @@ extension ProfileSettings: Codable {
         quality = value(.quality) ?? QualitySetting.saved(legacy: legacy)
         savesData = value(.savesData) ?? savesData
         textFromPictureSubtitles = value(.textFromPictureSubtitles) ?? textFromPictureSubtitles
+        pictureEnhance = value(.pictureEnhance) ?? pictureEnhance
         audioEnhancements = value(.audioEnhancements) ?? audioEnhancements
         hiddenLibraries = value(.hiddenLibraries) ?? hiddenLibraries
         rewatchDismissed = value(.rewatchDismissed) ?? rewatchDismissed
@@ -102,6 +105,26 @@ extension ProfileSettings: Codable {
         playsThemeMusic = value(.playsThemeMusic) ?? playsThemeMusic
         themeMusicVolume = value(.themeMusicVolume) ?? themeMusicVolume
     }
+}
+
+/// Enhance picture: how the phone upscales standard video, and how hard it sharpens and debands it. Sharpen and
+/// deband apply only while the upscaler is not Off.
+struct PictureEnhance: Equatable, Codable, Sendable {
+    enum Upscaler: String, Codable, CaseIterable, Sendable {
+        case off, automatic, lineArt
+
+        var title: String {
+            switch self {
+            case .off: "Off"
+            case .automatic: "Automatic"
+            case .lineArt: "Line art"
+            }
+        }
+    }
+
+    var upscaler = Upscaler.off
+    var sharpen = 0.3
+    var deband = 0.3
 }
 
 /// Behaviour spec §4: Force plays every file as it is, with no fallback, so choosing it asks first.

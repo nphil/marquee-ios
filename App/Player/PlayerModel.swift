@@ -190,6 +190,11 @@ final class PlayerModel: Identifiable {
     /// The UI tests' stand-in for the picture.
     let stillImage: UIImage?
     let pictureInPicture: PictureInPicture?
+    /// The picture enhancer of an AVPlayer-backed title; nil when another backend draws the picture.
+    let enhance: EnhanceController?
+    /// The full-screen player is up (not the bar, Picture in Picture or the glasses); set by `PlayerCenter`.
+    @ObservationIgnored private var showsFullPlayer = false
+    @ObservationIgnored private var inBackground = false
 
     private unowned let session: AppSession
     let library: PlexLibrary
@@ -397,6 +402,7 @@ final class PlayerModel: Identifiable {
         layerView.playerLayer.videoGravity = .resize
         layerView.playerLayer.player = backend.player
         pictureInPicture = backend.player == nil ? nil : PictureInPicture(layer: layerView.playerLayer)
+        enhance = backend.player == nil ? nil : EnhanceController(layerView: layerView)
         #if DEBUG
         // The still frame has no player layer, so no window to open: `-marquee.uitest.pip YES` offers one anyway,
         // for the tests that place its button.
@@ -532,6 +538,7 @@ final class PlayerModel: Identifiable {
         pictureInPicture?.onActiveChange = { [weak self] _ in
             self?.textRendererChanged()
             self?.updateNowPlayingSight()
+            self?.refreshEnhance()
         }
         audioSession.onInterruption = { [weak self] began, shouldResume in self?.interrupted(began: began, shouldResume: shouldResume) }
         audioSession.onRouteLost = { [weak self] in self?.pause() }
@@ -562,6 +569,7 @@ final class PlayerModel: Identifiable {
             },
         ]
         updateNowPlayingSight()
+        enhanceSettingsChanged()
         if request.download == nil {
             session.cast.player = self
             session.cast.beginSearch()
@@ -591,6 +599,7 @@ final class PlayerModel: Identifiable {
         subtitleFinder.cancel()
         stopStream()
         backend.tearDown()
+        enhance?.close()
         pictureInPicture?.tearDown()
         layerView.playerLayer.player = nil
         nowPlaying?.end()
@@ -1400,6 +1409,7 @@ final class PlayerModel: Identifiable {
         streamText.attach(to: playerItem)
         itemReady = false
         backend.load(playerItem)
+        enhance?.attach(playerItem)
     }
 
     /// Bounds the player's wait for a server transcode, the one start step without a timeout of its own: a
@@ -1541,6 +1551,7 @@ final class PlayerModel: Identifiable {
         if measured { measureLink() }
         lastTransfer = nil
         longestWait = 0
+        enhance?.detach()
         if pictureInPicture?.isActive ?? false { backend.hold() } else { backend.load(nil) }
         previewFile = nil
         itemReady = false
@@ -2006,7 +2017,10 @@ final class PlayerModel: Identifiable {
         mediaInfo = nil
         lastTransfer = nil
         take(next.choice)
-        if let item = backend.player?.currentItem { streamText.attach(to: item) }
+        if let item = backend.player?.currentItem {
+            streamText.attach(to: item)
+            enhance?.attach(item)
+        }
         let lost = replacingLost
         settleMove(at: next.rung)
         Diag.event(.player, lost ? "conversion.switched" : "auto.switched", ["rung": "\(next.rung)", "at": time, "stream": diagStream], .notice)
@@ -2497,6 +2511,7 @@ final class PlayerModel: Identifiable {
             Diag.event(.player, "state", ["playing": playing, "buffering": buffering, "at": time], .debug)
         }
         isPlaying = playing
+        refreshEnhance()
         isBuffering = buffering || landing != nil
         if case .remux(let remux) = stream { remux.setPlayerWaiting(buffering) }
         if playing, buffering { watchStall() } else { endStall() }
@@ -2629,6 +2644,7 @@ final class PlayerModel: Identifiable {
     private func externalPlaybackChanged(_ active: Bool) {
         Diag.event(.player, "external", ["active": active, "stream": diagStream], .notice)
         isExternalPlayback = active
+        refreshEnhance()
         PlaybackCapabilities.externalPlaybackActive = active
         textRendererChanged()
         updateNowPlayingSight()
@@ -3256,12 +3272,43 @@ final class PlayerModel: Identifiable {
     private func enteredBackground() {
         Diag.event(.player, "background", ["pip": pictureInPicture?.isActive ?? false, "external": isExternalPlayback])
         abandonMove()
+        inBackground = true
+        refreshEnhance()
         guard !(pictureInPicture?.isActive ?? false), !isExternalPlayback else { return }
         layerView.playerLayer.player = nil
     }
 
     private func enteringForeground() {
         layerView.playerLayer.player = backend.player
+        inBackground = false
+        refreshEnhance()
+    }
+
+    // MARK: Enhance picture
+
+    /// The setting changed, or the player opened: starts, retunes or stops the enhancer.
+    func enhanceSettingsChanged() {
+        guard let enhance, !closed else { return }
+        let setting = session.settings.pictureEnhance
+        switch setting.upscaler {
+        case .off: enhance.configure(.off)
+        case .automatic: enhance.configure(EnhanceOptions(upscaler: .automatic, sharpen: setting.sharpen, deband: setting.deband))
+        case .lineArt: enhance.configure(EnhanceOptions(upscaler: .lineArt, sharpen: setting.sharpen, deband: setting.deband))
+        }
+        refreshEnhance()
+    }
+
+    /// The enhancer works only while the picture plays in the full player, in the foreground, on the phone.
+    /// Paused, in the bar, in Picture in Picture, on AirPlay or a cast receiver, the plain picture shows.
+    private func refreshEnhance() {
+        guard !closed else { return }
+        let sees = isPlaying && showsFullPlayer && !inBackground && !isExternalPlayback && castDevice == nil
+        enhance?.setActive(sees && !(pictureInPicture?.isActive ?? false))
+    }
+
+    func fullPlayerChanged(_ shown: Bool) {
+        showsFullPlayer = shown
+        refreshEnhance()
     }
 
     // MARK: Helpers
@@ -3302,7 +3349,13 @@ final class PlayerCenter {
         case live(LivePlaybackModel)
     }
 
-    var presented: PlayerModel?
+    var presented: PlayerModel? {
+        didSet {
+            guard presented !== oldValue else { return }
+            oldValue?.fullPlayerChanged(false)
+            presented?.fullPlayerChanged(true)
+        }
+    }
     private(set) var active: PlayerModel?
     /// The live channel playing; `livePresented` is its full-screen player.
     private(set) var live: LivePlaybackModel?
