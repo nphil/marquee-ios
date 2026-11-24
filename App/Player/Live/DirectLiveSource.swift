@@ -33,6 +33,11 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
     @ObservationIgnored private var asked = TunerTranscode.Decision(profile: nil, reason: "not-luma", source: nil)
     @ObservationIgnored private var got = "?"
     @ObservationIgnored private var retried = false
+    /// Whether another client took the tuner from this phone; asked before a stream that ended is reopened.
+    @ObservationIgnored var displacement: ((LiveChannel) async -> TunerDisplacement?)?
+    @ObservationIgnored private var reopening = TunerReopen()
+    /// A retry or reopen is under way: the source reads as opening, not failed, so the UI shows no error between them.
+    private var recovering = false
     @ObservationIgnored private let transcode = TunerTranscode.shared
 
     init() {
@@ -48,7 +53,7 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
 
     var videoView: UIView { player.view }
 
-    var state: LiveState { Self.liveState(player.state) }
+    var state: LiveState { recovering ? .opening : Self.liveState(player.state) }
 
     var status: String? {
         guard player.state == .opening, let channel else { return nil }
@@ -71,6 +76,7 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
 
     /// `tappedAt` is `tapClock` at the channel change, so the tune's timing line counts from the tap.
     func play(_ channel: LiveChannel, tappedAt: Double?) async {
+        reopening = TunerReopen()
         await play(channel, tappedAt: tappedAt, retried: false)
     }
 
@@ -114,6 +120,7 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
     }
 
     private func stateChanged(_ state: LiveStreamPlayer.State) {
+        if case .failed = state {} else { recovering = false }
         if case .picture = state {
             Diag.event(.live, "direct.transcode", [
                 "asked": profileName, "profile": profileName, "reason": asked.reason, "source": sourceText,
@@ -124,16 +131,22 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
         var status: Int?
         if case .refused(let refusal) = failure { status = refusal.status }
         let noPicture = failure == .noPicture
+        if failure == .ended, channel.device.isLumaTV {
+            recovering = true
+            Task { @MainActor in await reopen(channel, after: failure) }
+            return
+        }
         guard asked.asked, status == 400 || status == 503 || noPicture else {
             onFailed?(channel, Self.error(failure))
             return
         }
+        recovering = true
         // The tuner's own sentence for a 503 says whether the conversion had anything to do with it.
         Task { @MainActor in
             let explained = status == 503 ? await sharingRefusal?(channel) != nil : false
             guard self.channel?.id == channel.id, case .failed = player.state else { return }
             guard TunerTranscode.retriesWithoutTranscode(asked: true, status: status, noPicture: noPicture, sharingRefusal: explained) else {
-                onFailed?(channel, Self.error(failure))
+                giveUp(channel, failure)
                 return
             }
             transcode.decline(tuner: "\(channel.device.uri)")
@@ -143,6 +156,24 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
             ])
             await play(channel, tappedAt: nil, retried: true)
         }
+    }
+
+    private func giveUp(_ channel: LiveChannel, _ failure: LiveStreamPlayer.Failure) {
+        recovering = false
+        onFailed?(channel, Self.error(failure))
+    }
+
+    /// A LumaTV stream ended mid-play. If the TV says another client took the tuner the router shows that and nothing
+    /// reopens; otherwise the same channel is reopened, within `TunerReopen`'s limits.
+    private func reopen(_ channel: LiveChannel, after failure: LiveStreamPlayer.Failure) async {
+        let taken = await displacement?(channel)
+        guard self.channel?.id == channel.id, case .failed = player.state else { return }
+        guard taken == nil else { return giveUp(channel, failure) }
+        let decision = reopening.ended(at: LiveStreamPlayer.tapClock())
+        guard decision.reopen else { return giveUp(channel, failure) }
+        if decision.withoutTranscode { transcode.decline(tuner: "\(channel.device.uri)") }
+        Diag.event(.live, "direct.reopen", ["n": String(decision.n), "reason": "ended"])
+        await play(channel, tappedAt: nil, retried: retried || decision.withoutTranscode)
     }
 
     private var profileName: String { asked.profile?.name ?? "none" }
