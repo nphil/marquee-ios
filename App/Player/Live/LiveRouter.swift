@@ -20,6 +20,10 @@ final class LiveRouter: LiveVideoSource {
     var prefersPlex = false
     /// This phone's name for a LumaTV tuner: sent with every direct stream, and matched in the tuner's list of
     /// displaced clients.
+    /// Settings › Video & Playback › Live TV › Prefer smooth motion.
+    var smoothMotion = true {
+        didSet { direct.smoothMotion = smoothMotion }
+    }
     var clientName = "" {
         didSet { direct.clientName = clientName }
     }
@@ -59,6 +63,9 @@ final class LiveRouter: LiveVideoSource {
         self.plex = plex
         direct.onFailed = { [weak self] channel, error in self?.directEnded(channel, after: error) }
         direct.transcodeProfiles = { [tuners] channel in await tuners.transcodeProfiles(channel.device.uri) }
+        direct.lineupInterlaced = { [weak self] channel in
+            self?.lineups[channel.device.key]?.first { $0.number == channel.number }?.interlaced
+        }
         direct.displacement = { [weak self, tuners] channel in
             await tuners.displacement(channel.device.uri, clientName: self?.clientName ?? "")
         }

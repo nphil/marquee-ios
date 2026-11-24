@@ -22,6 +22,8 @@ struct ProfileSettings: Equatable, Sendable {
     var videoOrientation = VideoOrientation.followDevice
     /// Live TV reads an HDHomeRun tuner on the home network itself; off, every channel plays through Plex.
     var readsTunerDirectly = true
+    /// Interlaced channels play the original broadcast (about 60 pictures a second) instead of the tuner's 30.
+    var prefersSmoothMotion = true
     var subtitleStyle = SubtitleLook()
     var homeRows = HomeLayout()
     var posterLabels = PosterLabels()
@@ -54,7 +56,7 @@ struct ProfileSettings: Equatable, Sendable {
 
 extension ProfileSettings: Codable {
     enum CodingKeys: String, CodingKey {
-        case skipInterval, skipTaps, introSkipDelay, nextEpisodeDelay, autoplaysNext, creditsAutoplay, directPlay, aspect, videoOrientation, readsTunerDirectly
+        case skipInterval, skipTaps, introSkipDelay, nextEpisodeDelay, autoplaysNext, creditsAutoplay, directPlay, aspect, videoOrientation, readsTunerDirectly, prefersSmoothMotion
         case subtitleStyle, homeRows
         case posterLabels, audioEnhancements, hiddenLibraries, rewatchDismissed, playsTrailers, playsThemeMusic, themeMusicVolume, savesData
         /// "quality" held a fixed quality before Auto existed (`LegacyKeys`).
@@ -82,6 +84,7 @@ extension ProfileSettings: Codable {
         aspect = value(.aspect) ?? aspect
         videoOrientation = value(.videoOrientation) ?? videoOrientation
         readsTunerDirectly = value(.readsTunerDirectly) ?? readsTunerDirectly
+        prefersSmoothMotion = value(.prefersSmoothMotion) ?? prefersSmoothMotion
         subtitleStyle = value(.subtitleStyle) ?? subtitleStyle
         homeRows = value(.homeRows) ?? homeRows
         posterLabels = value(.posterLabels) ?? posterLabels

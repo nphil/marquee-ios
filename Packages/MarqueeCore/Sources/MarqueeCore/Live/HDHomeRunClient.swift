@@ -22,6 +22,8 @@ public struct HDHomeRunChannel: Sendable, Hashable, Decodable {
     public var isHD: Bool
     public var isProtected: Bool
     public var isFavorite: Bool
+    /// The tuner's own word that the channel is interlaced (LumaTV's `lineup.json`); nil when it says nothing.
+    public var interlaced: Bool?
 
     public init(
         number: String,
@@ -31,7 +33,8 @@ public struct HDHomeRunChannel: Sendable, Hashable, Decodable {
         audioCodec: String? = nil,
         isHD: Bool = false,
         isProtected: Bool = false,
-        isFavorite: Bool = false
+        isFavorite: Bool = false,
+        interlaced: Bool? = nil
     ) {
         self.number = number
         self.name = name
@@ -41,11 +44,13 @@ public struct HDHomeRunChannel: Sendable, Hashable, Decodable {
         self.isHD = isHD
         self.isProtected = isProtected
         self.isFavorite = isFavorite
+        self.interlaced = interlaced
     }
 
     enum CodingKeys: String, CodingKey {
         case number = "GuideNumber", name = "GuideName", url = "URL"
         case videoCodec = "VideoCodec", audioCodec = "AudioCodec", hd = "HD", drm = "DRM", favorite = "Favorite"
+        case interlaced
     }
 
     public init(from decoder: any Decoder) throws {
@@ -58,6 +63,7 @@ public struct HDHomeRunChannel: Sendable, Hashable, Decodable {
         isHD = c.bool(.hd) ?? false
         isProtected = c.bool(.drm) ?? false
         isFavorite = c.bool(.favorite) ?? false
+        interlaced = c.bool(.interlaced)
     }
 
     /// Codecs the phone's renderer decodes; a missing codec field means "try".

@@ -156,11 +156,16 @@ struct VideoPlaybackSettingsView: View {
             Section {
                 Toggle("Direct from Tuner", isOn: $session.settings.readsTunerDirectly)
                     .accessibilityIdentifier("video.readsTunerDirectly")
+                Toggle("Prefer smooth motion", isOn: $session.settings.prefersSmoothMotion)
+                    .accessibilityIdentifier("video.prefersSmoothMotion")
             } header: {
                 Text("Live TV")
             } footer: {
-                Text("At home, channels play straight from the HDHomeRun; away from home, or if that fails, they play through Plex.")
-                    .foregroundStyle(theme.ink2)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("At home, channels play straight from the HDHomeRun; away from home, or if that fails, they play through Plex.")
+                    Text("Interlaced channels (1080i, 480i) play the original broadcast at about 60 pictures a second. Off: the TV converts them to 30, which uses less battery and data.")
+                }
+                .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)
         }

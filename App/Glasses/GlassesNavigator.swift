@@ -579,6 +579,7 @@ final class GlassesNavigator {
         let session = session
         let model = LivePlaybackModel(
             store: store, channel: channel, readsTunerDirectly: session.settings.readsTunerDirectly,
+            smoothMotion: session.settings.prefersSmoothMotion,
             clientName: session.diagnostics.deviceName,
             skipInterval: TimeInterval(session.settings.skipInterval),
             playbackActive: { session.downloads.setPlaybackActive($0) }

@@ -14,13 +14,16 @@ public final class TunerTranscode: @unchecked Sendable {
         public var maxHeight: Int?
         public var progressive: Bool
         public var kbps: Int?
+        /// Pictures a second the profile makes of an interlaced station; nil keeps the field rate (about 60).
+        public var interlacedFps: Int?
 
-        public init(name: String, codec: String, maxHeight: Int?, progressive: Bool, kbps: Int? = nil) {
+        public init(name: String, codec: String, maxHeight: Int?, progressive: Bool, kbps: Int? = nil, interlacedFps: Int? = nil) {
             self.name = name
             self.codec = codec
             self.maxHeight = maxHeight
             self.progressive = progressive
             self.kbps = kbps
+            self.interlacedFps = interlacedFps
         }
     }
 
@@ -29,17 +32,24 @@ public final class TunerTranscode: @unchecked Sendable {
         public var profile: Profile?
         public var reason: String
         public var source: Int?
+        /// Whether the channel is interlaced, when known; for the log.
+        public var interlaced: Bool?
+        /// The "Prefer smooth motion" setting this decision was made under; for the log.
+        public var smooth: Bool
         public var asked: Bool { profile != nil }
 
-        public init(profile: Profile?, reason: String, source: Int?) {
+        public init(profile: Profile?, reason: String, source: Int?, interlaced: Bool? = nil, smooth: Bool = false) {
             self.profile = profile
             self.reason = reason
             self.source = source
+            self.interlaced = interlaced
+            self.smooth = smooth
         }
     }
 
-    /// The tuner's `mobile` profile: H.264, 1280×720 at most. Used while the TV publishes no profiles.
-    public static let builtIn = Profile(name: "mobile", codec: "h264", maxHeight: 720, progressive: true)
+    /// The tuner's `mobile` profile: H.264, 1280×720 at most, 30 pictures a second from an interlaced station. Used
+    /// while the TV publishes no profiles.
+    public static let builtIn = Profile(name: "mobile", codec: "h264", maxHeight: 720, progressive: true, interlacedFps: 30)
     public static let shared = TunerTranscode()
     private static let offerLife: TimeInterval = 60
 
@@ -47,28 +57,53 @@ public final class TunerTranscode: @unchecked Sendable {
     private var declined = Set<String>()
     private var heights: [String: Int] = [:]
     private var learning = Set<String>()
+    private var scans: [String: Bool] = [:]
+    private var learningScan = Set<String>()
     private var offers: [String: (profiles: [Profile]?, at: Date)] = [:]
 
     public init() {}
 
     /// What the tune of `channel` on `tuner` asks for. A tune that does not limit the picture learns the channel's height
-    /// from its pictures (`noted`); the tallest seen counts, so a slate cannot pass for the station.
+    /// from its pictures (`noted`); the tallest seen counts, so a slate cannot pass for the station. A tune of the
+    /// original stream learns whether the channel is interlaced (`notedScan`) in the same way. `lineupInterlaced` is
+    /// the tuner's own word for the channel and wins over what was learned. `smooth` is "Prefer smooth motion".
     public func decide(
-        isLuma: Bool, tuner: String, channel: String, offer: [Profile]?, canDecode: (_ codec: String, _ height: Int?) -> Bool
+        isLuma: Bool, tuner: String, channel: String, offer: [Profile]?, smooth: Bool, lineupInterlaced: Bool? = nil,
+        canDecode: (_ codec: String, _ height: Int?) -> Bool
     ) -> Decision {
-        guard isLuma else { return Decision(profile: nil, reason: "not-luma", source: nil) }
+        guard isLuma else { return Decision(profile: nil, reason: "not-luma", source: nil, smooth: smooth) }
         let key = Self.key(tuner, channel)
         return lock.withLock {
             let source = heights[key]
-            if declined.contains(tuner) { return Decision(profile: nil, reason: "declined", source: source) }
-            let (profile, reason) = Self.choose(offer: offer, source: source, canDecode: canDecode)
+            let interlaced = lineupInterlaced ?? scans[key]
+            if declined.contains(tuner) {
+                return Decision(profile: nil, reason: "declined", source: source, interlaced: interlaced, smooth: smooth)
+            }
+            let (profile, reason) = Self.choose(
+                offer: offer, source: source, interlaced: interlaced, smooth: smooth, canDecode: canDecode
+            )
             if profile?.maxHeight == nil {
                 learning.insert(key)
                 heights[key] = nil
             } else {
                 learning.remove(key)
             }
-            return Decision(profile: profile, reason: reason, source: source)
+            if profile == nil {
+                learningScan.insert(key)
+                scans[key] = nil
+            } else {
+                learningScan.remove(key)
+            }
+            return Decision(profile: profile, reason: reason, source: source, interlaced: interlaced, smooth: smooth)
+        }
+    }
+
+    /// A picture of a tune of `channel` that asked for no profile was `interlaced` or not; one interlaced picture
+    /// makes the channel interlaced.
+    public func notedScan(interlaced: Bool, tuner: String, channel: String) {
+        let key = Self.key(tuner, channel)
+        lock.withLock {
+            if learningScan.contains(key) { scans[key] = (scans[key] ?? false) || interlaced }
         }
     }
 
@@ -108,21 +143,32 @@ public final class TunerTranscode: @unchecked Sendable {
     /// The best profile of `offer` for a channel of `source` lines, with the reason when there is none. A profile
     /// qualifies when it keeps the resolution (no limit, or a limit at or above the source; an unknown source only
     /// suits no limit), is progressive and has a decoder here; the tuner's order breaks ties. Without an `offer` it is
-    /// `builtIn` for a source of 720 lines or fewer.
+    /// `builtIn` for a source of 720 lines or fewer. With `smooth`, a profile that has an `interlacedFps` (it turns
+    /// about 60 fields a second into fewer pictures) does not qualify for a channel that is interlaced or not known
+    /// to be progressive; the reason is then `motion`.
     public static func choose(
-        offer: [Profile]?, source: Int?, canDecode: (_ codec: String, _ height: Int?) -> Bool
+        offer: [Profile]?, source: Int?, interlaced: Bool? = nil, smooth: Bool = false,
+        canDecode: (_ codec: String, _ height: Int?) -> Bool
     ) -> (Profile?, String) {
+        let keepsMotion = { (profile: Profile) in !smooth || profile.interlacedFps == nil || interlaced == false }
         guard let offer else {
             guard let source else { return (nil, "unknown") }
             if source > builtIn.maxHeight! { return (nil, "hd") }
+            if !keepsMotion(builtIn) { return (nil, "motion") }
             return canDecode(builtIn.codec, source) ? (builtIn, "sd") : (nil, "no-decoder")
         }
+        var skipped = false
         let best = offer.first { profile in
             guard profile.progressive else { return false }
             if let limit = profile.maxHeight, source.map({ limit < $0 }) ?? true { return false }
-            return canDecode(profile.codec, profile.maxHeight ?? source)
+            guard canDecode(profile.codec, profile.maxHeight ?? source) else { return false }
+            if !keepsMotion(profile) {
+                skipped = true
+                return false
+            }
+            return true
         }
-        return (best, best == nil ? "no-profile" : "profile")
+        return (best, best != nil ? "profile" : skipped ? "motion" : "no-profile")
     }
 
     /// The profiles in a tuner's `status.json`: nil when it publishes none (an older TV), empty when it is off.
@@ -139,7 +185,8 @@ public final class TunerTranscode: @unchecked Sendable {
             }
             return Profile(
                 name: name, codec: codec, maxHeight: (entry["maxHeight"] as? NSNumber)?.intValue,
-                progressive: entry["progressive"] as? Bool == true, kbps: (entry["kbps"] as? NSNumber)?.intValue
+                progressive: entry["progressive"] as? Bool == true, kbps: (entry["kbps"] as? NSNumber)?.intValue,
+                interlacedFps: (entry["interlacedFps"] as? NSNumber)?.intValue
             )
         }
     }

@@ -29,6 +29,10 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
     @ObservationIgnored var sharingRefusal: ((LiveChannel) async -> String?)?
     /// The conversion profiles the tuner publishes; nil when it publishes none.
     @ObservationIgnored var transcodeProfiles: ((LiveChannel) async -> [TunerTranscode.Profile]?)?
+    /// Settings › Video & Playback › Live TV › Prefer smooth motion.
+    @ObservationIgnored var smoothMotion = true
+    /// The tuner's own word that a channel is interlaced (`lineup.json`); nil when it says nothing.
+    @ObservationIgnored var lineupInterlaced: ((LiveChannel) -> Bool?)?
     /// What the current tune asked of the tuner, and the codec it got, for the `live.direct.transcode` line.
     @ObservationIgnored private var asked = TunerTranscode.Decision(profile: nil, reason: "not-luma", source: nil)
     @ObservationIgnored private var got = "?"
@@ -42,7 +46,7 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
 
     init() {
         player.onStateChange = { [weak self] state in self?.stateChanged(state) }
-        player.onShape = { [weak self] codec, height in self?.shaped(codec: codec, height: height) }
+        player.onShape = { [weak self] codec, height, interlaced in self?.shaped(codec: codec, height: height, interlaced: interlaced) }
         PlaybackGain.shared.register(self)
     }
 
@@ -95,7 +99,8 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
         let offer = await transcodeProfiles?(channel)
         guard self.channel?.id == channel.id else { return }
         asked = transcode.decide(
-            isLuma: true, tuner: "\(channel.device.uri)", channel: channel.number, offer: offer, canDecode: Self.decodes
+            isLuma: true, tuner: "\(channel.device.uri)", channel: channel.number, offer: offer, smooth: smoothMotion,
+            lineupInterlaced: lineupInterlaced?(channel), canDecode: Self.decodes
         )
         let named = TunerTakeover.naming(url, as: clientName)
         player.open(asked.profile.map { TunerTranscode.asking(named, $0) } ?? named, tappedAt: tappedAt)
@@ -124,6 +129,7 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
         if case .picture = state {
             Diag.event(.live, "direct.transcode", [
                 "asked": profileName, "profile": profileName, "reason": asked.reason, "source": sourceText,
+                "smooth": asked.smooth ? "on" : "off", "interlaced": interlacedText,
                 "got": got, "fallback": retried ? "retried" : "none",
             ])
         }
@@ -152,6 +158,7 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
             transcode.decline(tuner: "\(channel.device.uri)")
             Diag.event(.live, "direct.transcode", [
                 "asked": profileName, "profile": profileName, "reason": asked.reason, "source": sourceText,
+                "smooth": asked.smooth ? "on" : "off", "interlaced": interlacedText,
                 "got": "none", "fallback": "retried",
             ])
             await play(channel, tappedAt: nil, retried: true)
@@ -178,6 +185,7 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
 
     private var profileName: String { asked.profile?.name ?? "none" }
     private var sourceText: String { asked.source.map(String.init) ?? "unknown" }
+    private var interlacedText: String { asked.interlaced.map { $0 ? "yes" : "no" } ?? "unknown" }
 
     /// A decoder here for a profile's `codec` (VideoToolbox: H.264 always, HEVC where the chip has it, at any size).
     private static func decodes(_ codec: String, _ height: Int?) -> Bool {
@@ -188,8 +196,12 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
         }
     }
 
-    private func shaped(codec: String, height: Int) {
+    private func shaped(codec: String, height: Int, interlaced: Bool) {
         got = codec
+        // Only the original stream shows whether the station is interlaced; a profile's output is already converted.
+        if asked.profile == nil, let channel {
+            transcode.notedScan(interlaced: interlaced, tuner: "\(channel.device.uri)", channel: channel.number)
+        }
         // Only a tune that did not limit the picture says how tall the station is.
         if asked.profile?.maxHeight == nil, let channel { transcode.noted(height: height, tuner: "\(channel.device.uri)", channel: channel.number) }
     }
