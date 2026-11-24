@@ -39,6 +39,8 @@ public final class LiveStreamPlayer {
     public private(set) var state = State.idle
     /// Called after every change of `state`.
     @ObservationIgnored public var onStateChange: ((State) -> Void)?
+    /// Called when the picture's size or scan changes, with the video codec's name and the picture's height in lines.
+    @ObservationIgnored public var onShape: ((_ codec: String, _ height: Int) -> Void)?
     /// The tuner's slate stands in for the station after a dropout.
     public private(set) var slateOnScreen = false
     public private(set) var audioTracks: [LiveAudioTrack] = []
@@ -293,7 +295,8 @@ public final class LiveStreamPlayer {
         case .slateOnScreen(let on):
             slateOnScreen = on
             LiveLog.line(on ? "slate-in" : "slate-out")
-        case .shape(let shape):
+        case .shape(let shape, let codec, let height):
+            onShape?(codec, height)
             LiveLog.line("shape", ["picture": shape])
             LiveLog.signposter.emitEvent("shape", "\(shape, privacy: .public)")
         case .underrun:

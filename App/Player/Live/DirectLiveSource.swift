@@ -3,6 +3,7 @@ import MarqueeCore
 import MarqueeLive
 import Observation
 import UIKit
+import VideoToolbox
 
 /// Live TV read straight from the tuner (docs/LIVE-TV.md §2): `<device>/auto/v<number>` played on MarqueeLive's
 /// sample-buffer player. The tuner's slates are ordinary pictures, so nothing covers the picture; the status label
@@ -23,9 +24,20 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
     @ObservationIgnored var onFailed: ((LiveChannel, LiveError) -> Void)?
     /// The name this phone gives a LumaTV tuner, so the tuner can tell it who took the stream.
     @ObservationIgnored var clientName = ""
+    /// The sentence the tuner gives for a 503 (full, or the TV recording), when it gives one. A refusal it explains is
+    /// not retried without the conversion.
+    @ObservationIgnored var sharingRefusal: ((LiveChannel) async -> String?)?
+    /// The conversion profiles the tuner publishes; nil when it publishes none.
+    @ObservationIgnored var transcodeProfiles: ((LiveChannel) async -> [TunerTranscode.Profile]?)?
+    /// What the current tune asked of the tuner, and the codec it got, for the `live.direct.transcode` line.
+    @ObservationIgnored private var asked = TunerTranscode.Decision(profile: nil, reason: "not-luma", source: nil)
+    @ObservationIgnored private var got = "?"
+    @ObservationIgnored private var retried = false
+    @ObservationIgnored private let transcode = TunerTranscode.shared
 
     init() {
         player.onStateChange = { [weak self] state in self?.stateChanged(state) }
+        player.onShape = { [weak self] codec, height in self?.shaped(codec: codec, height: height) }
         PlaybackGain.shared.register(self)
     }
 
@@ -59,12 +71,28 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
 
     /// `tappedAt` is `tapClock` at the channel change, so the tune's timing line counts from the tap.
     func play(_ channel: LiveChannel, tappedAt: Double?) async {
+        await play(channel, tappedAt: tappedAt, retried: false)
+    }
+
+    private func play(_ channel: LiveChannel, tappedAt: Double?, retried: Bool) async {
         self.channel = channel
+        self.retried = retried
+        got = "?"
         #if DEBUG
         if FakeTuner.isActive { return FakeTuner.play(on: player) }
         #endif
         let url = channel.device.streamURL(channel)
-        player.open(channel.device.isLumaTV ? TunerTakeover.naming(url, as: clientName) : url, tappedAt: tappedAt)
+        guard channel.device.isLumaTV else {
+            asked = TunerTranscode.Decision(profile: nil, reason: "not-luma", source: nil)
+            return player.open(url, tappedAt: tappedAt)
+        }
+        let offer = await transcodeProfiles?(channel)
+        guard self.channel?.id == channel.id else { return }
+        asked = transcode.decide(
+            isLuma: true, tuner: "\(channel.device.uri)", channel: channel.number, offer: offer, canDecode: Self.decodes
+        )
+        let named = TunerTakeover.naming(url, as: clientName)
+        player.open(asked.profile.map { TunerTranscode.asking(named, $0) } ?? named, tappedAt: tappedAt)
     }
 
     static func tapClock() -> Double { LiveStreamPlayer.tapClock() }
@@ -86,8 +114,53 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
     }
 
     private func stateChanged(_ state: LiveStreamPlayer.State) {
+        if case .picture = state {
+            Diag.event(.live, "direct.transcode", [
+                "asked": profileName, "profile": profileName, "reason": asked.reason, "source": sourceText,
+                "got": got, "fallback": retried ? "retried" : "none",
+            ])
+        }
         guard case .failed(let failure) = state, let channel else { return }
-        onFailed?(channel, Self.error(failure))
+        var status: Int?
+        if case .refused(let refusal) = failure { status = refusal.status }
+        let noPicture = failure == .noPicture
+        guard asked.asked, status == 400 || status == 503 || noPicture else {
+            onFailed?(channel, Self.error(failure))
+            return
+        }
+        // The tuner's own sentence for a 503 says whether the conversion had anything to do with it.
+        Task { @MainActor in
+            let explained = status == 503 ? await sharingRefusal?(channel) != nil : false
+            guard self.channel?.id == channel.id, case .failed = player.state else { return }
+            guard TunerTranscode.retriesWithoutTranscode(asked: true, status: status, noPicture: noPicture, sharingRefusal: explained) else {
+                onFailed?(channel, Self.error(failure))
+                return
+            }
+            transcode.decline(tuner: "\(channel.device.uri)")
+            Diag.event(.live, "direct.transcode", [
+                "asked": profileName, "profile": profileName, "reason": asked.reason, "source": sourceText,
+                "got": "none", "fallback": "retried",
+            ])
+            await play(channel, tappedAt: nil, retried: true)
+        }
+    }
+
+    private var profileName: String { asked.profile?.name ?? "none" }
+    private var sourceText: String { asked.source.map(String.init) ?? "unknown" }
+
+    /// A decoder here for a profile's `codec` (VideoToolbox: H.264 always, HEVC where the chip has it, at any size).
+    private static func decodes(_ codec: String, _ height: Int?) -> Bool {
+        switch codec {
+        case "h264": true
+        case "hevc": VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC)
+        default: false
+        }
+    }
+
+    private func shaped(codec: String, height: Int) {
+        got = codec
+        // Only a tune that did not limit the picture says how tall the station is.
+        if asked.profile?.maxHeight == nil, let channel { transcode.noted(height: height, tuner: "\(channel.device.uri)", channel: channel.number) }
     }
 
     static func liveState(_ state: LiveStreamPlayer.State) -> LiveState {

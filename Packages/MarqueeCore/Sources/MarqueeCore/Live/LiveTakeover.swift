@@ -76,7 +76,7 @@ public enum TunerSharing {
         if viewers(in: body, wanting: number) >= capacity { return fullMessage }
         guard let root = try? JSONSerialization.jsonObject(with: body) as? [String: Any],
               let holder = root["holder"] as? [String: Any],
-              (holder["name"] as? String)?.localizedCaseInsensitiveContains("plex") == true else { return nil }
+              holder["name"] as? String == "Plex" else { return nil }
         return recordingMessage
     }
 

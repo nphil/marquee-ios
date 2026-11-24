@@ -48,7 +48,7 @@ struct LiveTakeoverTests {
         #expect(!TunerSharing.shares(in: sharing(viewers: ["2.1"]), wanting: "9.1"))
         #expect(TunerSharing.refusalMessage(in: sharing(viewers: ["2.1", "2.2", "2.1"]), wanting: "2.2") == nil)
         #expect(TunerSharing.refusalMessage(in: sharing(viewers: ["2.1", "2.2", "2.1", "2.2"]), wanting: "2.1") == TunerSharing.fullMessage)
-        #expect(TunerSharing.refusalMessage(in: sharing(viewers: ["2.1"], holder: #"{"name":"Plex Media Server"}"#), wanting: "9.1") == TunerSharing.recordingMessage)
+        #expect(TunerSharing.refusalMessage(in: sharing(viewers: ["2.1"], holder: #"{"name":"Plex"}"#), wanting: "9.1") == TunerSharing.recordingMessage)
     }
 
     @Test func missingFieldsAreTodaysBehaviour() {

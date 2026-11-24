@@ -58,6 +58,8 @@ final class LiveRouter: LiveVideoSource {
         self.live = live
         self.plex = plex
         direct.onFailed = { [weak self] channel, error in self?.directEnded(channel, after: error) }
+        direct.transcodeProfiles = { [tuners] channel in await tuners.transcodeProfiles(channel.device.uri) }
+        direct.sharingRefusal = { [tuners] channel in await tuners.sharingRefusal(channel.device.uri, wanting: channel.number) }
     }
 
     // MARK: LiveSource

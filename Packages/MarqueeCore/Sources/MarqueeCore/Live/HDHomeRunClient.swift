@@ -104,6 +104,18 @@ public struct HDHomeRunClient: Sendable {
         return TunerTakeover.displacement(in: response.body, clientName: clientName, now: now)
     }
 
+    /// The conversion profiles a LumaTV tuner publishes in `status.json`, read at most once a minute; nil when it
+    /// publishes none, is older, or did not answer.
+    public func transcodeProfiles(_ base: URL, timeout: TimeInterval = 0.5) async -> [TunerTranscode.Profile]? {
+        let tuner = base.absoluteString
+        if let cached = TunerTranscode.shared.cachedOffer(tuner: tuner) { return cached }
+        let request = PlexRequest(url: base.appendingPathComponent("status.json"), timeout: timeout)
+        guard let response = try? await transport.send(request), (200..<300).contains(response.status) else { return nil }
+        let offer = TunerTranscode.offer(in: response.body)
+        TunerTranscode.shared.store(offer: offer, tuner: tuner)
+        return offer
+    }
+
     /// The sentence for a 503 on `number`'s stream from a LumaTV tuner, read from `status.json`; nil when it has none
     /// to give, the tuner is older, or it did not answer.
     public func sharingRefusal(_ base: URL, wanting number: String, timeout: TimeInterval = 1.5) async -> String? {

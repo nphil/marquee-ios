@@ -21,8 +21,8 @@ public enum LiveEvent: Sendable, Equatable {
     case phase(LivePhase)
     /// The tuner's slate stands in mid-stream (after a dropout), or the station is back.
     case slateOnScreen(Bool)
-    /// The picture's size or scan changed: "720×480i".
-    case shape(String)
+    /// The picture's size or scan changed: "720×480i", from a stream of `codec` ("MPEG-2", "H.264") that is `height` lines tall.
+    case shape(String, codec: String, height: Int)
     case underrun
     /// Playback dropped to the newest picture and restarted its clock.
     case reanchor
@@ -647,7 +647,7 @@ final class LiveCore: @unchecked Sendable {
         if shape.isHardware, !interlacedSeen { text += " VT" }
         describedVideo = (shape, interlacedSeen, text)
         lock.withLock { diagnostics.video = text }
-        events.append(.shape("\(shape)\(scan)"))
+        events.append(.shape("\(shape)\(scan)", codec: name, height: Int(shape.height)))
     }
 
     /// The first picture of a start, a station after its slate, or a re-anchor is on screen.
