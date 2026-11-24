@@ -1,0 +1,52 @@
+name: Supersede
+
+# A push queues its iOS run behind the previous one on the same ref (ios.yml's concurrency group).
+# That run's UI shards take 25-60 min each on four Mac slots and test a commit that is no longer
+# the newest, so it is cancelled here: at once on a branch, and on main only after its Release job
+# has finished, so a release under way is never cut off.
+
+on:
+  push:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cancel-older:
+    name: Cancel the older run
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+      BRANCH: ${{ github.ref_name }}
+      SHA: ${{ github.sha }}
+    steps:
+      - name: Cancel
+        run: |
+          set -euo pipefail
+          older() {
+            gh run list -R "$REPO" --workflow ios.yml --branch "$BRANCH" --status in_progress \
+              --json databaseId,headSha --jq ".[] | select(.headSha != \"$SHA\") | .databaseId"
+          }
+          released() {
+            gh run view "$1" -R "$REPO" --json jobs \
+              --jq '[.jobs[] | select(.name == "Release") | .status] | first // "none"'
+          }
+          for attempt in $(seq 1 40); do
+            runs=$(older)
+            [ -n "$runs" ] || { echo "No older run in progress."; exit 0; }
+            waiting=0
+            for run in $runs; do
+              if [ "$BRANCH" != main ] || [ "$(released "$run")" = completed ]; then
+                echo "Cancelling run $run."
+                gh run cancel "$run" -R "$REPO" || true
+              else
+                waiting=1
+              fi
+            done
+            [ "$waiting" = 1 ] || exit 0
+            sleep 60
+          done
+          echo "The older run had not released after 40 minutes; left running."

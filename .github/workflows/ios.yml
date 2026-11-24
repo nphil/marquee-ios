@@ -5,7 +5,8 @@ on:
   workflow_dispatch:
 
 # One queue per ref: a second push waits for the first run instead of racing it, so two runs on
-# main never claim the same version.
+# main never claim the same version. `supersede.yml` cancels the waiting-for run once it has
+# released, so the queue does not sit behind UI tests of a commit that is no longer the newest.
 concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: false
@@ -223,6 +224,9 @@ jobs:
   # its standard ones.
   plan:
     name: Plan UI tests
+    # A low-risk change is pushed with `[skip ui]` in its head commit: the build, the unit tests and the release
+    # still run; the UI shards (25-60 min each on the 4 Mac slots) do not.
+    if: ${{ !contains(github.event.head_commit.message, '[skip ui]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -248,7 +252,8 @@ jobs:
 
   ui:
     name: UI tests ${{ matrix.shard }}
-    needs: plan
+    # After the builds, so `app` and `live` (which the release waits for) get the Mac slots first.
+    needs: [plan, app, live]
     runs-on: xcode-27
     # A shard measured 41-62 min with every test passing (2026-11-10): about 35 min of tests after a 6-15 min
     # build. The limit only stops a hung run; it is not a performance gate.
@@ -408,6 +413,8 @@ jobs:
   # iPhone 18 Pro.
   ui-sizes:
     name: UI tests on the smallest and largest iPhone
+    needs: [app, live]
+    if: ${{ !contains(github.event.head_commit.message, '[skip ui]') }}
     runs-on: xcode-27
     # Measured 2026-11-10 with every test passing: about 33 min per size (the three subtitle flows take 5-7 min
     # each) after a 10 min build; 75 min cut the second size two tests short.
