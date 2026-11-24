@@ -30,6 +30,12 @@ public final class TunerTranscode: @unchecked Sendable {
         public var reason: String
         public var source: Int?
         public var asked: Bool { profile != nil }
+
+        public init(profile: Profile?, reason: String, source: Int?) {
+            self.profile = profile
+            self.reason = reason
+            self.source = source
+        }
     }
 
     /// The tuner's `mobile` profile: H.264, 1280×720 at most. Used while the TV publishes no profiles.

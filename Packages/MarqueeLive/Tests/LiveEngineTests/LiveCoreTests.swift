@@ -50,7 +50,7 @@ struct LiveCoreTests {
     @Test func slateThenStationStartsMotionAndSoundTogether() throws {
         let sim = try Simulation.run(tuned, tail: 0)
         #expect(sim.phases == [.slate, .picture, .playing])
-        #expect(sim.events.compactMap { if case .shape(let shape) = $0.event { shape } else { nil } } == ["320×240p", "352×240i"])
+        #expect(sim.events.compactMap { if case .shape(let shape, _, _) = $0.event { shape } else { nil } } == ["320×240p", "352×240i"])
         let station = try #require(sim.times(of: .picture).first)
         let splice = try #require(sim.splices.first)
         // The station's first picture goes up as soon as it is decoded: within a frame of its delivery.
