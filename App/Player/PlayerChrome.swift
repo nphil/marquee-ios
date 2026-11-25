@@ -292,7 +292,7 @@ struct PlayerChrome: View {
                     Spacer(minLength: 0)
                     TracksMenu(model: model)
                         .opacity(model.isScrubbing ? 0 : 1)
-                    MoreMenu(model: model, carriesPictureInPicture: offersPictureInPicture && !topRowFitsPictureInPicture)
+                    MoreMenu(model: model, carriesPictureInPicture: offersPictureInPicture && !topRowFitsPictureInPicture, room: menuRoom)
                         .opacity(model.isScrubbing ? 0 : 1)
                 }
             }
@@ -943,106 +943,264 @@ private extension AnimeOverride {
 struct MoreMenu: View {
     let model: PlayerModel
     var carriesPictureInPicture = false
+    /// Height the popover may take; it scrolls when its rows are taller.
+    let room: CGFloat
+    @State private var shows = false
+    /// The button's trailing edge, which stands for the screen's width.
+    @State private var screenWidth: CGFloat = 0
+    @Environment(\.theme) private var theme
 
     var body: some View {
-        // Fixed, so the groups read top down above the button as they would below one.
-        PlayerMenuButton(model: model, systemImage: "ellipsis", label: "More", identifier: "player.more", order: .fixed, menu: menu)
+        Button {
+            Haptics.impact(.light)
+            shows = true
+        } label: {
+            Image(systemName: "ellipsis")
+        }
+        .buttonStyle(PlayerButtonStyle())
+        .accessibilityLabel("More")
+        .accessibilityIdentifier("player.more")
+        .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxX } action: { screenWidth = $0 }
+        // The popover hangs over the button: the controls it would cover stay clear.
+        .popover(isPresented: $shows, arrowEdge: .bottom) {
+            MorePanel(model: model, carriesPictureInPicture: carriesPictureInPicture, room: room, width: panelWidth) { shows = false }
+                .presentationCompactAdaptation(.popover)
+                .presentationBackground(theme.sheet)
+        }
+        .onChange(of: shows) { _, shown in
+            if shown { model.menuOpened() } else { model.menuClosed() }
+        }
     }
 
-    private var menu: UIMenu {
-        var sections: [UIMenuElement] = [UIMenu.section("player.more.picture", picture)]
-        let sound = playback
-        if !sound.isEmpty { sections.append(UIMenu.section("player.more.playback", sound)) }
-        var panels: [UIMenuElement] = [
-            UIAction.row("Playback Info", systemImage: "info.circle") { [model] in model.showsInfo = true },
-            UIAction.choice("Stats for Nerds", systemImage: "chart.bar.xaxis", isOn: model.showsStats) { [model] in
-                model.showsStats.toggle()
-            },
-        ]
+    /// 300 pt on a phone on its side, at most 70% of the width of one held upright.
+    private var panelWidth: CGFloat {
+        screenWidth > 0 ? min(300, screenWidth * 0.7) : 280
+    }
+
+    static let speeds: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
+
+    static func title(of speed: Float) -> String {
+        speed == 1 ? "Normal" : speed.formatted(.number.precision(.fractionLength(0...2))) + "×"
+    }
+}
+
+/// The More popover: the three groups of rows, each opening its choices in place under a back row, so
+/// every level is the same width and the same hairline rhythm. Colours come from the theme only.
+private struct MorePanel: View {
+    enum Page { case root, quality, aspect, speed, enhancements }
+
+    let model: PlayerModel
+    let carriesPictureInPicture: Bool
+    let room: CGFloat
+    let width: CGFloat
+    let dismiss: () -> Void
+    @State private var page = Page.root
+    @State private var contentHeight: CGFloat = 0
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        let measured = content
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        Group {
+            if contentHeight > room {
+                ScrollView { measured }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .frame(height: room)
+            } else {
+                measured
+            }
+        }
+        .frame(width: width)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("player.more.menu")
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            switch page {
+            case .root: root
+            case .quality:
+                back("Quality")
+                ForEach(QualitySetting.all, id: \.self) { setting in
+                    choice(setting.title, isOn: model.qualitySetting == setting) { model.qualityPick = setting }
+                }
+            case .aspect:
+                back("Aspect")
+                ForEach(VideoAspect.allCases, id: \.self) { aspect in
+                    choice(aspect.title, isOn: model.aspect == aspect) { model.aspectPick = aspect }
+                }
+            case .speed:
+                back("Speed")
+                ForEach(MoreMenu.speeds, id: \.self) { speed in
+                    choice(MoreMenu.title(of: speed), isOn: model.speed == speed) { model.speedPick = speed }
+                }
+            case .enhancements:
+                back("Audio Enhancements")
+                let state = model.enhancements
+                choice("Boost dialog", isOn: state.asked.contains(.boostDialog), isEnabled: state.unavailable == nil, closes: false) {
+                    model.toggleEnhancement(.boostDialog)
+                }
+                choice("Normalize loudness", isOn: state.asked.contains(.normalizeLoudness), isEnabled: state.unavailable == nil, closes: false) {
+                    model.toggleEnhancement(.normalizeLoudness)
+                }
+                if let text = state.unavailable ?? state.note { note(text) }
+            }
+        }
+    }
+
+    // MARK: Root
+
+    @ViewBuilder
+    private var root: some View {
+        if carriesPictureInPicture {
+            action("Picture in Picture", systemImage: "pip.enter", id: "player.pip") { model.togglePictureInPicture() }
+        }
+        if model.forcesDirectPlay {
+            RowFace(title: "Quality", systemImage: "dial.medium", value: qualityValue, chevron: false)
+                .opacity(0.5)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Quality")
+                .accessibilityValue(qualityValue)
+                .accessibilityIdentifier("player.quality")
+        } else {
+            open("Quality", systemImage: "dial.medium", value: qualityValue, id: "player.quality", page: .quality)
+        }
+        if model.quality == .original, model.isConverting { note("Your Plex server is converting this video.") }
+        if model.castDevice == nil {
+            open("Aspect", systemImage: "aspectratio", value: model.aspect.title, id: "player.aspect", page: .aspect)
+        }
+        if model.castDevice == nil || model.enhancements.offered { rule }
+        if model.castDevice == nil {
+            open("Speed", systemImage: "gauge.with.dots.needle.67percent", value: MoreMenu.title(of: model.speed), id: "player.speed", page: .speed)
+        }
+        if model.enhancements.offered {
+            open("Audio Enhancements", systemImage: "waveform", value: enhancementValue, id: "player.enhancements", page: .enhancements)
+        }
+        rule
+        action("Playback Info", systemImage: "info.circle", id: "player.info.open") { model.showsInfo = true }
+        action("Stats for Nerds", systemImage: "chart.bar.xaxis", id: "player.stats.toggle", checked: model.showsStats) {
+            model.showsStats.toggle()
+        }
         if ReportCenter.shared.isAvailable {
-            panels.append(UIAction.row("Report a Problem", systemImage: "exclamationmark.bubble", identifier: "player.report") {
-                // The action runs while the menu is still closing; the screenshot waits until it has gone.
+            action("Report a Problem", systemImage: "exclamationmark.bubble", id: "player.report") {
+                // The action runs while the popover is still closing; the screenshot waits until it has gone.
                 Task { @MainActor in
                     try? await Task.sleep(for: .milliseconds(350))
                     ReportCenter.shared.open(from: .player, screenshot: ReportCenter.capture())
                 }
-            })
+            }
         }
-        sections.append(UIMenu.section("player.more.panels", panels))
-        return UIMenu(identifier: UIMenu.Identifier(rawValue: "player.more"), children: sections)
     }
 
-    /// Picture in Picture when the top row cannot carry it, quality with the note that the server
-    /// converts the picture, and aspect.
-    private var picture: [UIMenuElement] {
-        var rows: [UIMenuElement] = []
-        if carriesPictureInPicture {
-            rows.append(UIAction.row("Picture in Picture", systemImage: "pip.enter", identifier: "player.pip") { [model] in
-                model.togglePictureInPicture()
-            })
-        }
-        if model.forcesDirectPlay {
-            // UIKit has no disabled submenu, so the quality stands as a row that opens nothing.
-            let quality = UIAction(title: "Quality", subtitle: qualityValue, image: UIImage(systemName: "dial.medium"), attributes: .disabled) { _ in }
-            quality.accessibilityIdentifier = "player.quality"
-            rows.append(quality)
-        } else {
-            let shown = model.qualitySetting
-            rows.append(UIMenu.submenu("player.quality", title: "Quality", systemImage: "dial.medium", value: qualityValue, QualitySetting.all.map { setting in
-                UIAction.choice(setting.title, isOn: shown == setting) { [model] in model.qualityPick = setting }
-            }))
-        }
-        if model.quality == .original, model.isConverting {
-            rows.append(UIAction.note("Your Plex server is converting this video."))
-        }
-        if model.castDevice == nil {
-            let shown = model.aspect
-            rows.append(UIMenu.submenu("player.aspect", title: "Aspect", systemImage: "aspectratio", value: shown.title, VideoAspect.allCases.map { aspect in
-                UIAction.choice(aspect.title, isOn: shown == aspect) { [model] in model.aspectPick = aspect }
-            }))
-        }
-        return rows
+    private var rule: some View {
+        Divider().overlay(theme.edge)
     }
 
-    /// Speed and the audio enhancements; a Chromecast plays at its own speed.
-    private var playback: [UIMenuElement] {
-        var rows: [UIMenuElement] = []
-        if model.castDevice == nil {
-            let shown = model.speed
-            rows.append(UIMenu.submenu(
-                "player.speed", title: "Speed", systemImage: "gauge.with.dots.needle.67percent", value: Self.title(of: shown),
-                Self.speeds.map { speed in
-                    UIAction.choice(Self.title(of: speed), isOn: shown == speed) { [model] in model.speedPick = speed }
+    /// A row that opens `page`, with the current value before its chevron.
+    private func open(_ title: String, systemImage: String, value: String, id: String, page next: Page) -> some View {
+        Button {
+            Haptics.impact(.light)
+            page = next
+        } label: {
+            RowFace(title: title, systemImage: systemImage, value: value, chevron: true)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(value)
+        .accessibilityIdentifier(id)
+    }
+
+    /// A row that does something and closes the popover; a checkmark marks a toggle that is on.
+    private func action(_ title: String, systemImage: String, id: String, checked: Bool? = nil, run: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.impact(.light)
+            dismiss()
+            run()
+        } label: {
+            RowFace(title: title, systemImage: systemImage, value: nil, chevron: false, checked: checked)
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(checked == true ? .isSelected : [])
+        .accessibilityIdentifier(id)
+    }
+
+    // MARK: Choices
+
+    private func back(_ title: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                Haptics.impact(.light)
+                page = .root
+            } label: {
+                HStack(spacing: Space.s2) {
+                    Image(systemName: "chevron.backward")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(theme.accent)
+                    Text(title)
+                        .textRole(.body)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(theme.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    Spacer(minLength: 0)
                 }
-            ))
+                .padding(.horizontal, Space.s4)
+                .frame(minHeight: Size.target)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(title)
+            .accessibilityHint("Back")
+            rule
         }
-        if model.enhancements.offered {
-            rows.append(UIMenu.submenu(
-                "player.enhancements", title: "Audio Enhancements", systemImage: "waveform", value: enhancementValue,
-                enhancementRows(model.enhancements)
-            ))
-        }
-        return rows
     }
 
-    /// Boost dialog and Normalize loudness, shown only for a Plex Pass server; the reason they cannot
-    /// apply to this video stands under them.
-    private func enhancementRows(_ state: PlayerModel.EnhancementState) -> [UIMenuElement] {
-        var rows: [UIMenuElement] = [
-            enhancementToggle("Boost dialog", .boostDialog, state),
-            enhancementToggle("Normalize loudness", .normalizeLoudness, state),
-        ]
-        if let text = state.unavailable ?? state.note {
-            rows.append(UIAction.note(text))
+    private func choice(_ title: String, isOn: Bool, isEnabled: Bool = true, closes: Bool = true, pick: @escaping () -> Void) -> some View {
+        Button {
+            Haptics.impact(.light)
+            pick()
+            if closes { dismiss() }
+        } label: {
+            HStack(spacing: Space.s3) {
+                Text(title)
+                    .textRole(.body)
+                    .foregroundStyle(theme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                Spacer(minLength: 0)
+                if isOn {
+                    Image(systemName: "checkmark")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(theme.accent)
+                }
+            }
+            .padding(.horizontal, Space.s4)
+            .frame(minHeight: Size.target)
+            .contentShape(Rectangle())
+            .opacity(isEnabled ? 1 : 0.5)
         }
-        return rows
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 
-    private func enhancementToggle(_ title: String, _ enhancement: AudioEnhancements, _ state: PlayerModel.EnhancementState) -> UIAction {
-        UIAction.choice(title, isOn: state.asked.contains(enhancement), isEnabled: state.unavailable == nil) { [model] in
-            model.toggleEnhancement(enhancement)
-        }
+    /// Words among the rows: why something cannot be chosen.
+    private func note(_ text: String) -> some View {
+        Text(text)
+            .textRole(.caption)
+            .foregroundStyle(theme.ink2)
+            .padding(.horizontal, Space.s4)
+            .padding(.vertical, Space.s2)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
+
+    // MARK: Values
 
     /// The enhancements asked for, or Off.
     private var enhancementValue: String {
@@ -1051,15 +1209,74 @@ struct MoreMenu: View {
         return asked.isEmpty ? "Off" : asked.joined(separator: ", ")
     }
 
-    static let speeds: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
-
-    static func title(of speed: Float) -> String {
-        speed == 1 ? "Normal" : speed.formatted(.number.precision(.fractionLength(0...2))) + "×"
-    }
-
     private var qualityValue: String {
         if model.forcesDirectPlay { return "Original" }
         if model.qualitySetting == .auto { return "Auto · " + model.qualityTitle }
         return model.quality == .original && model.isConverting ? "Original · Converted" : model.quality.title
+    }
+}
+
+/// One row: icon, title on one line, then the value in secondary ink and a chevron. At accessibility text
+/// sizes the value drops under the title.
+private struct RowFace: View {
+    let title: String
+    let systemImage: String
+    let value: String?
+    let chevron: Bool
+    var checked: Bool?
+    @Environment(\.theme) private var theme
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @ScaledMetric(relativeTo: .body) private var column = Size.menuGlyph
+
+    var body: some View {
+        HStack(spacing: Space.s3) {
+            Image(systemName: systemImage)
+                .foregroundStyle(theme.accent)
+                .frame(width: column)
+            if typeSize.isAccessibilitySize {
+                VStack(alignment: .leading, spacing: 0) {
+                    titleText
+                    valueText
+                }
+                Spacer(minLength: 0)
+            } else {
+                titleText
+                    .layoutPriority(1)
+                Spacer(minLength: Space.s2)
+                valueText
+            }
+            if chevron {
+                Image(systemName: "chevron.forward")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(theme.ink3)
+            }
+            if checked == true {
+                Image(systemName: "checkmark")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(theme.accent)
+            }
+        }
+        .padding(.horizontal, Space.s4)
+        .frame(minHeight: Size.target)
+        .contentShape(Rectangle())
+    }
+
+    private var titleText: some View {
+        Text(title)
+            .textRole(.body)
+            .foregroundStyle(theme.ink)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+    }
+
+    @ViewBuilder
+    private var valueText: some View {
+        if let value {
+            Text(value)
+                .textRole(.body)
+                .foregroundStyle(theme.ink2)
+                .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
+                .minimumScaleFactor(0.8)
+        }
     }
 }
