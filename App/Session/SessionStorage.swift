@@ -37,7 +37,6 @@ final class SessionStorage {
         static let linkName = "marquee.link.name"
         static let remoteEnabled = "marquee.remote.enabled"
         static let remoteAccess = "marquee.remote.access"
-        static let remoteDock = "marquee.remote.dock"
         static let remotePanel = "marquee.remote.panel"
         static let remoteModules = "marquee.remote.modules"
         static let remoteMode = "marquee.remote.mode"
@@ -226,14 +225,8 @@ final class SessionStorage {
         set { defaults.set(newValue.rawValue, forKey: Key.remoteAccess) }
     }
 
-    /// The remote's layout, per iPhone: where the floating button rests, the panel's rectangle, the groups of
-    /// controls it shows, the pad it opens on and whether the touchpad points by the phone's turns. Absent
-    /// means the default.
-    var remoteDock: RemoteDock? {
-        get { RemoteDock(decoding: defaults.string(forKey: Key.remoteDock)) }
-        set { defaults.set(newValue?.encoded, forKey: Key.remoteDock) }
-    }
-
+    /// The remote's layout, per iPhone: the panel's rectangle, the groups of controls it shows, the pad it
+    /// opens on and whether the touchpad points by the phone's turns. Absent means the default.
     var remotePanel: PanelFractions? {
         get { PanelFractions(decoding: defaults.string(forKey: Key.remotePanel)) }
         set { defaults.set(newValue?.encoded, forKey: Key.remotePanel) }

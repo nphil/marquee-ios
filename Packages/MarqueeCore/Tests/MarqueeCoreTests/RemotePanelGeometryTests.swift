@@ -38,12 +38,9 @@ struct RemotePanelGeometryTests {
         #expect(corners.count == 4)
     }
 
-    @Test func theOpeningPanelGrowsAwayFromTheOrbIntoTheLargerSide() {
-        let bottomRight = CGRect(left: 740, top: 540, right: 796, bottom: 596)
-        #expect(defaultPanel(bounds: bounds, orb: bottomRight, width: 380, height: 660) == CGRect(left: 416, top: 8, right: 796, bottom: 608))
-        let topLeft = CGRect(left: 16, top: 16, right: 72, bottom: 72)
-        #expect(defaultPanel(bounds: bounds, orb: topLeft, width: 380, height: 660) == CGRect(left: 16, top: 8, right: 396, bottom: 608))
-        #expect(defaultPanel(bounds: bounds, orb: bottomRight, width: 380, height: 288) == CGRect(left: 416, top: 308, right: 796, bottom: 596))
+    @Test func theOpeningPanelIsCentredAndNeverLargerThanTheBounds() {
+        #expect(defaultPanel(bounds: bounds, width: 380, height: 660) == CGRect(left: 218, top: 8, right: 598, bottom: 608))
+        #expect(defaultPanel(bounds: bounds, width: 2000, height: 2000) == bounds)
     }
 
     @Test func fitPanelPullsARectBackInsideAndGrowsATinyOneToTheMinimum() {

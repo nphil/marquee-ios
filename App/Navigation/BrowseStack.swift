@@ -52,17 +52,13 @@ struct BrowseStack<Root: View>: View {
 }
 
 /// What every page of a browse stack carries: the zoom namespace, the push actions, toasts above the tab
-/// bar, the stack's Hide state and the tab bar's reach for the floating remote to rest above.
+/// bar and the stack's Hide state.
 private struct StackChrome: ViewModifier {
     let zoom: Namespace.ID
     let open: OpenRouteAction
     let tabBar: TabBarScroll
 
     @Environment(\.tabSelection) private var tabSelection
-    @Environment(AppSession.self) private var session
-    /// How far the tab bar and what sits above it (the TV remote's accessory, a minimised playback's bar)
-    /// reach up from the window's foot, as this page last laid out.
-    @State private var bottomInset: CGFloat?
 
     func body(content: Content) -> some View {
         let tabs = tabSelection
@@ -80,15 +76,6 @@ private struct StackChrome: ViewModifier {
             })
             .environment(tabBar)
             .toolbarVisibility(tabBar.hidden ? .hidden : .automatic, for: .tabBar)
-            .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { inset in
-                bottomInset = inset
-                session.remote.setBottomChrome(inset)
-            }
-            // A page that comes back, from a push or another tab, is laid out as before, so it says what it
-            // last measured.
-            .onAppear {
-                if let bottomInset { session.remote.setBottomChrome(bottomInset) }
-            }
     }
 }
 

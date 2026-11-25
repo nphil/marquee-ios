@@ -4,13 +4,15 @@ import MarqueeCore
 import SwiftUI
 
 enum RemoteAccess: String, CaseIterable, Identifiable {
-    case miniBar, floatingButton
+    case profileButton, miniBar
     var id: String { rawValue }
-    var title: String { self == .miniBar ? "Mini Bar" : "Floating Button" }
+    var title: String { self == .miniBar ? "Mini Bar" : "Button by Profile" }
 
-    /// The saved choice. Builds before the floating button kept the Home button's `homeButton`.
+    /// The saved choice. The Mini Bar is the only one kept by name: the Home button of early builds
+    /// (`homeButton`) and the floating button that followed (`floatingButton`) both became the button by the
+    /// profile, and no saved choice means it too.
     init(stored raw: String?) {
-        self = raw == Self.floatingButton.rawValue || raw == "homeButton" ? .floatingButton : .miniBar
+        self = raw == Self.miniBar.rawValue ? .miniBar : .profileButton
     }
 }
 
@@ -22,8 +24,8 @@ final class TVRemote {
     /// The remote's panel over whatever the app shows.
     var isPresented = false
     var opensAfterSettings = false
-    /// Where the floating button rests when it is not being dragged.
-    private(set) var dock: RemoteDock
+    /// Where the panel grows from: the Home button's frame in the window, nil when something else opened it.
+    private(set) var origin: CGRect?
     /// The panel's rectangle as fractions of the window; nil until it has been moved or resized.
     private(set) var panel: PanelFractions?
     /// The groups of controls the panel shows.
@@ -31,10 +33,6 @@ final class TVRemote {
     private(set) var mode: RemotePadMode
     /// The touchpad's pointer follows the phone's turns (the air mouse) instead of a finger.
     private(set) var airMouse: Bool
-    /// How far the tab bar and what sits above it (the TV remote's accessory, a minimised playback's bar)
-    /// reach up from the window's bottom edge, measured by the tab content; 0 until a tab has laid out. The
-    /// floating button rests above it.
-    private(set) var bottomChrome: CGFloat = 0
     /// Made again by Delete All Local Data, so the remote's own settings start over too.
     private(set) var model: RemoteModel
     @ObservationIgnored private let storage: SessionStorage
@@ -48,7 +46,6 @@ final class TVRemote {
         self.inMemory = inMemory
         isEnabled = storage.remoteEnabled
         access = storage.remoteAccess
-        dock = storage.remoteDock ?? .default
         panel = storage.remotePanel
         modules = storage.remoteModules
         mode = storage.remoteMode
@@ -81,11 +78,6 @@ final class TVRemote {
         storage.remoteAccess = access
     }
 
-    func setDock(_ dock: RemoteDock) {
-        self.dock = dock
-        storage.remoteDock = dock
-    }
-
     func setPanel(_ panel: PanelFractions) {
         self.panel = panel
         storage.remotePanel = panel
@@ -106,7 +98,7 @@ final class TVRemote {
         storage.remoteAirMouse = on
     }
 
-    /// Arrange › Reset: the default panel, every module and the D-pad. The button keeps its spot.
+    /// Arrange › Reset: the default panel, every module and the D-pad.
     func resetLayout() {
         panel = nil
         modules = .all
@@ -114,12 +106,9 @@ final class TVRemote {
         storage.resetRemoteLayout()
     }
 
-    func setBottomChrome(_ inset: CGFloat) {
-        if abs(inset - bottomChrome) > 0.5 { bottomChrome = inset }
-    }
-
-    /// Opens the panel, from the floating button when it is showing.
-    func present() {
+    /// Opens the panel, growing from `button` when the Home button opened it.
+    func present(from button: CGRect? = nil) {
+        origin = button
         isPresented = true
     }
 
@@ -139,8 +128,7 @@ final class TVRemote {
         model.deactivate()
         isPresented = false
         isEnabled = false
-        access = .miniBar
-        dock = .default
+        access = .profileButton
         panel = nil
         modules = .all
         mode = .dpad
@@ -250,6 +238,40 @@ struct TVRemoteMiniBar: View {
     }
 }
 
+/// The remote's button in Home's header, left of the profile button: it opens the remote's panel, which grows
+/// out of it. Drawn as the profile button is: a theme-coloured ring around a disc.
+struct TVRemoteButton: View {
+    @Environment(AppSession.self) private var session
+    @Environment(\.theme) private var theme
+    @State private var frame = CGRect.zero
+
+    var body: some View {
+        Button {
+            session.remote.model.feedback.tick()
+            session.remote.present(from: frame)
+        } label: {
+            Image(systemName: "appletvremote.gen4.fill")
+                // 40% of the disc, the player controls' glyph proportion (Size.controlGlyph).
+                .font(.system(size: (Size.barButton - 2 * Space.s1) * Size.controlGlyph / Size.control, weight: .semibold))
+                .foregroundStyle(theme.accentText)
+                .frame(width: Size.barButton - 2 * Space.s1, height: Size.barButton - 2 * Space.s1)
+                .background(theme.sheet, in: Circle())
+                .padding(Space.s1)
+                .overlay(Circle().strokeBorder(theme.accent, lineWidth: 2))
+                .frame(width: Size.barButton, height: Size.barButton)
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame = $0 }
+        .accessibilityLabel("TV Remote")
+        .accessibilityHint("Controls the LumaTV.")
+        .accessibilityShowsLargeContentViewer {
+            Label("TV Remote", systemImage: "appletvremote.gen4.fill")
+        }
+        .accessibilityIdentifier("remote.button")
+    }
+}
+
 /// The LumaTV remote's settings and pairing entry point.
 struct TVRemoteSettingsView: View {
     @Environment(AppSession.self) private var session
@@ -276,7 +298,7 @@ struct TVRemoteSettingsView: View {
                     .accessibilityIdentifier("remote.setup")
                 }
             } footer: {
-                Text("Controls a LumaTV on the same Wi-Fi. The selected entry appears when the phone is at home: the Mini Bar above the tabs, or the Floating Button, which rests at the screen's edge and opens the remote's panel. Pair or open the remote here at any time.")
+                Text("Controls a LumaTV on the same Wi-Fi. The remote opens from a button in Home's header beside the profile button, or from the Mini Bar above the tabs, which appears when the phone is at home. Pair or open the remote here at any time.")
                     .foregroundStyle(theme.ink2)
             }
             .listRowBackground(theme.sheet)

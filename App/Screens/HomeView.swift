@@ -53,6 +53,11 @@ struct HomeView: View {
                     .sharedBackgroundVisibility(.hidden)
                 ToolbarSpacer(.fixed, placement: .topBarTrailing)
             }
+            if session.remote.isEnabled && session.remote.access == .profileButton && !session.glasses.isConnected {
+                ToolbarItem(placement: .topBarTrailing) { TVRemoteButton() }
+                    .sharedBackgroundVisibility(.hidden)
+                ToolbarSpacer(.fixed, placement: .topBarTrailing)
+            }
             ToolbarItem(placement: .topBarTrailing) { ProfileButton().sheetZoomSource(.settings, in: sheetNamespace) }
                 .sharedBackgroundVisibility(.hidden)
         }

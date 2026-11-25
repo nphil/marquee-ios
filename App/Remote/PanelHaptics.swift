@@ -11,7 +11,7 @@ struct PanelHaptics {
     private static let firm = UIImpactFeedbackGenerator(style: .rigid)
     private static let ticks = UISelectionFeedbackGenerator()
 
-    /// A key going down, or the floating button lifting off its spot.
+    /// A key going down.
     func press() {
         guard enabled else { return }
         Self.soft.impactOccurred(intensity: 0.7)

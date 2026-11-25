@@ -64,14 +64,11 @@ private func clamp(_ value: CGFloat, _ low: CGFloat, _ high: CGFloat) -> CGFloat
 /// Rounds half up, as the Android port does, so a saved edge never lands on a different grid line.
 private func roundHalfUp(_ value: CGFloat) -> CGFloat { (value + 0.5).rounded(.down) }
 
-/// The size and place the panel opens at before the user has moved it: it grows away from the orb into the larger side.
-public func defaultPanel(bounds: CGRect, orb: CGRect, width: CGFloat, height: CGFloat) -> CGRect {
+/// The size and place the panel opens at before the user has moved it: centred across `bounds`, near its top.
+public func defaultPanel(bounds: CGRect, width: CGFloat, height: CGFloat) -> CGRect {
     let w = min(width, bounds.width)
     let h = min(height, bounds.height)
-    let x = orb.midX < bounds.midX ? orb.minX : orb.maxX - w
-    let y = orb.midY > bounds.midY ? orb.maxY - h : orb.minY
-    return CGRect(
-        x: clamp(x, bounds.minX, bounds.maxX - w), y: clamp(y, bounds.minY, bounds.maxY - h), width: w, height: h)
+    return CGRect(x: bounds.midX - w / 2, y: bounds.minY, width: w, height: h)
 }
 
 /// Keeps `rect` inside `bounds`, shrinking it only when it cannot fit even at `minSize`.

@@ -27,7 +27,7 @@ final class RemoteScreenshotTests: XCTestCase {
         try snap("settings-remote-rose-pine")
         goBack(from: "LumaTV Remote", in: app)
         tap("settings.done", in: app)
-        waitFor("remote.miniBar", in: app)
+        waitFor("remote.button", in: app)
     }
 
     @MainActor
@@ -44,7 +44,13 @@ final class RemoteScreenshotTests: XCTestCase {
     /// swipes up to the remote's panel.
     @MainActor
     func testMiniBarBesideAMinimisedPlayback() throws {
-        let app = launchPlayingFilm(extra: [])
+        let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine", arguments: [
+            "-marquee.fakeSignedIn", "YES", "-marquee.uitest.remote", "YES", "-marquee.uitest.remoteAccess", "miniBar",
+            "--ui-testing-place-home",
+            "-marquee.uitest.play", "212", "-marquee.uitest.playerTime", "61", "-marquee.uitest.paused", "YES",
+            "-marquee.uitest.frame", "art/caminandes-backdrop.jpg",
+        ], waitingFor: nil)
+        XCTAssertTrue(element("player.playPause", in: app).waitForExistence(timeout: 20), "The player did not open")
         tap("player.minimise", in: app)
         XCTAssertTrue(element("miniplayer", in: app).waitForExistence(timeout: 10), "Minimising left no bar")
         let bar = element("remote.miniBar", in: app)
@@ -55,29 +61,8 @@ final class RemoteScreenshotTests: XCTestCase {
         XCTAssertTrue(element("remote.close", in: app).waitForNonExistence(timeout: 5))
     }
 
-    /// The floating button stays on screen over a minimised playback and opens the panel.
     @MainActor
-    func testFloatingButtonOverAMinimisedPlayback() throws {
-        let app = launchPlayingFilm(extra: ["-marquee.uitest.remoteAccess", "floatingButton"])
-        tap("player.minimise", in: app)
-        XCTAssertTrue(element("miniplayer", in: app).waitForExistence(timeout: 10), "Minimising left no bar")
-        tap("remote.button", in: app)
-        waitFor("remote.pair", in: app)
-    }
-
-    @MainActor
-    private func launchPlayingFilm(extra: [String]) -> XCUIApplication {
-        let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine", arguments: [
-            "-marquee.fakeSignedIn", "YES", "-marquee.uitest.remote", "YES", "--ui-testing-place-home",
-            "-marquee.uitest.play", "212", "-marquee.uitest.playerTime", "61", "-marquee.uitest.paused", "YES",
-            "-marquee.uitest.frame", "art/caminandes-backdrop.jpg",
-        ] + extra, waitingFor: nil)
-        XCTAssertTrue(element("player.playPause", in: app).waitForExistence(timeout: 20), "The player did not open")
-        return app
-    }
-
-    @MainActor
-    func testFloatingButtonChoice() async throws {
+    func testAccessChoice() async throws {
         let tv = FakeTV()
         let listener = try await FakeTVListener(tv: tv)
         defer { listener.stop() }
@@ -85,40 +70,35 @@ final class RemoteScreenshotTests: XCTestCase {
         let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine",
                          arguments: ["-marquee.fakeSignedIn", "YES", "-marquee.uitest.remote", "YES",
                                      "--ui-testing-place-home"])
-        waitFor("remote.miniBar", in: app)
-        openRemoteSettings(in: app)
-        selectRemoteAccess("Floating Button", in: app)
-        try snap("settings-remote-floating-button")
-        goBack(from: "LumaTV Remote", in: app)
-        tap("settings.done", in: app)
         waitFor("remote.button", in: app)
         XCTAssertFalse(element("remote.miniBar", in: app).exists)
+        try snap("remote-button")
         openRemoteSettings(in: app)
         selectRemoteAccess("Mini Bar", in: app)
+        try snap("settings-remote-mini-bar")
         goBack(from: "LumaTV Remote", in: app)
         tap("settings.done", in: app)
         waitFor("remote.miniBar", in: app)
         XCTAssertFalse(element("remote.button", in: app).exists)
         openRemoteSettings(in: app)
-        selectRemoteAccess("Floating Button", in: app)
+        selectRemoteAccess("Button by Profile", in: app)
         goBack(from: "LumaTV Remote", in: app)
         tap("settings.done", in: app)
         waitFor("remote.button", in: app)
-        try snap("remote-floating-button")
+        XCTAssertFalse(element("remote.miniBar", in: app).exists)
         tap("remote.button", in: app)
         try await pairAndPressHome(link: link, tv: tv, in: app)
     }
 
-    /// The floating button opens the panel, which invites pairing while no TV is paired, and the panel's own
-    /// Close puts it away.
+    /// The button opens the panel, which invites pairing while no TV is paired, and the panel's own Close puts
+    /// it away.
     @MainActor
-    func testFloatingButtonOpensAndCloses() throws {
+    func testButtonOpensAndCloses() throws {
         let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine",
                          arguments: ["-marquee.fakeSignedIn", "YES", "-marquee.uitest.remote", "YES",
-                                     "-marquee.uitest.remoteAccess", "floatingButton", "--ui-testing-place-home"])
+                                     "--ui-testing-place-home"])
         tap("remote.button", in: app)
         waitFor("remote.pair", in: app)
-        XCTAssertFalse(element("remote.button", in: app).exists, "The button stays while its panel is up")
         try snap("remote-panel-no-tv")
         tap("remote.close", in: app)
         XCTAssertTrue(element("remote.close", in: app).waitForNonExistence(timeout: 5))
@@ -135,7 +115,7 @@ final class RemoteScreenshotTests: XCTestCase {
         let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine",
                          arguments: ["-marquee.fakeSignedIn", "YES", "-marquee.uitest.remote", "YES",
                                      "--ui-testing-place-home"])
-        waitFor("remote.miniBar", in: app)
+        waitFor("remote.button", in: app)
         app.open(link)
         tap("pairing.pair", in: app)
         await waitUntil(tv, received: "pair")
@@ -151,19 +131,21 @@ final class RemoteScreenshotTests: XCTestCase {
         waitFor("remote.key.chup", in: app)
     }
 
+    /// The Mini Bar needs the phone at home; the button by the profile does not.
     @MainActor
-    func testRemoteHiddenAwayAndWhenPresenceUnknown() {
+    func testRemoteAwayAndWhenPresenceUnknown() {
         for place in ["--ui-testing-place-away", "--ui-testing-place-unknown"] {
             let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine",
                              arguments: ["-marquee.fakeSignedIn", "YES", "-marquee.uitest.remote", "YES", place])
+            waitFor("remote.button", in: app)
             XCTAssertFalse(element("remote.miniBar", in: app).exists, place)
-            XCTAssertFalse(element("remote.button", in: app).exists, place)
             openRemoteSettings(in: app)
             waitFor("remote.setup", in: app)
-            selectRemoteAccess("Floating Button", in: app)
+            selectRemoteAccess("Mini Bar", in: app)
             goBack(from: "LumaTV Remote", in: app)
             tap("settings.done", in: app)
-            XCTAssertFalse(element("remote.button", in: app).exists, place)
+            XCTAssertTrue(element("remote.button", in: app).waitForNonExistence(timeout: 5), place)
+            XCTAssertFalse(element("remote.miniBar", in: app).exists, place)
             app.terminate()
         }
     }
@@ -183,7 +165,7 @@ final class RemoteAccessibilityScreenshots: XCTestCase {
     }
 
     @MainActor
-    func testFloatingButton() async throws {
+    func testButtonByProfile() async throws {
         let tv = FakeTV()
         let listener = try await FakeTVListener(tv: tv)
         defer { listener.stop() }
@@ -192,13 +174,12 @@ final class RemoteAccessibilityScreenshots: XCTestCase {
                          arguments: ["-marquee.fakeSignedIn", "YES", "-marquee.uitest.remote", "YES",
                                      "--ui-testing-place-home"])
         openRemoteSettings(in: app)
-        selectRemoteAccess("Floating Button", in: app)
-        try snap("settings-remote-floating-button-ax-dawn")
+        try snap("settings-remote-button-ax-dawn")
         goBack(from: "LumaTV Remote", in: app)
         tap("settings.done", in: app)
         waitFor("remote.button", in: app)
         XCTAssertFalse(element("remote.miniBar", in: app).exists)
-        try snap("remote-floating-button-ax-dawn")
+        try snap("remote-button-ax-dawn")
         tap("remote.button", in: app)
         try await pairAndPressHome(link: link, tv: tv, in: app)
     }
@@ -219,7 +200,7 @@ extension XCTestCase {
             arguments: ["-marquee.fakeSignedIn", "YES", "-marquee.uitest.remote", "YES",
                         "--ui-testing-place-home"]
         )
-        waitFor("remote.miniBar", in: app)
+        waitFor("remote.button", in: app)
         try snap("remote-home-\(suffix)")
 
         app.open(link)
@@ -266,7 +247,7 @@ extension XCTestCase {
         let link = await tv.pairingLink(host: "127.0.0.1", port: listener.port)
         let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine",
                          arguments: ["-marquee.fakeSignedIn", "YES", "-marquee.uitest.remote", "YES",
-                                     "--ui-testing-place-home"])
+                                     "-marquee.uitest.remoteAccess", "miniBar", "--ui-testing-place-home"])
         let bar = element("remote.miniBar", in: app)
         XCTAssertTrue(bar.waitForExistence(timeout: 10))
         XCTAssertFalse(element("remote.button", in: app).exists)

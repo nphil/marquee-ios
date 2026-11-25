@@ -443,7 +443,7 @@ final class AppSession {
     /// fixtures; `-marquee.uitest.speechDock` does the same for SpeechDock and its `speechdock`
     /// fixtures, `-marquee.uitest.homelabber` for HomeLabber and its `homelabber` fixtures, and
     /// `-marquee.uitest.remote YES` turns the LumaTV remote on, and `-marquee.uitest.remoteAccess` chooses its
-    /// access (`floatingButton`; anything else is the Mini Bar). `-marquee.uitest.ntfy` with a server saves
+    /// access (`miniBar`; anything else is the Button by Profile). `-marquee.uitest.ntfy` with a server saves
     /// Diagnostic Logs sending to its `marquee-test` topic, answered by the `ntfy` fixtures.
     private func restoreUITest() {
         let arguments = UserDefaults.standard
