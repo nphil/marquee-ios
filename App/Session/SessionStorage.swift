@@ -8,10 +8,10 @@ import MarqueeCore
 @MainActor
 final class SessionStorage {
     let defaults: UserDefaults
-    /// The defaults domain Delete All Local Data empties: the app's own, or the UI tests' suite.
-    private let domain: String
+    /// The defaults domain Delete All Local Data empties: the app's own, or the UI tests' suite. Backups read it.
+    let domain: String
     /// Nil for UI-test launches, which keep secrets in `memory` instead.
-    private let keychain: KeychainStore?
+    let keychain: KeychainStore?
     private var memory: [String: Data] = [:]
 
     private enum Key {
@@ -56,6 +56,7 @@ final class SessionStorage {
         static let diagDetailed = "marquee.diag.detail"
         static let diagButton = "marquee.diag.button"
         static let tracksPrefix = "marquee."
+        static let accountID = "marquee.account.id"
     }
 
     private init(defaults: UserDefaults, domain: String, keychain: KeychainStore?) {
@@ -95,6 +96,13 @@ final class SessionStorage {
     var profile: PlexHomeUser? {
         get { defaults.data(forKey: Key.profile).flatMap { try? JSONDecoder().decode(PlexHomeUser.self, from: $0) } }
         set { defaults.set(newValue.flatMap { try? JSONEncoder().encode($0) }, forKey: Key.profile) }
+    }
+
+    /// The Plex account backups belong to (`BackupAccount.id`), kept so they work offline and between the
+    /// launch and the first answer from plex.tv. Not a secret, and not in a backup.
+    var accountID: String? {
+        get { defaults.string(forKey: Key.accountID) }
+        set { defaults.set(newValue, forKey: Key.accountID) }
     }
 
     /// The address that answered last time, tried alone first on the next launch.
@@ -331,6 +339,7 @@ final class SessionStorage {
         serverID = nil
         seerrSession = nil
         profile = nil
+        accountID = nil
         for key in defaults.dictionaryRepresentation().keys where key.hasPrefix(Key.addressPrefix) {
             defaults.removeObject(forKey: key)
         }

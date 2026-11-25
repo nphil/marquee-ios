@@ -56,8 +56,12 @@ struct RootView: View {
                 .interactiveDismissDisabled(session.player.zoomsFromBar)
         }
         // The TV's pairing QR code carries a lumaremote:// link. The remote opens from here, so Settings,
-        // a sheet over the same view, closes first.
+        // a sheet over the same view, closes first. A backup opened from Files goes to its page in Settings.
         .onOpenURL { url in
+            if url.isFileURL, url.pathExtension == BackupFormat.fileExtension {
+                session.openBackup(url)
+                return
+            }
             guard url.scheme == "lumaremote" else { return }
             session.showsSettings = false
             session.remote.open(url)

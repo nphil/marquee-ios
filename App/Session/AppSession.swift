@@ -90,6 +90,8 @@ final class AppSession {
     let link: PhoneLink
     /// Diagnostic Logs (DESIGN §8.12), kept per iPhone.
     let diagnostics: DiagnosticsSettings
+    /// Backup & Sync (DESIGN §8.13), kept per iPhone.
+    let backup: BackupCenter
 
     /// Made again by Delete All Local Data, which removes the stored client identifier.
     private(set) var identity: PlexClientIdentity
@@ -126,6 +128,7 @@ final class AppSession {
         glasses = GlassesCenter(storage: storage)
         link = PhoneLink(storage: storage, inMemory: FakePlex.isActive)
         diagnostics = DiagnosticsSettings(storage: storage)
+        backup = BackupCenter(storage: storage)
         homeSnapshots = Self.snapshotStore()
         restore()
         watchNetwork()
@@ -133,6 +136,7 @@ final class AppSession {
         // The fake server is plain HTTP on the test host; no prompt should cover the UI tests' screens.
         if !FakePlex.isActive { localNetwork.request() }
         ReportCenter.shared.session = self
+        backup.start()
     }
 
     // MARK: Sign-in
@@ -285,6 +289,7 @@ final class AppSession {
         showsSettings = false
         player.stopAll()
         storage.clearSignIn()
+        backup.setAccount(nil)
         plexTV = nil
         library = nil
         server = nil
@@ -322,6 +327,7 @@ final class AppSession {
     func deleteAllLocalData() async {
         signOut()
         storage.eraseAll()
+        backup.reset()
         for kind in ArrKind.allCases { arr.save(nil, for: kind) }
         diagnostics.eraseAll()
         remote.eraseAll()
@@ -347,6 +353,26 @@ final class AppSession {
                 title: "Signed out, and most local data deleted",
                 detail: "Some files could not be removed. Deleting the app removes the rest."
             )
+    }
+
+    // MARK: Backup
+
+    /// A backup opened from Files. The Backup page takes it up once the iPhone is signed in and past the server
+    /// choice; before that the copy iOS made is removed and the event counted.
+    func openBackup(_ url: URL) {
+        guard state == .ready else {
+            BackupFiles.removeInboxCopy(url)
+            Diag.event(.app, "backup.open.ignored", ["signedIn": state != .signedOut], .notice)
+            return
+        }
+        backup.open(file: url)
+        showsSettings = true
+    }
+
+    /// Backups belong to the Plex Home's admin, so a switch of profile keeps them reachable. An account not yet
+    /// known leaves the last one in place.
+    private func recordBackupAccount() {
+        if let id = BackupAccount.id(user: user, homeUsers: homeUsers) { backup.setAccount(id) }
     }
 
     func play(item: PlexMetadata, mediaIndex: Int = 0, fromStart: Bool = false) {
@@ -504,6 +530,7 @@ final class AppSession {
             homeUsers = profiles
             linkCode = nil
             setUser(account ?? profiles.first(where: \.isAdmin), sameAccount: true)
+            recordBackupAccount()
             switch pick {
             case .remembered: show(found)
             case .first: if let first = found.first { choose(first) } else { state = .choosingServer(found) }
@@ -527,6 +554,7 @@ final class AppSession {
             servers = found
             if let account { setUser(account, sameAccount: true) }
             if let profiles { homeUsers = profiles }
+            recordBackupAccount()
             switch state {
             case .ready:
                 // The open screens keep their library unless the server's token changed.

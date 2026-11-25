@@ -90,6 +90,22 @@ targets:
           - CFBundleURLName: com.nphil.marquee.lumaremote
             CFBundleURLSchemes:
               - lumaremote
+        # The backup file (DESIGN §8.13): the exporter names the type, and Files offers Marquee to open it. Not
+        # opened in place, so iOS hands the app a copy that is deleted once read.
+        UTExportedTypeDeclarations:
+          - UTTypeIdentifier: com.nphil.marquee.backup
+            UTTypeDescription: Marquee Backup
+            UTTypeConformsTo:
+              - public.data
+            UTTypeTagSpecification:
+              public.filename-extension:
+                - marqueebackup
+        CFBundleDocumentTypes:
+          - CFBundleTypeName: Marquee Backup
+            CFBundleTypeRole: Viewer
+            LSHandlerRank: Owner
+            LSItemContentTypes:
+              - com.nphil.marquee.backup
         UIAppFonts:
           - Manrope.ttf
           - AtkinsonHyperlegible-Regular.ttf

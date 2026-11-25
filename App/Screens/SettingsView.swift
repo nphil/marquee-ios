@@ -9,6 +9,7 @@ struct SettingsView: View {
     @Environment(ThemeStore.self) private var store
     @State private var confirmingSignOut = false
     @State private var confirmingDelete = false
+    @State private var showsBackup = false
 
     private var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
@@ -219,6 +220,19 @@ struct SettingsView: View {
             }
             .listRowBackground(theme.sheet)
 
+            Section {
+                NavigationLink {
+                    BackupSyncView()
+                } label: {
+                    LabeledContent("Backup & Sync") {
+                        Text(session.backup.summary)
+                            .foregroundStyle(theme.ink2)
+                    }
+                }
+                .accessibilityIdentifier("settings.backup")
+            }
+            .listRowBackground(theme.sheet)
+
             Section("About") {
                 LabeledContent {
                     Text(version).foregroundStyle(theme.ink2)
@@ -261,7 +275,7 @@ struct SettingsView: View {
                     .accessibilityIdentifier("settings.deleteData.confirm")
                     Button("Cancel", role: .cancel) {}
                 } message: {
-                    Text("This signs out and removes everything Marquee keeps on this iPhone: the sign-in, every profile's settings, remembered tracks, themes, Live TV lists, paired TVs, linked phones, cached artwork and the diagnostic log. Nothing on the Plex server changes.")
+                    Text("This signs out and removes everything Marquee keeps on this iPhone: the sign-in, every profile's settings, remembered tracks, themes, Live TV lists, paired TVs, linked phones, cached artwork and the diagnostic log. Nothing on the Plex server changes. Backup files stay where they were saved, and the key that opens them stays in the Keychain.")
                 }
             } footer: {
                 Text("Signs out and returns Marquee to how it was when first installed.")
@@ -276,6 +290,16 @@ struct SettingsView: View {
             ProfileSwitcher()
                 .preferredColorScheme(store.presentationScheme(for: theme))
         }
+        .navigationDestination(isPresented: $showsBackup) {
+            BackupSyncView()
+        }
+        // A backup opened from Files lands on its page.
+        .onAppear(perform: showOpenedBackup)
+        .onChange(of: session.backup.pendingOpen) { showOpenedBackup() }
+    }
+
+    private func showOpenedBackup() {
+        if session.backup.pendingOpen != nil, !session.backup.pageIsOpen { showsBackup = true }
     }
 }
 

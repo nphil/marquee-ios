@@ -178,6 +178,18 @@ The floating LumaTV remote's geometry and input maths; LumaRemoteKit owns the co
 - `RemotePadMode`: `dpad`, `joystick`, `touchpad`; anything unknown or unsaved is `dpad`.
 - `JoystickRepeater`: turns a held joystick into `DpadKey` repeats, slow near the centre and fast at the edge. `TrackpadTracker` and `ScrollMomentum`: the touchpad's taps, drags, two-finger scroll and fling. `AirMouseMath` and `OneEuroFilter`: the air mouse's turn rates and their smoothing.
 
+## Backup (`Backup/`)
+
+The settings backup shared with the Android app: the file, the keys that open it and an all-or-nothing restore (DESIGN §8.13). It uses CryptoKit on Apple platforms and swift-crypto elsewhere.
+
+- `Backup.seal(_:account:keyring:now:)`, `inspect(_:)`, `belongs(_:to:)` and `open(_:account:keyring:passphrase:)`: the file is `MQBK`, a version, a JSON `BackupHeader` and a ChaCha20-Poly1305 payload. `open` checks, in order: not a backup, damaged, newer, another account, no way in, wrong passphrase. `OpenedBackup` carries the header, the `BackupPayload` and the passphrase key that opened it.
+- `BackupKeyring`: the random backup secret and the optional passphrase key, stretched once (PBKDF2-HMAC-SHA256, `BackupFormat.passphraseIterations`); `create()`, `setPassphrase(_:)` (12 to 256 characters, NFKC), `removePassphrase()`, `adopt(_:)`. `Codable`; the app keeps one in a secure item per account. `BackupAccount.id(user:homeUsers:)` is the Plex Home admin's id.
+- `BackupError`: each refusal with its plain `message`. `BackupFormat`: the name, extension, version and limits.
+- `BackupScope`: what a platform backs up (`phone`, `classify(store:key:)`, `keys(in:)`). `BackupSnapshot.make(from:platform:appVersion:scope:)` and the keyed `fingerprint(_:key:)`. `BackupPayload`, `BackupEntry`, `BackupValue`, `BackupGroup`, `BackupIntegrations` (the part that crosses platforms) and `BackupContents` (what a restore changes, in words).
+- `BackupStore` and `BackupRestore.plan(_:scope:)` / `apply(_:to:scope:)`: the store reads, validates, writes and removes entries; `apply` holds every old value and puts them back if anything fails (`restoreFailed`, or `restoreIncomplete` when even that fails).
+
+Not checked on a device: the synchronizable Keychain item, and file coordination on iCloud Drive and network shares, which only the app uses.
+
 ## Not yet checked against a live server
 
 - The status codes for a wrong profile PIN (the live Plex Home has no protected profile). `/api/v2/resources`, `/api/v2/user` and `/api/v2/home/users` were decoded from a live account on 2026-11-06 with no mismatch.
