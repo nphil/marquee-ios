@@ -12,14 +12,15 @@ public enum BackupSnapshot {
     }
 
     /// A SHA-256 over what is backed up, not over when or by which version, so settings that did not change
-    /// need no new file. Meant to be held in memory only: it is a hash of secrets.
-    public static func fingerprint(_ payload: BackupPayload) -> Data {
+    /// need no new file. It hashes secrets, so it is keyed with the backup secret: the copy kept on the
+    /// iPhone between launches cannot be used to guess them.
+    public static func fingerprint(_ payload: BackupPayload, key: Data) -> Data {
         struct Content: Encodable {
             var entries: [BackupEntry]
             var integrations: BackupIntegrations
         }
         let encoder = BackupContainer.encoder()
         let bytes = (try? encoder.encode(Content(entries: payload.entries, integrations: payload.integrations))) ?? Data()
-        return BackupCrypto.sha256(bytes)
+        return BackupCrypto.sha256(key + bytes)
     }
 }

@@ -275,15 +275,17 @@ struct BackupSnapshotTests {
         #expect(payload.integrations["bazarr"] == BackupIntegration(address: "https://b", secret: "k"))
     }
 
-    @Test func theFingerprintChangesWithTheSettingsAndWithNothingElse() throws {
+    @Test func theFingerprintChangesWithTheSettingsAndTheKeyAndNothingElse() throws {
+        let key = Data(repeating: 7, count: 32)
         let store = FakeStore([defaults("marquee.tabs", .strings(["home"]))])
         let first = try BackupSnapshot.make(from: store, platform: "ios", appVersion: "1")
         let later = try BackupSnapshot.make(from: store, platform: "ios", appVersion: "2")
-        #expect(BackupSnapshot.fingerprint(first) == BackupSnapshot.fingerprint(later))
+        #expect(BackupSnapshot.fingerprint(first, key: key) == BackupSnapshot.fingerprint(later, key: key))
+        #expect(BackupSnapshot.fingerprint(first, key: key) != BackupSnapshot.fingerprint(first, key: Data(repeating: 8, count: 32)))
 
         try store.write(defaults("marquee.tabs", .strings(["home", "live"])))
         let changed = try BackupSnapshot.make(from: store, platform: "ios", appVersion: "1")
-        #expect(BackupSnapshot.fingerprint(first) != BackupSnapshot.fingerprint(changed))
+        #expect(BackupSnapshot.fingerprint(first, key: key) != BackupSnapshot.fingerprint(changed, key: key))
     }
 
     @Test func secretsAreNamedNeverSearchedFor() {
