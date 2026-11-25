@@ -101,6 +101,6 @@ The complete backlog and acceptance criteria are maintained once in [PLAN.md](PL
 
 ## Standing rules (also in AGENTS.md)
 
-- Video engine changes go upstream to `nphil/videoengine` and its release flow; inform both Stashy and Marquee of improvements and released tags. Marquee pins exact 3.0.0; Stashy pinned 2.0.3 when 2.0.5 was released.
+- Video engine changes go upstream to `nphil/videoengine` and its release flow; inform both Stashy and Marquee of improvements and released tags. Marquee pins exact 3.0.2; Stashy pinned 2.0.3 when 2.0.5 was released.
 - Clean room, real-server safety and token rules in AGENTS.md "Rules that bite" apply to every part.
 - Nitin is not a programmer: report to him in plain words, briefly.

@@ -285,6 +285,7 @@ final class AVPlayerBackend: VideoBackend, GainSink {
     }
 
     private func stopObservingPlayer() {
+        stallTask?.cancel()
         for observer in [timeObserver, switchObserver].compactMap({ $0 }) { avPlayer.removeTimeObserver(observer) }
         timeObserver = nil
         switchObserver = nil
@@ -312,8 +313,19 @@ final class AVPlayerBackend: VideoBackend, GainSink {
                 let failure = PlaybackFailure(note.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? NSError)
                 MainActor.assumeIsolated { self?.onEvent?(.failed(failure)) }
             },
-            center.addObserver(forName: AVPlayerItem.playbackStalledNotification, object: item, queue: .main) { _ in
+            center.addObserver(forName: AVPlayerItem.playbackStalledNotification, object: item, queue: .main) { [weak self, weak item] _ in
                 Diag.event(.player, "item.stalled", [:], .notice)
+                MainActor.assumeIsolated {
+                    guard let self, let item else { return }
+                    self.logStall(item, again: false)
+                    self.stallTask?.cancel()
+                    self.stallTask = Task { @MainActor [weak self, weak item] in
+                        try? await Task.sleep(for: .seconds(4.5))
+                        guard !Task.isCancelled, let self, let item, self.avPlayer.currentItem === item,
+                              self.avPlayer.timeControlStatus == .waitingToPlayAtSpecifiedRate else { return }
+                        self.logStall(item, again: true)
+                    }
+                }
             },
             center.addObserver(forName: AVPlayerItem.newErrorLogEntryNotification, object: item, queue: .main) { [weak self] note in
                 // The entry's address is a stream's, token and all, so it stays out of the log.
@@ -332,7 +344,38 @@ final class AVPlayerBackend: VideoBackend, GainSink {
         ]
     }
 
+    private var stallTask: Task<Void, Never>?
+
+    /// One line of buffer and log state for a stall; the logs' addresses carry tokens and stay out.
+    private func logStall(_ item: AVPlayerItem, again: Bool) {
+        let ranges = item.loadedTimeRanges.map { value -> String in
+            let r = value.timeRangeValue
+            return String(format: "%.1f-%.1f", r.start.seconds, r.end.seconds)
+        }.joined(separator: ",")
+        let access = item.accessLog()?.events.last
+        let error = item.errorLog()?.events.last
+        func yn(_ b: Bool) -> String { b ? "yes" : "no" }
+        Diag.event(.player, "player-stall", list: [
+            ("again", again ? "yes" : nil),
+            ("loaded", ranges.isEmpty ? "none" : ranges),
+            ("full", yn(item.isPlaybackBufferFull)),
+            ("empty", yn(item.isPlaybackBufferEmpty)),
+            ("likelyToKeepUp", yn(item.isPlaybackLikelyToKeepUp)),
+            ("control", String(describing: avPlayer.timeControlStatus.rawValue)),
+            ("waitReason", avPlayer.reasonForWaitingToPlay?.rawValue),
+            ("outputs", item.outputs.count),
+            ("requests", access?.numberOfMediaRequests),
+            ("stalls", access?.numberOfStalls),
+            ("bytes", access?.numberOfBytesTransferred),
+            ("errDomain", error?.errorDomain),
+            ("errCode", error?.errorStatusCode),
+            ("errComment", error?.errorComment),
+        ], .notice)
+    }
+
     private func clearItem() {
+        stallTask?.cancel()
+        stallTask = nil
         itemObservations.forEach { $0.invalidate() }
         itemObservations = []
         for token in itemNotifications { NotificationCenter.default.removeObserver(token) }
@@ -341,6 +384,7 @@ final class AVPlayerBackend: VideoBackend, GainSink {
 
     private func stateChanged() {
         let status = avPlayer.timeControlStatus
+        if status != .waitingToPlayAtSpecifiedRate { stallTask?.cancel() }
         let reason = status == .waitingToPlayAtSpecifiedRate ? avPlayer.reasonForWaitingToPlay?.rawValue : nil
         Diag.event(.player, "avplayer.state", [
             "status": Self.word(status), "reason": reason.map { Self.short($0, prefix: "AVPlayerWaiting", suffix: "Reason") },

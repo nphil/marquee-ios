@@ -114,10 +114,10 @@ final class EnhanceController {
             name = "unavailable"
             reason = why.rawValue
         }
-        Diag.event(.player, "enhance.state", ["state": name, "reason": reason])
+        Diag.event(.player, "enhance.state", ["state": name, "reason": reason, "outputs": item?.outputs.count])
         guard !probed, state != .idle else { return }
         probed = true
-        var plan = ["result": name]
+        var plan = ["result": name, "outputs": "\(item?.outputs.count ?? 0)"]
         if case .running(let running) = state {
             plan["scaler"] = running.upscaler?.rawValue ?? "none"
             plan["source"] = "\(running.sourceWidth)x\(running.sourceHeight)"
