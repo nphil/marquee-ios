@@ -149,6 +149,7 @@ struct RemoteKeyButton: View {
         if let value {
             Text(value)
                 .monospacedDigit()
+                .multilineTextAlignment(.center)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
         } else {

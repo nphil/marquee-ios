@@ -54,25 +54,29 @@ private struct Arrow: Identifiable {
     }
 }
 
-/// The pad's area: the D-pad, the joystick or the touchpad, with the switch between them along its foot.
+/// The pad's area: the D-pad, the joystick or the touchpad, and under it, in a row of its own, the switch between
+/// them. A pad too short for both is only the pad.
 struct RemotePad: View {
-    let size: CGSize
     let mode: RemotePadMode
     let ready: Bool
     let onMode: (RemotePadMode) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// From this height the pad shows its switch; a shorter pad is only the pad.
+    /// From this height the pad shows its switch.
     private static let switchMinHeight: CGFloat = 120
 
     var body: some View {
-        VStack(spacing: Space.s3) {
-            stage
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .disabled(!ready)
-            if size.height >= Self.switchMinHeight {
-                RemoteModeSwitch(mode: mode, onMode: onMode)
+        GeometryReader { proxy in
+            VStack(spacing: Space.s3) {
+                stage
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipped()
+                    .disabled(!ready)
+                if proxy.size.height >= Self.switchMinHeight {
+                    RemoteModeSwitch(mode: mode, onMode: onMode)
+                        .layoutPriority(1)
+                }
             }
         }
     }
@@ -80,8 +84,8 @@ struct RemotePad: View {
     private var stage: some View {
         ZStack {
             switch mode {
-            case .dpad: RemoteDpad().transition(.opacity)
-            case .joystick: RemoteJoystick().transition(.opacity)
+            case .dpad: RemoteDpad().padding(Space.s2).transition(.opacity)
+            case .joystick: RemoteJoystick().padding(Space.s2).transition(.opacity)
             case .touchpad: RemoteTouchPane().transition(.opacity)
             }
         }
@@ -89,7 +93,8 @@ struct RemotePad: View {
     }
 }
 
-/// Three glyph segments on a capsule: which pad the area shows.
+/// Three glyph segments on a capsule: which pad the area shows. The capsule is 36 pt; each segment's hit area is
+/// 44 pt tall.
 private struct RemoteModeSwitch: View {
     let mode: RemotePadMode
     let onMode: (RemotePadMode) -> Void
@@ -98,18 +103,23 @@ private struct RemoteModeSwitch: View {
     @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private static let maxWidth: CGFloat = 168
+    private static let capsule: CGFloat = 36
+    private static let hit: CGFloat = 44
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(RemotePadMode.allCases, id: \.self) { candidate in
-                segment(candidate)
+        ZStack {
+            Capsule()
+                .fill(theme.glassRaised)
+                .overlay(Capsule().strokeBorder(theme.edge, lineWidth: 1))
+                .frame(height: Self.capsule)
+            HStack(spacing: 0) {
+                ForEach(RemotePadMode.allCases, id: \.self) { candidate in
+                    segment(candidate)
+                }
             }
         }
-        .frame(maxWidth: Self.maxWidth)
-        .frame(height: Size.target)
-        .background(theme.glassRaised, in: Capsule())
-        .overlay(Capsule().strokeBorder(theme.edge, lineWidth: 1))
+        .frame(width: RemoteMetrics.stripWidth, height: Self.hit)
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .contain)
     }
 
@@ -123,11 +133,13 @@ private struct RemoteModeSwitch: View {
             Image(systemName: candidate.symbol)
                 .font(.system(size: Space.s5, weight: .semibold))
                 .foregroundStyle(selected ? theme.accentInk : theme.ink2)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .frame(maxWidth: .infinity)
+                .frame(height: Self.capsule - Space.s1)
                 .background { Capsule().fill(selected ? theme.accent : .clear) }
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: selected)
-                .padding(Space.s1)
-                .contentShape(Capsule())
+                .padding(.horizontal, Space.s1 / 2)
+                .frame(height: Self.hit)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(candidate.label))

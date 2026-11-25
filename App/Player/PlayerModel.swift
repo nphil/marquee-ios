@@ -185,7 +185,19 @@ final class PlayerModel: Identifiable {
     /// The Enhance Picture panel over the player, and the slider of it being dragged: while one is, the panel and
     /// the chrome step aside and the player draws that slider alone, under the finger.
     private(set) var showsEnhance = false
-    var enhanceDrag: EnhanceDrag?
+    var enhanceDrag: EnhanceDrag? {
+        didSet {
+            guard (oldValue == nil) != (enhanceDrag == nil) else { return }
+            layerView.setEnhanceSplit(enhanceDrag != nil)
+            if enhanceDrag == nil {
+                let setting = pictureEnhance
+                Diag.event(.player, "enhance.options", [
+                    "sharpen": setting.sharpen.formatted(.number.precision(.fractionLength(0...2))),
+                    "deband": setting.deband.formatted(.number.precision(.fractionLength(0...2))),
+                ])
+            }
+        }
+    }
     var enhanceDragging: Bool { enhanceDrag != nil }
     var showsStats = false
     var showsEpisodes = false
@@ -840,6 +852,7 @@ final class PlayerModel: Identifiable {
         guard !showsEnhance else { return }
         showsEnhance = true
         menuOpened()
+        refreshEnhance()
     }
 
     func closeEnhance() {
@@ -847,6 +860,7 @@ final class PlayerModel: Identifiable {
         showsEnhance = false
         enhanceDrag = nil
         menuClosed()
+        refreshEnhance()
     }
 
     func menuOpened() {
@@ -3374,11 +3388,12 @@ final class PlayerModel: Identifiable {
         refreshEnhance()
     }
 
-    /// The enhancer works only while the picture plays in the full player, in the foreground, on the phone.
-    /// Paused, in the bar, in Picture in Picture, on AirPlay or a cast receiver, the plain picture shows.
+    /// The enhancer works only while the picture plays (or the Enhance Picture panel is open) in the full player,
+    /// in the foreground, on the phone.
     private func refreshEnhance() {
         guard !closed else { return }
-        let sees = isPlaying && showsFullPlayer && !inBackground && !isExternalPlayback && castDevice == nil
+        // The panel is open: a paused picture is enhanced too, so a slider can be judged without playing.
+        let sees = (isPlaying || showsEnhance) && showsFullPlayer && !inBackground && !isExternalPlayback && castDevice == nil
         enhance?.setActive(sees && !(pictureInPicture?.isActive ?? false))
     }
 

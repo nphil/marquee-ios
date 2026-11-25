@@ -86,7 +86,7 @@ struct RemoteEditHeader: View {
                 stage.resetLayout(session.remote)
             }
             .accessibilityIdentifier("remote.edit.reset")
-            HeaderButton(symbol: "checkmark", label: "Done", emphasized: true) {
+            HeaderButton(symbol: "checkmark", label: "Done", look: .accent) {
                 stage.editing = false
             }
             .accessibilityIdentifier("remote.edit.done")

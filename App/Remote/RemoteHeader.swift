@@ -16,10 +16,16 @@ struct RemoteHeader: View {
     /// Below this width the TV's name leaves the header and only its state stays.
     private static let nameMinWidth: CGFloat = 300
 
+    /// The room a header button's hit area keeps beyond its drawn circle.
+    private static let hitSlack = (HeaderButton.hit - HeaderButton.disc) / 2
+
     var body: some View {
-        HStack(spacing: Space.s1) {
+        HStack(spacing: 0) {
             tvButton
-            HeaderButton(symbol: "power", label: model.connection == .connected ? "Power" : "Wake the TV", emphasized: true) {
+            HeaderButton(
+                symbol: "power", label: model.connection == .connected ? "Power" : "Wake the TV",
+                look: model.connection == .connected && model.state.power == .on ? .tinted : .raised
+            ) {
                 model.power()
             }
             .disabled(model.current == nil)
@@ -32,12 +38,14 @@ struct RemoteHeader: View {
                 }
                 .accessibilityIdentifier("remote.arrange")
             }
-            HeaderButton(symbol: "xmark", label: "Close remote") {
+            HeaderButton(symbol: "xmark.circle.fill", label: "Close remote", look: .bare) {
                 session.remote.isPresented = false
             }
             .accessibilityIdentifier("remote.close")
         }
-        .padding(.horizontal, Space.s2)
+        // The drawn circles, not their hit areas, sit on the card's inset.
+        .padding(.leading, RemoteMetrics.inset)
+        .padding(.trailing, RemoteMetrics.inset - Self.hitSlack)
         .frame(width: width, height: RemoteMetrics.header)
         .movesPanel(minimumDistance: 6)
     }
@@ -53,18 +61,17 @@ struct RemoteHeader: View {
                 VStack(alignment: .leading, spacing: 0) {
                     if width >= Self.nameMinWidth, let tv = model.current {
                         Text(tv.name)
-                            .textRole(.headline)
+                            .font(.headline)
                             .foregroundStyle(theme.ink)
                     }
                     Text(model.panelStatus)
-                        .textRole(.caption)
+                        .font(.footnote)
                         .foregroundStyle(theme.ink2)
                 }
                 .lineLimit(1)
                 Spacer(minLength: 0)
             }
-            .padding(.leading, Space.s2)
-            .frame(maxWidth: .infinity, minHeight: Size.target, alignment: .leading)
+            .frame(maxWidth: .infinity, minHeight: HeaderButton.hit, alignment: .leading)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -74,48 +81,75 @@ struct RemoteHeader: View {
     }
 }
 
-/// A round header button: the raised control fill, or the accent for the one that matters.
+/// A small round header button: a 32 pt circle in a 44 pt hit area. `tinted` colours the glyph with the accent
+/// for a state that is on, `accent` fills the circle for the one action that finishes a task, and `bare` is the
+/// standard dismiss glyph without a circle of its own.
 struct HeaderButton: View {
+    enum Look { case raised, tinted, accent, bare }
+
+    static let disc: CGFloat = 32
+    static let hit: CGFloat = 44
+
     let symbol: String
     let label: String
-    var emphasized = false
+    var look = Look.raised
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
         }
-        .buttonStyle(HeaderButtonStyle(emphasized: emphasized))
+        .buttonStyle(HeaderButtonStyle(look: look))
         .accessibilityLabel(Text(label))
         .accessibilityShowsLargeContentViewer { Label(label, systemImage: symbol) }
     }
 }
 
 private struct HeaderButtonStyle: ButtonStyle {
-    let emphasized: Bool
+    let look: HeaderButton.Look
 
     func makeBody(configuration: Configuration) -> some View {
-        HeaderButtonLabel(configuration: configuration, emphasized: emphasized)
+        HeaderButtonLabel(configuration: configuration, look: look)
     }
 }
 
 private struct HeaderButtonLabel: View {
     let configuration: ButtonStyleConfiguration
-    let emphasized: Bool
+    let look: HeaderButton.Look
 
     @Environment(\.theme) private var theme
     @Environment(\.isEnabled) private var isEnabled
 
     var body: some View {
+        let disc = HeaderButton.disc
         configuration.label
-            .font(.system(size: RemoteSize.glyph, weight: .semibold))
-            .foregroundStyle(emphasized ? theme.accentInk : theme.ink)
-            .frame(width: Size.target, height: Size.target)
-            .background(emphasized ? theme.accent : theme.glassRaised, in: Circle())
-            .overlay(Circle().strokeBorder(theme.edge, lineWidth: 1))
+            .font(.system(size: look == .bare ? disc - 4 : 15, weight: .semibold))
+            .symbolRenderingMode(look == .bare ? .hierarchical : .monochrome)
+            .foregroundStyle(ink)
+            .frame(width: disc, height: disc)
+            .background(fill, in: Circle())
+            .frame(width: HeaderButton.hit, height: HeaderButton.hit)
             .contentShape(Circle())
             .opacity(isEnabled ? 1 : 0.5)
-            .pressed(configuration.isPressed, in: Circle())
+            .scaleEffect(configuration.isPressed ? 0.92 : 1)
+            .animation(.easeOut(duration: 0.09), value: configuration.isPressed)
+    }
+
+    private var ink: Color {
+        switch look {
+        case .raised: theme.ink
+        case .tinted: theme.accentText
+        case .accent: theme.accentInk
+        case .bare: theme.ink3
+        }
+    }
+
+    private var fill: Color {
+        switch look {
+        case .raised, .tinted: theme.glassRaised
+        case .accent: theme.accent
+        case .bare: .clear
+        }
     }
 }
 

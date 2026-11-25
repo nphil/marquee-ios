@@ -20,11 +20,20 @@ final class PlayerLayerView: UIView {
     private(set) var enhancer: PictureEnhancer?
     private var gravityObservation: NSKeyValueObservation?
     private var readyObservation: NSKeyValueObservation?
+    /// An Enhance slider is being dragged: the picture shows plain on the left and enhanced on the right.
+    private var splitsEnhance = false
+    private let splitLine = CALayer()
+    private let originalLabel = CATextLayer()
+    private let enhancedLabel = CATextLayer()
+    private var splitLayers: [CALayer] { [splitLine, originalLabel, enhancedLabel] }
 
     func setEnhancer(_ enhancer: PictureEnhancer?) {
+        if enhancer == nil { splitsEnhance = false }
         guard enhancer !== self.enhancer else { return }
+        self.enhancer?.layer.mask = nil
         self.enhancer?.layer.removeFromSuperlayer()
         self.enhancer = enhancer
+        splitLayers.forEach { $0.removeFromSuperlayer() }
         gravityObservation = nil
         readyObservation = nil
         if let enhancer {
@@ -58,6 +67,54 @@ final class PlayerLayerView: UIView {
         let area = usesPicture ? picture.size : bounds.size
         let scale = traitCollection.displayScale
         enhancer.displaySize = CGSize(width: area.width * scale, height: area.height * scale)
+        updateSplit()
+    }
+
+    /// While an Enhance slider is dragged the picture is split down the middle: the left half is the plain
+    /// picture and the right half the enhanced one, so the effect of the slider can be judged as it moves. The
+    /// enhancer's layer is masked to the right half, and the player's own picture shows through the left.
+    func setEnhanceSplit(_ on: Bool) {
+        guard on != splitsEnhance else { return }
+        splitsEnhance = on
+        updateSplit()
+    }
+
+    private func updateSplit() {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+        guard let enhancer, splitsEnhance else {
+            enhancer?.layer.mask = nil
+            splitLayers.forEach { $0.removeFromSuperlayer() }
+            return
+        }
+        let picture = enhancer.layer.frame
+        let mask = enhancer.layer.mask ?? CALayer()
+        mask.backgroundColor = UIColor.white.cgColor
+        mask.frame = CGRect(x: picture.width / 2, y: 0, width: picture.width / 2, height: picture.height)
+        enhancer.layer.mask = mask
+
+        let top = max(picture.minY, safeAreaInsets.top) + Space.s2
+        splitLine.backgroundColor = UIColor.white.cgColor
+        splitLine.shadowColor = UIColor.black.cgColor
+        splitLine.shadowOpacity = 0.5
+        splitLine.shadowRadius = 2
+        splitLine.shadowOffset = .zero
+        splitLine.frame = CGRect(x: picture.midX - 0.75, y: picture.minY, width: 1.5, height: picture.height)
+        for (label, text, alignment) in [(originalLabel, "Original", CATextLayerAlignmentMode.right), (enhancedLabel, "Enhanced", .left)] {
+            label.string = text
+            label.alignmentMode = alignment
+            label.fontSize = 13
+            label.foregroundColor = UIColor.white.cgColor
+            label.shadowColor = UIColor.black.cgColor
+            label.shadowOpacity = 0.7
+            label.shadowRadius = 2
+            label.shadowOffset = .zero
+            label.contentsScale = traitCollection.displayScale
+            let width: CGFloat = 96
+            label.frame = CGRect(x: alignment == .right ? picture.midX - Space.s2 - width : picture.midX + Space.s2, y: top, width: width, height: 18)
+        }
+        for layer in splitLayers where layer.superlayer == nil { self.layer.addSublayer(layer) }
     }
 
     func prepareStandby(_ player: AVPlayer) {

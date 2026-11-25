@@ -11,12 +11,11 @@ struct EnhanceDrag: Equatable {
 
 /// The Enhance Picture page of the More menu, as a panel over the player and not a popover page: a system popover
 /// keeps its arrow and shadow, which would stay over the picture while a slider is dragged. It sits above the
-/// bottom controls, like the popover, in the theme's surface, and takes the popover's metrics and text styles.
+/// bottom controls, like the popover, in a system material, and takes the popover's metrics and text styles.
 struct EnhancePanel: View {
     let model: PlayerModel
     let screenWidth: CGFloat
     let bottomInset: CGFloat
-    @Environment(\.theme) private var theme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var contentHeight: CGFloat = 1000
     @State private var headerHeight: CGFloat = MenuMetrics.rowHeight
@@ -77,8 +76,7 @@ struct EnhancePanel: View {
         .clipShape(RoundedRectangle(cornerRadius: Radius.row, style: .continuous))
         .background {
             RoundedRectangle(cornerRadius: Radius.row, style: .continuous)
-                .fill(theme.sheet)
-                .overlay(RoundedRectangle(cornerRadius: Radius.row, style: .continuous).strokeBorder(theme.edge, lineWidth: 1))
+                .fill(.regularMaterial)
                 .shadow(color: .black.opacity(0.3), radius: 16, y: 6)
         }
         .opacity(hidden ? 0 : 1)
@@ -92,7 +90,7 @@ struct EnhancePanel: View {
             if let unavailable {
                 Text(unavailable)
                     .font(.footnote)
-                    .foregroundStyle(theme.ink2)
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal, MenuMetrics.margin)
                     .padding(.vertical, Space.s2)
             }
@@ -100,7 +98,7 @@ struct EnhancePanel: View {
                 choice(upscaler)
             }
             if setting.upscaler != .off {
-                Divider().overlay(theme.edge).padding(.leading, MenuMetrics.margin)
+                Divider().padding(.leading, MenuMetrics.margin)
                 EnhanceSliderRow(
                     model: model, title: "Sharpen", id: "player.enhanceSharpen", value: setting.sharpen, enabled: unavailable == nil
                 ) { $0.sharpen = $1 }
@@ -122,13 +120,13 @@ struct EnhancePanel: View {
             HStack(spacing: Space.s3) {
                 Text(upscaler.title)
                     .font(.subheadline)
-                    .foregroundStyle(theme.ink)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
                 Spacer(minLength: 0)
                 if isOn {
                     Image(systemName: "checkmark")
                         .font(.footnote.weight(.semibold))
-                        .foregroundStyle(theme.accent)
+                        .foregroundStyle(.tint)
                 }
             }
             .padding(.horizontal, MenuMetrics.margin)
@@ -156,7 +154,6 @@ private struct EnhanceSliderRow: View {
     let value: Double
     let enabled: Bool
     let set: (inout PictureEnhance, Double) -> Void
-    @Environment(\.theme) private var theme
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
     @State private var track = CGRect.zero
     @GestureState private var touching = false
@@ -167,12 +164,12 @@ private struct EnhanceSliderRow: View {
             HStack {
                 Text(title)
                     .font(.subheadline)
-                    .foregroundStyle(theme.ink)
+                    .foregroundStyle(.primary)
                 Spacer(minLength: 0)
                 Text("\(percent)%")
                     .font(.subheadline)
                     .monospacedDigit()
-                    .foregroundStyle(theme.ink2)
+                    .foregroundStyle(.secondary)
             }
             EnhanceTrack(value: value)
                 .frame(height: EnhanceTrack.height)
@@ -226,15 +223,14 @@ struct EnhanceTrack: View {
     static let height: CGFloat = 32
     static let thumb: CGFloat = 28
     let value: Double
-    @Environment(\.theme) private var theme
 
     var body: some View {
         GeometryReader { proxy in
             let travel = max(0, proxy.size.width - Self.thumb)
             let x = travel * min(1, max(0, value))
             ZStack(alignment: .leading) {
-                Capsule().fill(theme.ink3.opacity(0.35)).frame(height: 4)
-                Capsule().fill(theme.accent).frame(width: x + Self.thumb / 2, height: 4)
+                Capsule().fill(Color.secondary.opacity(0.35)).frame(height: 4)
+                Capsule().fill(.tint).frame(width: x + Self.thumb / 2, height: 4)
                 Circle()
                     .fill(.white)
                     .frame(width: Self.thumb, height: Self.thumb)
@@ -251,7 +247,6 @@ struct EnhanceTrack: View {
 /// touch: the page's slider still owns the gesture.
 struct EnhanceDragCapsule: View {
     let drag: EnhanceDrag
-    @Environment(\.theme) private var theme
     @ScaledMetric(relativeTo: .subheadline) private var line: CGFloat = 20
 
     private static let side = Space.s5
@@ -266,12 +261,12 @@ struct EnhanceDragCapsule: View {
                 HStack {
                     Text(drag.title)
                         .font(.subheadline)
-                        .foregroundStyle(theme.ink)
+                        .foregroundStyle(.primary)
                     Spacer(minLength: 0)
                     Text("\(Int((drag.value * 100).rounded()))%")
                         .font(.subheadline)
                         .monospacedDigit()
-                        .foregroundStyle(theme.ink2)
+                        .foregroundStyle(.secondary)
                 }
                 .frame(height: line)
                 EnhanceTrack(value: drag.value)

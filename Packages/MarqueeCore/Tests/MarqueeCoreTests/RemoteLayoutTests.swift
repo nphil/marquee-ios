@@ -47,8 +47,8 @@ struct RemoteLayoutTests {
         #expect(laidOut(300, 280).shape == .compact)
         #expect(laidOut(300, 284).shape == .column)
         // A row needs the area 1.25 times wider than tall, and a pad beside a strip.
-        #expect(laidOut(380, 348).shape == .row)
-        #expect(laidOut(380, 352).shape == .column)
+        #expect(laidOut(388, 348).shape == .row)
+        #expect(laidOut(388, 352).shape == .column)
     }
 
     @Test func stripsLeaveLeastUsedFirstAsThePanelGetsShorter() {

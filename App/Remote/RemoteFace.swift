@@ -69,13 +69,10 @@ struct RemoteFace: View {
     private func controls(_ layout: RemoteLayout) -> some View {
         let remote = session.remote
         return ZStack(alignment: .topLeading) {
-            RemotePad(size: layout.pad.size, mode: remote.mode, ready: ready, onMode: remote.setMode)
+            PadRegion(mode: remote.mode, ready: ready, onMode: remote.setMode)
                 .placed(layout.pad)
             ForEach(layout.strips, id: \.strip) { placement in
                 StripKeys(placement: placement, ready: ready)
-            }
-            if !stage.editing {
-                FaceNotice(pad: layout.pad)
             }
         }
     }
@@ -169,9 +166,12 @@ private struct StripKeys: View {
 
 // MARK: Notices
 
-/// Why the pad does not answer, and the one thing that fixes it, over the pad.
-private struct FaceNotice: View {
-    let pad: CGRect
+/// The pad's region: the pad and its switch, or, while the pad does not answer, the reason and the one thing that
+/// fixes it, in its place and alone.
+private struct PadRegion: View {
+    let mode: RemotePadMode
+    let ready: Bool
+    let onMode: (RemotePadMode) -> Void
 
     @Environment(RemoteStage.self) private var stage
     @Environment(RemoteModel.self) private var model
@@ -185,8 +185,7 @@ private struct FaceNotice: View {
     }
 
     var body: some View {
-        if let banner {
-            let card = RoundedRectangle(cornerRadius: Radius.card, style: .continuous)
+        if let banner, !stage.editing {
             VStack(spacing: Space.s3) {
                 Text(banner.text)
                     .textRole(.label)
@@ -195,14 +194,12 @@ private struct FaceNotice: View {
                 Button(banner.action, action: banner.perform)
                     .buttonStyle(.pill)
             }
-            .padding(Space.s4)
-            .background(theme.glass, in: card)
-            .overlay(card.strokeBorder(theme.edge, lineWidth: 1))
-            .padding(Space.s2)
-            .frame(width: pad.width, height: pad.height)
-            .offset(x: pad.minX, y: pad.minY)
+            .padding(.horizontal, Space.s4)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("remote.status")
+        } else {
+            RemotePad(mode: mode, ready: ready, onMode: onMode)
         }
     }
 
@@ -257,7 +254,7 @@ private struct NoTV: View {
             .buttonStyle(.pill)
             .accessibilityIdentifier("remote.pair")
         }
-        .padding(Space.s4)
+        .padding(.horizontal, RemoteMetrics.inset)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.top, RemoteMetrics.header)
     }

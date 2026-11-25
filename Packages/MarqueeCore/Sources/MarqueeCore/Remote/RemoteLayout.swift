@@ -41,10 +41,13 @@ public enum RemoteShape: Sendable { case column, row, compact }
 /// All measures are points on a 4 grid, relative to the panel's top-left corner.
 public enum RemoteMetrics {
     public static let grid: CGFloat = 4
+    /// The window's edge margin for the panel itself.
     public static let margin: CGFloat = 16
+    /// Space between the card's edge and everything on its face.
+    public static let inset: CGFloat = 20
     public static let gap: CGFloat = 12
     public static let key: CGFloat = 56
-    public static let header: CGFloat = 56
+    public static let header: CGFloat = 52
     public static let padMin: CGFloat = 144
     /// Three keys and the two gaps between them.
     public static let stripWidth: CGFloat = 192
@@ -102,7 +105,7 @@ public struct RemoteLayout: Equatable, Sendable {
         let m = RemoteMetrics.self
         let w = Self.onGrid(max(width, m.minPanel))
         let h = Self.onGrid(max(height, m.minPanel))
-        let area = CGRect(left: m.margin, top: m.header, right: w - m.margin, bottom: h - m.margin - tray)
+        let area = CGRect(left: m.inset, top: m.header, right: w - m.inset, bottom: h - m.inset - tray)
         let wanted = RemoteStrip.allCases.filter { strip in strip.modules.contains { visible.contains($0) } }
         let shape: RemoteShape
         if area.width >= 1.25 * area.height, area.width >= m.padMin + m.gap + m.stripWidth {
