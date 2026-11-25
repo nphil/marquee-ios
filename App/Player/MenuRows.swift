@@ -76,14 +76,23 @@ struct PopoverArrowTint: UIViewRepresentable {
             apply()
         }
 
+        /// Setting the colour rebuilds the popover's views, which moves this one to the window again: without the
+        /// guard that re-enters here until the stack runs out.
+        private var applying = false
+
         func apply() {
+            guard !applying, color != .clear else { return }
             var responder: UIResponder? = self
             while let current = responder {
                 if let controller = current as? UIViewController {
                     var chain: UIViewController? = controller
                     while let link = chain {
                         if let popover = link.presentationController as? UIPopoverPresentationController {
-                            popover.backgroundColor = color
+                            if popover.backgroundColor != color {
+                                applying = true
+                                popover.backgroundColor = color
+                                applying = false
+                            }
                             return
                         }
                         chain = link.parent
