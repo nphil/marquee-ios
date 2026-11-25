@@ -27,8 +27,9 @@ jobs:
         run: |
           set -euo pipefail
           older() {
-            gh run list -R "$REPO" --workflow ios.yml --branch "$BRANCH" --status in_progress \
-              --json databaseId,headSha --jq ".[] | select(.headSha != \"$SHA\") | .databaseId"
+            # Any unfinished state: a run whose jobs wait for a Mac slot reports "queued", not "in_progress".
+            gh run list -R "$REPO" --workflow ios.yml --branch "$BRANCH" --limit 20 --json databaseId,headSha,status \
+              --jq ".[] | select(.headSha != \"$SHA\" and .status != \"completed\") | .databaseId"
           }
           released() {
             gh run view "$1" -R "$REPO" --json jobs \
