@@ -102,6 +102,8 @@ final class EnhanceController {
 
     private func changed(to state: EnhanceState) {
         self.state = state
+        // The picture's rectangle is only known once a frame has been drawn.
+        layerView?.layoutEnhancer()
         let name: String
         var reason: String?
         switch state {

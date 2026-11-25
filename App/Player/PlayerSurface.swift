@@ -18,26 +18,46 @@ final class PlayerLayerView: UIView {
     /// The picture enhancer drawing over the player layer, with the same frame and gravity
     /// (docs/DESIGN.md, Enhance picture). Below the subtitles and controls, which are SwiftUI views above this one.
     private(set) var enhancer: PictureEnhancer?
+    private var gravityObservation: NSKeyValueObservation?
+    private var readyObservation: NSKeyValueObservation?
 
     func setEnhancer(_ enhancer: PictureEnhancer?) {
         guard enhancer !== self.enhancer else { return }
         self.enhancer?.layer.removeFromSuperlayer()
         self.enhancer = enhancer
+        gravityObservation = nil
+        readyObservation = nil
         if let enhancer {
             layer.addSublayer(enhancer.layer)
+            // The enhancer follows the player layer when its gravity changes and when its first picture
+            // arrives, which is when `videoRect` becomes known; layout alone sees neither.
+            gravityObservation = playerLayer.observe(\.videoGravity) { [weak self] _, _ in
+                Task { @MainActor in self?.layoutEnhancer() }
+            }
+            readyObservation = playerLayer.observe(\.isReadyForDisplay) { [weak self] _, _ in
+                Task { @MainActor in self?.layoutEnhancer() }
+            }
             layoutEnhancer()
         }
     }
 
-    private func layoutEnhancer() {
+    /// Puts the enhancer's layer exactly over the picture the player layer draws. `videoRect` is that picture
+    /// whatever the gravity, so Fit, Fill and the rest stay as they are with Enhance on; before the player has a
+    /// picture, the bounds and the gravity stand in for it.
+    func layoutEnhancer() {
         guard let enhancer else { return }
+        let picture = playerLayer.isReadyForDisplay ? playerLayer.videoRect : .zero
+        let usesPicture = picture.width > 0 && picture.height > 0
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        enhancer.layer.frame = bounds
-        enhancer.layer.videoGravity = playerLayer.videoGravity
+        enhancer.layer.frame = usesPicture ? picture : bounds
+        // The picture rectangle already is the fitted or filled one: the buffer, which has the picture's own
+        // shape, stretches to it.
+        enhancer.layer.videoGravity = usesPicture ? .resize : playerLayer.videoGravity
         CATransaction.commit()
+        let area = usesPicture ? picture.size : bounds.size
         let scale = traitCollection.displayScale
-        enhancer.displaySize = CGSize(width: bounds.width * scale, height: bounds.height * scale)
+        enhancer.displaySize = CGSize(width: area.width * scale, height: area.height * scale)
     }
 
     func prepareStandby(_ player: AVPlayer) {
