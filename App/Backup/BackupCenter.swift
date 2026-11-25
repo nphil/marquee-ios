@@ -406,11 +406,21 @@ final class BackupCenter {
     /// The folder the person picked in Files.
     func chooseFolder(_ result: Result<URL, any Error>) {
         switch result {
-        case .success(let url): adopt(folder: url)
+        case .success(let url):
+            Diag.event(.app, "backup.folder", ["state": "chosen"], .notice)
+            adopt(folder: url)
         case .failure(let error):
             guard (error as? CocoaError)?.code != .userCancelled else { return }
-            problem = Self.words(for: error)
+            failFolder(error)
         }
+    }
+
+    /// Every way choosing a folder can fail ends here, in a sentence beside the switch and in the log.
+    private func failFolder(_ error: any Error) {
+        let words = Self.words(for: error)
+        problem = words
+        automaticProblem = words
+        Diag.event(.app, "backup.folder", ["state": "failed", "reason": Self.reason(error)], .warning)
     }
 
     func stopAutomatic() {
@@ -435,7 +445,10 @@ final class BackupCenter {
     }
 
     private func adopt(folder url: URL) {
-        guard let account else { return }
+        guard let account else {
+            failFolder(BackupError.noAccount)
+            return
+        }
         problem = nil
         activity = .working("Checking the folder")
         Task {
@@ -445,7 +458,7 @@ final class BackupCenter {
                 let existing = try await BackupFiles.blocking { try BackupFiles.current(inFolder: bookmark) }
                 let found = existing.flatMap { try? Backup.inspect($0) }
                 if let found, !Backup.belongs(found, to: account) {
-                    problem = Self.words(for: BackupFiles.Failure.otherAccount)
+                    failFolder(BackupFiles.Failure.otherAccount)
                     return
                 }
                 folderBookmark = bookmark
@@ -463,8 +476,7 @@ final class BackupCenter {
                     await writeIfChanged()
                 }
             } catch {
-                problem = Self.words(for: error)
-                Diag.event(.app, "backup.auto.failed", ["reason": Self.reason(error)], .warning)
+                failFolder(error)
             }
         }
     }

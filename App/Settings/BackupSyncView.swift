@@ -9,7 +9,6 @@ struct BackupSyncView: View {
     @Environment(\.theme) private var theme
     @Environment(ThemeStore.self) private var store
     @State private var choosingBackup = false
-    @State private var choosingFolder = false
     @State private var editingPassphrase = false
     @State private var confirmsRemoval = false
 
@@ -96,7 +95,7 @@ struct BackupSyncView: View {
                         Text(center.lastAutomatic?.stamp ?? "Not yet").foregroundStyle(theme.ink2)
                     }
                     .accessibilityIdentifier("backup.auto.last")
-                    Button("Choose Another Folder…") { choosingFolder = true }
+                    Button("Choose Another Folder…") { FolderPicker.present { center.chooseFolder($0) } }
                         .accessibilityIdentifier("backup.folder")
                 }
             } footer: {
@@ -133,7 +132,7 @@ struct BackupSyncView: View {
 
     private func setAutomatic(_ on: Bool, _ center: BackupCenter) {
         if on {
-            if center.prepareAutomatic() { choosingFolder = true }
+            if center.prepareAutomatic() { FolderPicker.present { center.chooseFolder($0) } }
         } else {
             center.stopAutomatic()
         }
@@ -194,8 +193,6 @@ struct BackupSyncView: View {
                 ) { center.exported($0) }
             Color.clear
                 .fileImporter(isPresented: $choosingBackup, allowedContentTypes: [.marqueeBackup]) { center.restore(from: $0) }
-            Color.clear
-                .fileImporter(isPresented: $choosingFolder, allowedContentTypes: [.folder]) { center.chooseFolder($0) }
         }
         .accessibilityHidden(true)
     }
