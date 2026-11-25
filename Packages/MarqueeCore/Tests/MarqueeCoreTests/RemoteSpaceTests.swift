@@ -17,7 +17,9 @@ struct RemoteSpaceTests {
     }
 
     @Test func theKeyboardLiftsThePanelAboveIt() {
-        #expect(space(keyboardTop: 500).panelBounds.maxY == 500 - 16)
+        // Typed first: the macro's literal arithmetic did not compare equal on the CI toolchain.
+        let above: CGFloat = 500 - 16
+        #expect(space(keyboardTop: 500).panelBounds.maxY == above)
         #expect(space(keyboardTop: 852).panelBounds == space().panelBounds)
     }
 
