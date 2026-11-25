@@ -963,6 +963,7 @@ struct MoreMenu: View {
         // The popover hangs over the button: the controls it would cover stay clear.
         .popover(isPresented: Binding(get: { model.showsMore }, set: { model.showsMore = $0 }), arrowEdge: .bottom) {
             MorePanel(model: model, carriesPictureInPicture: carriesPictureInPicture, room: room, width: panelWidth) { model.showsMore = false }
+                .background { PopoverArrowTint(color: theme.sheet) }
                 .presentationCompactAdaptation(.popover)
                 .presentationBackground(theme.sheet)
         }
@@ -1002,13 +1003,19 @@ private struct MorePanel: View {
     var body: some View {
         let measured = content
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { contentHeight = $0 }
+        // A page that fits stands as it is; one that does not scrolls, with the system's soft edge effect
+        // where rows slide under the top and bottom, and its indicator flashing once when it opens.
         Group {
-            if contentHeight > room {
+            if contentHeight + 2 * MenuMetrics.edge > room {
                 ScrollView { measured }
                     .scrollBounceBehavior(.basedOnSize)
+                    .contentMargins(.vertical, MenuMetrics.edge, for: .scrollContent)
+                    .scrollEdgeEffectStyle(.soft, for: [.top, .bottom])
+                    .scrollIndicatorsFlash(onAppear: true)
                     .frame(height: room)
             } else {
                 measured
+                    .padding(.vertical, MenuMetrics.edge)
             }
         }
         .frame(width: width)
@@ -1165,31 +1172,9 @@ private struct MorePanel: View {
     // MARK: Choices
 
     private func back(_ title: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Button {
-                Haptics.impact(.light)
-                go(.root)
-            } label: {
-                HStack(spacing: Space.s2) {
-                    Image(systemName: "chevron.backward")
-                        .font(.footnote.weight(.semibold))
-                        .foregroundStyle(theme.accent)
-                    Text(title)
-                        .textRole(.body)
-                        .fontWeight(.semibold)
-                        .foregroundStyle(theme.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, Space.s4)
-                .frame(minHeight: Size.target)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(title)
-            .accessibilityHint("Back")
-            rule
+        MenuHeader(title: title) {
+            Haptics.impact(.light)
+            go(.root)
         }
     }
 
@@ -1201,7 +1186,7 @@ private struct MorePanel: View {
         } label: {
             HStack(spacing: Space.s3) {
                 Text(title)
-                    .textRole(.body)
+                    .font(.subheadline)
                     .foregroundStyle(theme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
@@ -1212,8 +1197,9 @@ private struct MorePanel: View {
                         .foregroundStyle(theme.accent)
                 }
             }
-            .padding(.horizontal, Space.s4)
-            .frame(minHeight: Size.target)
+            .padding(.horizontal, MenuMetrics.margin)
+            .padding(.vertical, MenuMetrics.vertical)
+            .frame(minHeight: MenuMetrics.rowHeight)
             .contentShape(Rectangle())
             .opacity(isEnabled ? 1 : 0.5)
         }
@@ -1227,9 +1213,9 @@ private struct MorePanel: View {
     /// Words among the rows: why something cannot be chosen.
     private func note(_ text: String) -> some View {
         Text(text)
-            .textRole(.caption)
+            .font(.footnote)
             .foregroundStyle(theme.ink2)
-            .padding(.horizontal, Space.s4)
+            .padding(.horizontal, MenuMetrics.margin)
             .padding(.vertical, Space.s2)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -1257,7 +1243,7 @@ private struct MorePanel: View {
 }
 
 /// One row: icon, title on one line, then the value in secondary ink and a chevron. At accessibility text
-/// sizes the value drops under the title.
+/// sizes the value drops under the title. Text is `.subheadline`, as in a system menu.
 private struct RowFace: View {
     let title: String
     let systemImage: String
@@ -1266,11 +1252,12 @@ private struct RowFace: View {
     var checked: Bool?
     @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
-    @ScaledMetric(relativeTo: .body) private var column = Size.menuGlyph
+    @ScaledMetric(relativeTo: .subheadline) private var column = MenuMetrics.glyph
 
     var body: some View {
         HStack(spacing: Space.s3) {
             Image(systemName: systemImage)
+                .font(.subheadline)
                 .foregroundStyle(theme.accent)
                 .frame(width: column)
             if typeSize.isAccessibilitySize {
@@ -1296,14 +1283,15 @@ private struct RowFace: View {
                     .foregroundStyle(theme.accent)
             }
         }
-        .padding(.horizontal, Space.s4)
-        .frame(minHeight: Size.target)
+        .padding(.horizontal, MenuMetrics.margin)
+        .padding(.vertical, MenuMetrics.vertical)
+        .frame(minHeight: MenuMetrics.rowHeight)
         .contentShape(Rectangle())
     }
 
     private var titleText: some View {
         Text(title)
-            .textRole(.body)
+            .font(.subheadline)
             .foregroundStyle(theme.ink)
             .lineLimit(1)
             .minimumScaleFactor(0.75)
@@ -1313,7 +1301,7 @@ private struct RowFace: View {
     private var valueText: some View {
         if let value {
             Text(value)
-                .textRole(.body)
+                .font(.subheadline)
                 .foregroundStyle(theme.ink2)
                 .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
                 .minimumScaleFactor(0.8)
