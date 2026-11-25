@@ -95,7 +95,7 @@ extension XCTestCase {
         func point(_ y: CGFloat) -> XCUICoordinate {
             app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: y / app.frame.height))
         }
-        for _ in 0..<8 {
+        for _ in 0..<16 {
             if isVisible() { return target }
             let up = !(target.exists && target.frame.midY < viewport.midY)
             let from = point(up ? span.bottom : span.top)

@@ -237,6 +237,7 @@ final class PlayerScreenshotTests: XCTestCase {
         openMore(in: app)
         let row = element("player.enhancePicture", in: app)
         XCTAssertTrue(row.waitForExistence(timeout: 5), "No Enhance Picture row in the More menu")
+        XCTAssertNotNil(scrollMenu(in: app) { row.isHittable ? row : nil }, "Enhance Picture is out of reach")
         row.tap()
         let automatic = element("player.enhance.automatic", in: app)
         XCTAssertTrue(automatic.waitForExistence(timeout: 5), "No Automatic choice")
@@ -683,14 +684,21 @@ private extension XCTestCase {
     /// still before letting go so the menu stops where the drag ends, until `row` finds one that can be tapped.
     @MainActor
     func scrollMenu(in app: XCUIApplication, to row: () -> XCUIElement?) -> XCUIElement? {
+        // The More panel is a popover over the bottom row, so the drags run inside its own frame; the
+        // tracks menu hangs from the right of the screen.
+        let panel = app.descendants(matching: .any)["player.more.menu"]
         for _ in 0..<12 {
             if let found = row() { return found }
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.85)).press(
-                forDuration: 0.1,
-                thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.3)),
-                withVelocity: .slow,
-                thenHoldForDuration: 0.2
-            )
+            let from: XCUICoordinate
+            let to: XCUICoordinate
+            if panel.exists {
+                from = panel.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.85))
+                to = panel.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.15))
+            } else {
+                from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.85))
+                to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.75, dy: 0.3))
+            }
+            from.press(forDuration: 0.1, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
         }
         return row()
     }

@@ -406,7 +406,12 @@ final class PlayerModel: Identifiable {
         layerView.playerLayer.videoGravity = .resize
         layerView.playerLayer.player = backend.player
         pictureInPicture = backend.player == nil ? nil : PictureInPicture(layer: layerView.playerLayer)
-        enhance = backend.player == nil ? nil : EnhanceController(layerView: layerView)
+        var offersEnhance = backend.player != nil
+        #if DEBUG
+        // The still frame has no player, but the tests drive the Enhance Picture menu on it.
+        offersEnhance = offersEnhance || FakePlex.root != nil
+        #endif
+        enhance = offersEnhance ? EnhanceController(layerView: layerView) : nil
         #if DEBUG
         // The still frame has no player layer, so no window to open: `-marquee.uitest.pip YES` offers one anyway,
         // for the tests that place its button.
