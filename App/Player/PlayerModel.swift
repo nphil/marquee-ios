@@ -238,30 +238,6 @@ final class PlayerModel: Identifiable {
         var isAnime: Bool
     }
 
-    /// What a track change can switch inside the playing stream; anything else needs a new stream.
-    private struct StreamKey: Equatable {
-        var kind: PlaybackRoute.Kind
-        var audio: Int?
-        var burnedIn: Int?
-        var remuxText: Int?
-        var reencodes: Bool
-        var bitrate: Int?
-        var resolution: String?
-
-        init(_ route: PlaybackRoute) {
-            kind = route.kind
-            audio = route.kind == .directPlay ? nil : route.audio?.id
-            reencodes = route.reencodesVideo
-            bitrate = route.maxVideoBitrateKbps
-            resolution = route.videoResolution
-            switch route.subtitle {
-            case .burnedIn(let track): burnedIn = track.id
-            case .sidecar(let track) where route.kind == .remux && !track.isImageBased: remuxText = track.id
-            default: break
-            }
-        }
-    }
-
     /// The skip past the intro being confirmed (`SkipCheck`), and the movie time it last looked at.
     @ObservationIgnored private var skipCheck: SkipCheck?
     @ObservationIgnored private var skipCheckAt: TimeInterval?
@@ -2420,6 +2396,7 @@ final class PlayerModel: Identifiable {
 
     private func arrived() {
         recovery.reset()
+        stallWatch.streamStarted(now: ProcessInfo.processInfo.systemUptime)
         startDeadline?.cancel()
         startDeadline = nil
         phase = .playing
@@ -2706,7 +2683,8 @@ final class PlayerModel: Identifiable {
             if let images = sidecar.bitmaps {
                 overlayTrack = images
             } else {
-                // Over a remux the file also rides in the stream, for AVPlayer to draw in Picture in Picture.
+                // Over a remux that started with the file, it also rides in the stream for Picture in Picture; a file
+                // picked later is only drawn here, so the stream is not restarted for it.
                 textCues = sidecar.cues
             }
         case .inStream(let track) where route.kind == .remux && track.isImageBased:

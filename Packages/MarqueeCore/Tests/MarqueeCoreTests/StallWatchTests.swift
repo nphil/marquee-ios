@@ -70,4 +70,29 @@ struct StallWatchTests {
         #expect(watch.check(now: 0, position: 3590, run: done) == .network(seconds: 0))
         #expect(watch.check(now: 3, position: 3590, run: done) == .network(seconds: 3))
     }
+
+    @Test func aFreshRunsPlayerGetsFourSecondsBeforeItsOutputCountsAsUnplayed() {
+        var watch = StallWatch()
+        let run = StallWatch.Run(produced: 825, fetching: true)
+        watch.streamStarted(now: 100)
+        #expect(watch.check(now: 100, position: 775.5, run: run) == .network(seconds: 0))
+        #expect(watch.check(now: 101.25, position: 775.5, run: run) == .network(seconds: 1.25))
+        #expect(watch.check(now: 103.5, position: 775.5, run: run) == .network(seconds: 3.5))
+        #expect(watch.check(now: 104, position: 775.5, run: run) == .stuck(ahead: 49.5, cause: .unplayed))
+    }
+
+    @Test func aWaitLongAfterTheStartIsStuckAfterASecond() {
+        var watch = StallWatch()
+        let run = StallWatch.Run(produced: 825, fetching: true)
+        watch.streamStarted(now: 100)
+        #expect(watch.check(now: 130, position: 775.5, run: run) == .network(seconds: 0))
+        #expect(watch.check(now: 131, position: 775.5, run: run) == .stuck(ahead: 49.5, cause: .unplayed))
+    }
+
+    @Test func aFreshRunThatDoesNothingIsStillStuckAfterASecond() {
+        var watch = StallWatch()
+        watch.streamStarted(now: 100)
+        #expect(watch.check(now: 100, position: 774.5, run: Self.idle) == .network(seconds: 0))
+        #expect(watch.check(now: 101, position: 774.5, run: Self.idle) == .stuck(ahead: 5.5, cause: .idle))
+    }
 }

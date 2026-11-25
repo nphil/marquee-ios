@@ -45,6 +45,11 @@ public struct StallWatch: Sendable {
     /// after two seeks and drained to empty with no engine event (Stashy, VideoEngine 3.0.0, 2026-11-24).
     static let finishedPatience: TimeInterval = 5
 
+    /// How long the player may wait just after a stream starts or lands before sitting on output counts as stuck.
+    /// A fresh run shows 30+ s of output at once while AVPlayer has not yet judged its buffer: it waited
+    /// 1.2 s with 49 s ahead and then played, while a restart at 1.2 s twice ended the playback (2026-11-25).
+    static let startGrace: TimeInterval = 4
+
     private struct Wait {
         var start: TimeInterval
         /// When the run last read or added output, and where its output ended then.
@@ -54,8 +59,16 @@ public struct StallWatch: Sendable {
 
     private var wait: Wait?
     private var lastRestart: TimeInterval?
+    private var startedAt: TimeInterval?
 
     public init() {}
+
+    /// A stream has started or landed: a wait that begins within `startGrace` of it is not `unplayed` before
+    /// it has lasted that long.
+    public mutating func streamStarted(now: TimeInterval) {
+        startedAt = now
+        wait = nil
+    }
 
     /// - Parameters:
     ///   - now: Seconds on a monotonic clock.
@@ -69,10 +82,11 @@ public struct StallWatch: Sendable {
             wait.produced = run.produced
         }
         let waited = now - wait.start
+        let settling = startedAt.map { wait.start - $0 < Self.startGrace } ?? false
         let ahead = run.map { $0.produced - position } ?? 0
         let cause: Cause? = if run == nil {
             nil
-        } else if waited >= Self.patience, ahead >= Self.ample {
+        } else if waited >= (settling ? Self.startGrace : Self.patience), ahead >= Self.ample {
             .unplayed
         } else if run?.finished == true ? waited >= Self.finishedPatience : now - wait.active >= Self.patience {
             .idle
