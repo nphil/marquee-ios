@@ -15,6 +15,7 @@ Read first: `docs/HANDOFF.md` (unfinished work, how it lands, decisions already 
 - **Themes and tokens.** Every colour comes from the theme (`@Environment(\.theme)`, roles in `Resources/themes.json`); space, size and radius from `App/DesignSystem/Tokens.swift`. No hex or raw numbers in views, and plugins/integrations supply data, never styling. A new surface must read in all 40 themes at default and accessibility text sizes.
 - **Integrations are plugins.** Off until enabled in Settings, each with its own page; the core stays minimal.
 - **Log through `Diag`.** New features log what they do with `Diag.event` (App) or `DiagHub` (Core), never `print` or a new `Logger`. Never log a secret, a token, the ntfy topic, or a playback or transcode URL.
+- **Backups cover settings by default.** A new `marquee.` defaults key is in the backup file unless `BackupScope.phone` leaves it out; a new Keychain secret is not, until it is added there by name; a value that must stay on the phone (device state, caches, anything tied to the sign-in) gets an `out(...)` rule. The file's version changes only for something an older reader cannot ignore: new fields and kinds are added, never reused.
 - **Push straight to `main`.** No feature branches or PRs (`/data/home/lgtv/CLAUDE.md`). Before pushing run the touched package's tests; docs-only commits use `[skip ci]`. A small, low-risk change (owner's decision, 2026-11-24) carries `[skip ui]` in the pushed head commit: the build, unit tests and release run, the UI shards do not. Anything that touches the player, navigation or a screen's layout keeps them. UI shards of an older push to the same branch are cancelled by a newer one. Fetch and rebase right before push, because several agents land work on `main` at once. Exception: while `docs/HANDOFF.md` describes an open batch, its work lands on the batch's branch and `main` is pushed once for the whole batch.
 - **`apps.json` and the release job are CI-owned.** The release job creates the GitHub release and commits `Update the Feather source for vX.Y.Z [skip ci]`; never hand-edit `apps.json`, tag, or bump a version. The version comes from the newest tag plus one patch.
 - **Measure before claiming.** "Faster" or "fixed" needs a frame or video result; "accepted" means checked on the actual iPhone with the receipt recorded; untested cases are listed as untested.
@@ -23,7 +24,7 @@ Read first: `docs/HANDOFF.md` (unfinished work, how it lands, decisions already 
 
 ## Module map
 
-`Packages/MarqueeCore` (Foundation only; `Security` only in `KeychainStore`; CryptoKit only in `LinkKeys`, swift-crypto in its place on Linux), under `Sources/MarqueeCore/`:
+`Packages/MarqueeCore` (Foundation only; `Security` only in `KeychainStore`; CryptoKit only in `LinkKeys` and `Backup/BackupCrypto`, swift-crypto in its place on Linux), under `Sources/MarqueeCore/`:
 
 | Folder | Holds |
 |---|---|
@@ -37,6 +38,7 @@ Read first: `docs/HANDOFF.md` (unfinished work, how it lands, decisions already 
 | `Downloads/` | `DownloadRecord` and `DownloadStore`, `PlexDownloadQueue`, `DownloadQualityPlan` (tiers sized per title, measured or estimated), `HomeLabber` (quality map client), `QualityMapAnswer` and `QualityCurve` (a title's measured curve per screen, and the steps Auto streams at), `QualityMapCache`, `TranscodeLadder`, `HLSPlaylist` and `StreamedFile` (a conversion's segments joined into one `.ts`) |
 | `Navigation/` | `Destination` and `TabLayout`: the person's tabs and their rules |
 | `Link/` | Linked phones: `LinkInvite` (the QR code's link, ids, names), `LinkKeys` (HKDF keys), `LinkMessage` (preamble, messages, status, `LinkDialing`, `LinkStatusPacer`) |
+| `Backup/` | The backup file (`BackupFile`: container, header; `Backup`: seal, open, inspect), its keys (`BackupKeyring`, `BackupAccount`; `BackupCrypto`: ChaCha20-Poly1305, HKDF, PBKDF2), what it covers (`BackupScope`, `BackupSnapshot`) and the all-or-nothing restore (`BackupRestore`, over the platform's `BackupStore`) |
 
 Reveal as Spoken gets its word timing from SpeechDock through `App/Player/WordTiming.swift`. Remote server content in the App is `App/Browse/Remote.swift`.
 

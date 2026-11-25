@@ -5,12 +5,16 @@ import Security
 /// Secrets in the Keychain: the account token, and encoded servers since they carry access tokens.
 ///
 /// Items stay on this device (never synced or restored to another phone) and are readable after the
-/// first unlock, so playback reporting keeps working with the screen locked.
+/// first unlock, so playback reporting keeps working with the screen locked. The one exception is a
+/// `synchronizable` store, which holds the backup key: its items travel through iCloud Keychain to the
+/// account's other devices when that is on, and stay readable after the first unlock.
 public struct KeychainStore: Sendable {
     public let service: String
+    public let synchronizable: Bool
 
-    public init(service: String = "com.nphil.marquee") {
+    public init(service: String = "com.nphil.marquee", synchronizable: Bool = false) {
         self.service = service
+        self.synchronizable = synchronizable
     }
 
     public func data(for key: String) throws -> Data? {
@@ -35,7 +39,8 @@ public struct KeychainStore: Sendable {
         }
         let attributes: [String: Any] = [
             kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+            kSecAttrAccessible as String: synchronizable
+                ? kSecAttrAccessibleAfterFirstUnlock : kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
         var status = SecItemUpdate(baseQuery(key) as CFDictionary, attributes as CFDictionary)
         if status == errSecItemNotFound {
@@ -54,12 +59,14 @@ public struct KeychainStore: Sendable {
     }
 
     private func baseQuery(_ key: String) -> [String: Any] {
-        [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
             kSecUseDataProtectionKeychain as String: true,
         ]
+        if synchronizable { query[kSecAttrSynchronizable as String] = true }
+        return query
     }
 }
 
