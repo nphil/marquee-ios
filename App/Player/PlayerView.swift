@@ -74,7 +74,13 @@ struct PlayerView: View {
                     model: model, offer: model.offer, waitsForNetwork: model.waitsForNetwork, frames: frames, close: close,
                     minimise: minimise
                 ) { bottomControls = $0 }
+                    .opacity(model.enhanceDragging ? 0 : 1)
+                    .animation(reduceMotion ? .easeOut(duration: 0.12) : .easeOut(duration: 0.2), value: model.enhanceDragging)
                     .transition(.opacity)
+            }
+            if model.showsEnhance {
+                EnhancePanel(model: model, screenWidth: screen.width, bottomInset: bottomControls.height + Space.s2)
+                    .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9, anchor: .bottomTrailing)))
             }
             OfferView(model: model, offer: model.offer)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
@@ -109,6 +115,7 @@ struct PlayerView: View {
         .preferredColorScheme(.dark)
         .statusBarHidden(!model.chromeVisible)
         .persistentSystemOverlays(model.chromeVisible ? .automatic : .hidden)
+        .animation(.snappy(duration: 0.3), value: model.showsEnhance)
         .accessibilityAction(.escape) { minimise() }
         .accessibilityAction(.magicTap) { model.togglePlay() }
         .diagPresentation("player.episodes", isPresented: model.showsEpisodes && !sideLayout)

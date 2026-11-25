@@ -945,7 +945,6 @@ struct MoreMenu: View {
     var carriesPictureInPicture = false
     /// Height the popover may take; it scrolls when its rows are taller.
     let room: CGFloat
-    @State private var shows = false
     /// The button's trailing edge, which stands for the screen's width.
     @State private var screenWidth: CGFloat = 0
     @Environment(\.theme) private var theme
@@ -953,7 +952,7 @@ struct MoreMenu: View {
     var body: some View {
         Button {
             Haptics.impact(.light)
-            shows = true
+            model.showsMore = true
         } label: {
             Image(systemName: "ellipsis")
         }
@@ -962,12 +961,12 @@ struct MoreMenu: View {
         .accessibilityIdentifier("player.more")
         .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).maxX } action: { screenWidth = $0 }
         // The popover hangs over the button: the controls it would cover stay clear.
-        .popover(isPresented: $shows, arrowEdge: .bottom) {
-            MorePanel(model: model, carriesPictureInPicture: carriesPictureInPicture, room: room, width: panelWidth) { shows = false }
+        .popover(isPresented: Binding(get: { model.showsMore }, set: { model.showsMore = $0 }), arrowEdge: .bottom) {
+            MorePanel(model: model, carriesPictureInPicture: carriesPictureInPicture, room: room, width: panelWidth) { model.showsMore = false }
                 .presentationCompactAdaptation(.popover)
                 .presentationBackground(theme.sheet)
         }
-        .onChange(of: shows) { _, shown in
+        .onChange(of: model.showsMore) { _, shown in
             if shown { model.menuOpened() } else { model.menuClosed() }
         }
     }
@@ -1089,6 +1088,21 @@ private struct MorePanel: View {
         if model.quality == .original, model.isConverting { note("Your Plex server is converting this video.") }
         if model.castDevice == nil {
             open("Aspect", systemImage: "aspectratio", value: model.aspect.title, id: "player.aspect", page: .aspect)
+        }
+        if model.enhance != nil {
+            let value = enhanceValue
+            Button {
+                Haptics.impact(.light)
+                dismiss()
+                model.openEnhance()
+            } label: {
+                RowFace(title: "Enhance Picture", systemImage: "wand.and.sparkles", value: value, chevron: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Enhance Picture")
+            .accessibilityValue(value)
+            .accessibilityIdentifier("player.enhancePicture")
         }
         if model.castDevice == nil || model.enhancements.offered { rule }
         if model.castDevice == nil {
@@ -1227,6 +1241,12 @@ private struct MorePanel: View {
         let all: [(AudioEnhancements, String)] = [(.boostDialog, "Boost dialog"), (.normalizeLoudness, "Normalize loudness")]
         let asked = all.filter { model.enhancements.asked.contains($0.0) }.map { $0.1 }
         return asked.isEmpty ? "Off" : asked.joined(separator: ", ")
+    }
+
+    /// Off, Automatic or Line art; the reason while the enhancer cannot work on this picture.
+    private var enhanceValue: String {
+        if model.pictureEnhance.upscaler != .off, case .unavailable(let reason)? = model.enhance?.state { return reason.message }
+        return model.pictureEnhance.upscaler.title
     }
 
     private var qualityValue: String {

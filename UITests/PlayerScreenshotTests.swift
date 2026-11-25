@@ -230,6 +230,21 @@ final class PlayerScreenshotTests: XCTestCase {
         XCTAssertTrue(playing.waitForNonExistence(timeout: 10), "The video did not come back to the phone")
     }
 
+    /// More › Enhance Picture › Automatic brings the Sharpen and Deband sliders.
+    @MainActor
+    func testEnhancePictureShowsSliders() throws {
+        let app = launchPlayer(at: 61, paused: true, mode: "dark")
+        openMore(in: app)
+        let row = element("player.enhancePicture", in: app)
+        XCTAssertTrue(row.waitForExistence(timeout: 5), "No Enhance Picture row in the More menu")
+        row.tap()
+        let automatic = element("player.enhance.automatic", in: app)
+        XCTAssertTrue(automatic.waitForExistence(timeout: 5), "No Automatic choice")
+        automatic.tap()
+        XCTAssertTrue(element("player.enhanceSharpen", in: app).waitForExistence(timeout: 5), "No Sharpen slider")
+        XCTAssertTrue(element("player.enhanceDeband", in: app).exists, "No Deband slider")
+    }
+
     /// Picture in Picture stands in the top row on a phone on its side, where four buttons still leave the
     /// title room, and is the first row of More upright (DESIGN §8.6 item 2). Turning the phone moves it.
     @MainActor

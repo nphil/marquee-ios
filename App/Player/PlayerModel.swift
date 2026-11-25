@@ -181,6 +181,10 @@ final class PlayerModel: Identifiable {
     /// Auto holds its lowest rung on a link that cannot sustain it; a wait on the network then says why.
     private(set) var belowQualityFloor = false
     var showsInfo = false
+    var showsMore = false
+    /// The Enhance Picture panel over the player, and a slider of it being dragged (the chrome steps aside).
+    private(set) var showsEnhance = false
+    var enhanceDragging = false
     var showsStats = false
     var showsEpisodes = false
     /// Find Subtitles for the playing item.
@@ -831,6 +835,29 @@ final class PlayerModel: Identifiable {
         isScrubbing = false
         seek(to: target)
         scheduleHide()
+    }
+
+    var pictureEnhance: PictureEnhance { session.settings.pictureEnhance }
+
+    /// Writes the setting the Settings page uses and retunes the playing video.
+    func setEnhance(_ value: PictureEnhance) {
+        guard value != session.settings.pictureEnhance else { return }
+        session.settings.pictureEnhance = value
+        enhanceSettingsChanged()
+    }
+
+    /// The panel stands in the player, not in a popover, so a dragged slider can leave the picture clear.
+    func openEnhance() {
+        guard !showsEnhance else { return }
+        showsEnhance = true
+        menuOpened()
+    }
+
+    func closeEnhance() {
+        guard showsEnhance else { return }
+        showsEnhance = false
+        enhanceDragging = false
+        menuClosed()
     }
 
     func menuOpened() {
