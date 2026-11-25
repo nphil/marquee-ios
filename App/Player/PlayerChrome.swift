@@ -947,7 +947,6 @@ struct MoreMenu: View {
     let room: CGFloat
     /// The button's trailing edge, which stands for the screen's width.
     @State private var screenWidth: CGFloat = 0
-    @Environment(\.theme) private var theme
 
     var body: some View {
         Button {
@@ -963,9 +962,7 @@ struct MoreMenu: View {
         // The popover hangs over the button: the controls it would cover stay clear.
         .popover(isPresented: Binding(get: { model.showsMore }, set: { model.showsMore = $0 }), arrowEdge: .bottom) {
             MorePanel(model: model, carriesPictureInPicture: carriesPictureInPicture, room: room, width: panelWidth) { model.showsMore = false }
-                .background { PopoverArrowTint(color: theme.sheet) }
                 .presentationCompactAdaptation(.popover)
-                .presentationBackground(theme.sheet)
         }
         .onChange(of: model.showsMore) { _, shown in
             if shown { model.menuOpened() } else { model.menuClosed() }
@@ -985,7 +982,8 @@ struct MoreMenu: View {
 }
 
 /// The More popover: the three groups of rows, each opening its choices in place under a back row, so
-/// every level is the same width and the same hairline rhythm. Colours come from the theme only.
+/// every level is the same width and the same hairline rhythm. Native iOS: the system draws the popover's
+/// material and arrow, and the rows use system colours.
 private struct MorePanel: View {
     enum Page { case root, quality, aspect, speed, enhancements }
 
@@ -998,7 +996,6 @@ private struct MorePanel: View {
     @State private var forward = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var contentHeight: CGFloat = 0
-    @Environment(\.theme) private var theme
 
     var body: some View {
         let measured = content
@@ -1135,7 +1132,7 @@ private struct MorePanel: View {
     }
 
     private var rule: some View {
-        Divider().overlay(theme.edge)
+        Divider()
     }
 
     /// A row that opens `page`, with the current value before its chevron.
@@ -1187,14 +1184,14 @@ private struct MorePanel: View {
             HStack(spacing: Space.s3) {
                 Text(title)
                     .font(.subheadline)
-                    .foregroundStyle(theme.ink)
+                    .foregroundStyle(.primary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                 Spacer(minLength: 0)
                 if isOn {
                     Image(systemName: "checkmark")
                         .font(.footnote.weight(.semibold))
-                        .foregroundStyle(theme.accent)
+                        .foregroundStyle(.tint)
                 }
             }
             .padding(.horizontal, MenuMetrics.margin)
@@ -1214,7 +1211,7 @@ private struct MorePanel: View {
     private func note(_ text: String) -> some View {
         Text(text)
             .font(.footnote)
-            .foregroundStyle(theme.ink2)
+            .foregroundStyle(.secondary)
             .padding(.horizontal, MenuMetrics.margin)
             .padding(.vertical, Space.s2)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -1250,7 +1247,6 @@ private struct RowFace: View {
     let value: String?
     let chevron: Bool
     var checked: Bool?
-    @Environment(\.theme) private var theme
     @Environment(\.dynamicTypeSize) private var typeSize
     @ScaledMetric(relativeTo: .subheadline) private var column = MenuMetrics.glyph
 
@@ -1258,7 +1254,7 @@ private struct RowFace: View {
         HStack(spacing: Space.s3) {
             Image(systemName: systemImage)
                 .font(.subheadline)
-                .foregroundStyle(theme.accent)
+                .foregroundStyle(.primary)
                 .frame(width: column)
             if typeSize.isAccessibilitySize {
                 VStack(alignment: .leading, spacing: 0) {
@@ -1275,12 +1271,12 @@ private struct RowFace: View {
             if chevron {
                 Image(systemName: "chevron.forward")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(theme.ink3)
+                    .foregroundStyle(.secondary)
             }
             if checked == true {
                 Image(systemName: "checkmark")
                     .font(.footnote.weight(.semibold))
-                    .foregroundStyle(theme.accent)
+                    .foregroundStyle(.tint)
             }
         }
         .padding(.horizontal, MenuMetrics.margin)
@@ -1292,7 +1288,7 @@ private struct RowFace: View {
     private var titleText: some View {
         Text(title)
             .font(.subheadline)
-            .foregroundStyle(theme.ink)
+            .foregroundStyle(.primary)
             .lineLimit(1)
             .minimumScaleFactor(0.75)
     }
@@ -1302,7 +1298,7 @@ private struct RowFace: View {
         if let value {
             Text(value)
                 .font(.subheadline)
-                .foregroundStyle(theme.ink2)
+                .foregroundStyle(.secondary)
                 .lineLimit(typeSize.isAccessibilitySize ? 2 : 1)
                 .minimumScaleFactor(0.8)
         }

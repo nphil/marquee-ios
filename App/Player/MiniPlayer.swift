@@ -336,8 +336,10 @@ struct MiniPlayerBar<Picture: View>: View {
 extension View {
     /// The bar of a minimised playback, in the tab's own bottom inset above the tab bar. Only the selected
     /// tab shows it: the playback's layer view lives in one place at a time. `width` is the tab view's.
-    func miniBarInset(isSelected: Bool, width: CGFloat) -> some View {
-        modifier(MiniBarInset(isSelected: isSelected, width: width))
+    /// `remoteBar` adds the TV remote's mini bar beneath it: the system accessory is off while a playback is
+    /// minimised, and the remote's mini bar must stay reachable.
+    func miniBarInset(isSelected: Bool, width: CGFloat, remoteBar: Bool) -> some View {
+        modifier(MiniBarInset(isSelected: isSelected, width: width, remoteBar: remoteBar))
     }
 }
 
@@ -350,6 +352,7 @@ extension View {
 private struct MiniBarInset: ViewModifier {
     let isSelected: Bool
     let width: CGFloat
+    let remoteBar: Bool
     @Environment(AppSession.self) private var session
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -359,10 +362,13 @@ private struct MiniBarInset: ViewModifier {
         content
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if docked {
-                    hosted(size)
-                        .padding(.horizontal, Space.s5)
-                        .padding(.bottom, Space.s2)
-                        .transition(.opacity)
+                    VStack(spacing: Space.s2) {
+                        hosted(size)
+                        if remoteBar { hostedRemote }
+                    }
+                    .padding(.horizontal, Space.s5)
+                    .padding(.bottom, Space.s2)
+                    .transition(.opacity)
                 }
             }
             // The bar fades as the playback is minimised and ended, and does not as the tabs change.
@@ -377,6 +383,18 @@ private struct MiniBarInset: ViewModifier {
                 .glassEffect(.regular, in: RoundedRectangle(cornerRadius: Radius.card, style: .continuous))
         } else {
             Color.clear.frame(height: CGFloat(size.height))
+        }
+    }
+
+    /// The remote's mini bar: a 48 pt glass capsule like the system accessory's, under the playback's bar.
+    @ViewBuilder
+    private var hostedRemote: some View {
+        if isSelected {
+            TVRemoteMiniBar()
+                .frame(height: Size.target)
+                .glassEffect(.regular, in: Capsule())
+        } else {
+            Color.clear.frame(height: Size.target)
         }
     }
 }

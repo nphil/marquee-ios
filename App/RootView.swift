@@ -185,7 +185,7 @@ private struct MainTabs: View {
             ForEach(tabs) { destination in
                 Tab(destination.title, systemImage: destination.systemImage, value: destination, role: destination == .search ? .search : nil) {
                     BrowseStack(tab: destination.rawValue) { destination.page() }
-                        .miniBarInset(isSelected: destination == selection, width: tabsWidth)
+                        .miniBarInset(isSelected: destination == selection, width: tabsWidth, remoteBar: showsRemoteBar)
                 }
                 .badge(destination.badge(in: session))
             }
@@ -239,8 +239,9 @@ private struct MainTabs: View {
         session.remote.isEnabled && session.remote.access == .miniBar && session.place == .home && !session.glasses.isConnected
     }
 
-    /// The system's bottom accessory is the remote's mini bar alone: a minimised playback's bar is each tab's
-    /// own inset (`miniBarInset`), as the accessory's glass cannot hold a bar of that height.
+    /// The system's bottom accessory is the remote's mini bar when no playback is minimised. A minimised
+    /// playback's bar is each tab's own inset (`miniBarInset`), as the accessory's glass cannot hold a bar of
+    /// that height, and the remote's mini bar moves into that inset beneath it.
     private var showsAccessory: Bool {
         showsRemoteBar && session.player.docked == nil
     }

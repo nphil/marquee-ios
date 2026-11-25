@@ -40,6 +40,42 @@ final class RemoteScreenshotTests: XCTestCase {
         try await remoteAccessFlow(swipe: true)
     }
 
+    /// A minimised playback does not take the remote's mini bar away: it sits under the playback's bar and
+    /// swipes up to the remote's panel.
+    @MainActor
+    func testMiniBarBesideAMinimisedPlayback() throws {
+        let app = launchPlayingFilm(extra: [])
+        tap("player.minimise", in: app)
+        XCTAssertTrue(element("miniplayer", in: app).waitForExistence(timeout: 10), "Minimising left no bar")
+        let bar = element("remote.miniBar", in: app)
+        XCTAssertTrue(bar.waitForExistence(timeout: 10), "The remote's mini bar went with the minimised playback")
+        bar.swipeUp()
+        waitFor("remote.close", in: app)
+        tap("remote.close", in: app)
+        XCTAssertTrue(element("remote.close", in: app).waitForNonExistence(timeout: 5))
+    }
+
+    /// The floating button stays on screen over a minimised playback and opens the panel.
+    @MainActor
+    func testFloatingButtonOverAMinimisedPlayback() throws {
+        let app = launchPlayingFilm(extra: ["-marquee.uitest.remoteAccess", "floatingButton"])
+        tap("player.minimise", in: app)
+        XCTAssertTrue(element("miniplayer", in: app).waitForExistence(timeout: 10), "Minimising left no bar")
+        tap("remote.button", in: app)
+        waitFor("remote.pair", in: app)
+    }
+
+    @MainActor
+    private func launchPlayingFilm(extra: [String]) -> XCUIApplication {
+        let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine", arguments: [
+            "-marquee.fakeSignedIn", "YES", "-marquee.uitest.remote", "YES", "--ui-testing-place-home",
+            "-marquee.uitest.play", "212", "-marquee.uitest.playerTime", "61", "-marquee.uitest.paused", "YES",
+            "-marquee.uitest.frame", "art/caminandes-backdrop.jpg",
+        ] + extra, waitingFor: nil)
+        XCTAssertTrue(element("player.playPause", in: app).waitForExistence(timeout: 20), "The player did not open")
+        return app
+    }
+
     @MainActor
     func testFloatingButtonChoice() async throws {
         let tv = FakeTV()
