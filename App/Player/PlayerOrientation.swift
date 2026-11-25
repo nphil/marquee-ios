@@ -57,12 +57,16 @@ enum PlayerOrientation {
     ) {
         allowed = orientations
         guard let scene else { return }
-        var controller = scene.keyWindow?.rootViewController
+        // Every window, not only the key one: the report button's overlay window answers too, and in Stashy
+        // (iOS 27.0.1) such a window that was not asked again refused the turn to landscape.
         var top: UIViewController?
-        while let current = controller {
-            current.setNeedsUpdateOfSupportedInterfaceOrientations()
-            top = current
-            controller = current.presentedViewController
+        for window in scene.windows {
+            var controller = window.rootViewController
+            while let current = controller {
+                current.setNeedsUpdateOfSupportedInterfaceOrientations()
+                if window.isKeyWindow { top = current }
+                controller = current.presentedViewController
+            }
         }
         guard let turn else { return }
         // A turn asked for while the player's cover slides in was dropped, and the screen turned only when

@@ -55,6 +55,9 @@ private final class ReportButtonController: UIViewController {
     private var face: UIView?
     private var placed = false
 
+    /// The player's own answer, so this window never vetoes a turn the player asked for.
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { PlayerOrientation.allowed }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .clear
