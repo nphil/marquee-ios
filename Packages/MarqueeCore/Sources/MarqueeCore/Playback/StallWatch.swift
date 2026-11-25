@@ -41,6 +41,9 @@ public struct StallWatch: Sendable {
     static let patience: TimeInterval = 1
     /// Output past the playhead that a working player plays from: three 10 s segments.
     static let ample: TimeInterval = 30
+    /// How long the player may wait on a finished run. AVPlayer once stopped loading a finished run's playlist
+    /// after two seeks and drained to empty with no engine event (Stashy, VideoEngine 3.0.0, 2026-11-24).
+    static let finishedPatience: TimeInterval = 5
 
     private struct Wait {
         var start: TimeInterval
@@ -71,7 +74,7 @@ public struct StallWatch: Sendable {
             nil
         } else if waited >= Self.patience, ahead >= Self.ample {
             .unplayed
-        } else if run?.finished != true, now - wait.active >= Self.patience {
+        } else if run?.finished == true ? waited >= Self.finishedPatience : now - wait.active >= Self.patience {
             .idle
         } else {
             nil

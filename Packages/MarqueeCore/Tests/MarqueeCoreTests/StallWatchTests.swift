@@ -57,6 +57,13 @@ struct StallWatchTests {
         #expect(watch.check(now: 40, position: 800, run: nil) == .network(seconds: 0))
     }
 
+    @Test func aPlayerWaitingFiveSecondsOnAFinishedRunRestartsIt() {
+        var watch = StallWatch()
+        let done = StallWatch.Run(produced: 3600, fetching: false, finished: true)
+        #expect(watch.check(now: 0, position: 3590, run: done) == .network(seconds: 0))
+        #expect(watch.check(now: 5, position: 3590, run: done) == .stuck(ahead: 10, cause: .idle))
+    }
+
     @Test func aFinishedRunIsNotRestartedForDoingNothing() {
         var watch = StallWatch()
         let done = StallWatch.Run(produced: 3600, fetching: false, finished: true)
