@@ -182,9 +182,11 @@ final class PlayerModel: Identifiable {
     private(set) var belowQualityFloor = false
     var showsInfo = false
     var showsMore = false
-    /// The Enhance Picture panel over the player, and a slider of it being dragged (the chrome steps aside).
+    /// The Enhance Picture panel over the player, and the slider of it being dragged: while one is, the panel and
+    /// the chrome step aside and the player draws that slider alone, under the finger.
     private(set) var showsEnhance = false
-    var enhanceDragging = false
+    var enhanceDrag: EnhanceDrag?
+    var enhanceDragging: Bool { enhanceDrag != nil }
     var showsStats = false
     var showsEpisodes = false
     /// Find Subtitles for the playing item.
@@ -861,7 +863,7 @@ final class PlayerModel: Identifiable {
     func closeEnhance() {
         guard showsEnhance else { return }
         showsEnhance = false
-        enhanceDragging = false
+        enhanceDrag = nil
         menuClosed()
     }
 

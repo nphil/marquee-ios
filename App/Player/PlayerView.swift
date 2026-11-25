@@ -75,12 +75,16 @@ struct PlayerView: View {
                     minimise: minimise
                 ) { bottomControls = $0 }
                     .opacity(model.enhanceDragging ? 0 : 1)
-                    .animation(reduceMotion ? .easeOut(duration: 0.12) : .easeOut(duration: 0.2), value: model.enhanceDragging)
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: model.enhanceDragging)
                     .transition(.opacity)
             }
             if model.showsEnhance {
                 EnhancePanel(model: model, screenWidth: screen.width, bottomInset: bottomControls.height + Space.s2)
                     .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.9, anchor: .bottomTrailing)))
+            }
+            // The slider being dragged, alone: drawn here, over the hidden page and chrome, and gone on release.
+            if let drag = model.enhanceDrag {
+                EnhanceDragCapsule(drag: drag)
             }
             OfferView(model: model, offer: model.offer)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
