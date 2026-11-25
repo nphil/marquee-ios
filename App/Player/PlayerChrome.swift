@@ -995,6 +995,8 @@ private struct MorePanel: View {
     let width: CGFloat
     let dismiss: () -> Void
     @State private var page = Page.root
+    @State private var forward = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var contentHeight: CGFloat = 0
     @Environment(\.theme) private var theme
 
@@ -1015,8 +1017,26 @@ private struct MorePanel: View {
         .accessibilityIdentifier("player.more.menu")
     }
 
-    @ViewBuilder
+    /// Pages slide as a navigation stack's do, on one spring that the panel's height follows; Reduce Motion cross-fades.
+    private func go(_ next: Page) {
+        forward = next != .root
+        withAnimation(.snappy(duration: 0.35)) { page = next }
+    }
+
+    private var slide: AnyTransition {
+        reduceMotion ? .opacity : .push(from: forward ? .trailing : .leading)
+    }
+
     private var content: some View {
+        pageRows
+            .id(page)
+            .transition(slide)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+            .clipped()
+    }
+
+    @ViewBuilder
+    private var pageRows: some View {
         VStack(alignment: .leading, spacing: 0) {
             switch page {
             case .root: root
@@ -1101,7 +1121,7 @@ private struct MorePanel: View {
     private func open(_ title: String, systemImage: String, value: String, id: String, page next: Page) -> some View {
         Button {
             Haptics.impact(.light)
-            page = next
+            go(next)
         } label: {
             RowFace(title: title, systemImage: systemImage, value: value, chevron: true)
         }
@@ -1134,7 +1154,7 @@ private struct MorePanel: View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
                 Haptics.impact(.light)
-                page = .root
+                go(.root)
             } label: {
                 HStack(spacing: Space.s2) {
                     Image(systemName: "chevron.backward")
