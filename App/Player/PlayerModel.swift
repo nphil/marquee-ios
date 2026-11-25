@@ -261,6 +261,11 @@ final class PlayerModel: Identifiable {
     @ObservationIgnored private var serverAudio: Int?
     @ObservationIgnored private var serverSubtitle: Int?
     @ObservationIgnored private var recovery = StartRecovery()
+    /// A stream that failed while it played is started again at the last played position (`StreamReconnect`).
+    @ObservationIgnored private var reconnection = StreamReconnect()
+    /// Set from the failure to the new stream playing: the stream let go meanwhile ends no playback on the server.
+    @ObservationIgnored private var reconnecting = false
+    @ObservationIgnored private var reconnectBegan: ContinuousClock.Instant?
     /// Fails a server stream that is not playing `StartRecovery.readyDeadline` after it went to the player.
     @ObservationIgnored private var startDeadline: Task<Void, Never>?
     @ObservationIgnored private var introCancelled = false
@@ -606,6 +611,7 @@ final class PlayerModel: Identifiable {
     func retry() {
         Diag.event(.player, "retry", ["at": time, "route": route?.kind.rawValue], .notice)
         recovery.reset()
+        reconnection.reset()
         if route == nil {
             loadItem(loadingKey ?? item.ratingKey)
         } else {
@@ -1539,7 +1545,7 @@ final class PlayerModel: Identifiable {
                     Diag.event(.player, "remux.finished", ["written": progress.mediaSeconds])
                 case .failed(let error, let progress):
                     Diag.event(.player, "remux.failed", ["error": DiagFormat.describe(error), "written": progress.mediaSeconds], .warning)
-                    streamFailed(PlaybackFailure(text: error.localizedDescription))
+                    streamFailed(PlaybackFailure(text: error.localizedDescription, isRetryable: Self.isRetryable(error)))
                 default:
                     break
                 }
@@ -1570,7 +1576,8 @@ final class PlayerModel: Identifiable {
         case .remux(let remux):
             remux.stop()
         case .transcode(let session):
-            end(transcode: session, reporter: reporter)
+            // The stopped report would end the playback on the server and scrobble from a position mid-reconnect.
+            end(transcode: session, reporter: reconnecting ? nil : reporter)
         case .direct, nil:
             break
         }
@@ -2186,6 +2193,51 @@ final class PlayerModel: Identifiable {
         }
     }
 
+    /// A remux run's failure a new run can get past: the source unreachable or its read failing, not a refusal
+    /// that stays or a file the engine cannot make a stream of.
+    private static func isRetryable(_ error: VideoEngineError) -> Bool {
+        switch error {
+        case .sourceUnreachable(let status): StreamReconnect.isRetryable(status: status)
+        case .readFailed, .timedOut: true
+        default: false
+        }
+    }
+
+    /// A stream that fails while it plays starts again at the last played position, on the same route, after a
+    /// growing wait, and shows as buffering throughout. False when the failure is of the kind that stays or the
+    /// budget is spent: the failure then takes the way it always did.
+    private func reconnect(after failure: PlaybackFailure, route: PlaybackRoute) -> Bool {
+        guard phase == .playing, castDevice == nil, failure.isRetryable else { return false }
+        guard case .reconnect(let attempt, let wait) = reconnection.failed(now: ProcessInfo.processInfo.systemUptime) else {
+            reconnecting = false
+            return false
+        }
+        // A stream that was itself starting by this reconnect has its landing as the position.
+        let at = landing ?? time
+        let seconds = Double(wait.components.seconds) + Double(wait.components.attoseconds) / 1e18
+        Diag.event(.player, "stream.reconnect", [
+            "n": attempt, "after": seconds, "reason": failure.detail, "route": route.kind.rawValue, "at": at,
+        ], .warning)
+        if !reconnecting { reconnectBegan = .now }
+        reconnecting = true
+        generation += 1
+        let generation = generation
+        loadTask?.cancel()
+        landing = at
+        isBuffering = true
+        let address = streamConnection
+        // The lost stream's last reads say nothing of the link.
+        stopStream(measured: false)
+        loadTask = Task { [weak self] in
+            guard let self else { return }
+            if let address { await library.connection.reportFailure(of: address) }
+            try? await Task.sleep(for: wait)
+            guard generation == self.generation, !Task.isCancelled else { return }
+            await startStream(at: at, generation: generation)
+        }
+        return true
+    }
+
     private func streamFailed(_ failure: PlaybackFailure) {
         Diag.event(.player, "stream.failed", [
             "error": failure.text, "detail": failure.detail, "route": route?.kind.rawValue, "stream": diagStream, "at": time,
@@ -2195,6 +2247,7 @@ final class PlayerModel: Identifiable {
             fail(failure)
             return
         }
+        if reconnect(after: failure, route: route) { return }
         let at = time
         generation += 1
         let generation = generation
@@ -2258,6 +2311,7 @@ final class PlayerModel: Identifiable {
         Diag.event(.player, "failed", ["error": failure.text, "detail": failure.detail, "at": time, "route": route?.kind.rawValue], .error)
         failureDetail = failure.detail
         let message = failure.text
+        reconnecting = false
         // Work still under way for the failed stream, a landing among it, ends here.
         generation += 1
         stopStream()
@@ -2299,6 +2353,8 @@ final class PlayerModel: Identifiable {
         failureDetail = nil
         wroteBack = false
         recovery.reset()
+        reconnection.reset()
+        reconnecting = false
         introCancelled = false
         skippedIntroEnd = nil
         skipCheck = nil
@@ -2419,6 +2475,13 @@ final class PlayerModel: Identifiable {
         } else {
             Diag.event(.player, "landed", ["at": time, "stream": diagStream])
         }
+        if reconnecting {
+            reconnecting = false
+            reconnection.landed(at: time)
+            Diag.event(.player, "stream.reconnected", [
+                "n": reconnection.attempts, "at": time, "route": route?.kind.rawValue, "ms": reconnectBegan.map { Diag.ms(since: $0) },
+            ], .notice)
+        }
         publishPosition()
         report()
         // A picture left paused, by a call during the load say, keeps its controls.
@@ -2512,6 +2575,7 @@ final class PlayerModel: Identifiable {
         updateOffers(at: movie)
         if !markedWatched, duration > 0, movie >= duration * 0.9 { markWatched() }
         if Date.now.timeIntervalSince(lastReport) >= 1 { report() }
+        reconnection.playing(at: movie)
         checkSkip(at: movie, pending: isBuffering || !isPlaying)
         sample(at: movie)
     }

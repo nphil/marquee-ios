@@ -26,11 +26,15 @@ struct PlaybackFailure: Equatable {
     let detail: String
     /// The error, or the one beneath it, is a 404: the server no longer has the stream's files.
     let isNotFound: Bool
+    /// A new try may play: not a refusal that stays (401, 403, 404, 410) or a file the player cannot open
+    /// (`StreamReconnect`).
+    let isRetryable: Bool
 
-    init(text: String, detail: String? = nil, isNotFound: Bool = false) {
+    init(text: String, detail: String? = nil, isNotFound: Bool = false, isRetryable: Bool = true) {
         self.text = text
         self.detail = detail ?? text
         self.isNotFound = isNotFound
+        self.isRetryable = isRetryable && !isNotFound
     }
 
     init(_ error: NSError?, comment: String? = nil) {
@@ -43,7 +47,8 @@ struct PlaybackFailure: Equatable {
         if let comment, !comment.isEmpty { detail += " " + comment }
         let notFound = [error, cause].contains { ConversionWatch.isNotFound(domain: $0.domain, code: $0.code) }
             || ConversionWatch.isNotFound(domain: nil, code: 0, comment: comment)
-        self.init(text: error.localizedDescription, detail: detail, isNotFound: notFound)
+        let retryable = [error, cause].allSatisfy { StreamReconnect.isRetryable(domain: $0.domain, code: $0.code, comment: comment) }
+        self.init(text: error.localizedDescription, detail: detail, isNotFound: notFound, isRetryable: retryable)
     }
 }
 
