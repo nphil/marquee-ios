@@ -155,8 +155,8 @@ final class RecordingAlerts {
             center.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in
                 MainActor.assumeIsolated {
                     guard let self else { return }
-                    stopPolling()
-                    if isOn { RecordingRefresh.schedule() }
+                    self.stopPolling()
+                    if self.isOn { RecordingRefresh.schedule() }
                 }
             },
         ]
