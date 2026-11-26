@@ -295,7 +295,7 @@ private struct LiveGuideScreen: View {
                     details = ProgrammeSelection(airing: airing, channel: channel)
                     return
                 }
-                try await store.record(option, values: [:], airing: airing)
+                try await store.record(option, values: RecordingDraft.quickValues(for: airing, option: option), airing: airing)
                 Haptics.success()
                 toasts.show(airing.isOn(at: store.now) ? "Recording \(airing.title)" : "\(airing.title) will record")
             } catch {

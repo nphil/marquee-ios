@@ -27,7 +27,7 @@ private struct RecordingBrowser: View {
                 ForEach(RecordingsSection.allCases) { Text($0.title).tag($0) }
             }.pickerStyle(.segmented).padding(.horizontal, Space.inset)
             GeometryReader { geometry in
-                let wide = geometry.size.width >= RecordingLayoutWidth
+                let wide = geometry.size.width >= splitWidth
                 HStack(spacing: 0) {
                     list(wide: wide)
                         .frame(width: wide ? geometry.size.width * 0.46 : nil)
@@ -76,7 +76,7 @@ private struct RecordingBrowser: View {
         .accessibilityIdentifier("livetv.recordings.screen")
     }
 
-    private var RecordingLayoutWidth: CGFloat { CGFloat(RecordingsLayout.splitMinWidth) }
+    private var splitWidth: CGFloat { CGFloat(RecordingsLayout.splitMinWidth) }
 
     private func select(_ value: RecordingsModel.Selection, wide: Bool) {
         if wide { model.selection = value } else { compactDetail = value }
@@ -120,7 +120,7 @@ private struct RecordingBrowser: View {
                 }
             case .recorded:
                 switch model.recorded {
-                case .loading: ProgressView()
+                case .loading: RecordedSkeleton()
                 case .failed(let message): Text(message)
                 case .ready(let items):
                     if items.isEmpty { Text("No identifiable recordings") }
@@ -219,9 +219,7 @@ private struct RuleRow: View {
     }
 
     private var detail: String {
-        let airings = rule.settings.first { $0.id == "onlyNewAirings" }.map {
-            RecordSettingFields.summary([$0], values: [:])
-        } ?? rule.airingsType
+        let airings = rule.airingsType
         let count = scheduled == 0 ? "none scheduled" : "\(scheduled) scheduled"
         return [airings, count].compactMap(\.self).joined(separator: " · ")
     }

@@ -11,12 +11,11 @@ public struct RecordingStorage: Hashable, Sendable, Codable {
         self.recordedSeconds = recordedSeconds
     }
 
-    /// "Recordings use 41.2 GB, about 68 hours of video. Plex does not report free space, so how many hours are
-    /// left cannot be shown."
+    /// Plex reports whole library sizes, including media that did not come from the DVR.
     public var line: String {
         let hours = Int((recordedSeconds / 3_600).rounded())
         let video = hours > 0 ? ", about \(hours) \(hours == 1 ? "hour" : "hours") of video" : ""
-        return "Recordings use \(Self.format(bytes: usedBytes))\(video). Plex does not report free space, so how many hours are left cannot be shown."
+        return "Recording libraries: \(Self.format(bytes: usedBytes))\(video). Free space unavailable."
     }
 
     /// Decimal units, one decimal place: "41.2 GB", "1.3 TB".

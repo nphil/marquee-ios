@@ -431,7 +431,9 @@ While surfing a card (`Radius.card`, `glassRaised` over `scrim`) follows the fin
 
 ### 6.10 Recordings
 
-Recordings (header button) has Scheduled | Recorded. Scheduled lists upcoming airings by day from `/media/subscriptions/scheduled`, with series rules above them. Recorded reads the libraries the DVR's rules record into, once per load (pull to refresh reloads), keeps completed DVR versions (`origin="dvr"`, `mediaGrabStatus="complete"`) and uses the recording start as its date. Plex can lose recording markers after a rematch; those recordings cannot be identified and are omitted.
+Upcoming groups airings by day and flags tuner conflicts; a later free showing of the same episode can replace a conflicting airing. Rules sets recording priority. Recorded plays completed DVR versions; Plex can lose those markers after a rematch. History explains skipped and failed airings. Wide layouts show details beside the list.
+
+The Record sheet shows the scopes and settings available on the server, applies an editable hour of extra time to live events, and summarizes the rule before saving. Recording notifications are opt-in and depend on when the OS lets Marquee check Plex.
 
 | State | Glyph | Role |
 |---|---|---|
