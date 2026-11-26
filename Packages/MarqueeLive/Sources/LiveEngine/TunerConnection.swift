@@ -11,13 +11,30 @@ import FoundationNetworking
 
 /// A stream the tuner would not start: the HTTP status, the `X-HDHomeRun-Error` code and text, and the
 /// sentence in the body (LumaTuner says why there, for example "the TV is in use: Live TV is in front").
+public struct TunerChallenge: Equatable, Sendable {
+    public let ticket: String
+    public let holders: String
+
+    fileprivate init?(_ body: Data) {
+        struct Wire: Decodable {
+            struct Holder: Decodable { let name: String? }
+            let version: Int, error: String, takeover: String, holders: [Holder]
+        }
+        guard let wire = try? JSONDecoder().decode(Wire.self, from: body),
+              wire.version == 1, wire.error == "takeover_required", !wire.takeover.isEmpty, !wire.holders.isEmpty else { return nil }
+        ticket = wire.takeover
+        holders = wire.holders.map { $0.name?.nilIfEmpty ?? "Another viewer" }.joined(separator: ", ")
+    }
+}
+
 public struct TunerRefusal: Error, Sendable, Equatable {
     public var status: Int
     public var code: Int?
     public var reason: String?
     public var message: String?
+    public var challenge: TunerChallenge?
 
-    public init(status: Int, errorHeader: String?, body: Data) {
+    public init(status: Int, errorHeader: String?, body: Data, mimeType: String? = nil) {
         self.status = status
         if let header = errorHeader?.trimmingCharacters(in: .whitespaces), !header.isEmpty {
             let parts = header.split(separator: " ", maxSplits: 1)
@@ -25,7 +42,9 @@ public struct TunerRefusal: Error, Sendable, Equatable {
             let text = code == nil ? header : parts.dropFirst().first.map(String.init)
             reason = text?.trimmingCharacters(in: .whitespaces).nilIfEmpty
         }
-        message = Self.sentence(body)
+        if mimeType == "application/json" {
+            if status == 503, code == 805 { challenge = TunerChallenge(body) }
+        } else { message = Self.sentence(body) }
     }
 
     /// Every tuner is taken, by the TV or another client (805), or the device has no free connection.
@@ -42,6 +61,7 @@ public struct TunerRefusal: Error, Sendable, Equatable {
     private static func sentence(_ body: Data) -> String? {
         guard !body.isEmpty else { return nil }
         var text = String(decoding: body.prefix(4096), as: UTF8.self)
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix("{") { return nil }
         if text.contains("<") {
             text = text.replacingOccurrences(of: "<[^>]*>", with: "\n", options: .regularExpression)
         }
@@ -122,6 +142,12 @@ public final class TunerConnection: NSObject, URLSessionDataDelegate, @unchecked
         session?.invalidateAndCancel()
     }
 
+    public func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                           newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
+        let consent = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.contains { $0.name == "consent" } == true
+        completionHandler(consent ? nil : request)
+    }
+
     public func urlSession(
         _ session: URLSession, dataTask: URLSessionDataTask, didReceive response: URLResponse,
         completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
@@ -149,7 +175,7 @@ public final class TunerConnection: NSObject, URLSessionDataDelegate, @unchecked
         session.finishTasksAndInvalidate()
         guard !cancelled else { return }
         if status != 0, status != 200 {
-            onEvent(.refused(TunerRefusal(status: status, errorHeader: header, body: body)))
+            onEvent(.refused(TunerRefusal(status: status, errorHeader: header, body: body, mimeType: task.response?.mimeType)))
         } else {
             // The end is known before a reader can reach it.
             onEvent(.ended(error.map { $0.localizedDescription }))

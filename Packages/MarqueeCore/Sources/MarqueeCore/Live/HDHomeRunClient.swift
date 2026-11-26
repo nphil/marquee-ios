@@ -102,6 +102,16 @@ public struct HDHomeRunClient: Sendable {
         try await get([HDHomeRunChannel].self, base.appendingPathComponent("lineup.json"), timeout: timeout)
     }
 
+    public func supportsConsent(_ base: URL) async -> Bool {
+        struct Status: Decodable {
+            struct Consent: Decodable { let version: Int }
+            let consent: Consent
+        }
+        let request = PlexRequest(url: base.appendingPathComponent("status.json"), timeout: 1)
+        guard let response = try? await transport.send(request), (200..<300).contains(response.status) else { return false }
+        return (try? JSONDecoder().decode(Status.self, from: response.body))?.consent.version == 1
+    }
+
     /// The entry of the tuner's `status.json` that says another client took the tuner from `clientName`; nil when
     /// there is none, the tuner is older, or it did not answer.
     public func displacement(_ base: URL, clientName: String, now: Date = Date(), timeout: TimeInterval = 1.5) async -> TunerDisplacement? {

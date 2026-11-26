@@ -306,18 +306,20 @@ private struct LiveChrome: View {
     @ViewBuilder
     private var centre: some View {
         if case .failed(let error) = model.state, model.surfing == nil {
-            if model.tunerHolder != nil || error.isTunerBusy {
-                TunerBusyCard(model: model, recording: model.tunerHolder, close: close)
-            } else if error.isDisplaced {
-                FailureCard(title: "Tuner in use", message: error.description, retryTitle: "Watch here", close: close) {
+            if let challenge = model.source.direct.challenge, model.source.active === model.source.direct {
+                FailureCard(title: "Tuner in use", message: challenge.holders, retryTitle: "Watch here", close: close) {
                     confirmingTakeover = true
                 }
                 .alert("Switch the tuner here?", isPresented: $confirmingTakeover) {
-                    Button("Cancel", role: .cancel) {}
-                    Button("Switch here", role: .destructive, action: model.retry)
+                    Button("Cancel", role: .cancel) { model.source.direct.declineSwitch() }
+                    Button("Switch here", role: .destructive) {
+                        if model.source.direct.challenge == challenge { model.source.confirmSwitch() }
+                    }
                 } message: {
-                    Text("\(error.description) Switching will interrupt that viewer.")
+                    Text("Switching will interrupt \(challenge.holders).")
                 }
+            } else if model.tunerHolder != nil || error.isTunerBusy {
+                TunerBusyCard(model: model, recording: model.tunerHolder, close: close)
             } else {
                 FailureCard(message: error.description, close: close, retry: model.retry)
             }

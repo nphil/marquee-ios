@@ -65,6 +65,11 @@ final class LiveRouter: LiveVideoSource {
         self.plex = plex
         direct.onFailed = { [weak self] channel, error in self?.directEnded(channel, after: error) }
         direct.transcodeProfiles = { [tuners] channel in await tuners.transcodeProfiles(channel.device.uri) }
+        direct.supportsConsent = { [tuners] channel in await tuners.supportsConsent(channel.device.uri) }
+        direct.onConsentRefusal = { [weak self] in
+            self?.recordingGuard?.cancel()
+            self?.recordingWarning = nil
+        }
         direct.lineupInterlaced = { [weak self] channel in
             self?.lineups[channel.device.key]?.first { $0.number == channel.number }?.interlaced
         }
@@ -115,6 +120,12 @@ final class LiveRouter: LiveVideoSource {
             active?.stop()
             ownState = .failed(.protectedChannel)
         }
+    }
+
+    func confirmSwitch() {
+        guard active === direct, ownState == nil, let channel, let challenge = direct.challenge else { return }
+        direct.confirmSwitch(challenge)
+        guardRecordings(channel, generation: generation)
     }
 
     func pause() {

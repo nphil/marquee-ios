@@ -29,6 +29,18 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
     @ObservationIgnored var sharingRefusal: ((LiveChannel) async -> String?)?
     /// The conversion profiles the tuner publishes; nil when it publishes none.
     @ObservationIgnored var transcodeProfiles: ((LiveChannel) async -> [TunerTranscode.Profile]?)?
+    @ObservationIgnored var supportsConsent: ((LiveChannel) async -> Bool)?
+    @ObservationIgnored var onConsentRefusal: (() -> Void)?
+    private var consentURL: URL?
+    private(set) var challenge: TunerChallenge?
+
+    func declineSwitch() { challenge = nil }
+
+    func confirmSwitch(_ expected: TunerChallenge) {
+        guard challenge == expected, let consentURL else { return }
+        challenge = nil
+        player.open(consentURL.appending(queryItems: [URLQueryItem(name: "takeover", value: expected.ticket)]))
+    }
     /// Settings › Video & Playback › Live TV › Prefer smooth motion.
     @ObservationIgnored var smoothMotion = true
     /// The tuner's own word that a channel is interlaced (`lineup.json`); nil when it says nothing.
@@ -85,6 +97,8 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
     }
 
     private func play(_ channel: LiveChannel, tappedAt: Double?, retried: Bool) async {
+        challenge = nil
+        consentURL = nil
         self.channel = channel
         self.retried = retried
         got = "?"
@@ -96,6 +110,7 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
             asked = TunerTranscode.Decision(profile: nil, reason: "not-luma", source: nil)
             return player.open(url, tappedAt: tappedAt)
         }
+        let consent = await supportsConsent?(channel) == true
         let offer = await transcodeProfiles?(channel)
         guard self.channel?.id == channel.id else { return }
         asked = transcode.decide(
@@ -103,7 +118,9 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
             lineupInterlaced: lineupInterlaced?(channel), canDecode: Self.decodes
         )
         let named = TunerTakeover.naming(url, as: clientName)
-        player.open(asked.profile.map { TunerTranscode.asking(named, $0) } ?? named, tappedAt: tappedAt)
+        let target = asked.profile.map { TunerTranscode.asking(named, $0) } ?? named
+        if consent { consentURL = target.appending(queryItems: [URLQueryItem(name: "consent", value: "1")]) }
+        player.open(consentURL ?? target, tappedAt: tappedAt)
     }
 
     static func tapClock() -> Double { LiveStreamPlayer.tapClock() }
@@ -121,6 +138,9 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
     }
 
     func stop() {
+        consentURL = nil
+        challenge = nil
+        channel = nil
         player.close()
     }
 
@@ -135,7 +155,15 @@ final class DirectLiveSource: LiveVideoSource, GainSink {
         }
         guard case .failed(let failure) = state, let channel else { return }
         var status: Int?
-        if case .refused(let refusal) = failure { status = refusal.status }
+        if case .refused(let refusal) = failure {
+            status = refusal.status
+            if status == 503, consentURL != nil {
+                recovering = false
+                challenge = refusal.challenge
+                onConsentRefusal?()
+                return
+            }
+        }
         let noPicture = failure == .noPicture
         if failure == .ended, channel.device.isLumaTV {
             recovering = true

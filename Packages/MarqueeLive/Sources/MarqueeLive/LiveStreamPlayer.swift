@@ -107,10 +107,12 @@ public final class LiveStreamPlayer {
     /// Opens the tuner's stream (`…/auto/v<channel>`); while another plays, this is a channel change. `tappedAt`
     /// (`tapClock()` when the viewer chose the channel) makes the tune's `live-tune.timing` line count from the tap.
     public func open(_ url: URL, tappedAt: Double? = nil) {
-        self.url = url
+        var reusable = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        reusable?.queryItems?.removeAll { $0.name == "takeover" }
+        self.url = reusable?.url
         if let pipeline { logTune(pipeline.diagnostics.timings) }
         tapLead = tappedAt.map { Self.tapClock() - $0 }
-        start(LiveFeed(url: url, buffer: .temporary()), name: url.absoluteString)
+        start(LiveFeed(url: url, buffer: .temporary()), name: url.path)
     }
 
     /// Plays bytes the caller writes into `buffer`: a recording, in tests and screenshots.
