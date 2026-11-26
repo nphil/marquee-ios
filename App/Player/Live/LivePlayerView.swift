@@ -27,6 +27,7 @@ struct LivePlayerView: View {
     /// How far the channel card leans with the finger while surfing.
     @State private var lean: CGFloat = 0
     @State private var details: ProgrammeSelection?
+    @State private var confirmingTakeover = false
     @State private var size = CGSize(width: 2, height: 1)
 
     /// One swipe gesture, read the way it started.
@@ -300,7 +301,15 @@ private struct LiveChrome: View {
             if model.tunerHolder != nil || error.isTunerBusy {
                 TunerBusyCard(model: model, recording: model.tunerHolder, close: close)
             } else if error.isDisplaced {
-                FailureCard(title: "Tuner in use", message: error.description, retryTitle: "Watch here", close: close, retry: model.retry)
+                FailureCard(title: "Tuner in use", message: error.description, retryTitle: "Watch here", close: close) {
+                    confirmingTakeover = true
+                }
+                .alert("Switch the tuner here?", isPresented: $confirmingTakeover) {
+                    Button("Cancel", role: .cancel) {}
+                    Button("Switch here", role: .destructive, action: model.retry)
+                } message: {
+                    Text("\(error.description) Switching will interrupt that viewer.")
+                }
             } else {
                 FailureCard(message: error.description, close: close, retry: model.retry)
             }
