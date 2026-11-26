@@ -25,12 +25,11 @@ struct ProgrammeSheet: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var detent: PresentationDetent = .medium
     @State private var choices: Choices = .loading
-    @State private var values: [String: String] = [:]
-    @State private var showsSettings = false
+    @State private var draft: RecordingDraft?
+    @State private var showsEditor = false
     @State private var working: Work?
     @State private var problem: String?
     @State private var confirmsStop = false
-    @State private var confirmsWholeShow = false
 
     private enum Choices: Equatable {
         case loading
@@ -39,7 +38,6 @@ struct ProgrammeSheet: View {
     }
 
     private enum Work: Equatable {
-        case record(Int)
         case unschedule
     }
 
@@ -49,10 +47,6 @@ struct ProgrammeSheet: View {
     private var mark: RecordingMark? { store.mark(for: airing) }
     private var recordable: Bool { store.canRecord && airing.end > now }
     private var watchable: Bool { watch != nil && airing.isOn(at: now) }
-    private var wholeShow: RecordOption? {
-        guard case .ready(let options) = choices else { return nil }
-        return options.wholeShow
-    }
 
     var body: some View {
         ScrollView {
@@ -77,9 +71,6 @@ struct ProgrammeSheet: View {
                         .foregroundStyle(theme.ink2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .fixedSize(horizontal: false, vertical: true)
-                }
-                if recordable, mark == nil, case .ready(let options) = choices {
-                    SettingsCard(settings: RecordSettingFields.settings(options.flatMap(\.settings)), values: $values, expanded: $showsSettings)
                 }
             }
             .padding(.horizontal, Space.inset)
@@ -106,15 +97,12 @@ struct ProgrammeSheet: View {
         } message: {
             Text("The tuner is freed at once.")
         }
-        .confirmationDialog(
-            "Record every airing of \(airing.title)?",
-            isPresented: $confirmsWholeShow,
-            titleVisibility: .visible,
-            presenting: wholeShow
-        ) { option in
-            Button(LiveText.recordTitle(option)) { record(option) }
-        } message: { _ in
-            Text("The server books every upcoming airing, on any channel, until the rule is deleted.")
+        .sheet(isPresented: $showsEditor) {
+            if let draft {
+                RecordingEditor(draft: draft, save: { submission in
+                    try await store.record(submission.option, values: submission.values, airing: airing)
+                })
+            }
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("livetv.programme")
@@ -214,24 +202,16 @@ struct ProgrammeSheet: View {
                     }
                     .buttonStyle(.tonal)
                 }
-            case .ready(let options):
-                if options.defaultOption == nil, options.wholeShow == nil {
+            case .ready:
+                if draft == nil {
                     Text("\(store.serverName) can't record this programme.")
                         .textRole(.label)
                         .foregroundStyle(theme.ink2)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
-                    VStack(alignment: .leading, spacing: Space.s2) {
-                        if options.defaultOption == nil {
-                            Text("\(store.serverName) only offers a rule for every airing of this programme.")
-                                .textRole(.label)
-                                .foregroundStyle(theme.ink2)
-                        }
-                        ViewThatFits(in: .horizontal) {
-                            HStack(spacing: Space.s2) { recordButtons(options) }
-                            VStack(spacing: Space.s2) { recordButtons(options) }
-                        }
-                    }
+                    Button("Record…") { showsEditor = true }
+                        .buttonStyle(.pill)
+                        .accessibilityIdentifier("livetv.programme.options")
                 }
             }
         case .scheduled?:
@@ -243,41 +223,6 @@ struct ProgrammeSheet: View {
         case .failed?, .recorded?:
             EmptyView()
         }
-    }
-
-    /// Recording this airing is the accent pill unless Watch is. The whole-show rule is always tonal
-    /// and asks first: it books every airing, and only an explicit choice creates it.
-    @ViewBuilder
-    private func recordButtons(_ options: [RecordOption]) -> some View {
-        if let option = options.defaultOption {
-            let primary = !watchable
-            if primary {
-                Button { record(option) } label: { recordLabel(option, primary: true) }
-                    .buttonStyle(.pill)
-                    .accessibilityIdentifier("livetv.programme.record.\(option.type)")
-            } else {
-                Button { record(option) } label: { recordLabel(option, primary: false) }
-                    .buttonStyle(.tonal)
-                    .accessibilityIdentifier("livetv.programme.record.\(option.type)")
-            }
-        }
-        if let show = options.wholeShow {
-            Button { confirmsWholeShow = true } label: { recordLabel(show, primary: false) }
-                .buttonStyle(.tonal)
-                .accessibilityIdentifier("livetv.programme.record.\(show.type)")
-        }
-    }
-
-    private func recordLabel(_ option: RecordOption, primary: Bool) -> some View {
-        HStack(spacing: Space.s2) {
-            if working == .record(option.type) {
-                ProgressView()
-                    .tint(primary ? theme.accentInk : theme.ink)
-            }
-            Text(LiveText.recordTitle(option))
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity)
     }
 
     private func unscheduleButton(_ title: String, systemImage: String, confirm: Bool = false) -> some View {
@@ -306,25 +251,10 @@ struct ProgrammeSheet: View {
         guard recordable else { return }
         do {
             let options = try await store.recordOptions(for: airing)
-            values = RecordSettingFields.values(RecordSettingFields.settings(options.flatMap(\.settings)))
+            draft = RecordingDraft(airing: airing, channel: channel, options: options, libraries: await store.recordingLibraries())
             choices = .ready(options)
         } catch {
             choices = .failed
-        }
-    }
-
-    private func record(_ option: RecordOption) {
-        working = .record(option.type)
-        problem = nil
-        Task {
-            do {
-                try await store.record(option, values: values, airing: airing)
-                Haptics.success()
-            } catch {
-                Haptics.error()
-                problem = LiveText.recordingProblem(error, server: store.serverName)
-            }
-            working = nil
         }
     }
 

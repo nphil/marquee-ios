@@ -507,6 +507,18 @@ struct RecordingJournalTests {
         #expect(journal.history.map(\.reason) == ["You skipped this airing."] && journal.history.first?.outcome == .skipped)
     }
 
+    @Test func deletingARuleInTheAppReportsNothingForItsAirings() {
+        var journal = RecordingJournal()
+        let running = F.grab("one", status: .inprogress, from: 0, to: 60)
+        let coming = F.grab("two", from: 100, to: 160)
+        _ = journal.observe(LiveRecordings(scheduled: [running, coming]), dvr: F.dvr(), now: F.at(1))
+
+        journal.noteRemoved([running, coming])
+        let events = journal.observe(LiveRecordings(), dvr: F.dvr(), now: F.at(5))
+
+        #expect(events.isEmpty && journal.history.isEmpty)
+    }
+
     @Test func historyIsCappedAndSurvivesEncoding() throws {
         var journal = RecordingJournal()
         _ = journal.observe(LiveRecordings(), dvr: F.dvr(), now: F.at(0))

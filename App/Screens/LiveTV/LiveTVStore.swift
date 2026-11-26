@@ -50,6 +50,8 @@ final class LiveTVStore {
 
     let live: PlexLiveTV
     let serverName: String
+    /// Who the recordings journal and the alerts belong to.
+    let recordingKey: RecordingAlerts.Key
     private(set) var phase: Phase = .loading
     private(set) var dvr: LiveDVR?
     private(set) var guide: LiveGuide = .empty
@@ -79,6 +81,7 @@ final class LiveTVStore {
     @ObservationIgnored private var refreshing: Task<Void, Never>?
     @ObservationIgnored private var genreCache: [String: Set<String>] = [:]
     @ObservationIgnored private var recordedCache: [PlexMetadata]?
+    @ObservationIgnored private var libraryCache: [RecordingLibrary]?
 
     /// The guide loads the next 3 hours first, then the rest of the day.
     static let firstSpan: TimeInterval = 3 * 60 * 60
@@ -91,6 +94,7 @@ final class LiveTVStore {
         live = PlexLiveTV(library: library)
         self.serverName = serverName
         serverID = library.server.id
+        recordingKey = RecordingAlerts.Key(server: library.server.id, profile: profile ?? "owner")
         lists = LiveLists(server: library.server.id, profile: profile ?? "owner")
         favourites = lists.favourites
         recents = lists.recents
@@ -272,6 +276,14 @@ final class LiveTVStore {
         try await live.recordOptions(airing)
     }
 
+    /// The libraries recordings can go into, for the Record sheet. Read once; empty when the server does not say.
+    func recordingLibraries() async -> [RecordingLibrary] {
+        if let libraryCache { return libraryCache }
+        let found = (try? await live.recordingLibraries()) ?? []
+        if !found.isEmpty { libraryCache = found }
+        return found
+    }
+
     /// Creates the rule, then reads the schedule back: the server books airings a moment after it
     /// answers, so a second read follows when the first does not show the airing yet.
     func record(_ option: RecordOption, values: [String: String], airing: LiveAiring) async throws {
@@ -298,6 +310,16 @@ final class LiveTVStore {
     func update(_ rule: RecordingRule, values: [String: String]) async throws {
         try await live.update(rule, values: values)
         await loadRecordings()
+    }
+
+    /// Records `airing` in place of `grab`, which loses a tuner conflict, and reads the schedule back.
+    func switchRecording(_ grab: ScheduledRecording, to airing: LiveAiring) async throws {
+        try await live.switchRecording(grab, to: airing, in: recordings)
+        await loadRecordings()
+        if recordings.mark(for: airing) == nil {
+            try? await Task.sleep(for: .seconds(2))
+            await loadRecordings()
+        }
     }
 
     /// Takes `airing` off the schedule, or stops it when it is recording.

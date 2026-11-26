@@ -1,219 +1,194 @@
 import MarqueeCore
 import SwiftUI
 
-/// Recordings (docs/LIVE-TV.md §6.10). Scheduled: the series rules, then the airings due by day, each
-/// taken off with a swipe. Recorded: the newest items the DVR recorded, which play in the normal player.
 struct RecordingsView: View {
     let store: LiveTVStore
-
-    private enum Page: String, CaseIterable, Identifiable {
-        case scheduled = "Scheduled"
-        case recorded = "Recorded"
-
-        var id: Self { self }
-    }
-
-    @Environment(\.theme) private var theme
-    @State private var page = Page.scheduled
+    @Environment(RecordingAlerts.self) private var alerts
 
     var body: some View {
-        Group {
-            switch page {
-            case .scheduled: ScheduledList(store: store)
-            case .recorded: RecordedList(store: store)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(theme.canvas)
-        .navigationTitle("Recordings")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Picker("Recordings", selection: $page) {
-                    ForEach(Page.allCases) { page in
-                        Text(page.rawValue).tag(page)
+        RecordingBrowser(initial: RecordingsModel(store: store, alerts: alerts))
+    }
+}
+
+private struct RecordingBrowser: View {
+    @State private var model: RecordingsModel
+    @Environment(\.theme) private var theme
+    @Environment(\.sessionActions) private var actions
+    @State private var compactDetail: RecordingsModel.Selection?
+    @State private var stopping: ScheduledRecording?
+    @State private var errorMessage: String?
+
+    init(initial: RecordingsModel) { _model = State(initialValue: initial) }
+
+    var body: some View {
+        @Bindable var model = model
+        VStack(spacing: 0) {
+            Picker("Recordings", selection: $model.section) {
+                ForEach(RecordingsSection.allCases) { Text($0.title).tag($0) }
+            }.pickerStyle(.segmented).padding(.horizontal, Space.inset)
+            GeometryReader { geometry in
+                let wide = geometry.size.width >= RecordingLayoutWidth
+                HStack(spacing: 0) {
+                    list(wide: wide)
+                        .frame(width: wide ? geometry.size.width * 0.46 : nil)
+                    if wide {
+                        Divider()
+                        ScrollView { detail(model.selection).padding() }.frame(maxWidth: .infinity)
                     }
                 }
-                .pickerStyle(.segmented)
-                .fixedSize()
-                .accessibilityIdentifier("livetv.recordings.pages")
+            }
+            if let storage = model.storage { Text(storage.line).textRole(.caption).foregroundStyle(theme.ink2) }
+        }
+        .navigationTitle("Recordings").navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Menu {
+                    Toggle("Recording notifications", isOn: Binding(get: { model.alerts.isOn }, set: { on in
+                        Task { await model.setAlerts(on); if on && model.alerts.isBlocked { errorMessage = "Allow notifications in iOS Settings first." } }
+                    }))
+                    if model.section == .rules {
+                        Button(model.isReordering ? "Done reordering" : "Reorder rules") { model.isReordering.toggle() }
+                    }
+                } label: { Label("Recording options", systemImage: "ellipsis.circle") }
             }
         }
-        // Pushed outside the stack's routes, so it carries its own toasts.
-        .overlay(alignment: .bottom) { ToastOverlay() }
-        .accessibilityElement(children: .contain)
+        .navigationDestination(item: $compactDetail) { selection in ScrollView { detail(selection).padding() } }
+        .sheet(item: $model.editing) { rule in
+            RecordingEditor(draft: RecordingDraft(editing: rule), save: { submission in
+                try await model.store.update(rule, values: submission.values)
+            }, remove: { try await model.delete(rule) })
+        }
+        .alert("Recording", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            Button("OK") {}
+        } message: { Text(errorMessage ?? "") }
+        .confirmationDialog("Stop this recording?", isPresented: Binding(get: { stopping != nil }, set: { if !$0 { stopping = nil } }), presenting: stopping) { grab in
+            Button("Stop Recording", role: .destructive) { run { try await model.unschedule(grab) } }
+        }
+        .onChange(of: model.section) { model.selection = nil; model.isReordering = false }
+        .task(id: model.section) { if model.section == .recorded { await model.loadRecorded() } }
+        .task {
+            model.loadJournal()
+            repeat {
+                await model.refresh()
+                do { try await Task.sleep(for: RecordingsModel.refreshEvery) } catch { break }
+            } while !Task.isCancelled
+        }
         .accessibilityIdentifier("livetv.recordings.screen")
     }
-}
 
-// MARK: - Scheduled
+    private var RecordingLayoutWidth: CGFloat { CGFloat(RecordingsLayout.splitMinWidth) }
 
-private struct ScheduledList: View {
-    let store: LiveTVStore
+    private func select(_ value: RecordingsModel.Selection, wide: Bool) {
+        if wide { model.selection = value } else { compactDetail = value }
+    }
 
-    @Environment(ToastCenter.self) private var toasts
-    @Environment(\.theme) private var theme
-    @State private var editing: RecordingRule?
-    @State private var deleting: RecordingRule?
-    @State private var stopping: ScheduledRecording?
-    /// Rules and airings taken off, hidden at once while the server confirms (DESIGN §11).
-    @State private var hidden: Set<String> = []
-
-    var body: some View {
-        let rules = store.seriesRules.filter { !hidden.contains($0.id) }
-        let days = ScheduleDay.group(
-            store.upcoming.filter { !hidden.contains($0.id) && !hidden.contains($0.ruleID ?? "") },
-            now: store.now
-        )
-        Group {
-            if rules.isEmpty, days.isEmpty {
-                EmptyState(
-                    title: "Nothing scheduled",
-                    message: "Programmes set to record show here. Open one in the guide and choose Record.",
-                    systemImage: "record.circle"
-                )
-                .accessibilityIdentifier("livetv.scheduled.empty")
-            } else {
-                List {
-                    if !rules.isEmpty {
-                        Section("Series") {
-                            ForEach(rules) { rule in
-                                Button {
-                                    editing = rule
-                                } label: {
-                                    RuleRow(rule: rule, scheduled: scheduledCount(rule))
-                                }
-                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                                    Button("Delete", systemImage: "trash") { deleting = rule }
-                                        .tint(theme.danger)
-                                }
-                                .accessibilityIdentifier("livetv.rule.\(rule.id)")
-                            }
-                        }
-                        .listRowBackground(theme.sheet)
-                    }
-                    ForEach(days) { day in
-                        Section(day.title) {
-                            ForEach(day.recordings) { recording in
-                                let mark = store.recordings.mark(of: recording)
-                                ScheduledRow(recording: recording, mark: mark, now: store.now)
-                                    .swipeActions(edge: .trailing, allowsFullSwipe: mark != .recording) {
-                                        swipeAction(recording, mark: mark)
+    private func list(wide: Bool) -> some View {
+        List {
+            switch model.section {
+            case .upcoming:
+                if model.days.isEmpty { Text("Nothing scheduled") }
+                ForEach(model.days) { day in
+                    Section(day.heading(now: model.now)) {
+                        ForEach(day.items) { item in
+                            Button { select(.upcoming(item.id), wide: wide) } label: {
+                                VStack(alignment: .leading) {
+                                    ScheduledRow(recording: item.recording, mark: model.store.recordings.mark(of: item.recording), now: model.now)
+                                    HStack {
+                                        if let freshness = item.freshness { TagChip(text: freshness.badge) }
+                                        if item.isConflict { Text("Conflict").foregroundStyle(theme.danger) }
                                     }
-                                    .accessibilityIdentifier("livetv.scheduled.\(recording.id)")
+                                }
                             }
+                            .contextMenu { if let rule = model.rule(item.recording.ruleID) { Button("Edit rule") { model.editing = rule } } }
+                            .swipeActions {
+                                if model.store.recordings.mark(of: item.recording) == .recording {
+                                    Button("Stop") { stopping = item.recording }
+                                } else { Button("Skip") { run { try await model.unschedule(item.recording) } } }
+                            }
+                            .accessibilityIdentifier("livetv.scheduled.\(item.id)")
                         }
-                        .headerProminence(.increased)
-                        .listRowBackground(theme.sheet)
                     }
                 }
-                .themedList(theme)
-                .refreshable { await store.loadRecordings() }
+            case .rules:
+                if model.rules.isEmpty { Text("No recording rules") }
+                ForEach(model.rules) { rule in
+                    Button { select(.rule(rule.id), wide: wide) } label: { RuleRow(rule: rule, scheduled: model.scheduledCount(of: rule)) }
+                        .accessibilityIdentifier("livetv.rule.\(rule.id)")
+                }.onMove { offsets, destination in
+                    guard let index = offsets.first, let move = model.reorder(model.rules[index], to: destination > index ? destination - 1 : destination) else { return }
+                    run { try await model.send(move) }
+                }
+            case .recorded:
+                switch model.recorded {
+                case .loading: ProgressView()
+                case .failed(let message): Text(message)
+                case .ready(let items):
+                    if items.isEmpty { Text("No identifiable recordings") }
+                    ForEach(items) { item in
+                        Button { select(.recorded(item.ratingKey), wide: wide) } label: { RecordedRow(item: item) }
+                            .accessibilityIdentifier("livetv.recorded.\(item.ratingKey)")
+                    }
+                }
+            case .history:
+                if model.history.isEmpty { Text("No recording history yet") }
+                ForEach(model.history) { entry in
+                    Button { select(.history(entry.id), wide: wide) } label: {
+                        VStack(alignment: .leading) { Text(entry.title); Text(entry.outcome.label).foregroundStyle(theme.ink2) }
+                    }
+                }
             }
-        }
-        .task { await store.loadRecordings() }
-        .diagPresentation("recordings.edit", isPresented: editing != nil)
-        .sheet(item: $editing) { rule in
-            RuleSheet(store: store, rule: rule, scheduled: scheduledCount(rule)) { delete($0) }
-        }
-        .confirmationDialog(
-            deleting.map { "Delete the series recording of \($0.title)?" } ?? "",
-            isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
-            titleVisibility: .visible,
-            presenting: deleting
-        ) { rule in
-            Button("Delete Series", role: .destructive) { delete(rule) }
-        } message: { _ in
-            Text("Its scheduled airings are cancelled. Recordings already made stay in the library.")
-        }
-        .confirmationDialog(
-            stopping.map { "Stop recording \($0.title)?" } ?? "",
-            isPresented: Binding(get: { stopping != nil }, set: { if !$0 { stopping = nil } }),
-            titleVisibility: .visible,
-            presenting: stopping
-        ) { recording in
-            Button("Stop Recording", role: .destructive) { unschedule(recording) }
-            if store.offersSeriesDeletion(recording) {
-                Button("Stop and Delete the Series Rule", role: .destructive) { unschedule(recording, deletingSeries: true) }
-            }
-        } message: { _ in
-            Text("The tuner is freed at once.")
-        }
+        }.themedList(theme)
+        .environment(\.editMode, .constant(model.isReordering ? .active : .inactive))
+        .refreshable { await model.refresh(includingRecorded: model.section == .recorded) }
     }
 
-    private func scheduledCount(_ rule: RecordingRule) -> Int {
-        store.upcoming.count { $0.ruleID == rule.id && $0.isUpcoming }
-    }
-
-    /// Stop while recording; Skip under a series, which keeps the rest; Cancel for a one-off.
-    @ViewBuilder
-    private func swipeAction(_ recording: ScheduledRecording, mark: RecordingMark?) -> some View {
-        switch mark {
-        case .recording?:
-            Button("Stop", systemImage: "stop.fill") { stopping = recording }
-                .tint(theme.danger)
-        case .series?:
-            Button("Skip", systemImage: "forward.end") { unschedule(recording) }
-        case .scheduled?:
-            Button("Cancel", systemImage: "xmark") { unschedule(recording) }
-                .tint(theme.danger)
-        case .failed?, .recorded?, nil:
-            EmptyView()
-        }
-    }
-
-    private func unschedule(_ recording: ScheduledRecording, deletingSeries: Bool = false) {
-        withAnimation { _ = hidden.insert(recording.id) }
-        Task {
-            do {
-                try await store.unschedule(recording, deletingSeries: deletingSeries)
-                Haptics.success()
-                toasts.show("\(recording.title) won't record")
-            } catch {
-                Haptics.error()
-                toasts.show(LiveText.recordingProblem(error, server: store.serverName))
+    @ViewBuilder private func detail(_ selection: RecordingsModel.Selection?) -> some View {
+        VStack(alignment: .leading, spacing: Space.s3) {
+            switch selection {
+            case .upcoming(let id):
+                if let item = model.upcoming(id) {
+                    ScheduledRow(recording: item.recording, mark: model.store.recordings.mark(of: item.recording), now: model.now)
+                    Text(item.status.label)
+                    if let conflict = model.conflicts.first(where: { $0.id == item.conflictID }) {
+                        Text(conflict.sentence).foregroundStyle(theme.danger)
+                        if item.losesToConflict {
+                            let alternatives = model.alternatives(for: item.recording)
+                            if alternatives.isEmpty { Text("No other free airing in the loaded guide.") }
+                            ForEach(alternatives) { airing in
+                                Button("Switch to \(LiveText.when(airing, now: model.now))") { run { try await model.switchRecording(item.recording, to: airing) } }
+                            }
+                        }
+                    }
+                    if let rule = model.rule(item.recording.ruleID) { Button("Edit rule") { model.editing = rule } }
+                }
+            case .rule(let id):
+                if let rule = model.rule(id) {
+                    Text(rule.title).textRole(.title)
+                    Text(RecordingDraft(editing: rule).summary)
+                    Button("Edit rule") { model.editing = rule }
+                    ForEach(model.upcoming(under: rule)) { grab in
+                        ScheduledRow(recording: grab, mark: model.store.recordings.mark(of: grab), now: model.now)
+                    }
+                }
+            case .recorded(let id):
+                if let item = model.recordedItem(id) {
+                    RecordedRow(item: item)
+                    if let index = item.recordedMediaIndex { Button("Play recording") { actions.play(item, mediaIndex: index) } }
+                }
+            case .history(let id):
+                if let entry = model.history.first(where: { $0.id == id }) {
+                    Text(entry.title).textRole(.title); Text(entry.airedAt.formatted()); Text(entry.reason)
+                }
+            case nil: Text("Choose a recording or rule").foregroundStyle(theme.ink2)
             }
-            withAnimation { _ = hidden.remove(recording.id) }
-        }
+        }.frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func delete(_ rule: RecordingRule) {
-        withAnimation { _ = hidden.insert(rule.id) }
-        Task {
-            do {
-                try await store.delete(rule)
-                Haptics.success()
-                toasts.show("Deleted the series recording of \(rule.title)")
-            } catch {
-                Haptics.error()
-                toasts.show(LiveText.recordingProblem(error, server: store.serverName))
-            }
-            withAnimation { _ = hidden.remove(rule.id) }
-        }
+    private func run(_ action: @escaping () async throws -> Void) {
+        Task { do { try await action() } catch { errorMessage = LiveText.recordingProblem(error, server: model.store.serverName) } }
     }
 }
 
-/// One day of the schedule. An airing under way, or one that failed, files under today.
-private struct ScheduleDay: Identifiable {
-    let id: Date
-    let title: String
-    var recordings: [ScheduledRecording]
-
-    static func group(_ recordings: [ScheduledRecording], now: Date) -> [ScheduleDay] {
-        let calendar = Calendar.current
-        var days: [ScheduleDay] = []
-        for recording in recordings.sorted(by: { $0.start < $1.start }) {
-            let shown = max(recording.start, now)
-            let day = calendar.startOfDay(for: shown)
-            if days.last?.id == day {
-                days[days.count - 1].recordings.append(recording)
-            } else {
-                days.append(ScheduleDay(id: day, title: LiveText.day(shown, now: now), recordings: [recording]))
-            }
-        }
-        return days
-    }
-}
 
 /// A series rule: the show's poster, its title, which airings it takes and how many are booked.
 private struct RuleRow: View {
@@ -312,182 +287,6 @@ private struct ScheduledRow: View {
     }
 }
 
-/// A series rule's settings, saved together, and Delete Series. A partial sheet keeps the system glass;
-/// at full height the list takes the canvas (DESIGN §6).
-private struct RuleSheet: View {
-    let store: LiveTVStore
-    let rule: RecordingRule
-    let scheduled: Int
-    let delete: @MainActor (RecordingRule) -> Void
-
-    @Environment(ThemeStore.self) private var themes
-    @Environment(\.theme) private var theme
-    @Environment(\.dismiss) private var dismiss
-    @State private var detent: PresentationDetent = .medium
-    @State private var values: [String: String] = [:]
-    @State private var saving = false
-    @State private var problem: String?
-    @State private var confirmsDelete = false
-
-    private var settings: [RecordSetting] { RecordSettingFields.settings(rule.settings) }
-
-    /// The values that differ from the rule's, which are all Save sends.
-    private var changes: [String: String] {
-        values.filter { id, value in rule.settings.first { $0.id == id }?.value != value }
-    }
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    if settings.isEmpty {
-                        Text("\(store.serverName) offers no settings for this series.")
-                            .foregroundStyle(theme.ink2)
-                    } else {
-                        RecordSettingFields(settings: settings, values: $values)
-                    }
-                } footer: {
-                    Text(footer)
-                }
-                .listRowBackground(theme.sheet)
-                if let problem {
-                    Section {
-                        HStack(alignment: .firstTextBaseline, spacing: Space.s2) {
-                            Image(systemName: "exclamationmark.circle.fill")
-                                .foregroundStyle(theme.danger)
-                                .accessibilityHidden(true)
-                            Text(problem)
-                                .foregroundStyle(theme.ink)
-                        }
-                        .accessibilityElement(children: .combine)
-                    }
-                    .listRowBackground(theme.sheet)
-                }
-                Section {
-                    Button("Delete Series", role: .destructive) { confirmsDelete = true }
-                        .foregroundStyle(theme.danger)
-                        .accessibilityIdentifier("livetv.rule.delete")
-                }
-                .listRowBackground(theme.sheet)
-            }
-            .themedList(theme, onCanvas: detent == .large)
-            .tint(theme.accent)
-            .navigationTitle(rule.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                        .accessibilityIdentifier("livetv.rule.cancel")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { save() }
-                        .disabled(changes.isEmpty || saving)
-                        .accessibilityIdentifier("livetv.rule.save")
-                }
-            }
-            .confirmationDialog("Delete the series recording of \(rule.title)?", isPresented: $confirmsDelete, titleVisibility: .visible) {
-                Button("Delete Series", role: .destructive) {
-                    dismiss()
-                    delete(rule)
-                }
-            } message: {
-                Text("Its scheduled airings are cancelled. Recordings already made stay in the library.")
-            }
-        }
-        .presentationDetents([.medium, .large], selection: $detent)
-        .preferredColorScheme(themes.presentationScheme(for: theme))
-        .onAppear { values = RecordSettingFields.values(settings) }
-    }
-
-    private var footer: String {
-        let count = scheduled == 1 ? "1 airing scheduled." : "\(scheduled) airings scheduled."
-        guard let library = rule.librarySectionTitle else { return count }
-        return "\(count) Recordings go to \(library)."
-    }
-
-    private func save() {
-        saving = true
-        problem = nil
-        Task {
-            do {
-                try await store.update(rule, values: changes)
-                Haptics.success()
-                dismiss()
-            } catch {
-                Haptics.error()
-                problem = LiveText.recordingProblem(error, server: store.serverName)
-            }
-            saving = false
-        }
-    }
-}
-
-// MARK: - Recorded
-
-private struct RecordedList: View {
-    let store: LiveTVStore
-
-    private enum Load {
-        case loading
-        case ready([PlexMetadata])
-        case failed(String)
-    }
-
-    @Environment(\.sessionActions) private var sessionActions
-    @Environment(\.theme) private var theme
-    @State private var load = Load.loading
-    @State private var attempt = 0
-
-    var body: some View {
-        Group {
-            switch load {
-            case .loading:
-                RecordedSkeleton()
-            case .ready(let items) where items.isEmpty:
-                EmptyState(
-                    title: "No identifiable recordings",
-                    message: "Only recordings Plex still identifies as DVR appear here. Others may be in your library.",
-                    systemImage: "film.stack"
-                )
-                .accessibilityIdentifier("livetv.recorded.empty")
-            case .ready(let items):
-                List {
-                    ForEach(items) { item in
-                        Button {
-                            if let index = item.recordedMediaIndex {
-                                sessionActions.play(item, mediaIndex: index)
-                            }
-                        } label: {
-                            RecordedRow(item: item)
-                        }
-                        .accessibilityHint("Plays the recording")
-                        .accessibilityIdentifier("livetv.recorded.\(item.ratingKey)")
-                    }
-                    .listRowBackground(theme.sheet)
-                }
-                .themedList(theme)
-                .refreshable { await reload(refresh: true) }
-            case .failed(let message):
-                EmptyState(
-                    title: "Recordings didn't load",
-                    message: message,
-                    systemImage: "exclamationmark.triangle",
-                    action: EmptyState.Action(title: "Try Again", systemImage: "arrow.clockwise") { attempt += 1 }
-                )
-                .accessibilityIdentifier("livetv.recorded.failed")
-            }
-        }
-        .task(id: attempt) { await reload() }
-    }
-
-    private func reload(refresh: Bool = false) async {
-        do {
-            load = .ready(try await store.recorded(refresh: refresh))
-        } catch {
-            load = .failed(LiveText.problem(error, server: store.serverName))
-        }
-    }
-}
 
 /// A recording: its still with progress along the bottom, the show, the episode, and its length and
 /// when it was recorded. At accessibility sizes the text goes under the still.

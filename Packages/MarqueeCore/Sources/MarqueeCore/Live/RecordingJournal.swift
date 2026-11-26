@@ -150,6 +150,12 @@ public struct RecordingJournal: Sendable, Hashable, Codable {
             grab.status == .inprogress ? "You stopped this recording." : "You skipped this airing.", now)
     }
 
+    /// Forgets airings the person removed together with their rule. They are neither history nor news.
+    public mutating func noteRemoved(_ grabs: [ScheduledRecording]) {
+        let ids = Set(grabs.map(\.id))
+        seen.removeAll { ids.contains($0.id) }
+    }
+
     private mutating func add(_ outcome: RecordingOutcome, _ grab: ScheduledRecording, _ reason: String, _ now: Date) {
         let id = "\(grab.id).\(outcome.rawValue)"
         guard !history.contains(where: { $0.id == id }) else { return }
