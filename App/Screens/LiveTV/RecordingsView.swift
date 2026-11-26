@@ -26,6 +26,7 @@ private struct RecordingBrowser: View {
             Picker("Recordings", selection: $model.section) {
                 ForEach(RecordingsSection.allCases) { Text($0.title).tag($0) }
             }.pickerStyle(.segmented).padding(.horizontal, Space.inset)
+            .padding(.vertical, Space.s2)
             GeometryReader { geometry in
                 let wide = geometry.size.width >= splitWidth
                 HStack(spacing: 0) {
@@ -37,8 +38,9 @@ private struct RecordingBrowser: View {
                     }
                 }
             }
-            if let storage = model.storage { Text(storage.line).textRole(.caption).foregroundStyle(theme.ink2) }
         }
+        .background(theme.canvas.ignoresSafeArea())
+        .toolbarBackground(theme.canvas, for: .navigationBar, .tabBar)
         .navigationTitle("Recordings").navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -49,10 +51,16 @@ private struct RecordingBrowser: View {
                     if model.section == .rules {
                         Button(model.isReordering ? "Done reordering" : "Reorder rules") { model.isReordering.toggle() }
                     }
+                    if let storage = model.storage {
+                        Section("Recording libraries") { Text(storage.line) }
+                    }
                 } label: { Label("Recording options", systemImage: "ellipsis.circle") }
             }
         }
-        .navigationDestination(item: $compactDetail) { selection in ScrollView { detail(selection).padding() } }
+        .navigationDestination(item: $compactDetail) { selection in
+            ScrollView { detail(selection).padding(Space.inset) }
+                .background(theme.canvas.ignoresSafeArea())
+        }
         .sheet(item: $model.editing) { rule in
             RecordingEditor(draft: RecordingDraft(editing: rule), save: { submission in
                 try await model.store.update(rule, values: submission.values)
@@ -84,6 +92,7 @@ private struct RecordingBrowser: View {
 
     private func list(wide: Bool) -> some View {
         List {
+            Group {
             switch model.section {
             case .upcoming:
                 if model.days.isEmpty { Text("Nothing scheduled") }
@@ -137,6 +146,8 @@ private struct RecordingBrowser: View {
                     }
                 }
             }
+            }
+            .listRowBackground(theme.sheet)
         }.themedList(theme)
         .environment(\.editMode, .constant(model.isReordering ? .active : .inactive))
         .refreshable { await model.refresh(includingRecorded: model.section == .recorded) }
@@ -235,18 +246,18 @@ private struct ScheduledRow: View {
 
     var body: some View {
         HStack(spacing: Space.s3) {
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: Space.s1) {
                 Text(recording.title)
                     .textRole(.headline)
                     .foregroundStyle(theme.ink)
-                if let subtitle = LiveText.subtitle(recording) {
-                    Text(subtitle)
-                        .textRole(.label)
-                        .foregroundStyle(theme.ink2)
-                }
                 Text(line)
                     .textRole(.label)
-                    .foregroundStyle(mark == .failed ? theme.danger : theme.ink2)
+                    .foregroundStyle(mark == .failed ? theme.danger : theme.ink)
+                if let subtitle = LiveText.subtitle(recording) {
+                    Text(subtitle)
+                        .textRole(.caption)
+                        .foregroundStyle(theme.ink2)
+                }
             }
             Spacer(minLength: 0)
             if let mark {
