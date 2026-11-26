@@ -107,8 +107,7 @@ extension ProfileSettings: Codable {
     }
 }
 
-/// Enhance picture: how the phone upscales standard video, and how hard it sharpens and debands it. Sharpen and
-/// deband apply only while the upscaler is not Off.
+/// Enhance picture: how the phone upscales standard video, and how hard it cleans and sharpens it. The sliders apply only while the upscaler is not Off.
 struct PictureEnhance: Equatable, Codable, Sendable {
     enum Upscaler: String, Codable, CaseIterable, Sendable {
         case off, automatic, lineArt
@@ -123,8 +122,24 @@ struct PictureEnhance: Equatable, Codable, Sendable {
     }
 
     var upscaler = Upscaler.off
-    var sharpen = 0.3
+    var sharpen = 0.25
     var deband = 0.3
+    var noiseReduction = 0.0
+    var deblock = 0.0
+    var vivid = 0.0
+
+    init() {}
+
+    /// Saved profiles from before Noise Reduction, Deblock and Vivid have none of those keys; the user's own values stay.
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        upscaler = try c.decodeIfPresent(Upscaler.self, forKey: .upscaler) ?? upscaler
+        sharpen = try c.decodeIfPresent(Double.self, forKey: .sharpen) ?? sharpen
+        deband = try c.decodeIfPresent(Double.self, forKey: .deband) ?? deband
+        noiseReduction = try c.decodeIfPresent(Double.self, forKey: .noiseReduction) ?? noiseReduction
+        deblock = try c.decodeIfPresent(Double.self, forKey: .deblock) ?? deblock
+        vivid = try c.decodeIfPresent(Double.self, forKey: .vivid) ?? vivid
+    }
 }
 
 /// Behaviour spec §4: Force plays every file as it is, with no fallback, so choosing it asks first.

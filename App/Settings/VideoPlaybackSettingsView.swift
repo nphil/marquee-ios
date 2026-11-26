@@ -139,6 +139,21 @@ struct VideoPlaybackSettingsView: View {
                             .frame(maxWidth: 180)
                     }
                     .accessibilityIdentifier("video.enhanceDeband")
+                    LabeledContent("Noise Reduction") {
+                        Slider(value: $session.settings.pictureEnhance.noiseReduction, in: 0...1)
+                            .frame(maxWidth: 180)
+                    }
+                    .accessibilityIdentifier("video.enhanceNoiseReduction")
+                    LabeledContent("Deblock") {
+                        Slider(value: $session.settings.pictureEnhance.deblock, in: 0...1)
+                            .frame(maxWidth: 180)
+                    }
+                    .accessibilityIdentifier("video.enhanceDeblock")
+                    LabeledContent("Vivid") {
+                        Slider(value: $session.settings.pictureEnhance.vivid, in: 0...1)
+                            .frame(maxWidth: 180)
+                    }
+                    .accessibilityIdentifier("video.enhanceVivid")
                 }
             } footer: {
                 Text("Sharpens and upscales standard video on the phone. HDR and Dolby Vision play unchanged. It pauses itself when the phone is hot, in Low Power Mode or when it cannot keep up.")

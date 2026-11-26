@@ -194,6 +194,9 @@ final class PlayerModel: Identifiable {
                 Diag.event(.player, "enhance.options", [
                     "sharpen": setting.sharpen.formatted(.number.precision(.fractionLength(0...2))),
                     "deband": setting.deband.formatted(.number.precision(.fractionLength(0...2))),
+                    "noiseReduction": setting.noiseReduction.formatted(.number.precision(.fractionLength(0...2))),
+                    "deblock": setting.deblock.formatted(.number.precision(.fractionLength(0...2))),
+                    "vivid": setting.vivid.formatted(.number.precision(.fractionLength(0...2))),
                 ])
             }
         }
@@ -3382,8 +3385,8 @@ final class PlayerModel: Identifiable {
         let setting = session.settings.pictureEnhance
         switch setting.upscaler {
         case .off: enhance.configure(.off)
-        case .automatic: enhance.configure(EnhanceOptions(upscaler: .automatic, sharpen: setting.sharpen, deband: setting.deband))
-        case .lineArt: enhance.configure(EnhanceOptions(upscaler: .lineArt, sharpen: setting.sharpen, deband: setting.deband))
+        case .automatic: enhance.configure(EnhanceOptions(upscaler: .automatic, sharpen: setting.sharpen, deband: setting.deband, noiseReduction: setting.noiseReduction, deblock: setting.deblock, vivid: setting.vivid))
+        case .lineArt: enhance.configure(EnhanceOptions(upscaler: .lineArt, sharpen: setting.sharpen, deband: setting.deband, noiseReduction: setting.noiseReduction, deblock: setting.deblock, vivid: setting.vivid))
         }
         refreshEnhance()
     }

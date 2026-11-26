@@ -105,6 +105,15 @@ struct EnhancePanel: View {
                 EnhanceSliderRow(
                     model: model, title: "Deband", id: "player.enhanceDeband", value: setting.deband, enabled: unavailable == nil
                 ) { $0.deband = $1 }
+                EnhanceSliderRow(
+                    model: model, title: "Noise Reduction", id: "player.enhanceNoiseReduction", value: setting.noiseReduction, enabled: unavailable == nil
+                ) { $0.noiseReduction = $1 }
+                EnhanceSliderRow(
+                    model: model, title: "Deblock", id: "player.enhanceDeblock", value: setting.deblock, enabled: unavailable == nil
+                ) { $0.deblock = $1 }
+                EnhanceSliderRow(
+                    model: model, title: "Vivid", id: "player.enhanceVivid", value: setting.vivid, enabled: unavailable == nil
+                ) { $0.vivid = $1 }
             }
         }
     }
