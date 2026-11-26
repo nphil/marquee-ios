@@ -91,6 +91,8 @@ private struct DetailPage: View {
     @State private var barInset: CGFloat = 0
     @State private var version = 0
     @State private var showsTracks = false
+    @State private var showsAirings = false
+    @Environment(AppSession.self) private var appSession
     @State private var watchlisted: Bool? = nil
     @State private var extras: [PlexMetadata] = []
     @State private var deleting: DeleteTarget?
@@ -216,6 +218,11 @@ private struct DetailPage: View {
         .sheet(isPresented: $showsTracks) {
             if let tracks {
                 TracksSheet(tracks: tracks)
+            }
+        }
+        .sheet(isPresented: $showsAirings) {
+            if let library {
+                ShowRecordingAirings(title: item.title, library: library, profile: appSession.user?.uuid)
             }
         }
         .task(id: item.guid) {
@@ -416,6 +423,9 @@ private struct DetailPage: View {
 
     private var moreMenu: some View {
         Menu {
+            if item.type == .show, library != nil {
+                Button("Record on Live TV…", systemImage: "record.circle") { showsAirings = true }
+            }
             if let target = playTarget, target.progress != nil {
                 Button("Play from Beginning", systemImage: "arrow.counterclockwise") {
                     session.play(target, mediaIndex: mediaIndex(for: target), fromStart: true)

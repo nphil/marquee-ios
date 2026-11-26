@@ -638,7 +638,14 @@ struct RecordingsPlexTests {
     }
 
     @Test func switchingRecordsTheOtherAiringFirstThenDropsTheOldOne() async throws {
-        let (live, transport) = LiveTVTests.live()
+        let bookings: @Sendable (PlexRequest) -> PlexHTTPResponse? = { request in
+            guard request.url.path == "/media/subscriptions/scheduled" else { return nil }
+            return container(["MediaGrabOperation": [
+                LiveFixtures.grab("g1", rule: "4", status: "scheduled", from: 100, to: 160),
+                LiveFixtures.grab("later", rule: "31", status: "scheduled", from: 400, to: 460)
+            ]])
+        }
+        let (live, transport) = LiveTVTests.live(bookings)
         let oneOff = F.rule("4", type: 4)
         let grab = F.grab("g1", rule: "4", from: 100, to: 160)
         let later = LiveAiring(id: "alt", channelKey: "aaa-0201", guid: "plex://episode/news12", title: "Evening News", start: F.at(400), end: F.at(460))
@@ -647,10 +654,15 @@ struct RecordingsPlexTests {
 
         let sent = await transport.requests.filter { $0.method != .get }.map { "\($0.method.rawValue) \($0.url.path)" }
         #expect(sent == ["POST /media/subscriptions", "DELETE /media/subscriptions/4"])
-        let (series, seriesTransport) = LiveTVTests.live()
+        let (series, seriesTransport) = LiveTVTests.live(bookings)
         try await series.switchRecording(grab, to: later, in: LiveRecordings(rules: [F.rule("4")], scheduled: [grab]))
         let seriesSent = await seriesTransport.requests.filter { $0.method != .get }.map { "\($0.method.rawValue) \($0.url.path)" }
         #expect(seriesSent == ["POST /media/subscriptions", "DELETE /media/grabbers/operations/g1"])
+        let (unconfirmed, untouched) = LiveTVTests.live()
+        await #expect(throws: PlexError.self) {
+            try await unconfirmed.switchRecording(grab, to: later, in: LiveRecordings(rules: [oneOff], scheduled: [grab]))
+        }
+        #expect(await untouched.requests.allSatisfy { $0.method != .delete })
     }
 
     @Test func recordingAlertStateStaysOutOfTheBackup() {

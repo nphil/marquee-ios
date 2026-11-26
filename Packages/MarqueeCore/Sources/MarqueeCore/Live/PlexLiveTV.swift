@@ -201,7 +201,14 @@ public struct PlexLiveTV: Sendable {
         let options = try await recordOptions(airing)
         guard let option = options.defaultOption else { throw PlexError.decoding("no way to record that airing") }
         try await record(option, values: RecordingDraft.quickValues(for: airing, option: option))
-        if let rule = recordings.rule(grab.ruleID), !rule.isSeries {
+        // Plex can reuse an existing subscription instead of booking the requested repeat.
+        let bookings = try await scheduled()
+        guard let replacement = bookings.first(where: { $0.id != grab.id && $0.isUpcoming && $0.covers(airing) }),
+              replacement.ruleID != nil else {
+            throw PlexError.server(status: 409, message: "Plex hasn't confirmed the other airing. The original booking was kept.")
+        }
+        guard bookings.contains(where: { $0.id == grab.id }) else { return }
+        if let rule = recordings.rule(grab.ruleID), !rule.isSeries, replacement.ruleID != rule.id {
             try await delete(rule, stopping: grab.status == .inprogress ? [grab] : [])
         } else {
             try await cancel(grab)
