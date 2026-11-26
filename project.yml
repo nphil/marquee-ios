@@ -23,7 +23,7 @@ packages:
     path: Packages/MarqueeLive
   VideoEngine:
     url: https://github.com/nphil/videoengine.git
-    exactVersion: 3.1.0
+    exactVersion: 3.1.1
   GoogleCast:
     url: https://github.com/googlecast/google-cast-ios-sdk.git
     exactVersion: 4.8.6
