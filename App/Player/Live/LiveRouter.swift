@@ -36,6 +36,8 @@ final class LiveRouter: LiveVideoSource {
     private var ownState: LiveState?
     /// The router's own status line: a fallback to Plex, or a recording about to take the tuner.
     private var notice: String?
+    private(set) var recordingWarning: ScheduledRecording?
+    private var acknowledgedAiring: String?
 
     @ObservationIgnored private let live: PlexLiveTV
     @ObservationIgnored private let tuners = HDHomeRunClient()
@@ -83,6 +85,8 @@ final class LiveRouter: LiveVideoSource {
     func play(_ channel: LiveChannel) async {
         let tappedAt = DirectLiveSource.tapClock()
         generation += 1
+        recordingWarning = nil
+        acknowledgedAiring = nil
         let mine = generation
         self.channel = channel
         recordingGuard?.cancel()
@@ -127,6 +131,7 @@ final class LiveRouter: LiveVideoSource {
 
     func stop() {
         generation += 1
+        recordingWarning = nil
         channel = nil
         recordingGuard?.cancel()
         active?.stop()
@@ -228,6 +233,7 @@ final class LiveRouter: LiveVideoSource {
         }
         let mine = generation
         recordingGuard?.cancel()
+        recordingWarning = nil
         if !refused { ownState = .opening }
         Task {
             let found = await tuners.displacement(channel.device.uri, clientName: clientName)
@@ -260,6 +266,7 @@ final class LiveRouter: LiveVideoSource {
         }
         Diag.event(.live, "fallback", ["channel": channel.number, "error": error], .warning)
         recordingGuard?.cancel()
+        recordingWarning = nil
         ownState = .opening
         say("Couldn't play from the tuner; playing through Plex", for: .seconds(8))
         Task {
@@ -291,16 +298,45 @@ final class LiveRouter: LiveVideoSource {
     private func checkRecordings(_ channel: LiveChannel, generation mine: Int) async -> Duration? {
         if let found = try? await live.scheduled() { recordings = found }
         guard mine == generation, active === direct else { return nil }
-        guard let grab = nextGrab(on: channel) else { return .seconds(Self.guardInterval) }
+        guard let grab = nextGrab(on: channel) else {
+            recordingWarning = nil
+            return .seconds(Self.guardInterval)
+        }
         let lead = grab.at.timeIntervalSinceNow - Self.guardMargin
         if lead <= 0 {
+            recordingWarning = nil
             handOver(to: grab.recording, watching: channel)
             return nil
         }
-        if lead <= Self.guardInterval {
-            say("Recording on \(grab.recording.channelNumber ?? channel.device.name) starts in 1 min")
+        if lead <= Self.guardInterval, grab.recording.channelKey != channel.id {
+            recordingWarning = acknowledgedAiring == grab.recording.id ? nil : grab.recording
+        } else {
+            recordingWarning = nil
         }
-        return .seconds(min(lead, Self.guardInterval))
+        return .seconds(lead > Self.guardInterval ? min(lead - Self.guardInterval, Self.guardInterval) : lead)
+    }
+
+    func answerWarning(_ airing: ScheduledRecording, skip: Bool) {
+        guard recordingWarning?.id == airing.id, let channel else { return }
+        acknowledgedAiring = airing.id
+        recordingWarning = nil
+        guard skip else { return }
+        let mine = generation
+        Task {
+            do {
+                let schedule = try await live.scheduled()
+                guard generation == mine, active === direct else { return }
+                recordings = schedule
+                guard let next = nextGrab(on: channel), next.recording.id == airing.id,
+                      next.recording.start == airing.start, next.at.timeIntervalSinceNow > Self.guardMargin else { return }
+                try await live.cancel(next.recording)
+                guard generation == mine, active === direct else { return }
+                guardRecordings(channel, generation: mine)
+            } catch {
+                guard generation == mine else { return }
+                say("Couldn’t skip this airing. The recording keeps priority.", for: .seconds(8))
+            }
+        }
     }
 
     /// The first recording that would find every tuner of `channel`'s device taken with the phone's stream counted,

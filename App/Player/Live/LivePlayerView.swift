@@ -27,7 +27,6 @@ struct LivePlayerView: View {
     /// How far the channel card leans with the finger while surfing.
     @State private var lean: CGFloat = 0
     @State private var details: ProgrammeSelection?
-    @State private var confirmingTakeover = false
     @State private var size = CGSize(width: 2, height: 1)
 
     /// One swipe gesture, read the way it started.
@@ -87,6 +86,14 @@ struct LivePlayerView: View {
                     .tint(outerTheme.accentText)
                     .transition(reduceMotion ? .opacity : .move(edge: isWide ? .trailing : .bottom))
             }
+        }
+        .alert("A recording needs the tuner", isPresented: Binding(
+            get: { model.source.recordingWarning != nil }, set: { _ in }
+        ), presenting: model.source.recordingWarning) { airing in
+            Button("Let recording start") { model.source.answerWarning(airing, skip: false) }
+            Button("Skip this airing and keep watching", role: .destructive) { model.source.answerWarning(airing, skip: true) }
+        } message: { airing in
+            Text("Live TV will stop so \(airing.title) can record. If you don’t choose, the recording starts.")
         }
         .animation(Motion.spring(reduceMotion: reduceMotion), value: model.showsGuide)
         .animation(.easeOut(duration: 0.18), value: model.status)
@@ -241,6 +248,7 @@ private struct LiveChrome: View {
     /// The top row's bottom edge and the bottom row's top edge, on screen, for the scrims.
     @State private var topRow: CGFloat = 0
     @State private var bottomRow: CGFloat = .infinity
+    @State private var confirmingTakeover = false
 
     var body: some View {
         VStack(spacing: 0) {
