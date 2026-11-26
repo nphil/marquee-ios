@@ -25,7 +25,9 @@ final class FolderPicker: NSObject, UIDocumentPickerDelegate {
         let owner = FolderPicker(finish: finish)
         picker.delegate = owner
         current = owner
-        top.present(picker, animated: true)
+        top.present(picker, animated: true) {
+            Diag.event(.app, "backup.folder", ["state": "presented"], .notice)
+        }
     }
 
     private static func topController() -> UIViewController? {
@@ -38,6 +40,7 @@ final class FolderPicker: NSObject, UIDocumentPickerDelegate {
 
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
         Self.current = nil
+        Diag.event(.app, "backup.folder", ["state": "picked", "count": "\(urls.count)"], .notice)
         if let url = urls.first {
             finish(.success(url))
         } else {
@@ -47,6 +50,7 @@ final class FolderPicker: NSObject, UIDocumentPickerDelegate {
 
     func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
         Self.current = nil
+        Diag.event(.app, "backup.folder", ["state": "cancelled"], .notice)
         finish(.failure(CocoaError(.userCancelled)))
     }
 }
