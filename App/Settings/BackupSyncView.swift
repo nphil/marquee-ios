@@ -1,8 +1,8 @@
 import MarqueeCore
 import SwiftUI
 
-/// Backup & Sync (DESIGN §8.13): a backup file saved anywhere in Files and restored from there, a folder in
-/// Files that keeps one up to date, and the recovery passphrase that opens a backup where the account's key
+/// Backup & Sync (DESIGN §8.13): a backup file saved anywhere in Files and restored from there, a file in
+/// Files kept up to date, and the recovery passphrase that opens a backup where the account's key
 /// is not. Nothing here shows a value: the sheets and lines carry counts, dates and names of settings only.
 struct BackupSyncView: View {
     @Environment(AppSession.self) private var session
@@ -87,26 +87,29 @@ struct BackupSyncView: View {
                 Toggle("Automatic Backup", isOn: Binding(get: { center.automaticIsOn }, set: { setAutomatic($0, center) }))
                     .disabled(center.account == nil || center.activity != .idle)
                     .accessibilityIdentifier("backup.auto")
-                if let name = center.folderName {
-                    LabeledContent("Folder") {
-                        Text(name).foregroundStyle(theme.ink2)
+                if let name = center.fileName {
+                    LabeledContent("File") {
+                        Text([name, center.filePlace].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                            .foregroundStyle(theme.ink2)
+                            .multilineTextAlignment(.trailing)
                     }
+                    .accessibilityIdentifier("backup.file")
                     LabeledContent("Last Saved") {
                         Text(center.lastAutomatic?.stamp ?? "Not yet").foregroundStyle(theme.ink2)
                     }
                     .accessibilityIdentifier("backup.auto.last")
-                    Button("Choose Another Folder…") { FolderPicker.present { center.chooseFolder($0) } }
-                        .accessibilityIdentifier("backup.folder")
+                    Button("Change…") { center.chooseBackupFile() }
+                        .accessibilityIdentifier("backup.fileChange")
                 }
             } footer: {
                 if let problem = center.automaticProblem {
                     ProblemLine(text: problem)
                         .accessibilityIdentifier("backup.auto.problem")
                 } else if center.automaticIsOn {
-                    Text("The backup in the folder is replaced a short while after a setting changes. The copy before it stays beside it as “\(BackupFiles.previousName)”.")
+                    Text("The backup file is replaced a short while after a setting changes.")
                         .foregroundStyle(theme.ink2)
                 } else {
-                    Text("Keeps one backup up to date in a folder chosen in Files. A folder in iCloud Drive keeps it in iCloud, ready to restore on a new iPhone.")
+                    Text("Keeps one backup file up to date. Choose it in Files: with none made yet, the first backup is saved where you pick; otherwise pick an existing one. A file in iCloud Drive is ready to restore on a new iPhone.")
                         .foregroundStyle(theme.ink2)
                 }
             }
@@ -114,14 +117,14 @@ struct BackupSyncView: View {
 
             if let date = center.foundNewer {
                 Section {
-                    Button("Restore That Backup") { center.restoreFromFolder() }
+                    Button("Restore That Backup") { center.restoreFromChosenFile() }
                         .accessibilityIdentifier("backup.newer.restore")
-                    Button("Replace It with This iPhone's Settings") { center.replaceNewerInFolder() }
+                    Button("Replace It with This iPhone's Settings") { center.replaceNewerInFile() }
                         .accessibilityIdentifier("backup.newer.replace")
                 } footer: {
                     StatusLine(
                         symbol: "icloud.and.arrow.down", tint: theme.accentText,
-                        text: "The folder holds a backup from \(date.stamp), newer than anything this iPhone saved. Automatic backup waits until one of these is chosen."
+                        text: "The backup file holds a backup from \(date.stamp), newer than anything this iPhone saved. Automatic backup waits until one of these is chosen."
                     )
                     .accessibilityIdentifier("backup.newer")
                 }
@@ -132,7 +135,7 @@ struct BackupSyncView: View {
 
     private func setAutomatic(_ on: Bool, _ center: BackupCenter) {
         if on {
-            if center.prepareAutomatic() { FolderPicker.present { center.chooseFolder($0) } }
+            center.chooseBackupFile()
         } else {
             center.stopAutomatic()
         }

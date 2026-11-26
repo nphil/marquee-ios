@@ -1,12 +1,10 @@
 import Foundation
 import MarqueeCore
 
-/// The files a backup touches: one the person picked in Files, and the one folder automatic backups go to.
+/// The files a backup touches: one the person picked in Files, and the one file automatic backups are written to.
 /// Everything here blocks on file coordination (a network share or iCloud may be slow), so it runs through
 /// `blocking`, never on the main actor.
 enum BackupFiles {
-    static let currentName = "Marquee.\(BackupFormat.fileExtension)"
-    static let previousName = "Marquee (previous).\(BackupFormat.fileExtension)"
     /// A backup is a few kilobytes; a file far larger than this is not one.
     static let sizeLimit = 8_000_000
 
@@ -14,12 +12,12 @@ enum BackupFiles {
     enum Failure: Error, Equatable {
         /// iCloud has not put the file on this iPhone yet.
         case notDownloaded
-        /// The folder holds another Plex account's backup, which is never replaced.
+        /// The file holds another Plex account's backup, which is never replaced.
         case otherAccount
-        /// The folder holds a backup newer than any this iPhone wrote or restored.
+        /// The file holds a backup newer than any this iPhone wrote or restored.
         case newer(Date)
-        /// The system no longer lets Marquee into the folder.
-        case folderUnavailable
+        /// The system no longer lets Marquee reach the file.
+        case fileUnavailable
     }
 
     /// Runs file work on a background queue, so a slow share cannot hold a thread of the cooperative pool.
@@ -31,11 +29,20 @@ enum BackupFiles {
         }
     }
 
-    /// A bookmark for a folder from the picker, which keeps it reachable after a relaunch.
-    static func bookmark(for folder: URL) throws -> Data {
-        let opened = folder.startAccessingSecurityScopedResource()
-        defer { if opened { folder.stopAccessingSecurityScopedResource() } }
-        return try folder.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+    /// A bookmark for a file from the picker, which keeps it reachable after a relaunch.
+    static func bookmark(for file: URL) throws -> Data {
+        let opened = file.startAccessingSecurityScopedResource()
+        defer { if opened { file.stopAccessingSecurityScopedResource() } }
+        return try file.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
+    }
+
+    /// The file's name and where it lives, for the Backup page ("iCloud Drive › Marquee").
+    static func place(of file: URL) -> String {
+        let parts = file.deletingLastPathComponent().pathComponents
+        if let cloud = parts.firstIndex(of: "com~apple~CloudDocs") {
+            return (["iCloud Drive"] + parts[(cloud + 1)...]).joined(separator: " › ")
+        }
+        return parts.last ?? ""
     }
 
     /// A backup the person picked, or one iOS copied into the app's inbox when it was opened from Files; that
@@ -50,44 +57,39 @@ enum BackupFiles {
         return data
     }
 
-    /// The folder's current backup, or nil when it has none.
-    static func current(inFolder bookmark: Data) throws -> Data? {
-        try withFolder(bookmark) { folder in
-            try coordinatedRead(folder.appending(path: currentName))
-        }.value
+    /// The chosen file's contents, or nil when it is empty or gone.
+    static func current(at bookmark: Data) throws -> Data? {
+        try withFile(bookmark) { try coordinatedRead($0) }.value
     }
 
-    /// Makes `file` the folder's current backup and keeps the one it replaces as the previous backup. Another
-    /// account's backup is never replaced, and neither is one newer than `knownNewest` (the newest this iPhone
-    /// wrote or restored) unless `replacingNewer` says the person chose that. Returns a fresh bookmark when the
-    /// system marked the old one stale.
+    /// Rewrites the chosen file in place. Another account's backup is never replaced, and neither is one newer
+    /// than `knownNewest` (the newest this iPhone wrote or restored) unless `replacingNewer` says the person
+    /// chose that. Returns a fresh bookmark when the system marked the old one stale.
     static func write(
-        _ file: Data, inFolder bookmark: Data, account: String, knownNewest: Int, replacingNewer: Bool
+        _ data: Data, at bookmark: Data, account: String, knownNewest: Int, replacingNewer: Bool
     ) throws -> Data? {
-        try withFolder(bookmark) { folder in
-            let current = folder.appending(path: currentName)
-            if let existing = try coordinatedRead(current), let header = try? Backup.inspect(existing) {
+        try withFile(bookmark) { file in
+            if let existing = try coordinatedRead(file), let header = try? Backup.inspect(existing) {
                 guard Backup.belongs(header, to: account) else { throw Failure.otherAccount }
                 guard replacingNewer || header.createdAt <= knownNewest else { throw Failure.newer(header.createdDate) }
-                try coordinatedWrite(existing, to: folder.appending(path: previousName))
             }
-            try coordinatedWrite(file, to: current)
+            try coordinatedWrite(data, to: file)
         }.refreshed
     }
 
-    private static func withFolder<T>(_ bookmark: Data, _ body: (URL) throws -> T) throws -> (value: T, refreshed: Data?) {
+    private static func withFile<T>(_ bookmark: Data, _ body: (URL) throws -> T) throws -> (value: T, refreshed: Data?) {
         var stale = false
-        let folder: URL
+        let file: URL
         do {
-            folder = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
+            file = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
         } catch {
-            throw Failure.folderUnavailable
+            throw Failure.fileUnavailable
         }
-        let opened = folder.startAccessingSecurityScopedResource()
-        defer { if opened { folder.stopAccessingSecurityScopedResource() } }
-        let value = try body(folder)
+        let opened = file.startAccessingSecurityScopedResource()
+        defer { if opened { file.stopAccessingSecurityScopedResource() } }
+        let value = try body(file)
         var refreshed: Data?
-        if stale { refreshed = try? folder.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil) }
+        if stale { refreshed = try? file.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil) }
         return (value, refreshed)
     }
 

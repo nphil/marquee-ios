@@ -5,7 +5,7 @@ import MarqueeCore
 import Observation
 import UIKit
 
-/// Backup and restore of the iPhone's settings (DESIGN §8.13): the encrypted file, the folder that keeps one
+/// Backup and restore of the iPhone's settings (DESIGN §8.13): the encrypted file, the file that is kept
 /// up to date, the key and recovery passphrase that open it, and the restore that puts it back. What is in a
 /// backup is `BackupScope.phone`; the file format and the all-or-nothing restore are `MarqueeCore`'s.
 ///
@@ -44,14 +44,16 @@ final class BackupCenter {
     /// What went wrong with the last thing the person asked for, in plain words.
     private(set) var problem: String?
     private(set) var lastBackup: Date?
-    private(set) var folderName: String?
+    private(set) var fileName: String?
+    /// Where the chosen file lives, e.g. "iCloud Drive › Marquee".
+    private(set) var filePlace: String?
     private(set) var lastAutomatic: Date?
     /// Why the last automatic backup was not saved.
     private(set) var automaticProblem: String?
     private(set) var hasPassphrase = false
     /// Where the key lives; nil until the first backup makes it.
     private(set) var keyHome: BackupKeyringStore.Home?
-    /// The folder holds a backup newer than anything this iPhone wrote or restored: automatic backup waits for
+    /// The chosen file holds a backup newer than anything this iPhone wrote or restored: automatic backup waits for
     /// the person to choose between restoring it and replacing it.
     private(set) var foundNewer: Date?
     var exportRequest: ExportRequest?
@@ -62,9 +64,9 @@ final class BackupCenter {
     @ObservationIgnored private let storage: SessionStorage
     @ObservationIgnored private let keyrings: BackupKeyringStore
     @ObservationIgnored private let pairings: any PairingStore
-    @ObservationIgnored private var folderBookmark: Data?
+    @ObservationIgnored private var fileBookmark: Data?
     @ObservationIgnored private var lastFingerprint: Data?
-    /// The `createdAt` of the newest backup in the folder that this iPhone wrote or restored.
+    /// The `createdAt` of the newest backup in the file that this iPhone wrote or restored.
     @ObservationIgnored private var newest = 0
     @ObservationIgnored private var pendingCheck: Task<Void, Never>?
     @ObservationIgnored private var writing = false
@@ -76,8 +78,12 @@ final class BackupCenter {
     @ObservationIgnored var pageIsOpen = false
 
     private enum Key {
-        static let folder = "marquee.backup.folder"
-        static let folderName = "marquee.backup.folderName"
+        static let file = "marquee.backup.file"
+        static let fileName = "marquee.backup.fileName"
+        static let filePlace = "marquee.backup.filePlace"
+        /// The folder bookmark of 0.1.93 and before; it is dropped, the file is chosen again.
+        static let oldFolder = "marquee.backup.folder"
+        static let oldFolderName = "marquee.backup.folderName"
         static let fingerprint = "marquee.backup.fingerprint"
         static let newest = "marquee.backup.newest"
         static let last = "marquee.backup.last"
@@ -95,15 +101,17 @@ final class BackupCenter {
         pairings = live ? KeychainPairingStore() : MemoryPairingStore()
         account = storage.accountID
         let defaults = storage.defaults
-        folderBookmark = defaults.data(forKey: Key.folder)
-        folderName = folderBookmark == nil ? nil : defaults.string(forKey: Key.folderName)
+        for key in [Key.oldFolder, Key.oldFolderName] { defaults.removeObject(forKey: key) }
+        fileBookmark = defaults.data(forKey: Key.file)
+        fileName = fileBookmark == nil ? nil : defaults.string(forKey: Key.fileName)
+        filePlace = fileBookmark == nil ? nil : defaults.string(forKey: Key.filePlace)
         lastFingerprint = defaults.data(forKey: Key.fingerprint)
         newest = defaults.integer(forKey: Key.newest)
         lastBackup = Self.date(defaults, Key.last)
         lastAutomatic = Self.date(defaults, Key.lastAutomatic)
     }
 
-    var automaticIsOn: Bool { folderName != nil }
+    var automaticIsOn: Bool { fileName != nil }
 
     /// Without iCloud Keychain the key stays on this iPhone, so only a recovery passphrase lets another device
     /// open an automatic backup: it is required before one is written.
@@ -140,7 +148,7 @@ final class BackupCenter {
         keyHome = nil
     }
 
-    /// Delete All Local Data: the folder, the bookkeeping and the account go. The key stays in the Keychain, so
+    /// Delete All Local Data: the file choice, the bookkeeping and the account go. The key stays in the Keychain, so
     /// the backups already made can still be opened after signing in again.
     func reset() {
         stopAutomatic()
@@ -160,8 +168,8 @@ final class BackupCenter {
             keyHome = found.home
             hasPassphrase = found.keyring.hasPassphrase
         }
-        guard folderBookmark != nil, foundNewer == nil, !writing else { return }
-        Task { await checkFolder(account: account) }
+        guard fileBookmark != nil, foundNewer == nil, !writing else { return }
+        Task { await checkFile(account: account) }
     }
 
     // MARK: Back up now
@@ -261,10 +269,10 @@ final class BackupCenter {
         }
     }
 
-    func restoreFromFolder() {
-        guard let bookmark = folderBookmark else { return }
+    func restoreFromChosenFile() {
+        guard let bookmark = fileBookmark else { return }
         beginRestore {
-            guard let file = try await BackupFiles.blocking({ try BackupFiles.current(inFolder: bookmark) }) else {
+            guard let file = try await BackupFiles.blocking({ try BackupFiles.current(at: bookmark) }) else {
                 throw BackupError.notABackup
             }
             return file
@@ -383,7 +391,7 @@ final class BackupCenter {
 
     // MARK: Automatic backup
 
-    /// Whether the folder picker can open: the key must exist and, without iCloud Keychain, a passphrase too.
+    /// Whether the file picker can open: the key must exist and, without iCloud Keychain, a passphrase too.
     func prepareAutomatic() -> Bool {
         problem = nil
         guard let account else {
@@ -403,71 +411,107 @@ final class BackupCenter {
         return true
     }
 
-    /// The folder the person picked in Files.
-    func chooseFolder(_ result: Result<URL, any Error>) {
-        switch result {
-        case .success(let url):
-            Diag.event(.app, "backup.folder", ["state": "chosen"], .notice)
-            adopt(folder: url)
-        case .failure(let error):
-            guard (error as? CocoaError)?.code != .userCancelled else { return }
-            failFolder(error)
+    /// "Choose Backup File": with no backup made yet the first one is saved where the person picks, otherwise
+    /// an existing backup is picked. Either way the file is then kept up to date in place.
+    func chooseBackupFile() {
+        guard prepareAutomatic(), activity == .idle, let account else { return }
+        guard lastBackup == nil else {
+            FilePicker.open { [weak self] in self?.chooseFile($0) }
+            return
+        }
+        activity = .working("Preparing the backup")
+        Task {
+            defer { activity = .idle }
+            do {
+                let keyring = try loadKeyring(for: account)
+                let made = try snapshot(keyring: keyring)
+                let now = Date.now
+                let data = try await seal(made.payload, account: account, keyring: keyring, now: now)
+                let folder = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+                try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+                let temp = folder.appending(path: BackupFormat.fileName(on: now))
+                try data.write(to: temp)
+                FilePicker.save(temp) { [weak self] result in
+                    try? FileManager.default.removeItem(at: folder)
+                    if case .success = result {
+                        self?.newest = Int(now.timeIntervalSince1970)
+                        self?.storage.defaults.set(self?.newest ?? 0, forKey: Key.newest)
+                    }
+                    self?.chooseFile(result)
+                }
+            } catch {
+                failFile(error)
+            }
         }
     }
 
-    /// Every way choosing a folder can fail ends here, in a sentence beside the switch and in the log.
-    private func failFolder(_ error: any Error) {
+    private func chooseFile(_ result: Result<URL, any Error>) {
+        switch result {
+        case .success(let url):
+            Diag.event(.app, "backup.auto", ["file": "chosen"], .notice)
+            adopt(file: url)
+        case .failure(let error):
+            guard (error as? CocoaError)?.code != .userCancelled else { return }
+            failFile(error)
+        }
+    }
+
+    /// Every way choosing the file can fail ends here, in a sentence beside the switch and in the log.
+    private func failFile(_ error: any Error) {
         let words = Self.words(for: error)
         problem = words
         automaticProblem = words
-        Diag.event(.app, "backup.folder", ["state": "failed", "reason": Self.reason(error)], .warning)
+        Diag.event(.app, "backup.auto", ["file": "failed", "reason": Self.reason(error)], .warning)
     }
 
     func stopAutomatic() {
         pendingCheck?.cancel()
         pendingCheck = nil
-        folderBookmark = nil
-        folderName = nil
+        fileBookmark = nil
+        fileName = nil
+        filePlace = nil
         lastFingerprint = nil
         lastAutomatic = nil
         foundNewer = nil
         automaticProblem = nil
         let defaults = storage.defaults
-        for key in [Key.folder, Key.folderName, Key.fingerprint, Key.lastAutomatic] { defaults.removeObject(forKey: key) }
+        for key in [Key.file, Key.fileName, Key.filePlace, Key.fingerprint, Key.lastAutomatic] { defaults.removeObject(forKey: key) }
         Diag.event(.app, "backup.auto.off", [:], .notice)
     }
 
-    /// The person chose to keep this iPhone's settings over the newer backup in the folder.
-    func replaceNewerInFolder() {
+    /// The person chose to keep this iPhone's settings over the newer backup in the file.
+    func replaceNewerInFile() {
         foundNewer = nil
         lastFingerprint = nil
         Task { await writeIfChanged(replacingNewer: true) }
     }
 
-    private func adopt(folder url: URL) {
+    private func adopt(file url: URL) {
         guard let account else {
-            failFolder(BackupError.noAccount)
+            failFile(BackupError.noAccount)
             return
         }
         problem = nil
-        activity = .working("Checking the folder")
+        activity = .working("Checking the file")
         Task {
             defer { activity = .idle }
             do {
                 let bookmark = try await BackupFiles.blocking { try BackupFiles.bookmark(for: url) }
-                let existing = try await BackupFiles.blocking { try BackupFiles.current(inFolder: bookmark) }
+                let existing = try await BackupFiles.blocking { try BackupFiles.current(at: bookmark) }
                 let found = existing.flatMap { try? Backup.inspect($0) }
                 if let found, !Backup.belongs(found, to: account) {
-                    failFolder(BackupFiles.Failure.otherAccount)
+                    failFile(BackupFiles.Failure.otherAccount)
                     return
                 }
-                folderBookmark = bookmark
-                folderName = url.lastPathComponent
+                fileBookmark = bookmark
+                fileName = url.lastPathComponent
+                filePlace = BackupFiles.place(of: url)
                 lastFingerprint = nil
                 automaticProblem = nil
                 let defaults = storage.defaults
-                defaults.set(bookmark, forKey: Key.folder)
-                defaults.set(folderName, forKey: Key.folderName)
+                defaults.set(bookmark, forKey: Key.file)
+                defaults.set(fileName, forKey: Key.fileName)
+                defaults.set(filePlace, forKey: Key.filePlace)
                 defaults.removeObject(forKey: Key.fingerprint)
                 Diag.event(.app, "backup.auto.on", ["found": found != nil], .notice)
                 if let found, found.createdAt > newest {
@@ -476,15 +520,15 @@ final class BackupCenter {
                     await writeIfChanged()
                 }
             } catch {
-                failFolder(error)
+                failFile(error)
             }
         }
     }
 
-    private func checkFolder(account: String) async {
-        guard let bookmark = folderBookmark else { return }
+    private func checkFile(account: String) async {
+        guard let bookmark = fileBookmark else { return }
         do {
-            let existing = try await BackupFiles.blocking { try BackupFiles.current(inFolder: bookmark) }
+            let existing = try await BackupFiles.blocking { try BackupFiles.current(at: bookmark) }
             guard let header = existing.flatMap({ try? Backup.inspect($0) }),
                   Backup.belongs(header, to: account), header.createdAt > newest
             else { return }
@@ -495,7 +539,7 @@ final class BackupCenter {
     }
 
     private func settingsMayHaveChanged() {
-        guard folderBookmark != nil, pendingCheck == nil else { return }
+        guard fileBookmark != nil, pendingCheck == nil else { return }
         pendingCheck = Task {
             try? await Task.sleep(for: .seconds(Self.quiet))
             guard !Task.isCancelled else { return }
@@ -506,7 +550,7 @@ final class BackupCenter {
 
     /// The app is leaving the foreground: write at once, and ask iOS for the few seconds it takes.
     private func flush() {
-        guard folderBookmark != nil else { return }
+        guard fileBookmark != nil else { return }
         pendingCheck?.cancel()
         pendingCheck = nil
         let owns = backgroundTask == .invalid
@@ -528,9 +572,9 @@ final class BackupCenter {
         backgroundTask = .invalid
     }
 
-    /// Writes the folder's backup when the settings differ from what was last written.
+    /// Rewrites the chosen file when the settings differ from what was last written.
     private func writeIfChanged(replacingNewer: Bool = false) async {
-        guard let bookmark = folderBookmark, let account, foundNewer == nil, !writing else { return }
+        guard let bookmark = fileBookmark, let account, foundNewer == nil, !writing else { return }
         writing = true
         defer { writing = false }
         do {
@@ -545,12 +589,12 @@ final class BackupCenter {
             let file = try await seal(made.payload, account: account, keyring: keyring, now: now)
             let known = newest
             let refreshed = try await BackupFiles.blocking {
-                try BackupFiles.write(file, inFolder: bookmark, account: account, knownNewest: known, replacingNewer: replacingNewer)
+                try BackupFiles.write(file, at: bookmark, account: account, knownNewest: known, replacingNewer: replacingNewer)
             }
             let defaults = storage.defaults
             if let refreshed {
-                folderBookmark = refreshed
-                defaults.set(refreshed, forKey: Key.folder)
+                fileBookmark = refreshed
+                defaults.set(refreshed, forKey: Key.file)
             }
             lastFingerprint = made.fingerprint
             newest = Int(now.timeIntervalSince1970)
@@ -597,7 +641,7 @@ final class BackupCenter {
         return made
     }
 
-    /// A change to the passphrase must reach the folder's file even when the settings did not change.
+    /// A change to the passphrase must reach the chosen file even when the settings did not change.
     private func keyChanged() {
         lastFingerprint = nil
         storage.defaults.removeObject(forKey: Key.fingerprint)
@@ -629,9 +673,9 @@ final class BackupCenter {
         case let error as BackupFiles.Failure:
             switch error {
             case .notDownloaded: return "iCloud has not downloaded the backup to this iPhone yet. Try again when it is online."
-            case .otherAccount: return "That folder holds the backup of another Plex account. Choose a different folder."
-            case .newer: return "That folder holds a newer backup."
-            case .folderUnavailable: return "Marquee can no longer reach the folder. Choose it again."
+            case .otherAccount: return "That file holds the backup of another Plex account. Choose a different file."
+            case .newer: return "That file holds a newer backup."
+            case .fileUnavailable: return "Marquee can no longer reach the backup file. Choose it again."
             }
         case is KeychainError:
             return "Marquee could not reach the Keychain. Unlock the iPhone and try again."
