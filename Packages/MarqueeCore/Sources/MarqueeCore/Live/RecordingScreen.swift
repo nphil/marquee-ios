@@ -56,6 +56,18 @@ extension UpcomingDay {
     }
 }
 
+extension RecordingPlan {
+    /// "Starts 2 min early, ends 1 hour late.", or nil when the airing records on time.
+    public func paddingSentence(of grab: ScheduledRecording) -> String? {
+        let pad = padding(of: grab)
+        var parts: [String] = []
+        if pad.start > 0 { parts.append("starts \(RecordingDraft.duration(pad.start)) early") }
+        if pad.end > 0 { parts.append("ends \(RecordingDraft.duration(pad.end)) late") }
+        guard let first = parts.first else { return nil }
+        return (first.prefix(1).uppercased() + first.dropFirst() + parts.dropFirst().map { ", " + $0 }.joined()) + "."
+    }
+}
+
 extension RecordingRule {
     /// The rule in a sentence: "Records new episodes of Jimmy Kimmel Live! on any channel, starts 2 min early."
     public var summary: String { RecordingDraft(editing: self).summary }

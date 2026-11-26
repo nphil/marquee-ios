@@ -62,6 +62,8 @@ public struct RecordingJournal: Sendable, Hashable, Codable {
     static let keptSeenDays: TimeInterval = 2 * 86_400
     /// A grab can leave the list a little before its end when the server closes it early.
     static let endSlack: TimeInterval = 120
+    /// A notification for something that ended longer ago than this is noise: the phone was off for a day.
+    static let staleEvent: TimeInterval = 6 * 3_600
 
     public static func decoded(_ data: Data?) -> RecordingJournal {
         data.flatMap { try? JSONDecoder().decode(RecordingJournal.self, from: $0) } ?? RecordingJournal()
@@ -131,7 +133,14 @@ public struct RecordingJournal: Sendable, Hashable, Codable {
         history = history.filter { $0.noted > now.addingTimeInterval(-Self.historyDays) }
             .sorted { $0.noted > $1.noted }
             .prefix(Self.keptHistory).map { $0 }
-        return events
+        return events.filter { $0.recording.end > now.addingTimeInterval(-Self.staleEvent) }
+    }
+
+    /// Looks at the DVR and reports nothing, so that what happened while alerts were off is not announced when
+    /// they are turned on.
+    public mutating func look(_ recordings: LiveRecordings, dvr: LiveDVR?, now: Date) {
+        checkedAt = nil
+        _ = observe(recordings, dvr: dvr, now: now)
     }
 
     /// Records that the user skipped or stopped `grab`, so the next look does not report it as lost.

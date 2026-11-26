@@ -190,6 +190,15 @@ struct RecordingPlanTests {
         #expect(defaults.padding(of: F.grab("x", from: 0, to: 1)) == (2, 5))
     }
 
+    @Test func thePaddingReadsAsASentence() {
+        let defaults = RecordingPlan(LiveRecordings(scheduled: [F.grab("x", from: 0, to: 1)]), dvr: F.dvr(padding: (2, 60)))
+        #expect(defaults.paddingSentence(of: F.grab("x", from: 0, to: 1)) == "Starts 2 min early, ends 1 hour late.")
+        let endOnly = RecordingPlan(LiveRecordings(scheduled: [F.grab("x", from: 0, to: 1)]), dvr: F.dvr(padding: (0, 5)))
+        #expect(endOnly.paddingSentence(of: F.grab("x", from: 0, to: 1)) == "Ends 5 min late.")
+        let none = RecordingPlan(LiveRecordings(scheduled: [F.grab("x", from: 0, to: 1)]), dvr: F.dvr())
+        #expect(none.paddingSentence(of: F.grab("x", from: 0, to: 1)) == nil)
+    }
+
     @Test func anotherAiringOfTheSameEpisodeFreesTheTuner() {
         let rules = [F.rule("one", title: "Show A"), F.rule("two", title: "Show B")]
         let loser = F.grab("two", channel: "b", from: 130, to: 190, title: "Show B", episodeTitle: "Pilot", guid: "plex://episode/p")
@@ -409,6 +418,32 @@ struct RecordingJournalTests {
         let finished = look(nil, 91)
         #expect(finished.map(\.kind) == [.finished] && finished[0].title == "Recording finished")
         #expect(journal.history.isEmpty && look(nil, 120).isEmpty)
+    }
+
+    @Test func whatEndedHoursAgoIsNotAnnounced() {
+        var journal = RecordingJournal()
+        let rule = F.rule("g")
+        let running = LiveRecordings(rules: [rule], scheduled: [F.grab("g", status: .inprogress, from: 0, to: 60)])
+        _ = journal.observe(running, dvr: F.dvr(), now: F.at(1))
+
+        let done = LiveRecordings(rules: [rule], scheduled: [F.grab("g", status: .complete, from: 0, to: 60)])
+        // The phone was off for the rest of the day.
+        #expect(journal.observe(done, dvr: F.dvr(), now: F.at(60 * 24)).isEmpty)
+    }
+
+    @Test func aQuietLookAnnouncesNothingAndLaterLooksOnlyWhatChangedAfterIt() {
+        var journal = RecordingJournal()
+        let rule = F.rule("g")
+        func recordings(_ status: ScheduledRecording.Status) -> LiveRecordings {
+            LiveRecordings(rules: [rule], scheduled: [F.grab("g", status: status, from: 30, to: 90)])
+        }
+        _ = journal.observe(recordings(.scheduled), dvr: F.dvr(), now: F.at(0))
+
+        // Alerts were off while it started.
+        journal.look(recordings(.inprogress), dvr: F.dvr(), now: F.at(60))
+
+        #expect(journal.observe(recordings(.inprogress), dvr: F.dvr(), now: F.at(61)).isEmpty)
+        #expect(journal.observe(recordings(.complete), dvr: F.dvr(), now: F.at(91)).map(\.kind) == [.finished])
     }
 
     @Test func anErrorIsAFailureWithItsReason() {
