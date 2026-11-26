@@ -80,15 +80,26 @@ public struct RecordSetting: Identifiable, Hashable, Sendable {
     public var type: String
     public var value: String
     public var isHidden: Bool
+    /// What the server picks when the rule leaves the setting alone; nil when it does not say.
+    public var defaultValue: String?
     /// From `enumValues` "0:New and Repeat Airings|1:New Airings Only".
     public var choices: [Choice]
 
-    public init(id: String, label: String, type: String, value: String, isHidden: Bool = false, choices: [Choice] = []) {
+    public init(
+        id: String,
+        label: String,
+        type: String,
+        value: String,
+        isHidden: Bool = false,
+        defaultValue: String? = nil,
+        choices: [Choice] = []
+    ) {
         self.id = id
         self.label = label
         self.type = type
         self.value = value
         self.isHidden = isHidden
+        self.defaultValue = defaultValue
         self.choices = choices
     }
 
@@ -142,11 +153,15 @@ public struct RecordingRule: Identifiable, Hashable, Sendable {
 
     /// A rule for a whole show rather than one airing.
     public var isSeries: Bool { type == RecordOption.Kind.show.rawValue }
+
+    public func setting(_ id: String) -> RecordSetting? {
+        settings.first { $0.id == id }
+    }
 }
 
 /// One airing the DVR will record, is recording or has recorded (`MediaGrabOperation`).
-public struct ScheduledRecording: Identifiable, Hashable, Sendable {
-    public enum Status: String, Sendable {
+public struct ScheduledRecording: Identifiable, Hashable, Sendable, Codable {
+    public enum Status: String, Sendable, Codable {
         case inactive, scheduled, inprogress, complete, cancelled, error, postprocessing, paused, unknown
     }
 
@@ -165,6 +180,8 @@ public struct ScheduledRecording: Identifiable, Hashable, Sendable {
     public var thumb: String?
     public var start: Date
     public var end: Date
+    /// The day the episode first aired, "2026-11-26"; compared with `start` for NEW and RERUN.
+    public var originallyAvailableAt: String?
 
     public init(
         id: String,
@@ -180,7 +197,8 @@ public struct ScheduledRecording: Identifiable, Hashable, Sendable {
         guid: String? = nil,
         thumb: String? = nil,
         start: Date,
-        end: Date
+        end: Date,
+        originallyAvailableAt: String? = nil
     ) {
         self.id = id
         self.ruleID = ruleID
@@ -196,6 +214,7 @@ public struct ScheduledRecording: Identifiable, Hashable, Sendable {
         self.thumb = thumb
         self.start = start
         self.end = end
+        self.originallyAvailableAt = originallyAvailableAt
     }
 
     /// Still ahead or under way: shown under Scheduled and counted by the recording guard.

@@ -85,7 +85,7 @@ extension BackupScope {
             out("marquee.server.address.", prefix: true), out("marquee.profile"), out("marquee.backup.", prefix: true),
             out("marquee.account.", prefix: true), out("marquee.link.", prefix: true), out("marquee.uitest.", prefix: true),
             out("marquee.fakeSignedIn"), out("marquee.fakeServerList"), out("marquee.downloads.backgroundBroken"),
-            out("marquee.diag.name"),
+            out("marquee.diag.name"), out("marquee.recordings.", prefix: true),
 
             inn("marquee.settings.", .profiles, prefix: true),
             inn("marquee.theme.", .appearance, prefix: true), inn("marquee.headerStyle", .appearance),

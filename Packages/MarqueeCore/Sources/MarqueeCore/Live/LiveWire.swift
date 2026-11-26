@@ -108,7 +108,7 @@ struct WireDevice: Decodable {
 struct WireSetting: Decodable {
     let setting: RecordSetting
 
-    enum CodingKeys: String, CodingKey { case id, label, type, value, hidden, enumValues }
+    enum CodingKeys: String, CodingKey { case id, label, type, value, hidden, enumValues, defaultValue = "default" }
 
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -119,6 +119,7 @@ struct WireSetting: Decodable {
             type: c.string(.type) ?? "text",
             value: value,
             isHidden: c.bool(.hidden) ?? false,
+            defaultValue: c.string(.defaultValue) ?? c.bool(.defaultValue).map { $0 ? "true" : "false" },
             choices: RecordSetting.choices(c.string(.enumValues))
         )
     }
@@ -400,11 +401,27 @@ struct WireProviders: Decodable {
     struct Feature: Decodable {
         let type: String?
         let filters: [Filter]
-        enum CodingKeys: String, CodingKey { case type, filters = "GridChannelFilter" }
+        let directories: [Library]
+        enum CodingKeys: String, CodingKey { case type, filters = "GridChannelFilter", directories = "Directory" }
         init(from decoder: any Decoder) throws {
             let c = try decoder.container(keyedBy: CodingKeys.self)
             type = c.string(.type)
             filters = c.list(.filters)
+            directories = c.list(.directories)
+        }
+    }
+
+    /// A library as the content feature lists it with `includeStorage=1`.
+    struct Library: Decodable {
+        let id: Int?
+        let bytes: Int64?
+        let milliseconds: Double?
+        enum CodingKeys: String, CodingKey { case id, storageTotal, durationTotal }
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = c.int(.id)
+            bytes = c.double(.storageTotal).map { Int64($0) }
+            milliseconds = c.double(.durationTotal)
         }
     }
 
@@ -431,6 +448,19 @@ struct WireProviders: Decodable {
             guard let title = filter.title, let key = filter.key else { return nil }
             return LiveChannelFilter(title: title, key: key)
         }
+    }
+
+    /// The size and length of the libraries `ids` in the server's own library provider, or nil when the
+    /// provider lists none of them.
+    func storage(ofSections ids: Set<Int>) -> RecordingStorage? {
+        let libraries = providers.filter { $0.identifier == "com.plexapp.plugins.library" }
+            .flatMap(\.features).filter { $0.type == "content" }.flatMap(\.directories)
+            .filter { library in library.id.map(ids.contains) ?? false }
+        guard !libraries.isEmpty else { return nil }
+        return RecordingStorage(
+            usedBytes: libraries.reduce(0) { $0 + ($1.bytes ?? 0) },
+            recordedSeconds: libraries.reduce(0) { $0 + ($1.milliseconds ?? 0) } / 1_000
+        )
     }
 }
 
@@ -553,11 +583,12 @@ struct WireGrab: Decodable {
         let episode: Int?
         let guid: String?
         let thumb: String?
+        let originallyAvailableAt: String?
         let media: WireAiringItem.Media?
         let channelKey: String?
 
         enum CodingKeys: String, CodingKey {
-            case title, grandparentTitle, type, parentIndex, index, guid, thumb, grandparentThumb
+            case title, grandparentTitle, type, parentIndex, index, guid, thumb, grandparentThumb, originallyAvailableAt
             case media = "Media"
         }
 
@@ -576,6 +607,7 @@ struct WireGrab: Decodable {
             season = isEpisode ? c.int(.parentIndex) : nil
             episode = isEpisode ? c.int(.index) : nil
             guid = c.string(.guid)
+            originallyAvailableAt = c.string(.originallyAvailableAt)
             thumb = isEpisode ? c.string(.grandparentThumb) ?? c.string(.thumb) : c.string(.thumb)
             let media: [WireAiringItem.Media] = c.list(.media)
             self.media = media.first
@@ -607,7 +639,50 @@ struct WireGrab: Decodable {
             guid: item.guid,
             thumb: item.thumb,
             start: start,
-            end: end
+            end: end,
+            originallyAvailableAt: item.originallyAvailableAt
         )
+    }
+}
+
+/// `/library/sections`: the movie and show libraries recordings can be saved into, with their folders.
+struct WireLibrarySections: Decodable {
+    let libraries: [RecordingLibrary]
+
+    enum CodingKeys: String, CodingKey { case directories = "Directory" }
+
+    struct Section: Decodable {
+        let id: Int?
+        let title: String?
+        let type: String?
+        let locationID: Int?
+
+        enum CodingKeys: String, CodingKey { case key, title, type, locations = "Location" }
+        struct Location: Decodable {
+            let id: Int?
+            enum CodingKeys: String, CodingKey { case id }
+            init(from decoder: any Decoder) throws {
+                id = try decoder.container(keyedBy: CodingKeys.self).int(.id)
+            }
+        }
+
+        init(from decoder: any Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            id = c.int(.key)
+            title = c.string(.title)
+            type = c.string(.type)
+            let locations: [Location] = c.list(.locations)
+            locationID = locations.first?.id
+        }
+    }
+
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let sections: [Section] = c.list(.directories)
+        libraries = sections.compactMap { section in
+            guard let id = section.id, let title = section.title, let type = section.type,
+                  let kind = RecordingLibrary.Kind(rawValue: type) else { return nil }
+            return RecordingLibrary(id: id, locationID: section.locationID, title: title, kind: kind)
+        }
     }
 }

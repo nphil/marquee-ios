@@ -5047,9 +5047,9 @@
     ]
    },
    {
-    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5151",
-    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5151",
-    "guid": "plex://episode/ch-1101-5151",
+    "ratingKey": "plex%3A%2F%2Fepisode%2Fch-1101-5113",
+    "key": "/tv.plex.providers.epg.cloud/metadata/ch-1101-5113",
+    "guid": "plex://episode/ch-1101-5113",
     "type": "episode",
     "Genre": [
      {
@@ -5060,9 +5060,9 @@
      }
     ],
     "grandparentTitle": "Star Rangers",
-    "title": "Moon Base",
+    "title": "Lost Signal",
     "parentIndex": 1,
-    "index": 7,
+    "index": 9,
     "grandparentGuid": "plex://show/star-rangers",
     "Media": [
      {

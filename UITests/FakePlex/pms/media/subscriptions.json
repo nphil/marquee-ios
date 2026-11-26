@@ -1,7 +1,7 @@
 {
  "__anchor": 1800000000,
  "MediaContainer": {
-  "size": 5,
+  "size": 8,
   "MediaSubscription": [
    {
     "key": "41",
@@ -9,33 +9,11 @@
     "title": "This Episode",
     "librarySectionTitle": "TV Shows",
     "targetLibrarySectionID": 2,
-    "Video": {
-     "type": "episode",
-     "title": "News 7 Tonight",
-     "grandparentTitle": "News 7 Tonight"
-    },
+    "Video": {"type": "episode", "title": "News 7 Tonight", "grandparentTitle": "News 7 Tonight"},
     "Setting": [
-     {
-      "id": "startOffsetMinutes",
-      "label": "Start recording",
-      "type": "int",
-      "value": "1",
-      "hidden": false
-     },
-     {
-      "id": "endOffsetMinutes",
-      "label": "Stop recording",
-      "type": "int",
-      "value": "2",
-      "hidden": false
-     },
-     {
-      "id": "oneShot",
-      "label": "",
-      "type": "bool",
-      "value": "true",
-      "hidden": true
-     }
+     {"id": "startOffsetMinutes", "label": "Start recording", "type": "int", "value": "1", "hidden": false},
+     {"id": "endOffsetMinutes", "label": "Stop recording", "type": "int", "value": "2", "hidden": false},
+     {"id": "oneShot", "label": "", "type": "bool", "value": "true", "hidden": true}
     ],
     "MediaGrabOperation": [
      {
@@ -48,15 +26,8 @@
        "title": "News 7 Tonight",
        "guid": "plex://episode/ch-0701-5065",
        "grandparentTitle": "News 7 Tonight",
-       "Media": [
-        {
-         "beginsAt": 1800000000,
-         "endsAt": 1800003600,
-         "channelIdentifier": "ch-0701",
-         "channelVcn": "7.1",
-         "channelCallSign": "WNWS"
-        }
-       ]
+       "originallyAvailableAt": "2099-01-01",
+       "Media": [{"beginsAt": 1800000000, "endsAt": 1800003600, "channelIdentifier": "ch-0701", "channelVcn": "7.1", "channelCallSign": "WNWS"}]
       }
      }
     ]
@@ -68,48 +39,20 @@
     "airingsType": "New Airings Only",
     "librarySectionTitle": "TV Shows",
     "targetLibrarySectionID": 2,
-    "Directory": {
-     "type": "show",
-     "title": "City Desk"
-    },
+    "Directory": {"type": "show", "title": "City Desk"},
     "Setting": [
-     {
-      "id": "startOffsetMinutes",
-      "label": "Start recording",
-      "type": "int",
-      "value": "0",
-      "hidden": false
-     },
-     {
-      "id": "endOffsetMinutes",
-      "label": "Stop recording",
-      "type": "int",
-      "value": "5",
-      "hidden": false
-     },
-     {
-      "id": "onlyNewAirings",
-      "label": "Airings",
-      "type": "int",
-      "value": "1",
-      "hidden": false,
-      "enumValues": "0:New and Repeat Airings|1:New Airings Only"
-     },
-     {
-      "id": "minVideoQuality",
-      "label": "Resolution",
-      "type": "int",
-      "value": "0",
-      "hidden": false,
-      "enumValues": "0:Prefer HD|720:HD Only|1080:Full HD Only"
-     },
-     {
-      "id": "oneShot",
-      "label": "",
-      "type": "bool",
-      "value": "false",
-      "hidden": true
-     }
+     {"id": "lineupChannel", "label": "Channel", "type": "text", "value": "", "default": "", "hidden": false},
+     {"id": "startOffsetMinutes", "label": "Start recording", "type": "int", "value": "0", "default": "1", "hidden": false},
+     {"id": "endOffsetMinutes", "label": "Stop recording", "type": "int", "value": "5", "default": "2", "hidden": false},
+     {"id": "onlyNewAirings", "label": "Airings", "type": "int", "value": "1", "default": "1", "hidden": false, "enumValues": "0:New and Repeat Airings|1:New Airings Only"},
+     {"id": "minVideoQuality", "label": "Resolution", "type": "int", "value": "0", "default": "0", "hidden": false, "enumValues": "0:Prefer HD|720:HD Only|1080:Full HD Only"},
+     {"id": "replaceLowerQuality", "label": "Replace lower quality", "type": "bool", "value": "false", "default": "false", "hidden": false},
+     {"id": "recordPartials", "label": "Record partial airings", "type": "bool", "value": "false", "default": "false", "hidden": false},
+     {"id": "autoDeletionItemPolicyUnwatchedLibrary", "label": "Keep", "type": "int", "value": "5", "default": "0", "hidden": false, "enumValues": "0:All episodes|1:Latest episode|3:Latest 3 episodes|5:Latest 5 episodes|-7:Past 7 days|-30:Past 30 days"},
+     {"id": "autoDeletionItemPolicyWatchedLibrary", "label": "Delete after watching", "type": "int", "value": "0", "default": "0", "hidden": false, "enumValues": "0:Never|1:After a day|7:After a week|100:On next refresh"},
+     {"id": "comskipEnabled", "label": "Commercials", "type": "bool", "value": "false", "default": "false", "hidden": false},
+     {"id": "comskipMethod", "label": "Commercial method", "type": "int", "value": "0", "default": "0", "hidden": false, "enumValues": "0:Detect only|1:Remove commercials"},
+     {"id": "oneShot", "label": "", "type": "bool", "value": "false", "hidden": true}
     ],
     "MediaGrabOperation": [
      {
@@ -124,15 +67,8 @@
        "grandparentTitle": "City Desk",
        "parentIndex": 3,
        "index": 10,
-       "Media": [
-        {
-         "beginsAt": 1800003600,
-         "endsAt": 1800007200,
-         "channelIdentifier": "ch-0201",
-         "channelVcn": "2.1",
-         "channelCallSign": "WMRQ"
-        }
-       ]
+       "originallyAvailableAt": "2099-01-01",
+       "Media": [{"beginsAt": 1800003600, "endsAt": 1800007200, "channelIdentifier": "ch-0201", "channelVcn": "2.1", "channelCallSign": "WMRQ"}]
       }
      },
      {
@@ -147,15 +83,8 @@
        "parentIndex": 3,
        "index": 11,
        "guid": "plex://episode/city-desk-s3e11",
-       "Media": [
-        {
-         "beginsAt": 1800176400,
-         "endsAt": 1800180000,
-         "channelIdentifier": "ch-0201",
-         "channelVcn": "2.1",
-         "channelCallSign": "WMRQ"
-        }
-       ]
+       "originallyAvailableAt": "2099-01-01",
+       "Media": [{"beginsAt": 1800176400, "endsAt": 1800180000, "channelIdentifier": "ch-0201", "channelVcn": "2.1", "channelCallSign": "WMRQ"}]
       }
      },
      {
@@ -170,15 +99,8 @@
        "parentIndex": 3,
        "index": 12,
        "guid": "plex://episode/city-desk-s3e12",
-       "Media": [
-        {
-         "beginsAt": 1800781200,
-         "endsAt": 1800784800,
-         "channelIdentifier": "ch-0201",
-         "channelVcn": "2.1",
-         "channelCallSign": "WMRQ"
-        }
-       ]
+       "originallyAvailableAt": "2099-01-01",
+       "Media": [{"beginsAt": 1800781200, "endsAt": 1800784800, "channelIdentifier": "ch-0201", "channelVcn": "2.1", "channelCallSign": "WMRQ"}]
       }
      }
     ]
@@ -189,33 +111,11 @@
     "title": "This Episode",
     "librarySectionTitle": "TV Shows",
     "targetLibrarySectionID": 2,
-    "Video": {
-     "type": "episode",
-     "title": "Sintel",
-     "grandparentTitle": "Open Movie Night"
-    },
+    "Video": {"type": "episode", "title": "Sintel", "grandparentTitle": "Open Movie Night"},
     "Setting": [
-     {
-      "id": "startOffsetMinutes",
-      "label": "Start recording",
-      "type": "int",
-      "value": "1",
-      "hidden": false
-     },
-     {
-      "id": "endOffsetMinutes",
-      "label": "Stop recording",
-      "type": "int",
-      "value": "2",
-      "hidden": false
-     },
-     {
-      "id": "oneShot",
-      "label": "",
-      "type": "bool",
-      "value": "true",
-      "hidden": true
-     }
+     {"id": "startOffsetMinutes", "label": "Start recording", "type": "int", "value": "1", "hidden": false},
+     {"id": "endOffsetMinutes", "label": "Stop recording", "type": "int", "value": "2", "hidden": false},
+     {"id": "oneShot", "label": "", "type": "bool", "value": "true", "hidden": true}
     ],
     "MediaGrabOperation": [
      {
@@ -230,16 +130,9 @@
        "grandparentTitle": "Open Movie Night",
        "parentIndex": 1,
        "index": 3,
+       "originallyAvailableAt": "2010-09-30",
        "thumb": "https://metadata-static.plex.tv/art/sintel-backdrop.jpg",
-       "Media": [
-        {
-         "beginsAt": 1800003600,
-         "endsAt": 1800005400,
-         "channelIdentifier": "ch-1301",
-         "channelVcn": "13.1",
-         "channelCallSign": "WQXL"
-        }
-       ]
+       "Media": [{"beginsAt": 1800003600, "endsAt": 1800005400, "channelIdentifier": "ch-1301", "channelVcn": "13.1", "channelCallSign": "WQXL"}]
       }
      }
     ]
@@ -250,33 +143,11 @@
     "title": "This Episode",
     "librarySectionTitle": "TV Shows",
     "targetLibrarySectionID": 2,
-    "Video": {
-     "type": "episode",
-     "title": "The Long Tide",
-     "grandparentTitle": "Harbour Lights"
-    },
+    "Video": {"type": "episode", "title": "The Long Tide", "grandparentTitle": "Harbour Lights"},
     "Setting": [
-     {
-      "id": "startOffsetMinutes",
-      "label": "Start recording",
-      "type": "int",
-      "value": "1",
-      "hidden": false
-     },
-     {
-      "id": "endOffsetMinutes",
-      "label": "Stop recording",
-      "type": "int",
-      "value": "2",
-      "hidden": false
-     },
-     {
-      "id": "oneShot",
-      "label": "",
-      "type": "bool",
-      "value": "true",
-      "hidden": true
-     }
+     {"id": "startOffsetMinutes", "label": "Start recording", "type": "int", "value": "1", "hidden": false},
+     {"id": "endOffsetMinutes", "label": "Stop recording", "type": "int", "value": "2", "hidden": false},
+     {"id": "oneShot", "label": "", "type": "bool", "value": "true", "hidden": true}
     ],
     "MediaGrabOperation": [
      {
@@ -291,15 +162,8 @@
        "grandparentTitle": "Harbour Lights",
        "parentIndex": 2,
        "index": 7,
-       "Media": [
-        {
-         "beginsAt": 1799996400,
-         "endsAt": 1800000000,
-         "channelIdentifier": "ch-0201",
-         "channelVcn": "2.1",
-         "channelCallSign": "WMRQ"
-        }
-       ]
+       "originallyAvailableAt": "2018-10-11",
+       "Media": [{"beginsAt": 1799996400, "endsAt": 1800000000, "channelIdentifier": "ch-0201", "channelVcn": "2.1", "channelCallSign": "WMRQ"}]
       }
      }
     ]
@@ -311,49 +175,13 @@
     "airingsType": "New and Repeat Airings",
     "librarySectionTitle": "TV Shows",
     "targetLibrarySectionID": 2,
-    "Directory": {
-     "type": "show",
-     "title": "Wild Coasts",
-     "thumb": "https://metadata-static.plex.tv/art/spring-poster.jpg"
-    },
+    "Directory": {"type": "show", "title": "Wild Coasts", "thumb": "https://metadata-static.plex.tv/art/spring-poster.jpg"},
     "Setting": [
-     {
-      "id": "startOffsetMinutes",
-      "label": "Start recording",
-      "type": "int",
-      "value": "0",
-      "hidden": false
-     },
-     {
-      "id": "endOffsetMinutes",
-      "label": "Stop recording",
-      "type": "int",
-      "value": "5",
-      "hidden": false
-     },
-     {
-      "id": "onlyNewAirings",
-      "label": "Airings",
-      "type": "int",
-      "value": "0",
-      "hidden": false,
-      "enumValues": "0:New and Repeat Airings|1:New Airings Only"
-     },
-     {
-      "id": "minVideoQuality",
-      "label": "Resolution",
-      "type": "int",
-      "value": "0",
-      "hidden": false,
-      "enumValues": "0:Prefer HD|720:HD Only|1080:Full HD Only"
-     },
-     {
-      "id": "oneShot",
-      "label": "",
-      "type": "bool",
-      "value": "false",
-      "hidden": true
-     }
+     {"id": "startOffsetMinutes", "label": "Start recording", "type": "int", "value": "0", "hidden": false},
+     {"id": "endOffsetMinutes", "label": "Stop recording", "type": "int", "value": "5", "hidden": false},
+     {"id": "onlyNewAirings", "label": "Airings", "type": "int", "value": "0", "hidden": false, "enumValues": "0:New and Repeat Airings|1:New Airings Only"},
+     {"id": "minVideoQuality", "label": "Resolution", "type": "int", "value": "0", "hidden": false, "enumValues": "0:Prefer HD|720:HD Only|1080:Full HD Only"},
+     {"id": "oneShot", "label": "", "type": "bool", "value": "false", "hidden": true}
     ],
     "MediaGrabOperation": [
      {
@@ -368,15 +196,100 @@
        "parentIndex": 1,
        "index": 4,
        "guid": "plex://episode/wild-coasts-s1e4",
-       "Media": [
-        {
-         "beginsAt": 1800259200,
-         "endsAt": 1800262800,
-         "channelIdentifier": "ch-1301",
-         "channelVcn": "13.1",
-         "channelCallSign": "WQXL"
-        }
-       ]
+       "originallyAvailableAt": "2022-03-14",
+       "Media": [{"beginsAt": 1800259200, "endsAt": 1800262800, "channelIdentifier": "ch-1301", "channelVcn": "13.1", "channelCallSign": "WQXL"}]
+      }
+     }
+    ]
+   },
+   {
+    "key": "46",
+    "type": 2,
+    "title": "All Episodes",
+    "airingsType": "New Airings Only",
+    "librarySectionTitle": "TV Shows",
+    "targetLibrarySectionID": 2,
+    "Directory": {"type": "show", "title": "The World at Ten"},
+    "Setting": [
+     {"id": "startOffsetMinutes", "label": "Start recording", "type": "int", "value": "1", "hidden": false},
+     {"id": "endOffsetMinutes", "label": "Stop recording", "type": "int", "value": "2", "hidden": false},
+     {"id": "onlyNewAirings", "label": "Airings", "type": "int", "value": "1", "hidden": false, "enumValues": "0:New and Repeat Airings|1:New Airings Only"},
+     {"id": "minVideoQuality", "label": "Resolution", "type": "int", "value": "0", "hidden": false, "enumValues": "0:Prefer HD|720:HD Only|1080:Full HD Only"},
+     {"id": "oneShot", "label": "", "type": "bool", "value": "false", "hidden": true}
+    ],
+    "MediaGrabOperation": [
+     {
+      "id": "grab-47",
+      "mediaSubscriptionID": 46,
+      "status": "scheduled",
+      "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+      "Metadata": {
+       "type": "episode",
+       "title": "The World at Ten",
+       "guid": "plex://episode/ch-0701-5066",
+       "grandparentTitle": "The World at Ten",
+       "originallyAvailableAt": "2099-01-01",
+       "Media": [{"beginsAt": 1800003600, "endsAt": 1800007200, "channelIdentifier": "ch-0701", "channelVcn": "7.1", "channelCallSign": "WNWS"}]
+      }
+     }
+    ]
+   },
+   {
+    "key": "47",
+    "type": 4,
+    "title": "This Episode",
+    "librarySectionTitle": "TV Shows",
+    "targetLibrarySectionID": 2,
+    "Video": {"type": "episode", "title": "Lost Signal", "grandparentTitle": "Star Rangers"},
+    "Setting": [
+     {"id": "startOffsetMinutes", "label": "Start recording", "type": "int", "value": "1", "hidden": false},
+     {"id": "endOffsetMinutes", "label": "Stop recording", "type": "int", "value": "2", "hidden": false},
+     {"id": "oneShot", "label": "", "type": "bool", "value": "true", "hidden": true}
+    ],
+    "MediaGrabOperation": [
+     {
+      "id": "grab-48",
+      "mediaSubscriptionID": 47,
+      "status": "scheduled",
+      "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+      "Metadata": {
+       "type": "episode",
+       "title": "Lost Signal",
+       "guid": "plex://episode/ch-1101-5113",
+       "grandparentTitle": "Star Rangers",
+       "parentIndex": 1,
+       "index": 9,
+       "originallyAvailableAt": "2019-04-02",
+       "Media": [{"beginsAt": 1800003600, "endsAt": 1800005400, "channelIdentifier": "ch-1101", "channelVcn": "11.1", "channelCallSign": "WKID"}]
+      }
+     }
+    ]
+   },
+   {
+    "key": "48",
+    "type": 4,
+    "title": "This Episode",
+    "librarySectionTitle": "TV Shows",
+    "targetLibrarySectionID": 2,
+    "Video": {"type": "episode", "title": "Riverside at Northgate", "grandparentTitle": "College Basketball"},
+    "Setting": [
+     {"id": "startOffsetMinutes", "label": "Start recording", "type": "int", "value": "1", "hidden": false},
+     {"id": "endOffsetMinutes", "label": "Stop recording", "type": "int", "value": "60", "hidden": false},
+     {"id": "oneShot", "label": "", "type": "bool", "value": "true", "hidden": true}
+    ],
+    "MediaGrabOperation": [
+     {
+      "id": "grab-49",
+      "mediaSubscriptionID": 48,
+      "status": "inprogress",
+      "grabberIdentifier": "tv.plex.grabbers.hdhomerun",
+      "Metadata": {
+       "type": "episode",
+       "title": "Riverside at Northgate",
+       "guid": "plex://episode/ch-0901-5082",
+       "grandparentTitle": "College Basketball",
+       "originallyAvailableAt": "2099-01-01",
+       "Media": [{"beginsAt": 1800001800, "endsAt": 1800009000, "channelIdentifier": "ch-0901", "channelVcn": "9.1", "channelCallSign": "WSPT"}]
       }
      }
     ]

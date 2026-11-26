@@ -50,6 +50,13 @@ public struct LiveDVR: Identifiable, Hashable, Sendable, Codable {
     public func device(_ device: TunerDevice, carries channelKey: String) -> Bool {
         mappings.contains { $0.deviceKey == device.key && $0.channelKey == channelKey && $0.isEnabled }
     }
+
+    /// How many channels the DVR can record at once: the tuners of its live devices, or of all of them when
+    /// none answers.
+    public var tuners: Int {
+        let live = devices.filter(\.isAlive)
+        return max((live.isEmpty ? devices : live).reduce(0) { $0 + $1.tunerCount }, 1)
+    }
 }
 
 /// One channel as one device receives it (`Device.ChannelMapping`).
@@ -229,6 +236,21 @@ public struct LiveAiring: Identifiable, Hashable, Sendable, Codable {
     }
 
     public var duration: TimeInterval { end.timeIntervalSince(start) }
+
+    /// A sports event or other live broadcast, which can run past its listed end. Guide providers tag these with
+    /// genres such as "Sports", "Sports event" and "Live"; a league name stands in when only that is listed.
+    public var isLiveEvent: Bool {
+        genres.contains { genre in
+            let name = genre.lowercased()
+            return name == "sports" || name.hasPrefix("sports event") || name == "live" || name == "event"
+                || Self.leagueGenres.contains(name)
+        }
+    }
+
+    private static let leagueGenres: Set<String> = [
+        "football", "basketball", "baseball", "hockey", "soccer", "golf", "tennis", "motorsports", "racing",
+        "wrestling", "boxing", "mixed martial arts", "cricket", "rugby", "olympics",
+    ]
 
     public func isOn(at date: Date) -> Bool { start <= date && date < end }
 

@@ -172,6 +172,42 @@ public struct PlexLiveTV: Sendable {
         _ = try await library.send(.delete, "/media/subscriptions/\(PlexURL.encode(rule.id))", [], headers: [:])
     }
 
+    // MARK: Recordings screen
+
+    /// Puts `rule` right behind `other` in the priority order, or first when `other` is nil. Plex records the
+    /// rules higher in the list first when airings overlap.
+    public func move(_ rule: RecordingRule, after other: RecordingRule?) async throws {
+        let query = other.map { [URLQueryItem(name: "after", value: $0.id)] } ?? []
+        _ = try await library.send(.put, "/media/subscriptions/\(PlexURL.encode(rule.id))/move", query, headers: [:])
+    }
+
+    /// The libraries recordings can be saved into, for the Record sheet's Library row.
+    public func recordingLibraries() async throws -> [RecordingLibrary] {
+        try await get(WireLibrarySections.self, "/library/sections").libraries
+    }
+
+    /// The size of the libraries the rules save into; nil when the server lists none of them.
+    public func storage(for rules: [RecordingRule]) async throws -> RecordingStorage? {
+        let sections = Set(rules.compactMap(\.targetLibrarySectionID))
+        guard !sections.isEmpty else { return nil }
+        return try await get(WireProviders.self, "/media/providers", [URLQueryItem(name: "includeStorage", value: "1")])
+            .storage(ofSections: sections)
+    }
+
+    /// Records `airing` instead of `grab`, the same episode at another time, to get out of a tuner conflict.
+    /// The new airing is recorded first, so a failure leaves the old one in place. The old one is dropped
+    /// with its rule when that was for this one episode, and skipped when the rule goes on.
+    public func switchRecording(_ grab: ScheduledRecording, to airing: LiveAiring, in recordings: LiveRecordings) async throws {
+        let options = try await recordOptions(airing)
+        guard let option = options.defaultOption else { throw PlexError.decoding("no way to record that airing") }
+        try await record(option, values: RecordingDraft.quickValues(for: airing, option: option))
+        if let rule = recordings.rule(grab.ruleID), !rule.isSeries {
+            try await delete(rule, stopping: grab.status == .inprogress ? [grab] : [])
+        } else {
+            try await cancel(grab)
+        }
+    }
+
     // MARK: Transport
 
     private func get<T: Decodable>(_ type: T.Type, _ path: String, _ query: [URLQueryItem] = []) async throws -> T {

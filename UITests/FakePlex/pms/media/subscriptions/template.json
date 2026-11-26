@@ -17,35 +17,17 @@
        "grandparentTitle": "Show"
       },
       "Setting": [
-       {
-        "id": "startOffsetMinutes",
-        "label": "Start recording",
-        "type": "int",
-        "value": "1",
-        "hidden": false
-       },
-       {
-        "id": "endOffsetMinutes",
-        "label": "Stop recording",
-        "type": "int",
-        "value": "2",
-        "hidden": false
-       },
-       {
-        "id": "minVideoQuality",
-        "label": "Resolution",
-        "type": "int",
-        "value": "0",
-        "hidden": false,
-        "enumValues": "0:Prefer HD|720:HD Only|1080:Full HD Only"
-       },
-       {
-        "id": "oneShot",
-        "label": "",
-        "type": "bool",
-        "value": "true",
-        "hidden": true
-       }
+       {"id": "lineupChannel", "label": "Channel", "type": "text", "value": "", "default": "", "hidden": false},
+       {"id": "startOffsetMinutes", "label": "Start recording", "type": "int", "value": "1", "default": "1", "hidden": false},
+       {"id": "endOffsetMinutes", "label": "Stop recording", "type": "int", "value": "2", "default": "2", "hidden": false},
+       {"id": "minVideoQuality", "label": "Resolution", "type": "int", "value": "0", "default": "0", "hidden": false, "enumValues": "0:Prefer HD|720:HD Only|1080:Full HD Only"},
+       {"id": "replaceLowerQuality", "label": "Replace lower quality", "type": "bool", "value": "false", "default": "false", "hidden": false},
+       {"id": "recordPartials", "label": "Record partial airings", "type": "bool", "value": "false", "default": "false", "hidden": false},
+       {"id": "autoDeletionItemPolicyUnwatchedLibrary", "label": "Keep", "type": "int", "value": "0", "default": "0", "hidden": false, "enumValues": "0:All episodes|1:Latest episode|3:Latest 3 episodes|5:Latest 5 episodes|-7:Past 7 days|-30:Past 30 days"},
+       {"id": "autoDeletionItemPolicyWatchedLibrary", "label": "Delete after watching", "type": "int", "value": "0", "default": "0", "hidden": false, "enumValues": "0:Never|1:After a day|7:After a week|100:On next refresh"},
+       {"id": "comskipEnabled", "label": "Commercials", "type": "bool", "value": "false", "default": "false", "hidden": false},
+       {"id": "comskipMethod", "label": "Commercial method", "type": "int", "value": "0", "default": "0", "hidden": false, "enumValues": "0:Detect only|1:Remove commercials"},
+       {"id": "oneShot", "label": "", "type": "bool", "value": "true", "default": "true", "hidden": true}
       ]
      },
      {
@@ -60,43 +42,18 @@
        "title": "Show"
       },
       "Setting": [
-       {
-        "id": "startOffsetMinutes",
-        "label": "Start recording",
-        "type": "int",
-        "value": "1",
-        "hidden": false
-       },
-       {
-        "id": "endOffsetMinutes",
-        "label": "Stop recording",
-        "type": "int",
-        "value": "2",
-        "hidden": false
-       },
-       {
-        "id": "onlyNewAirings",
-        "label": "Airings",
-        "type": "int",
-        "value": "1",
-        "hidden": false,
-        "enumValues": "0:New and Repeat Airings|1:New Airings Only"
-       },
-       {
-        "id": "minVideoQuality",
-        "label": "Resolution",
-        "type": "int",
-        "value": "0",
-        "hidden": false,
-        "enumValues": "0:Prefer HD|720:HD Only|1080:Full HD Only"
-       },
-       {
-        "id": "oneShot",
-        "label": "",
-        "type": "bool",
-        "value": "false",
-        "hidden": true
-       }
+       {"id": "lineupChannel", "label": "Channel", "type": "text", "value": "", "default": "", "hidden": false},
+       {"id": "startOffsetMinutes", "label": "Start recording", "type": "int", "value": "1", "default": "1", "hidden": false},
+       {"id": "endOffsetMinutes", "label": "Stop recording", "type": "int", "value": "2", "default": "2", "hidden": false},
+       {"id": "onlyNewAirings", "label": "Airings", "type": "int", "value": "1", "default": "1", "hidden": false, "enumValues": "0:New and Repeat Airings|1:New Airings Only"},
+       {"id": "minVideoQuality", "label": "Resolution", "type": "int", "value": "0", "default": "0", "hidden": false, "enumValues": "0:Prefer HD|720:HD Only|1080:Full HD Only"},
+       {"id": "replaceLowerQuality", "label": "Replace lower quality", "type": "bool", "value": "false", "default": "false", "hidden": false},
+       {"id": "recordPartials", "label": "Record partial airings", "type": "bool", "value": "false", "default": "false", "hidden": false},
+       {"id": "autoDeletionItemPolicyUnwatchedLibrary", "label": "Keep", "type": "int", "value": "0", "default": "0", "hidden": false, "enumValues": "0:All episodes|1:Latest episode|3:Latest 3 episodes|5:Latest 5 episodes|-7:Past 7 days|-30:Past 30 days"},
+       {"id": "autoDeletionItemPolicyWatchedLibrary", "label": "Delete after watching", "type": "int", "value": "0", "default": "0", "hidden": false, "enumValues": "0:Never|1:After a day|7:After a week|100:On next refresh"},
+       {"id": "comskipEnabled", "label": "Commercials", "type": "bool", "value": "false", "default": "false", "hidden": false},
+       {"id": "comskipMethod", "label": "Commercial method", "type": "int", "value": "0", "default": "0", "hidden": false, "enumValues": "0:Detect only|1:Remove commercials"},
+       {"id": "oneShot", "label": "", "type": "bool", "value": "false", "default": "false", "hidden": true}
       ]
      }
     ]
