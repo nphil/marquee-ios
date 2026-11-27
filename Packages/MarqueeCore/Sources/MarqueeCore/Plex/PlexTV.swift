@@ -139,7 +139,7 @@ public struct PlexTV: Sendable {
     /// those friends share, in that order and otherwise as plex.tv lists them.
     public func servers() async throws -> [PlexServer] {
         let query = ["includeHttps": "1", "includeRelay": "1", "includeIPv6": "1"]
-        var directory = request(.get, "/api/v2/resources", query)
+        var directory = request(.get, "/api/v2/resources", query, base: URL(string: "https://clients.plex.tv")!)
         directory.headers["Cache-Control"] = "no-cache"
         directory.restrictToOrigin = true
         var servers: [PlexServer]
@@ -185,9 +185,9 @@ public struct PlexTV: Sendable {
         return token
     }
 
-    private func request(_ method: HTTPMethod, _ path: String, _ query: [String: String] = [:]) -> PlexRequest {
+    private func request(_ method: HTTPMethod, _ path: String, _ query: [String: String] = [:], base: URL = Self.base) -> PlexRequest {
         let items = query.sorted { $0.key < $1.key }.map { URLQueryItem(name: $0.key, value: $0.value) }
-        return PlexRequest(method: method, url: PlexURL.make(base: Self.base, path: path, query: items)!)
+        return PlexRequest(method: method, url: PlexURL.make(base: base, path: path, query: items)!)
     }
 }
 

@@ -91,6 +91,26 @@ struct PlexTVTests {
         #expect(servers.map(\.id) == ["own", "home", "friend"])
     }
 
+    @Test func freshSignInDiscoversServerWithTheNewCredential() async throws {
+        let transport = FakeTransport { request, _ in
+            switch (request.url.host, request.url.path) {
+            case ("plex.tv", "/api/v2/pins"):
+                return json(["id": 17, "code": "approved"])
+            case ("plex.tv", "/api/v2/pins/17"):
+                return json(["id": 17, "code": "approved", "authToken": "new-account-token"])
+            case ("clients.plex.tv", "/api/v2/resources") where request.headers[PlexHeader.token] == "new-account-token":
+                return json([["provides": "server", "clientIdentifier": "library"]])
+            default:
+                return json([], status: 404)
+            }
+        }
+        let tv = plexTV(transport)
+        let pin = try await tv.createPIN()
+        let token = try await tv.waitForToken(pin)
+        await tv.http.setToken(token)
+        #expect(try await tv.servers().map(\.id) == ["library"])
+    }
+
     #if canImport(Darwin) || canImport(FoundationXML)
     @Test func emptyDirectoryRecoversOnlyServersSharedWithThisToken() async throws {
         let xml = """
