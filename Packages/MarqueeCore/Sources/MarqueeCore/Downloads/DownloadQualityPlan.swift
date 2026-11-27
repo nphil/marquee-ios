@@ -63,7 +63,7 @@ public struct DownloadQualityPlan: Sendable, Hashable {
         let sizes = media.parts.compactMap(\.size)
         let frame = DownloadRecord.Frame(media: media, target: nil)
         let original = Option(
-            quality: .original, target: nil, basis: .original, bytes: sizes.isEmpty ? nil : Int64(sizes.reduce(0, +)),
+            quality: .original, target: nil, basis: .original, bytes: sizes.isEmpty ? nil : sizes.reduce(0, +),
             resolution: frame.map { FormatBadge.resolution(width: $0.width).rawValue }
         )
         func option(_ quality: DownloadQuality, _ target: DownloadTarget, _ basis: Option.Basis) -> Option? {

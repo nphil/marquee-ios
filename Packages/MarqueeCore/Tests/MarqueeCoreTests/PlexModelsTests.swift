@@ -3,6 +3,15 @@ import Testing
 @testable import MarqueeCore
 
 struct PlexModelsTests {
+    @Test func largeMediaPartKeepsItsByteCountWithoutOverflowingOtherFields() throws {
+        for raw in [#"5368709121"#, #""5368709121""#] {
+            let data = Data(#"{"size":\#(raw),"duration":1e38}"#.utf8)
+            let part = try JSONDecoder().decode(PlexPart.self, from: data)
+            #expect(part.size == 5_368_709_121)
+            #expect(part.duration == 0)
+        }
+    }
+
     @Test func episodeDecodesFromMixedFieldTypes() throws {
         let episode: [String: Any] = [
             "ratingKey": 5012, "key": "/library/metadata/5012", "type": "episode", "title": "Pilot",

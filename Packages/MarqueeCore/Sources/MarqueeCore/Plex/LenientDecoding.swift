@@ -11,11 +11,19 @@ extension KeyedDecodingContainer {
     }
 
     func int(_ key: Key) -> Int? {
-        if let value = try? decodeIfPresent(Int.self, forKey: key) { return value }
-        if let value = try? decodeIfPresent(Double.self, forKey: key) { return Self.integer(value) }
+        integer(Int.self, key)
+    }
+
+    func int64(_ key: Key) -> Int64? {
+        integer(Int64.self, key)
+    }
+
+    private func integer<T: FixedWidthInteger & Decodable>(_ type: T.Type, _ key: Key) -> T? {
+        if let value = try? decodeIfPresent(type, forKey: key) { return value }
+        if let value = try? decodeIfPresent(Double.self, forKey: key) { return T(exactly: value.rounded(.towardZero)) }
         if let value = try? decodeIfPresent(String.self, forKey: key) {
             let trimmed = value.trimmingCharacters(in: .whitespaces)
-            return Int(trimmed) ?? Double(trimmed).flatMap(Self.integer)
+            return T(trimmed) ?? Double(trimmed).flatMap { T(exactly: $0.rounded(.towardZero)) }
         }
         if let value = try? decodeIfPresent(Bool.self, forKey: key) { return value ? 1 : 0 }
         return nil
@@ -59,10 +67,6 @@ extension KeyedDecodingContainer {
     func tags(_ key: Key) -> [String] {
         let tags: [PlexTag] = list(key)
         return tags.compactMap(\.tag)
-    }
-
-    private static func integer(_ value: Double) -> Int? {
-        value.isFinite && abs(value) < 9.0e18 ? Int(value) : nil
     }
 }
 

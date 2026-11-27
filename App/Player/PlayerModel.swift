@@ -1512,7 +1512,7 @@ final class PlayerModel: Identifiable {
             options.sidecarSubtitles = [sidecar.sidecar]
         }
         let headers = library.authorizationHeaders()
-        let length = part.size.map(Int64.init)
+        let length = part.size
         return RemuxSession(
             sourceFactory: {
                 if source.isFileURL { return try FileRangeSource(fileURL: source) }

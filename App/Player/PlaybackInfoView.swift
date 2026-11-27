@@ -59,7 +59,7 @@ struct PlaybackInfoView: View {
                 Section("File") {
                     if let container = model.part?.container ?? media.container { row("Container", container.uppercased()) }
                     if let bitrate = media.bitrate { row("Bitrate", "\((Double(bitrate) / 1000).formatted(.number.precision(.fractionLength(1)))) Mbps") }
-                    if let size = model.part?.size { row("Size", Int64(size).formatted(.byteCount(style: .file))) }
+                    if let size = model.part?.size { row("Size", size.formatted(.byteCount(style: .file))) }
                 }
                 .listRowBackground(theme.sheet)
             }

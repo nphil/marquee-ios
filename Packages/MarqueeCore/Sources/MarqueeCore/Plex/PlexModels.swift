@@ -385,7 +385,7 @@ public struct PlexPart: Sendable, Hashable, Identifiable, Decodable {
     public var duration: Int
     /// Path on the server, for display only.
     public var file: String?
-    public var size: Int?
+    public var size: Int64?
     public var container: String?
     public var streams: [PlexStream]
     /// The server made scene thumbnails for the scrubber (`indexes` lists `sd`).
@@ -402,7 +402,7 @@ public struct PlexPart: Sendable, Hashable, Identifiable, Decodable {
         key = c.string(.key) ?? ""
         duration = c.int(.duration) ?? 0
         file = c.string(.file)
-        size = c.int(.size)
+        size = c.int64(.size)
         container = c.string(.container)
         streams = c.list(.streams)
         hasSceneThumbnails = c.string(.indexes)?.split(separator: ",").contains("sd") ?? false

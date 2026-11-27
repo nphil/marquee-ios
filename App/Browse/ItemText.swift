@@ -156,7 +156,7 @@ extension PlexMedia {
     var versionLabel: String {
         let picture = [resolution, dynamicRange].compactMap(\.self).joined(separator: " ")
         let bytes = parts.compactMap(\.size).reduce(0, +)
-        let size = bytes > 0 ? Int64(bytes).formatted(.byteCount(style: .file)) : nil
+        let size = bytes > 0 ? bytes.formatted(.byteCount(style: .file)) : nil
         let label = [picture.isEmpty ? nil : picture, size].compactMap(\.self).joined(separator: " · ")
         return label.isEmpty ? (container?.uppercased() ?? "Version") : label
     }

@@ -167,7 +167,7 @@ enum PlayerStats {
         let file = [
             (model.part?.container ?? model.media?.container)?.uppercased(),
             model.media?.bitrate.map { mbps(Double($0) * 1000) },
-            model.part?.size.map { Int64($0).formatted(.byteCount(style: .file)) },
+            model.part?.size.map { $0.formatted(.byteCount(style: .file)) },
         ].compactMap { $0 }
         if !file.isEmpty {
             lines.append(Line("File", file.joined(separator: " · ")))
