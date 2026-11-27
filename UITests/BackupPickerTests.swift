@@ -10,11 +10,12 @@ final class BackupPickerTests: XCTestCase {
 
         let save = app.buttons["Save"].firstMatch
         XCTAssertTrue(save.waitForExistence(timeout: 20))
-        let name = "Marquee Restore Test \(UUID().uuidString.prefix(8))"
-        let field = app.textFields.firstMatch
-        XCTAssertTrue(field.exists)
-        field.tap()
-        field.typeText(name)
+        // Files can save under the suggested name without exposing an editable filename.
+        // The isolated simulator starts with an empty local Files library.
+        let date = DateFormatter()
+        date.locale = Locale(identifier: "en_US_POSIX")
+        date.dateFormat = "yyyy-MM-dd"
+        let name = "Marquee Backup \(date.string(from: .now))"
         save.tap()
 
         let restore = element("backup.restore", in: app)
