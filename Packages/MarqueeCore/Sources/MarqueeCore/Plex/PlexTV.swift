@@ -139,7 +139,27 @@ public struct PlexTV: Sendable {
     /// those friends share, in that order and otherwise as plex.tv lists them.
     public func servers() async throws -> [PlexServer] {
         let query = ["includeHttps": "1", "includeRelay": "1", "includeIPv6": "1"]
-        let servers = try await http.decode([PlexResource].self, from: request(.get, "/api/v2/resources", query)).compactMap(\.server)
+        var directory = request(.get, "/api/v2/resources", query)
+        directory.headers["Cache-Control"] = "no-cache"
+        directory.restrictToOrigin = true
+        var servers: [PlexServer]
+        #if canImport(Darwin) || canImport(FoundationXML)
+        do {
+            servers = try await http.decode([PlexResource].self, from: directory).compactMap(\.server)
+        } catch PlexError.decoding {
+            servers = []
+        } catch PlexError.server(let status, _) where (500..<600).contains(status) {
+            servers = []
+        }
+        if servers.isEmpty {
+            var alternate = request(.get, "/api/resources", query)
+            alternate.headers = ["Accept": "application/xml", "Cache-Control": "no-cache"]
+            alternate.restrictToOrigin = true
+            servers = try PlexResourceDirectory.decode(await http.send(alternate).body)
+        }
+        #else
+        servers = try await http.decode([PlexResource].self, from: directory).compactMap(\.server)
+        #endif
         return servers.enumerated()
             .sorted { ($0.element.listOrder, $0.offset) < ($1.element.listOrder, $1.offset) }
             .map(\.element)

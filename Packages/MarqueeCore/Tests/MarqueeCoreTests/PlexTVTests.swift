@@ -91,6 +91,40 @@ struct PlexTVTests {
         #expect(servers.map(\.id) == ["own", "home", "friend"])
     }
 
+    #if canImport(Darwin) || canImport(FoundationXML)
+    @Test func emptyDirectoryRecoversOnlyServersSharedWithThisToken() async throws {
+        let xml = """
+        <MediaContainer><Device name="TV" clientIdentifier="tv" provides="player"/>
+        <Device name="Shared" clientIdentifier="pms" provides="server" accessToken="server-token" sourceTitle="Owner">
+        <Connection uri="https://pms.example:32400" local="1"/></Device></MediaContainer>
+        """
+        let transport = FakeTransport { request, _ in
+            if request.url.path == "/api/v2/resources" { return json([] as [String]) }
+            guard request.url.host == "plex.tv", request.url.path == "/api/resources",
+                  request.headers[PlexHeader.token] == "profile-token", request.restrictToOrigin else { return json([], status: 401) }
+            return PlexHTTPResponse(status: 200, body: Data(xml.utf8))
+        }
+        let tv = plexTV(transport)
+        await tv.http.setToken("profile-token")
+        let servers = try await tv.servers()
+        #expect(servers.map(\.id) == ["pms"])
+        #expect(servers.first?.accessToken == "server-token")
+        #expect(servers.first?.ownerName == "Owner")
+        #expect(servers.first?.connections.first?.uri.absoluteString == "https://pms.example:32400")
+    }
+
+    @Test func directoryRefusalNeverBecomesAnEmptyServerList() async throws {
+        let denied = FakeTransport { _, _ in json([], status: 401) }
+        let tv = plexTV(denied)
+        await #expect(throws: PlexError.unauthorized) { try await tv.servers() }
+        #expect(await denied.requests(to: "/api/resources").isEmpty)
+        let malformed = plexTV(FakeTransport { request, _ in
+            request.url.path == "/api/v2/resources" ? json([] as [String]) : PlexHTTPResponse(status: 200, body: Data("<html/>".utf8))
+        })
+        await #expect(throws: PlexError.decoding("invalid Plex server directory")) { try await malformed.servers() }
+    }
+    #endif
+
     @Test func homeUserSurvivesEncoding() throws {
         let kid = try decode(PlexHomeUser.self, ["id": 9, "uuid": "u9", "title": "Kid", "thumb": "https://plex.tv/a.png", "protected": "1", "restricted": true])
 

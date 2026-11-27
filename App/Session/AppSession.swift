@@ -214,13 +214,18 @@ final class AppSession {
         guard let tv = plexTV else { return }
         do {
             let found = try await tv.servers()
+            guard !Task.isCancelled, plexTV?.http === tv.http else { return }
             storage.servers = found
             servers = found
-            if case .choosingServer = state { state = .choosingServer(found) }
+            if case .choosingServer = state { show(found) }
         } catch PlexError.unauthorized {
+            guard plexTV?.http === tv.http else { return }
             state = .failed(.unauthorized)
+        } catch is CancellationError {
+            return
         } catch {
-            // The list keeps the servers it has.
+            guard plexTV?.http === tv.http else { return }
+            if servers.isEmpty { state = .failed(error as? PlexError ?? .unreachable(.other)) }
         }
     }
 
@@ -549,7 +554,7 @@ final class AppSession {
             let found = try await tv.servers()
             let account = try? await tv.account()
             let profiles = try? await tv.homeUsers()
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled, plexTV?.http === tv.http else { return }
             storage.servers = found
             servers = found
             if let account { setUser(account, sameAccount: true) }
