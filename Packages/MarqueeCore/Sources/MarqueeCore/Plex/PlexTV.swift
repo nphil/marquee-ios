@@ -142,23 +142,40 @@ public struct PlexTV: Sendable {
         var directory = request(.get, "/api/v2/resources", query, base: URL(string: "https://clients.plex.tv")!)
         directory.headers["Cache-Control"] = "no-cache"
         directory.restrictToOrigin = true
+        func primary() async throws -> [PlexServer] {
+            let response = try await http.send(directory)
+            do {
+                let entries = try PlexJSON.decode([PlexResource].self, from: response.body)
+                let found = entries.compactMap(\.server)
+                DiagHub.emit(.plex, "discovery.json", ["status": response.status, "bytes": response.body.count,
+                             "devices": entries.count, "servers": found.count,
+                             "missingID": entries.lazy.filter(\.missingServerID).count], level: found.isEmpty ? .notice : .info)
+                return found
+            } catch {
+                DiagHub.emit(.plex, "discovery.json.invalid", ["status": response.status, "bytes": response.body.count,
+                             "reason": String(describing: error)], level: .warning)
+                throw error
+            }
+        }
         var servers: [PlexServer]
         #if canImport(Darwin) || canImport(FoundationXML)
         do {
-            servers = try await http.decode([PlexResource].self, from: directory).compactMap(\.server)
+            servers = try await primary()
         } catch PlexError.decoding {
             servers = []
         } catch PlexError.server(let status, _) where (500..<600).contains(status) {
             servers = []
         }
         if servers.isEmpty {
+            DiagHub.emit(.plex, "discovery.fallback", ["directory": "/api/resources"], level: .notice)
             var alternate = request(.get, "/api/resources", query)
             alternate.headers = ["Accept": "application/xml", "Cache-Control": "no-cache"]
             alternate.restrictToOrigin = true
-            servers = try PlexResourceDirectory.decode(await http.send(alternate).body)
+            let response = try await http.send(alternate)
+            servers = try PlexResourceDirectory.decode(response.body, status: response.status)
         }
         #else
-        servers = try await http.decode([PlexResource].self, from: directory).compactMap(\.server)
+        servers = try await primary()
         #endif
         return servers.enumerated()
             .sorted { ($0.element.listOrder, $0.offset) < ($1.element.listOrder, $1.offset) }

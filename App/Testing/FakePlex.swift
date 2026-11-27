@@ -183,6 +183,18 @@ struct FakePlexRouter {
         let path = url.path(percentEncoded: false)
         let query = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
         let method = request.httpMethod ?? "GET"
+        if UserDefaults.standard.bool(forKey: "marquee.uitest.emptyDirectory") {
+            if host == "clients.plex.tv", path == "/api/v2/resources" { return .success(json([["provides": "player"]])) }
+            if host == "plex.tv", path == "/api/resources" {
+                return .success(Reply(status: 200, body: Data("<MediaContainer/>".utf8), contentType: "application/xml"))
+            }
+            if host == "ntfy.local", query.contains(where: { $0.name == "filename" }) {
+                let report = String(decoding: Self.body(of: request) ?? Data(), as: UTF8.self)
+                guard report.contains("discovery.json"), report.contains("discovery.xml") else {
+                    return .success(json([String: String](), status: 403))
+                }
+            }
+        }
         if path == "/api/alignment/windows", prefix(for: host) == "speechdock" {
             guard let reply = Self.aligned(Self.body(of: request)) else { return .success(json([String: Any](), status: 400)) }
             return .success(json(reply))

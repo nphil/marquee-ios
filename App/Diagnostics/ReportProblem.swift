@@ -10,7 +10,7 @@ final class ReportCenter {
     static let shared = ReportCenter()
 
     enum Source: String {
-        case settings, player, button
+        case settings, player, button, discovery
     }
 
     /// The active theme and scheme, for the sheet and the floating button, which hang outside RootView.

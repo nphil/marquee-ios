@@ -87,9 +87,10 @@ public struct PlexConnection: Sendable, Hashable, Codable {
     }
 }
 
-/// One entry of `GET https://plex.tv/api/v2/resources`.
+/// One entry of the account's JSON resource directory.
 struct PlexResource: Decodable {
     let server: PlexServer?
+    let missingServerID: Bool
 
     enum CodingKeys: String, CodingKey {
         case name, clientIdentifier, accessToken, owned, home, sourceTitle, presence, httpsRequired
@@ -99,7 +100,10 @@ struct PlexResource: Decodable {
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         let provides = (c.string(.provides) ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-        guard provides.contains("server"), let identifier = c.string(.clientIdentifier) else {
+        let identifier = c.string(.clientIdentifier)
+        let isServer = provides.contains("server")
+        missingServerID = isServer && identifier == nil
+        guard isServer, let identifier else {
             server = nil
             return
         }

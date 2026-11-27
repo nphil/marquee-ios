@@ -41,12 +41,42 @@ struct ServerListView: View {
         }
         .navigationTitle("Servers")
         .toolbar {
+            if session.servers.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) { DiscoveryLogsButton() }
+            }
             if isRoot {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Sign Out") { confirmingSignOut = true }
                         .accessibilityIdentifier("servers.signOut")
                         .signOutConfirmation(isPresented: $confirmingSignOut, session: session)
                 }
+            }
+        }
+    }
+}
+
+/// Reporting must work before there is a library or a Settings tab.
+struct DiscoveryLogsButton: View {
+    @Environment(AppSession.self) private var session
+    @State private var showsReport = false
+    @State private var showsSetup = false
+
+    var body: some View {
+        Button("Send Logs") {
+            if session.diagnostics.config == nil { showsSetup = true } else { showsReport = true }
+        }
+        .accessibilityIdentifier("discovery.sendLogs")
+        .sheet(isPresented: $showsReport) {
+            ReportProblemView(screenshot: nil, source: .discovery) { showsReport = false }
+        }
+        .sheet(isPresented: $showsSetup) {
+            NavigationStack {
+                DiagnosticsView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Done") { showsSetup = false }
+                        }
+                    }
             }
         }
     }

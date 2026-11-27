@@ -4,6 +4,18 @@ import XCTest
 /// up, the floating report button over Settings, and Report a Problem from it, sent. In Rosé Pine.
 final class DiagnosticsScreenshotTests: XCTestCase {
     @MainActor
+    func testSendDiscoveryLogBeforeChoosingAServer() throws {
+        let app = launch(matchSystem: false, fixedMode: "dark", dark: "rose-pine",
+                         arguments: ["-marquee.fakeServerList", "YES", "-marquee.uitest.emptyDirectory", "YES",
+                                     "-marquee.uitest.ntfy", "https://ntfy.local"], waitingFor: "Servers")
+        XCTAssertTrue(app.staticTexts["No servers found"].waitForExistence(timeout: 10))
+        try snap("servers-empty-send-logs")
+        tap("discovery.sendLogs", in: app)
+        tap("report.send", in: app)
+        XCTAssertTrue(label(containing: "with the log attached", in: app).waitForExistence(timeout: 15))
+    }
+
+    @MainActor
     func testDiagnosticLogsAndReport() throws {
         let app = try diagnosticsSetUp(mode: "dark", suffix: "rose-pine")
         flip("diagnostics.button", in: app)

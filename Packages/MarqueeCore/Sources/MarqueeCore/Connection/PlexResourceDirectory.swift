@@ -10,15 +10,23 @@ final class PlexResourceDirectory: NSObject, XMLParserDelegate {
     private var depth = 0
     private var current: PlexServer?
     private var servers: [PlexServer] = []
+    private var devices = 0
+    private var missingID = 0
 
-    static func decode(_ data: Data) throws -> [PlexServer] {
+    static func decode(_ data: Data, status: Int) throws -> [PlexServer] {
         let directory = PlexResourceDirectory()
         let parser = XMLParser(data: data)
         parser.delegate = directory
         parser.shouldResolveExternalEntities = false
         guard parser.parse(), parser.parserError == nil, directory.root == "MediaContainer" else {
+            DiagHub.emit(.plex, "discovery.xml.invalid", ["status": status, "bytes": data.count,
+                         "parserCode": (parser.parserError as NSError?)?.code, "line": parser.lineNumber,
+                         "expectedRoot": directory.root == "MediaContainer"], level: .warning)
             throw PlexError.decoding("invalid Plex server directory")
         }
+        DiagHub.emit(.plex, "discovery.xml", ["status": status, "bytes": data.count, "devices": directory.devices,
+                     "servers": directory.servers.count, "missingID": directory.missingID],
+                     level: directory.servers.isEmpty ? .notice : .info)
         return directory.servers
     }
 
@@ -26,8 +34,10 @@ final class PlexResourceDirectory: NSObject, XMLParserDelegate {
         depth += 1
         if depth == 1 { root = element; return }
         func flag(_ key: String) -> Bool { a[key] == "1" || a[key]?.lowercased() == "true" }
-        if depth == 2, element == "Device", let id = a["clientIdentifier"], !id.isEmpty,
-           a["provides"]?.split(separator: ",").contains(where: { $0.trimmingCharacters(in: .whitespaces) == "server" }) == true {
+        if depth == 2, element == "Device" {
+            devices += 1
+            guard a["provides"]?.split(separator: ",").contains(where: { $0.trimmingCharacters(in: .whitespaces) == "server" }) == true else { return }
+            guard let id = a["clientIdentifier"], !id.isEmpty else { missingID += 1; return }
             current = PlexServer(name: a["name"] ?? id, clientIdentifier: id, accessToken: a["accessToken"], isOwned: flag("owned"),
                                  isHome: flag("home"), ownerName: a["sourceTitle"], isPresent: flag("presence"), httpsRequired: flag("httpsRequired"),
                                  productVersion: a["productVersion"], connections: [])

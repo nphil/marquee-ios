@@ -49,6 +49,7 @@ struct SignInView: View {
             }
         case .failed(let error):
             failure(error)
+            DiscoveryLogsButton()
         default:
             signInButtons
         }
