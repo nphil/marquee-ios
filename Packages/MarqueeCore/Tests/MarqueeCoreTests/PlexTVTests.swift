@@ -91,6 +91,26 @@ struct PlexTVTests {
         #expect(servers.map(\.id) == ["own", "home", "friend"])
     }
 
+    @Test func serverThatPlexListsAsAControllerStillOpensItsLibrary() async throws {
+        let entry: [String: Any] = ["product": "Plex Media Server", "provides": "controller", "owned": true,
+                                    "clientIdentifier": "machine", "accessToken": "library-key",
+                                    "connections": [["uri": "https://home.example:32400", "local": false]]]
+        let directory = json([entry, ["product": "Plex for iOS", "provides": "controller", "clientIdentifier": "phone"]])
+        let transport = FakeTransport { request, _ in
+            switch (request.url.host, request.url.path) {
+            case ("clients.plex.tv", "/api/v2/resources"): return directory
+            case ("home.example", "/identity"): return json(["MediaContainer": ["machineIdentifier": "machine"]])
+            case ("home.example", "/library/sections") where request.headers[PlexHeader.token] == "library-key":
+                return json(["MediaContainer": ["Directory": [["key": "1", "title": "Movies", "type": "movie"]]]])
+            default: return json([], status: 403)
+            }
+        }
+        let found = try await plexTV(transport).servers()
+        #expect(found.map(\.id) == ["machine"])
+        let library = PlexLibrary(server: try #require(found.first), identity: testIdentity, transport: transport)
+        #expect(try await library.sections().map(\.title) == ["Movies"])
+    }
+
     @Test func freshSignInDiscoversServerWithTheNewCredential() async throws {
         let transport = FakeTransport { request, _ in
             switch (request.url.host, request.url.path) {

@@ -94,14 +94,14 @@ struct PlexResource: Decodable {
 
     enum CodingKeys: String, CodingKey {
         case name, clientIdentifier, accessToken, owned, home, sourceTitle, presence, httpsRequired
-        case productVersion, provides, connections
+        case product, productVersion, provides, connections
     }
 
     init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        let provides = (c.string(.provides) ?? "").split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-        let identifier = c.string(.clientIdentifier)
-        let isServer = provides.contains("server")
+        let provides = c.string(.provides).map { $0.components(separatedBy: ",") } ?? c.list(.provides) as [String]
+        let identifier = c.string(.clientIdentifier).flatMap { $0.isEmpty ? nil : $0 }
+        let isServer = Self.identifiesServer(product: c.string(.product), capabilities: provides)
         missingServerID = isServer && identifier == nil
         guard isServer, let identifier else {
             server = nil
@@ -120,6 +120,12 @@ struct PlexResource: Decodable {
             productVersion: c.string(.productVersion),
             connections: connections.compactMap(\.connection)
         )
+    }
+
+    // Plex can list a claimed, online PMS as product "Plex Media Server" with only "controller" in provides.
+    static func identifiesServer(product: String?, capabilities: [String]) -> Bool {
+        product?.caseInsensitiveCompare("Plex Media Server") == .orderedSame ||
+            capabilities.contains { $0.trimmingCharacters(in: .whitespacesAndNewlines).caseInsensitiveCompare("server") == .orderedSame }
     }
 }
 

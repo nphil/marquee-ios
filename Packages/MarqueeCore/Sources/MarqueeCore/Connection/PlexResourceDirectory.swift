@@ -36,7 +36,7 @@ final class PlexResourceDirectory: NSObject, XMLParserDelegate {
         func flag(_ key: String) -> Bool { a[key] == "1" || a[key]?.lowercased() == "true" }
         if depth == 2, element == "Device" {
             devices += 1
-            guard a["provides"]?.split(separator: ",").contains(where: { $0.trimmingCharacters(in: .whitespaces) == "server" }) == true else { return }
+            guard PlexResource.identifiesServer(product: a["product"], capabilities: a["provides"]?.components(separatedBy: ",") ?? []) else { return }
             guard let id = a["clientIdentifier"], !id.isEmpty else { missingID += 1; return }
             current = PlexServer(name: a["name"] ?? id, clientIdentifier: id, accessToken: a["accessToken"], isOwned: flag("owned"),
                                  isHome: flag("home"), ownerName: a["sourceTitle"], isPresent: flag("presence"), httpsRequired: flag("httpsRequired"),
