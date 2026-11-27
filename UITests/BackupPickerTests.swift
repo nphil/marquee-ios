@@ -22,7 +22,16 @@ final class BackupPickerTests: XCTestCase {
         XCTAssertTrue(restore.waitForExistence(timeout: 10))
         restore.tap()
         let document = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", name)).firstMatch
-        if !document.waitForExistence(timeout: 5), app.buttons["Recents"].exists { app.buttons["Recents"].tap() }
+        if !document.waitForExistence(timeout: 5) {
+            // Saving does not open the document. A fresh Files simulator therefore has no Recents.
+            let browse = app.buttons["Browse"].firstMatch
+            XCTAssertTrue(browse.waitForExistence(timeout: 15))
+            browse.tap()
+            if !document.waitForExistence(timeout: 5) {
+                let location = app.cells.containing(NSPredicate(format: "label CONTAINS[c] %@", "On My iPhone")).firstMatch
+                if location.isHittable { location.tap() }
+            }
+        }
         XCTAssertTrue(document.waitForExistence(timeout: 15), "Files must offer the exported backup for restore")
         document.tap()
         if app.buttons["Open"].isHittable { app.buttons["Open"].tap() }
