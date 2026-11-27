@@ -24,6 +24,14 @@ final class FilePicker: NSObject, UIDocumentPickerDelegate {
         }
     }
 
+    /// A one-time restore needs a readable copy, not ongoing access to the original. Cloud providers can
+    /// label an encrypted backup as generic data; Backup.inspect validates the actual contents.
+    static func importBackup(_ finish: @escaping (Result<URL, any Error>) -> Void) {
+        present(kind: "restore", leftover: nil, finish: finish) {
+            UIDocumentPickerViewController(forOpeningContentTypes: [.data], asCopy: true)
+        }
+    }
+
     /// Lets the person pick where `file` is saved; the file moves there and the picker returns its new URL.
     static func save(_ file: URL, _ finish: @escaping (Result<URL, any Error>) -> Void) {
         present(kind: "save", leftover: file, finish: finish) {
@@ -63,7 +71,16 @@ final class FilePicker: NSObject, UIDocumentPickerDelegate {
         Self.current = nil
         Diag.event(.app, "backup.file", ["state": "picked", "kind": kind, "count": urls.count], .notice)
         if let url = urls.first {
-            finish(.success(url))
+            // The restore review is another sheet. Present it only after Files has left the screen.
+            if kind == "restore", controller.presentingViewController != nil {
+                if controller.isBeingDismissed, let transition = controller.transitionCoordinator,
+                   transition.animate(alongsideTransition: nil, completion: { [finish] _ in finish(.success(url)) }) {
+                    return
+                }
+                controller.dismiss(animated: true) { [finish] in finish(.success(url)) }
+            } else {
+                finish(.success(url))
+            }
         } else {
             discardLeftover()
             finish(.failure(CocoaError(.fileNoSuchFile)))

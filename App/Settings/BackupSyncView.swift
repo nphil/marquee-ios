@@ -8,7 +8,6 @@ struct BackupSyncView: View {
     @Environment(AppSession.self) private var session
     @Environment(\.theme) private var theme
     @Environment(ThemeStore.self) private var store
-    @State private var choosingBackup = false
     @State private var editingPassphrase = false
     @State private var confirmsRemoval = false
 
@@ -22,7 +21,12 @@ struct BackupSyncView: View {
         .themedList(theme)
         .navigationTitle("Backup & Sync")
         .navigationBarTitleDisplayMode(.inline)
-        .background { pickers(center) }
+        .fileExporter(
+            isPresented: Binding(get: { center.exportRequest != nil }, set: { if !$0 { center.exportRequest = nil } }),
+            document: center.exportRequest?.document,
+            contentType: .marqueeBackup,
+            defaultFilename: center.exportRequest?.name
+        ) { center.exported($0) }
         .sheet(isPresented: $editingPassphrase) {
             PassphraseSheet()
                 .preferredColorScheme(store.presentationScheme(for: theme))
@@ -56,7 +60,7 @@ struct BackupSyncView: View {
             }
             .disabled(!enabled)
             .accessibilityIdentifier("backup.now")
-            Button("Restore from Backup…") { choosingBackup = true }
+            Button("Restore from Backup…") { FilePicker.importBackup(center.restore(from:)) }
                 .disabled(!enabled)
                 .accessibilityIdentifier("backup.restore")
             LabeledContent("Last Backup") {
@@ -180,24 +184,6 @@ struct BackupSyncView: View {
             }
         }
         .listRowBackground(theme.sheet)
-    }
-
-    // MARK: Pickers
-
-    /// The system pickers hang off empty leaves, one each, so none of them waits on another to close.
-    private func pickers(_ center: BackupCenter) -> some View {
-        ZStack {
-            Color.clear
-                .fileExporter(
-                    isPresented: Binding(get: { center.exportRequest != nil }, set: { if !$0 { center.exportRequest = nil } }),
-                    document: center.exportRequest?.document,
-                    contentType: .marqueeBackup,
-                    defaultFilename: center.exportRequest?.name
-                ) { center.exported($0) }
-            Color.clear
-                .fileImporter(isPresented: $choosingBackup, allowedContentTypes: [.marqueeBackup]) { center.restore(from: $0) }
-        }
-        .accessibilityHidden(true)
     }
 }
 
